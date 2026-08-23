@@ -17,6 +17,10 @@
 
 <br/>
 
+**[简体中文](README.md)** • **[English](README_EN.md)**
+
+<br/>
+
 [🚀 快速开始](#download) • [✨ 核心特性](#features) • [🎨 视觉定制](#visuals) • [🌐 多语言](#i18n) • [🛠️ 开发者指南](#build) • [💡 开发致谢](#acknowledgements) • [📋 更新日志](CHANGELOG.md)
 
 </div>
