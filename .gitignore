@@ -1,0 +1,46 @@
+# Visual Studio & .NET Build Artifacts
+**/[Bb]in/
+**/[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+# Executables, Assemblies & Release Binaries
+*.exe
+*.dll
+*.pdb
+*.zip
+releases/**/bin/
+releases/**/StarPie-*-Standalone-*/
+releases/**/StarPie-*-Lightweight/
+
+# Python & Test Artifacts
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+test_env_appdata/
+artifacts/
+
+# Large Third-Party Installers & Runtime Packages
+windowsdesktop-runtime-*.exe
+*.iso
+*.msi
+
+# Temporary & Working Files
+*.tmp
+*.log
+.tolaria-rename-txn/
+
+# OS Specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+
