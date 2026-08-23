@@ -2,10 +2,10 @@
 
 <img src="assets/logo.png" width="128" height="128" alt="StarPie Logo" />
 
-# StarPie (星芒轮盘)
+# StarPie (星盘)
 
-### 现代化 Windows 鼠标轮盘笔势与极速生产力增强系统
-**Next-Generation Radial Pie Menu & Mouse Gestures for Windows 10 / 11**
+### 极简 · 轻量 · 极速 现代化 Windows 鼠标轮盘笔势系统
+**Ultra-Lightweight, Blazing-Fast & Elegant Radial Pie Menu for Windows 10 / 11**
 
 [![Release Version](https://img.shields.io/badge/Release-v1.3.8-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D4.svg?style=flat-square&logo=windows)](https://microsoft.com/windows)
@@ -24,20 +24,30 @@
 
 ## <a id="intro"></a>📖 简介 (Introduction)
 
-**StarPie (星芒轮盘)** 是一款专为 Windows 10 / 11 打造的**高性能、高颜值、低延迟**现代鼠标轮盘手势（Radial / Pie Menu）系统。
+**StarPie (星盘)** 是一款专为 Windows 10 / 11 打造的**极致轻量、超低开销、毫秒级响应、高颜值**现代鼠标轮盘手势（Radial / Pie Menu）生产力工具。
 
 在任意桌面或应用程序中，只需**按住鼠标右键轻轻滑动**，即可在光标所在位置瞬间呼出 60FPS 丝滑液态轮盘。配合 4/8/12 方位动作映射、多程序专属配置（Per-App Profiles）、快捷键录制、程序极速启动与全光谱发光特效，将重复冗长的操作化为指尖瞬时的肌肉记忆。
 
-> 🟢 **免安装即开即用**：提供独立单文件版（`StarPie.exe`），内置 .NET 8 运行时，下载双击即可直接运行，无需安装任何额外依赖！
+> 🪶 **极致轻量无负担 (Ultra-Lightweight)**：
+> - **🍃 3~5 MB 极低内存常驻**：原生 C# WPF 构建，无 Electron 臃肿内核，内置工作集内存优化引擎，常驻后台近乎零占用；
+> - **⚡ < 2ms 毫秒级极速响应**：基于 Win32 `WH_MOUSE_LL` 底层事件流，轻量无感，告别输入延迟；
+> - **🟢 0 依赖免安装单文件**：提供独立单文件版（`StarPie.exe`），内置 .NET 8 运行时，双击即开即用，无需配置任何外部依赖！
 
 ---
 
 ## <a id="features"></a>✨ 核心功能亮点 (Key Features)
 
-### 1. ⚡ 极速低级鼠标钩子与毫秒级触发
-- 基于 Windows Win32 `WH_MOUSE_LL` 低级钩子架构，输入延迟低于 **2ms**，轻量无感；
-- 自动心跳守护与自愈恢复机制，杜绝钩子被系统超时释放导致的失效；
-- 智能识别普通右键点击与滑动笔势手势，完全不影响原生右键菜单正常弹出。
+### 1. 🪶 极致轻量架构与 3~5MB 内存守护
+- **拒绝臃肿**：采用高性能原生 C# 与底层 Win32 API 打造，彻底告别基于 Chromium/Electron 带来的数百兆内存与资源消耗；
+- **智能内存修剪**：轮盘窗口收起后自动调度工作集压缩回收，后台常驻内存仅 **3 ~ 5 MB**，轻薄本与老旧设备也能全天候丝滑无感常驻；
+- **绿色便携**：所有配置采用本地 `config.json` 存储，无流氓服务与后台驻留守护进程，解压即用，随拷随走。
+
+---
+
+### 2. ⚡ 毫秒级极速唤醒与低级鼠标钩子
+- 基于 Windows Win32 `WH_MOUSE_LL` 低级鼠标钩子，输入捕获延迟低于 **2ms**；
+- 自动心跳巡检与自愈恢复机制，杜绝钩子被系统异常释放导致的偶发失效；
+- 智能区分普通右键单击与划动笔势，完全不影响原生右键菜单正常弹出。
 
 <div align="center">
   <img src="attachments/1787481575418-2026-08-23_05-38-41.gif" width="680" alt="毫秒级极速呼出演示" />
@@ -47,7 +57,7 @@
 
 ---
 
-### <a id="visuals"></a>2. 🎨 4 大几何形态与 7 套精美预设主题
+### <a id="visuals"></a>3. 🎨 4 大几何形态与 7 套精美预设主题
 - **4 大几何形态**：
   - **经典紧凑扇区 (Original)**：经典紧凑，手感稳定；
   - **独立悬浮圆形 (Circle)**：灵动悬浮，视野通透；
@@ -63,7 +73,7 @@
 
 ---
 
-### 3. 🌈 8 种高亮边缘发光光晕 (Highlight Glow)
+### 4. 🌈 8 种高亮边缘发光光晕 (Highlight Glow)
 - **多光谱发光特效**：
   - 支持 **丁香晶紫**、**冰川湛蓝**、**翡翠荧绿**、**樱花粉晕**、**琥珀金光**、**珊瑚赤光**、**冰魄纯白** 等预设光晕；
   - 支持全调色盘自定义颜色与屏幕吸色；
@@ -75,7 +85,7 @@
 
 ---
 
-### 4. 🖼️ 中心核圆图案与本地图片贴图 (Core Pattern & Custom Image)
+### 5. 🖼️ 中心核圆图案与本地图片贴图 (Core Pattern & Custom Image)
 - **多样矢量图案**：内置十字准心、Windows 徽标、靶心圆点、快捷主页、电源开关、罗盘、萌宠猫爪等矢量图案；
 - **自定义本地贴图**：支持一键导入任意本地图片（PNG/JPG/WebP/ICO/GIF）作为中心核圆专属图案，并支持独立显示开关与尺寸自适应。
 
@@ -85,7 +95,7 @@
 
 ---
 
-### 5. 🎯 4 / 8 / 12 键多向方位自适应 (Dynamic Sector Adaptation)
+### 6. 🎯 4 / 8 / 12 键多向方位自适应 (Dynamic Sector Adaptation)
 - **4 键十字方位 (Cross 4)**：上下左右大角度盲操，误触率为 0；
 - **8 键全向方位 (Standard 8)**：经典 8 向均衡布局（默认推荐）；
 - **12 键钟表方位 (Clock 12)**：高密度功能映射，适合重度生产力用户。
@@ -96,7 +106,7 @@
 
 ---
 
-### 6. 💼 多程序专属方案与智能检索高清图标 (Per-App Profiles & Scanner)
+### 7. 💼 多程序专属方案与智能检索高清图标 (Per-App Profiles & Scanner)
 - **多程序专属方案自动匹配**：
   - 为 Chrome、VS Code、Photoshop、Word、CAD 等不同软件自动匹配专属轮盘与动作快捷键；
 - **全新智能应用程序检索**：
@@ -110,7 +120,7 @@
 
 ---
 
-### 7. 🛡️ 场景隔离与全屏游戏防误触 (Gaming & Blacklist Isolation)
+### 8. 🛡️ 场景隔离与全屏游戏防误触 (Gaming & Blacklist Isolation)
 - **全屏与游戏智能放行**：
   - 智能检测全屏独占应用与 3D 游戏，自动放行原生右键；
 - **修饰键与黑名单穿透**：
@@ -123,18 +133,13 @@
 
 ---
 
-### 8. 🌐 四国多语言即时热切换 (Multi-Language i18n)
+### 9. 🌐 四国多语言即时热切换 (Multi-Language i18n)
 - 原生内置 **简体中文 (zh-CN)**、**繁體中文 (zh-TW)**、**English (en)**、**日本語 (ja)** 与 **跟随系统 (System Default)** 五种语言模式；
 - 在设置页切换即时热刷新，免重启立即生效。
 
 <div align="center">
   <img src="attachments/1787484707963-2026-08-23_06-31-34.gif" width="680" alt="四国多语言热切换演示" />
 </div>
-
----
-
-### 9. 🚀 极致轻量内存管理 (Memory Optimization)
-- 内置专用工作集内存优化引擎，常驻后台内存仅 **3 ~ 5 MB**，轻量无感，告别资源占用焦虑。
 
 ---
 
