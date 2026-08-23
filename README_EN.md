@@ -253,7 +253,20 @@ StarPie/
 
 ---
 
-## <a id="acknowledgements"></a>💡 Acknowledgements & Maintenance
+## <a id="acknowledgements"></a>💡 Developer Story, Acknowledgements & Maintenance
+
+### 🌟 Inspiration & Developer Story
+> **"Bringing the tactile, fluid flick of industrial CAD modeling straight to everyone's everyday desktop."**
+>
+> As a student majoring in **Mechanical Design, Manufacturing & Automation**, I spend a significant amount of time in **SolidWorks** for 3D modeling and engineering drafting. The intuitive, high-efficiency mouse gesture radial wheel in SolidWorks has long been an indispensable part of my muscle memory.
+>
+> When I discovered the immense potential of modern **AI Agents**, a compelling idea sparked: **What if we could bring this proven, tactile radial gesture interaction from professional CAD suites to the entire Windows operating system as a universal productivity powerhouse?** To many people, gestures might feel completely fresh and novel; being able to deliver that delightful sense of fluidity and novelty to everyday users brings me immense joy.
+>
+> While alternative pie menu tools exist on GitHub, StarPie represents my distinct vision—combining **ultra-low footprint (3~5MB resident memory)**, **adaptive geometric forms**, **sub-2ms self-healing low-level hooks**, and **zero-dependency single-file portability**.
+>
+> Between academic coursework and engineering competitions, the project was developed iteratively over roughly one intensive week of human-AI collaboration. While there may still be rough edges or areas for expansion, StarPie represents my genuine, heartfelt dedication—**every feature landed, every subtle bug squashed, every millisecond shaved, and every UI pixel refined has brought me incomparable joy**.
+>
+> Please forgive any initial rough spots. If you encounter bugs or have inspiring ideas, feel free to open a **Bug Report**, suggest a **Feature Request**, or submit a **Pull Request**! As time and energy permit alongside my studies and career pursuit, I will continue to pour my heart into polishing and refining StarPie.
 
 ### 🤖 Human-AI Co-Creation (Co-Authored with AI Agent)
 StarPie was architected, designed, and tuned by the human developer in close collaboration with the advanced AI coding agent (**AI Agent - Antigravity**):
