@@ -13,10 +13,11 @@
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-15%2F15%20Passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Language](https://img.shields.io/badge/Language-zh--CN%20%7C%20zh--TW%20%7C%20en%20%7C%20ja-8B5CF6.svg?style=flat-square)](#i18n)
+[![Co-Authored](https://img.shields.io/badge/Co--Authored%20with-AI%20Agent-6366F1.svg?style=flat-square&logo=openai)](#acknowledgements)
 
 <br/>
 
-[🚀 快速开始](#download) • [✨ 核心特性](#features) • [🎨 视觉定制](#visuals) • [🌐 多语言](#i18n) • [🛠️ 开发者指南](#build) • [📋 更新日志](CHANGELOG.md)
+[🚀 快速开始](#download) • [✨ 核心特性](#features) • [🎨 视觉定制](#visuals) • [🌐 多语言](#i18n) • [🛠️ 开发者指南](#build) • [💡 开发致谢](#acknowledgements) • [📋 更新日志](CHANGELOG.md)
 
 </div>
 
@@ -29,7 +30,7 @@
 在任意桌面或应用程序中，只需**按住鼠标右键轻轻滑动**，即可在光标所在位置瞬间呼出 60FPS 丝滑液态轮盘。配合 4/8/12 方位动作映射、多程序专属配置（Per-App Profiles）、快捷键录制、程序极速启动与全光谱发光特效，将重复冗长的操作化为指尖瞬时的肌肉记忆。
 
 > 🪶 **极致轻量无负担 (Ultra-Lightweight)**：
-> - **🍃 3~5 MB 极低内存常驻**：原生 C# WPF 构建，无 Electron 臃肿内核，内置工作集内存优化引擎，常驻后台近乎零占用；
+> - **🍃 3 ～ 5 MB 极低内存常驻**：原生 C# WPF 构建，无 Electron 臃肿内核，内置工作集内存优化引擎，常驻后台近乎零占用；
 > - **⚡ < 2ms 毫秒级极速响应**：基于 Win32 `WH_MOUSE_LL` 底层事件流，轻量无感，告别输入延迟；
 > - **🟢 0 依赖免安装单文件**：提供独立单文件版（`StarPie.exe`），内置 .NET 8 运行时，双击即开即用，无需配置任何外部依赖！
 
@@ -37,9 +38,9 @@
 
 ## <a id="features"></a>✨ 核心功能亮点 (Key Features)
 
-### 1. 🪶 极致轻量架构与 3~5MB 内存守护
+### 1. 🪶 极致轻量架构与 3 ～ 5MB 内存守护
 - **拒绝臃肿**：采用高性能原生 C# 与底层 Win32 API 打造，彻底告别基于 Chromium/Electron 带来的数百兆内存与资源消耗；
-- **智能内存修剪**：轮盘窗口收起后自动调度工作集压缩回收，后台常驻内存仅 **3 ~ 5 MB**，轻薄本与老旧设备也能全天候丝滑无感常驻；
+- **智能内存修剪**：轮盘窗口收起后自动调度工作集压缩回收，后台常驻内存仅 **3 ～ 5 MB**，轻薄本与老旧设备也能全天候丝滑无感常驻；
 - **绿色便携**：所有配置采用本地 `config.json` 存储，无流氓服务与后台驻留守护进程，解压即用，随拷随走。
 
 ---
@@ -77,7 +78,7 @@
 - **多光谱发光特效**：
   - 支持 **丁香晶紫**、**冰川湛蓝**、**翡翠荧绿**、**樱花粉晕**、**琥珀金光**、**珊瑚赤光**、**冰魄纯白** 等预设光晕；
   - 支持全调色盘自定义颜色与屏幕吸色；
-  - 发光弥散半径（8~48px）与不透明度（0~100%）自由平滑微调。
+  - 发光弥散半径（8 ～ 48px）与不透明度（0% ～ 100%）自由平滑微调。
 
 <div align="center">
   <img src="attachments/1787483334642-2026-08-23_06-07-59.gif" width="680" alt="高亮光晕自定义调节演示" />
@@ -244,6 +245,19 @@ StarPie/
 ├── LICENSE                    # MIT 开源许可证
 └── README.md                  # 项目说明主文档
 ```
+
+---
+
+## <a id="acknowledgements"></a>💡 开发致谢与维护声明 (Acknowledgements & Maintenance)
+
+### 🤖 人机协同工程实践 (Co-Authored with AI Agent)
+本项目由开发者主导架构设计、产品交互原型与核心系统调优，并与先进 AI 编程智能体（**AI Agent - Antigravity**）深度协作完成：
+- **研发范式**：全流程践行**规格驱动开发 (SDD)** 与 **测试驱动开发 (TDD)**，通过 15 项端到端 GUI 自动化测试实现严苛的质量保障；
+- **分工边界**：由人类开发者把控 Windows 交互直觉、Win32 钩子安全边界与多语言术语，AI Agent 协同加速模块化代码构建、多版本重构与极限场景回归测试。
+
+### 📌 阶段性维护说明 (Maintenance Notice)
+- **当前状态**：StarPie v1.3.8 核心功能已完整实现并经过真机全面验证（**Feature-Complete & Production-Ready**），可直接作为生产力日常主力工具使用；
+- **后续规划**：近期开发者因**学业深造与求职事务**，版本迭代节奏将转为阶段性维护模式。欢迎社区伙伴提交 Issue 与 Pull Request 共同完善！
 
 ---
 
