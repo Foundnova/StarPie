@@ -256,17 +256,15 @@ StarPie/
 ## <a id="acknowledgements"></a>💡 Developer Story, Acknowledgements & Maintenance
 
 ### 🌟 Inspiration & Developer Story
-> **"Bringing the tactile, fluid flick of industrial CAD modeling straight to everyone's everyday desktop."**
->
-> As a student majoring in **Mechanical Design, Manufacturing & Automation**, I spend a significant amount of time in **SolidWorks** for 3D modeling and engineering drafting. The intuitive, high-efficiency mouse gesture radial wheel in SolidWorks has long been an indispensable part of my muscle memory.
->
-> When I discovered the immense potential of modern **AI Agents**, a compelling idea sparked: **What if we could bring this proven, tactile radial gesture interaction from professional CAD suites to the entire Windows operating system as a universal productivity powerhouse?** To many people, gestures might feel completely fresh and novel; being able to deliver that delightful sense of fluidity and novelty to everyday users brings me immense joy.
->
-> While alternative pie menu tools exist on GitHub, StarPie represents my distinct vision—combining **ultra-low footprint (3~5MB resident memory)**, **adaptive geometric forms**, **sub-2ms self-healing low-level hooks**, and **zero-dependency single-file portability**.
->
-> Between academic coursework and engineering competitions, the project was developed iteratively over roughly one intensive week of human-AI collaboration. While there may still be rough edges or areas for expansion, StarPie represents my genuine, heartfelt dedication—**every feature landed, every subtle bug squashed, every millisecond shaved, and every UI pixel refined has brought me incomparable joy**.
->
-> Please forgive any initial rough spots. If you encounter bugs or have inspiring ideas, feel free to open a **Bug Report**, suggest a **Feature Request**, or submit a **Pull Request**! As time and energy permit alongside my studies and career pursuit, I will continue to pour my heart into polishing and refining StarPie.
+I am an undergraduate student majoring in Mechanical Design, Manufacturing & Automation. In my daily studies and 3D modeling work, I frequently use SolidWorks and find its built-in mouse gesture wheel exceptionally intuitive and handy.
+
+After exploring the capabilities of modern AI Agents, I thought it would be great to bring this gesture wheel workflow to the global Windows desktop to enhance everyday efficiency and comfort. For those who haven't used radial mouse gestures before, it might be a novel experience—and being able to build and share this experience with others genuinely brings me joy.
+
+While similar pie menu tools exist on GitHub, StarPie focuses on slightly different workflow details and nuances. Between university coursework and competitions, development was paused occasionally; over roughly one week of part-time human-AI collaboration, I managed to bring StarPie to its current state.
+
+Although the feature set might still feel simple and some rough edges remain, this project truly represents my honest dedication. Every implemented feature, resolved bug, performance optimization, and UI improvement has brought me simple, authentic joy.
+
+Please bear with any imperfections. If you encounter issues or have ideas for improvements, feel free to submit a bug report, open an issue, or create a Pull Request! As long as time and energy permit alongside my studies and career path, I will gladly do my best to keep refining it.
 
 ### 🤖 Human-AI Co-Creation (Co-Authored with AI Agent)
 StarPie was architected, designed, and tuned by the human developer in close collaboration with the advanced AI coding agent (**AI Agent - Antigravity**):
