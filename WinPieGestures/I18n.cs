@@ -556,24 +556,31 @@ namespace WinPieGestures
             },
             ["BtnAddProcess"] = new()
             {
-                [LanguageCode.ZhCn] = "添加进程",
-                [LanguageCode.ZhTw] = "新增行程",
-                [LanguageCode.En] = "Add Process",
-                [LanguageCode.Ja] = "プロセス追加"
+                [LanguageCode.ZhCn] = "➕ 添加进程",
+                [LanguageCode.ZhTw] = "➕ 新增處理程序",
+                [LanguageCode.En] = "➕ Add Process",
+                [LanguageCode.Ja] = "➕ プロセス追加"
+            },
+            ["BtnPickProcess"] = new()
+            {
+                [LanguageCode.ZhCn] = "🔍 选择应用...",
+                [LanguageCode.ZhTw] = "🔍 選擇應用程式...",
+                [LanguageCode.En] = "🔍 Select App...",
+                [LanguageCode.Ja] = "🔍 アプリを選択..."
             },
             ["BtnDeleteProcess"] = new()
             {
-                [LanguageCode.ZhCn] = "删除选中",
-                [LanguageCode.ZhTw] = "刪除選中",
-                [LanguageCode.En] = "Delete Selected",
-                [LanguageCode.Ja] = "選択項目を削除"
+                [LanguageCode.ZhCn] = "🗑️ 移除选中",
+                [LanguageCode.ZhTw] = "🗑️ 移除選取",
+                [LanguageCode.En] = "🗑️ Remove Selected",
+                [LanguageCode.Ja] = "🗑️ 選択項目を削除"
             },
             ["BlacklistPlaceholder"] = new()
             {
-                [LanguageCode.ZhCn] = "输入进程名称 (如 mstsc.exe)",
-                [LanguageCode.ZhTw] = "輸入行程名稱 (如 mstsc.exe)",
-                [LanguageCode.En] = "Enter process name (e.g. mstsc.exe)",
-                [LanguageCode.Ja] = "プロセス名を入力 (例: mstsc.exe)"
+                [LanguageCode.ZhCn] = "输入进程名称 (如 solidworks.exe) 或点击右侧选择应用...",
+                [LanguageCode.ZhTw] = "輸入處理程序名稱 (如 solidworks.exe) 或點擊右側選擇應用程式...",
+                [LanguageCode.En] = "Enter process name (e.g. solidworks.exe) or browse...",
+                [LanguageCode.Ja] = "プロセス名を入力 (例: solidworks.exe) またはアプリを選択..."
             },
 
             // Tab 1: Appearance & Shapes

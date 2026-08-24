@@ -697,13 +697,22 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="NewBlacklistProcessTextBox" Height="34" Margin="0,0,10,0"/>
-                                        <Button x:Name="AddBlacklistButton" Grid.Column="1" Content="添加进程" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Click="AddBlacklistButton_Click"/>
+                                        <TextBox x:Name="NewBlacklistProcessTextBox" Height="34" Margin="0,0,8,0"
+                                                 FontSize="12" VerticalContentAlignment="Center"
+                                                 ToolTip="输入进程名称 (如 solidworks.exe) 或直接点击右侧选择应用..."
+                                                 KeyDown="NewBlacklistProcessTextBox_KeyDown"/>
+                                        <Button x:Name="BrowseBlacklistButton" Grid.Column="1" Content="🔍 选择应用..." 
+                                                Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" 
+                                                Click="BrowseBlacklistButton_Click" ToolTip="从已安装软件列表中快速选择要排除的程序"/>
+                                        <Button x:Name="AddBlacklistButton" Grid.Column="2" Content="➕ 添加进程" 
+                                                Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="16,0" 
+                                                Click="AddBlacklistButton_Click" ToolTip="将输入框中的进程名称加入排除黑名单"/>
                                     </Grid>
 
-                                    <ListBox x:Name="BlacklistListBox" Height="110" Margin="0,0,0,8"/>
-                                    <Button x:Name="DeleteBlacklistButton" Content="移除选中的进程" Style="{StaticResource ModernButtonStyle}" HorizontalAlignment="Right" Height="30" Padding="12,0" Click="DeleteBlacklistButton_Click"/>
+                                    <ListBox x:Name="BlacklistListBox" Height="110" Margin="0,0,0,8" KeyDown="BlacklistListBox_KeyDown"/>
+                                    <Button x:Name="DeleteBlacklistButton" Content="🗑️ 移除选中的进程" Style="{StaticResource ModernButtonStyle}" HorizontalAlignment="Right" Height="30" Padding="12,0" Click="DeleteBlacklistButton_Click"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

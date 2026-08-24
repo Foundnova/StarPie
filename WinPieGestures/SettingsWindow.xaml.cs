@@ -358,8 +358,10 @@ namespace WinPieGestures
             if (AltModifierCheckBox != null) AltModifierCheckBox.Content = I18n.T("ModifierAlt");
             if (BlacklistTitleText != null) BlacklistTitleText.Text = I18n.T("BlacklistTitle");
             if (BlacklistDescText != null) BlacklistDescText.Text = I18n.T("BlacklistDesc");
+            if (BrowseBlacklistButton != null) BrowseBlacklistButton.Content = I18n.T("BtnPickProcess");
             if (AddBlacklistButton != null) AddBlacklistButton.Content = I18n.T("BtnAddProcess");
             if (DeleteBlacklistButton != null) DeleteBlacklistButton.Content = I18n.T("BtnDeleteProcess");
+            if (NewBlacklistProcessTextBox != null) NewBlacklistProcessTextBox.ToolTip = I18n.T("BlacklistPlaceholder");
 
             // Tab 1: Appearance & Shapes
             if (AppearancePageHeader != null) AppearancePageHeader.Text = I18n.T("AppearanceHeader");
@@ -1724,11 +1726,59 @@ namespace WinPieGestures
             SyncUiToConfigAndSave(true);
         }
 
+        private void BrowseBlacklistButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new ProgramPickerWindow();
+                picker.Owner = this;
+                if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+                {
+                    string fileName = System.IO.Path.GetFileName(picker.SelectedPath).ToLower();
+                    AddBlacklistProcess(fileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[BrowseBlacklistButton_Click Error]: {ex}");
+            }
+        }
+
         private void AddBlacklistButton_Click(object sender, RoutedEventArgs e)
         {
             string proc = NewBlacklistProcessTextBox.Text.Trim().ToLower();
-            if (string.IsNullOrEmpty(proc)) return;
+            if (string.IsNullOrEmpty(proc))
+            {
+                // If empty, open ProgramPickerWindow to let user pick directly!
+                BrowseBlacklistButton_Click(sender, e);
+                return;
+            }
 
+            AddBlacklistProcess(proc);
+        }
+
+        private void NewBlacklistProcessTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                AddBlacklistButton_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        private void BlacklistListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Delete || e.Key == System.Windows.Input.Key.Back)
+            {
+                DeleteBlacklistButton_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        private void AddBlacklistProcess(string proc)
+        {
+            if (string.IsNullOrWhiteSpace(proc)) return;
+            proc = proc.Trim().ToLower();
             if (!proc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
                 proc += ".exe";
@@ -1737,6 +1787,9 @@ namespace WinPieGestures
             if (!BlacklistListBox.Items.Contains(proc))
             {
                 BlacklistListBox.Items.Add(proc);
+                BlacklistListBox.SelectedItem = proc;
+                BlacklistListBox.ScrollIntoView(proc);
+
                 if (ConfigManager.CurrentConfig.BlacklistedProcesses == null)
                 {
                     ConfigManager.CurrentConfig.BlacklistedProcesses = new List<string>();
@@ -1748,11 +1801,21 @@ namespace WinPieGestures
                 NewBlacklistProcessTextBox.Clear();
                 SyncUiToConfigAndSave(true);
             }
+            else
+            {
+                BlacklistListBox.SelectedItem = proc;
+                BlacklistListBox.ScrollIntoView(proc);
+            }
         }
 
         private void DeleteBlacklistButton_Click(object sender, RoutedEventArgs e)
         {
             var selected = BlacklistListBox.SelectedItem?.ToString();
+            if (string.IsNullOrEmpty(selected) && BlacklistListBox.Items.Count > 0)
+            {
+                selected = BlacklistListBox.Items[BlacklistListBox.Items.Count - 1]?.ToString();
+            }
+
             if (!string.IsNullOrEmpty(selected))
             {
                 BlacklistListBox.Items.Remove(selected);
