@@ -126,6 +126,20 @@ namespace WinPieGestures
                 [LanguageCode.En] = "Flick cursor outwards past the wheel radius to safely cancel without returning to center.",
                 [LanguageCode.Ja] = "ホイールの外側へ素早くスワイプすることで、安全に操作をキャンセルできます。"
             },
+                        ["OuterEscapeDistanceTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "外甩取消距离灵敏度 (Escape Distance):",
+                [LanguageCode.ZhTw] = "外甩取消距離靈敏度 (Escape Distance):",
+                [LanguageCode.En] = "Escape Distance Threshold (Sensitivity):",
+                [LanguageCode.Ja] = "キャンセルスワイプ距離 (感度設定):"
+            },
+            ["OuterEscapeDistanceDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "设定光标划出距离中心多远时判定为放弃。数值越小越灵敏（更易甩出取消），数值越大越沉稳（需甩得更远）。",
+                [LanguageCode.ZhTw] = "設定游標劃出距離中心多遠時判定為放棄。數值越小越靈敏（更易甩出取消），數值越大越沉穩（需甩得更遠）。",
+                [LanguageCode.En] = "How far past the center the cursor must travel to cancel. Smaller values cancel easier, larger values require a farther flick.",
+                [LanguageCode.Ja] = "中心からどれだけ離れたらキャンセルとするかを設定します。値が小さいほど敏感になり、大きいほど遠くへのスワイプが必要になります。"
+            },
             ["OuterEscapeCheckbox"] = new()
             {
                 [LanguageCode.ZhCn] = "启用向外顺势甩出取消手势 (推荐开启)",

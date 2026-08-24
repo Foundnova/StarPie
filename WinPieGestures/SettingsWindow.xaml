@@ -674,6 +674,24 @@
                                             <TextBlock x:Name="OuterEscapeCheckboxDescText" Text="超过轮盘外圈范围后立即解除高亮，松开右键 0 误触安全放弃。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                                         </StackPanel>
                                     </CheckBox>
+
+                                    <!-- Escape Distance Slider (Shown when enabled) -->
+                                    <StackPanel x:Name="OuterEscapeDistancePanel" Margin="0,10,0,0">
+                                        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                            <StackPanel>
+                                                <TextBlock x:Name="OuterEscapeDistanceTitleText" Text="外甩取消距离灵敏度 (Escape Distance):" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock x:Name="OuterEscapeDistanceDescText" Text="设定光标划出距离中心多远时触发安全取消。数值越小越灵敏（更易甩出取消），数值越大越沉稳（需甩得更远）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap"/>
+                                                <Grid Margin="0,2,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Slider x:Name="OuterEscapeDistanceSlider" Minimum="140" Maximum="320" Value="190" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OuterEscapeDistanceSlider_ValueChanged"/>
+                                                    <TextBlock x:Name="OuterEscapeDistanceLabel" Grid.Column="1" Text="190 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 

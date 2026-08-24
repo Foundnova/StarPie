@@ -372,6 +372,8 @@ namespace WinPieGestures
             if (OuterEscapeTitleText != null) OuterEscapeTitleText.Text = I18n.T("OuterEscapeTitle");
             if (OuterEscapeDescText != null) OuterEscapeDescText.Text = I18n.T("OuterEscapeDesc");
             if (OuterEscapeCheckboxTitleText != null) OuterEscapeCheckboxTitleText.Text = I18n.T("OuterEscapeCheckbox");
+            if (OuterEscapeDistanceTitleText != null) OuterEscapeDistanceTitleText.Text = I18n.T("OuterEscapeDistanceTitle");
+            if (OuterEscapeDistanceDescText != null) OuterEscapeDistanceDescText.Text = I18n.T("OuterEscapeDistanceDesc");
             if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
             if (RenamePresetInPanelButton != null) RenamePresetInPanelButton.Content = I18n.T("RenameCustomPresetButton");
 
@@ -1051,6 +1053,7 @@ namespace WinPieGestures
         {
             if (ConfigManager.CurrentConfig == null) return;
             ConfigManager.CurrentConfig.EnableOuterEscapeCancel = true;
+            if (OuterEscapeDistancePanel != null) OuterEscapeDistancePanel.Visibility = Visibility.Visible;
             SyncUiToConfigAndSave(true);
         }
 
@@ -1058,6 +1061,19 @@ namespace WinPieGestures
         {
             if (ConfigManager.CurrentConfig == null) return;
             ConfigManager.CurrentConfig.EnableOuterEscapeCancel = false;
+            if (OuterEscapeDistancePanel != null) OuterEscapeDistancePanel.Visibility = Visibility.Collapsed;
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void OuterEscapeDistanceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+            double val = Math.Round(e.NewValue);
+            ConfigManager.CurrentConfig.OuterEscapeDistance = val;
+            if (OuterEscapeDistanceLabel != null)
+            {
+                OuterEscapeDistanceLabel.Text = $"{val:0} px";
+            }
             SyncUiToConfigAndSave(true);
         }
 

@@ -827,6 +827,9 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     outer_escape_chk = win.child_window(auto_id="EnableOuterEscapeCheckBox", control_type="CheckBox")
     assert outer_escape_chk.exists(timeout=3), "EnableOuterEscapeCheckBox should exist"
     
+    escape_dist_slider = win.child_window(auto_id="OuterEscapeDistanceSlider", control_type="Slider")
+    assert escape_dist_slider.exists(timeout=3), "OuterEscapeDistanceSlider should exist"
+    
     # 2. Gestures Tab (Tab 2)
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
