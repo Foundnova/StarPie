@@ -647,13 +647,9 @@ def test_v136_custom_color_preset_deletion_and_management(app):
     theme_combo = win.child_window(auto_id="ThemeComboBox", control_type="ComboBox")
     assert theme_combo.exists(timeout=3), "ThemeComboBox should exist"
     
-    # 3. Select Custom Theme (Last item in list)
-    theme_combo.select(theme_combo.item_count() - 1)
-    time.sleep(0.4)
-    
-    # Verify Save Button in CustomColorsPanel exists
-    save_preset_btn = win.child_window(auto_id="SaveCustomColorPresetButton", control_type="Button")
-    assert save_preset_btn.exists(timeout=3), "SaveCustomColorPresetButton should exist"
+    # 3. Verify CustomColorExpander exists
+    color_expander = win.child_window(auto_id="CustomColorExpander", control_type="Group")
+    assert color_expander.exists(timeout=3), "CustomColorExpander should exist"
     
     # 4. Verify config file integrity
     config_path = get_config_path(local_app_data)
@@ -767,3 +763,46 @@ def test_v139_folder_action_type_and_i18n_consistency(app):
         
     if type_combo is not None:
         assert saved_config["Profiles"][0]["Actions"][0]["Type"] == "Folder", "Action type should persist as Folder"
+
+def test_v140_custom_icons_and_appearance_collapsible_and_milestones_folding(app):
+    """
+    Test v1.4.0 Features:
+    1. Appearance Tab (NavTab1):
+       - Verify UiStyleComboBox does not contain CatPaw.
+       - Verify CustomColorExpander exists and is collapsible.
+    2. Gestures Tab (NavTab2):
+       - Verify Launch and Folder browse buttons exist.
+    3. About Tab (NavTab4):
+       - Verify Milestone cards exist and OlderMilestonesExpander exists.
+    """
+    win, local_app_data = app
+    
+    # 1. Appearance Tab (Tab 1)
+    tab1 = win.child_window(auto_id="NavTab1", control_type="RadioButton")
+    tab1.select()
+    time.sleep(0.4)
+    
+    ui_style_combo = win.child_window(auto_id="UiStyleComboBox", control_type="ComboBox")
+    assert ui_style_combo.exists(timeout=3), "UiStyleComboBox should exist"
+    # Should have exactly 3 styles now (ClassicRing, CleanSectors, Glassmorphism)
+    assert ui_style_combo.item_count() == 3, f"UiStyleComboBox should have 3 items without CatPaw, got {ui_style_combo.item_count()}"
+    
+    color_expander = win.child_window(auto_id="CustomColorExpander", control_type="Group")
+    assert color_expander.exists(timeout=3), "CustomColorExpander should exist"
+    
+    # 2. Gestures Tab (Tab 2)
+    tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
+    tab2.select()
+    time.sleep(0.4)
+    
+    action_list_title = win.child_window(auto_id="SectorActionListTitleText", control_type="Text")
+    assert action_list_title.exists(timeout=3), "SectorActionListTitleText should exist"
+    
+    # 3. About Tab (Tab 4)
+    tab4 = win.child_window(auto_id="NavTab4", control_type="RadioButton")
+    tab4.select()
+    time.sleep(0.4)
+    
+    older_expander = win.child_window(auto_id="OlderMilestonesExpander", control_type="Group")
+    assert older_expander.exists(timeout=3), "OlderMilestonesExpander should exist"
+

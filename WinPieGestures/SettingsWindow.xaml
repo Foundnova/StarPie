@@ -606,7 +606,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.3.9" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock Text="v1.4.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -774,7 +774,7 @@
                                             <ComboBoxItem Content="经典圆环 (Classic Ring)" Tag="ClassicRing" IsSelected="True"/>
                                             <ComboBoxItem Content="极简扇区 (Clean Sectors)" Tag="CleanSectors"/>
                                             <ComboBoxItem Content="液态毛玻璃 (Glassmorphism)" Tag="Glassmorphism"/>
-                                            <ComboBoxItem Content="萌宠猫爪 (Cute Cat Paw)" Tag="CatPaw"/>
+                                            
                                         </ComboBox>
 
                                         <TextBlock Text="轮盘配色方案 (Wheel Theme):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
@@ -790,13 +790,23 @@
                                                 <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest"/>
                                                 <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce"/>
                                                 <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted"/>
-                                                <ComboBoxItem Content="自定义高级配色 (Custom)" Tag="Custom"/>
                                             </ComboBox>
                                             <Button x:Name="DeleteCustomColorPresetButton" Grid.Column="1" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义配色方案预设"/>
                                         </Grid>
 
-                                        <!-- Custom Colors Sub-Panel with Color Picker & Screen Eyedropper -->
-                                        <StackPanel x:Name="CustomColorsPanel" Visibility="Collapsed" Margin="0,4,0,0">
+                                                                        <!-- Card 1.5: Custom Advanced Colors (Collapsible) -->
+                                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16,12" Margin="0,0,0,12">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                    </Border.Effect>
+                                    <Expander x:Name="CustomColorExpander" IsExpanded="False" Background="Transparent" BorderThickness="0">
+                                        <Expander.Header>
+                                            <StackPanel Margin="0,2,0,2">
+                                                <TextBlock x:Name="CustomColorsExpanderTitleText" Text="🎨 自定义高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock x:Name="CustomColorsExpanderDescText" Text="展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Expander.Header>
+                                        <StackPanel x:Name="CustomColorsPanel" Margin="0,12,0,4">
                                             <TextBlock Text="自定义十六进制色彩 (色盘调色 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                                             
                                             <!-- Sector Normal Color -->
@@ -888,8 +898,10 @@
                                                 <Button x:Name="DeletePresetInPanelButton" Grid.Column="1" Content="🗑️ 删除此预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义预设方案"/>
                                             </Grid>
                                         </StackPanel>
+                                    </Expander>
+                                </Border>
 
-                                        <!-- Highlight Glow & Luminous Halo Controls (高亮边缘光晕与发光特效) -->
+                                <!-- Highlight Glow & Luminous Halo Controls (高亮边缘光晕与发光特效) -->
                                         <TextBlock Text="高亮边缘光晕模式 (Highlight Glow):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,4"/>
                                         <ComboBox x:Name="HighlightGlowPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,8" SelectionChanged="HighlightGlowPresetComboBox_SelectionChanged">
                                             <ComboBoxItem Content="🌈 跟随主题高亮色 (Auto / Follow Theme)" Tag="Auto" IsSelected="True"/>
@@ -1277,8 +1289,10 @@
                                                                     <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                                                                         IsReadOnly="True" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center"/>
-                                                                <Button Grid.Column="1" Content="..." Width="28" Style="{StaticResource ModernButtonStyle}" Click="Browse_Click" Height="30"/>
+                                                                         IsReadOnly="True" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的应用程序路径"/>
+                                                                <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Click="Browse_Click" Height="30" ToolTip="选择应用程序或快捷方式...">
+                                                                    <TextBlock Text="📁" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Button>
                                                             </Grid>
 
                                                             <!-- 3. Open Folder -->
@@ -1288,8 +1302,10 @@
                                                                     <ColumnDefinition Width="Auto"/>
                                                                 </Grid.ColumnDefinitions>
                                                                 <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
-                                                                         Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center"/>
-                                                                <Button Grid.Column="1" Content="..." Width="28" Style="{StaticResource ModernButtonStyle}" Click="BrowseFolder_Click" Height="30"/>
+                                                                         Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的本地文件夹路径"/>
+                                                                <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Click="BrowseFolder_Click" Height="30" ToolTip="选择本地文件夹...">
+                                                                    <TextBlock Text="📂" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Button>
                                                             </Grid>
                                                             
                                                             <!-- 4. System Preset -->
@@ -1470,7 +1486,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.3.9" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
@@ -1479,7 +1495,21 @@
                                  </Grid>
                             </Border>
 
-                                                        <!-- Card 2: v1.3.9 Highlights -->
+                                                                                    <!-- Card 2: v1.4.0 Highlights -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock Text="v1.4.0 自定义图标导入 &amp; 动作视觉引导 &amp; 配色折叠 &amp; 历史记录收纳" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="• 🎨 支持导入自定义 SVG 矢量图与 PNG/ICO/JPG 本地图片图标，全端自适应无损渲染；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• 📁 启动程序与打开文件夹右侧方框强化为高对比度引导图标，提升视觉交互指引；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• 🛠️ 将自定义高级配色单列为折叠卡片，默认折叠收纳，保持界面清爽克制；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• 📜 版本演进里程碑默认仅展示最近三条更新，早期历史记录折叠收纳。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 2: v1.3.9 Highlights -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
@@ -1511,7 +1541,26 @@
                                 <StackPanel>
                                     <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14"/>
                                     
-                                    <!-- v1.3.8 -->
+                                    <!-- Milestone 1: v1.4.0 (Recent) -->
+                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                <TextBlock Text="v1.4.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                <TextBlock Text="自定义图标导入 &amp; 动作引导视觉强化 &amp; 配色折叠收纳 &amp; 架构精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                <TextBlock Text="支持导入自定义 SVG/PNG/ICO 图标，强化启动程序引导图标，单列自定义高级配色折叠卡片，精简收纳历史版本。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="2026-08-24" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Milestone 2: v1.3.9 (Recent) -->
                                     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -1523,6 +1572,25 @@
                                                 <TextBlock Text="v1.3.9" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                <TextBlock Text="打开文件夹动作类型 &amp; 全局界面语言统一性强化" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                <TextBlock Text="新增打开文件夹专属动作类型与目录选择器，消除 Raw 字典键与混排语言，全弹窗国际化深度适配。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="2026-08-24" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Milestone 3: v1.3.8 (Recent) -->
+                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                <TextBlock Text="v1.3.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock Text="StarPie 品牌视觉升级 &amp; 原生圆角星轨图标 &amp; 托盘图标自愈修复" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
                                                 <TextBlock Text="升级 StarPie 品牌，修复任务栏圆角与托盘图标缺失，重构控制台侧边栏 Logo 与排版。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
                                             </StackPanel>
@@ -1530,284 +1598,105 @@
                                         </Grid>
                                     </Border>
 
-                                    <!-- v1.3.4 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.3.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                    <!-- Collapsible Older Milestones -->
+                                    <Expander x:Name="OlderMilestonesExpander" Header="📜 展开查看更早的历史版本演进 (Older Milestones)" IsExpanded="False" Background="Transparent" BorderThickness="0" Margin="0,4,0,0">
+                                        <StackPanel Margin="0,8,0,0">
+                                            <!-- v1.3.4 -->
+                                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                        <TextBlock Text="v1.3.4" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="纯白主题画布渲染优化 &amp; 全局设置记忆 &amp; 极简内存瘦身" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                        <TextBlock Text="优化纯白主题下实时画布背景色彩，增加关闭与退出自动记忆功能，大幅优化内存占用至15-25MB。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="2026-08-23" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                </Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="纯白主题画布渲染优化 &amp; 全局设置记忆 &amp; 极简内存瘦身" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="优化纯白主题下实时画布背景色彩，增加关闭与退出自动记忆功能，大幅优化内存占用至15-25MB。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-23" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
 
-                                    <!-- v1.3.3 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.3.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            <!-- v1.3.3 -->
+                                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                        <TextBlock Text="v1.3.3" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="4/12键方位全流程适配修复 &amp; 扇区切削形态精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                        <TextBlock Text="修复4键/12键切换无响应问题，支持动态自适应缩放与钟表映射，精简保留四大核心高质感形态。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                </Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="4/12键方位全流程适配修复 &amp; 扇区切削形态精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="修复4键/12键切换无响应问题，支持动态自适应缩放与钟表映射，精简保留四大核心高质感形态。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
 
-                                    <!-- v1.3.2 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.3.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            <!-- v1.3.2 -->
+                                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                        <TextBlock Text="v1.3.2" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="轮盘图标大小调节 &amp; 光弧极简重构" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                        <TextBlock Text="新增图标大小滑动微调，重构光弧同心导轨与悬浮节点，优化比例。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                </Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="轮盘图标大小调节 &amp; 光弧极简重构 &amp; 猫爪肉垫比例协调" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="新增图标大小滑动微调，重构光弧同心导轨与悬浮节点，优化猫爪肉垫立体饱满比例。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
 
-                                    <!-- v1.3.1 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.3.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            <!-- v1.3.1 -->
+                                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                        <TextBlock Text="v1.3.1" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="新增液态水滴与光弧轨道形态 &amp; 文字字号调节" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                        <TextBlock Text="精简合并圆角胶囊形态，新增液态水滴与光弧轨道形态，支持自定义文字大小。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                </Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="新增液态水滴与光弧轨道形态 &amp; 文字字号调节 &amp; 猫爪主题全端调试" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="精简合并圆角胶囊形态，新增液态水滴与光弧轨道形态，支持自定义文字大小，彻底调试猫爪中心肉垫与大间距猫耳。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
 
-                                    <!-- v1.3.0 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.3.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                            <!-- v1.3.0 -->
+                                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="80"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                        <TextBlock Text="v1.3.0" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="主题视觉深度重塑 &amp; 自定义配色预设保存" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                                                        <TextBlock Text="重塑经典、极简与毛玻璃主题，支持保存多套自定义十六进制颜色预设。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                                </Grid>
                                             </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="四大主题视觉深度重塑 &amp; 自定义配色预设保存 &amp; 轮盘文字修复" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="融合毛玻璃底盘与空间悬浮美学，精简并支持保存自定义配色预设，修复文字显示与排版联动。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- v1.2.5 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="界面主题色系简约重构 &amp; 文字对比度增强 &amp; 更新日志全量同步" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="重构 6 套极简高质感主题配色，全面提升深色/浅色模式下的文本可读性与控件语义画刷协调性。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- v1.2.4 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.4" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="精简轮盘背景贴图 &amp; 选色器色卡滚轮修复 &amp; 软件界面主题风格" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="移除轮盘背景贴图功能，修复选色面板色卡滚动截断，新增应用界面主题风格选择。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- v1.2.3 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.3" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="HSV调色板与全局屏幕吸色 &amp; 轮盘高级调色预设扩充" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="支持全功能色盘选色与放大镜屏幕吸色，扩充冰川透蓝与莫兰迪柔灰预设。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- v1.2.2 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.2" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="交互式热键录入框 &amp; 扩充 18 种系统级快捷控制指令" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="自动捕获物理组合键输入，扩充计算机、任务管理器、锁屏、截屏等系统操作。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-22" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-
-                                    <!-- v1.2.1 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.1" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="已安装软件浏览选择器 &amp; 自定义专属配置方案管理" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="智能枚举已安装软件与开始菜单程序，支持自定义命名配置方案与多配置切换。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-21" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-                                    
-                                    <!-- v1.2.0 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.2.0" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="五维分区重构 &amp; 五大轮盘形态 &amp; 矢量图标引擎 &amp; 实时画布" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="重构设置架构，加入60FPS实时交互画布，支持蜂巢六边形等五大形态、30+矢量图标与配置备份还原。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-19" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-                                    
-                                    <!-- v1.1.0 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.1.0" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="全主题UI质感升级 &amp; 磁吸弹簧动效 &amp; 版本管理体系" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="重构六大主题渲染器，增加扇区磁吸外凸与中心退出动效，建立CHANGELOG与版本管理。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-08-19" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-                                    
-                                    <!-- v1.0.4 -->
-                                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="80"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="90"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.0.4" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                            </Border>
-                                            <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                <TextBlock Text="场景隔离防误触 &amp; 风格渲染器架构解耦" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                                <TextBlock Text="全屏游戏检测阻断、修饰键旁路绕过、进程黑名单、IRadialStyleRenderer 接口解耦。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="2026-06-29" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                        </Grid>
-                                    </Border>
-                                    
-                                    <!-- v1.0.0 -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="80"/>
-                                              <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="90"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                            <TextBlock Text="v1.0.0" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                            <TextBlock Text="初始版本发布" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                                            <TextBlock Text="全局低级鼠标钩子、4/8/12 键轮盘布局、模拟热键与程序启动执行引擎。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="2" Text="2026-06-01" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Card 4: Action Shortcuts -->
-                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
-                                </Border.Effect>
-                                <StackPanel>
-                                    <TextBlock Text="快捷与维护动作" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
-                                    <WrapPanel>
-                                        <Button Name="OpenReleasesFolderButton" Content="打开发布归档目录" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,10" Click="OpenReleasesFolderButton_Click"/>
-                                        <Button Name="OpenAppFolderButton" Content="打开应用所在位置" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,10" Click="OpenAppFolderButton_Click"/>
-                                        <Button Content="以管理员权限重启" Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,10" Click="ElevatePrivileges_Click"/>
-                                    </WrapPanel>
+                                    </Expander>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

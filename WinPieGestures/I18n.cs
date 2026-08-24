@@ -91,6 +91,48 @@ namespace WinPieGestures
         private static readonly Dictionary<string, Dictionary<LanguageCode, string>> Translations = new()
         {
             // Standard Global Buttons & Actions
+            ["IconPickerImport"] = new()
+            {
+                [LanguageCode.ZhCn] = "➕ 导入自定义图标...",
+                [LanguageCode.ZhTw] = "➕ 匯入自訂圖示...",
+                [LanguageCode.En] = "➕ Import Custom Icon...",
+                [LanguageCode.Ja] = "➕ カスタムアイコンをインポート..."
+            },
+            ["CustomColorsExpanderTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "🎨 自定义高级配色与色彩微调",
+                [LanguageCode.ZhTw] = "🎨 自訂進階配色與色彩微調",
+                [LanguageCode.En] = "🎨 Custom Advanced Color Tuning",
+                [LanguageCode.Ja] = "🎨 高度なカラーカスタマイズ"
+            },
+            ["CustomColorsExpanderDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。",
+                [LanguageCode.ZhTw] = "展開後可精準微調扇區底色、高亮光暈、邊框線條、文字與光弧等各項色彩。",
+                [LanguageCode.En] = "Expand to fine-tune individual colors for sectors, highlights, borders, text, and glow.",
+                [LanguageCode.Ja] = "セクター、ハイライト、ボーダー、テキストなどの色を個別に調整します。"
+            },
+            ["MilestonesOlderExpander"] = new()
+            {
+                [LanguageCode.ZhCn] = "📜 展开查看更早的历史版本演进 (Older Milestones)",
+                [LanguageCode.ZhTw] = "📜 展開查看更早的歷史版本演進 (Older Milestones)",
+                [LanguageCode.En] = "📜 View Older Milestones",
+                [LanguageCode.Ja] = "📜 過去の更新履歴を表示"
+            },
+            ["BrowseAppTooltip"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择应用程序或快捷方式...",
+                [LanguageCode.ZhTw] = "選擇應用程式或捷徑...",
+                [LanguageCode.En] = "Browse application or shortcut...",
+                [LanguageCode.Ja] = "アプリまたはショートカットを参照..."
+            },
+            ["BrowseFolderTooltip"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择本地文件夹...",
+                [LanguageCode.ZhTw] = "選擇本機資料夾...",
+                [LanguageCode.En] = "Browse local folder...",
+                [LanguageCode.Ja] = "フォルダーを参照..."
+            },
             ["BtnConfirm"] = new()
             {
                 [LanguageCode.ZhCn] = "确定",
@@ -1304,10 +1346,10 @@ namespace WinPieGestures
             },
             ["TrayTooltip"] = new()
             {
-                [LanguageCode.ZhCn] = "StarPie v1.3.9 - 现代化鼠标轮盘笔势",
-                [LanguageCode.ZhTw] = "StarPie v1.3.9 - 現代化滑鼠輪盤手勢",
-                [LanguageCode.En] = "StarPie v1.3.9 - Modern Mouse Radial Gestures",
-                [LanguageCode.Ja] = "StarPie v1.3.9 - 次世代マウスラジアルジェスチャー"
+                [LanguageCode.ZhCn] = "StarPie v1.4.0 - 现代化鼠标轮盘笔势",
+                [LanguageCode.ZhTw] = "StarPie v1.4.0 - 現代化滑鼠輪盤手勢",
+                [LanguageCode.En] = "StarPie v1.4.0 - Modern Mouse Radial Gestures",
+                [LanguageCode.Ja] = "StarPie v1.4.0 - 次世代マウスラジアルジェスチャー"
             }
         };
     }

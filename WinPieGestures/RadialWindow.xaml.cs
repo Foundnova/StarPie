@@ -423,19 +423,55 @@ namespace WinPieGestures
 
                     if (iconElement == null && !string.IsNullOrEmpty(iconKey))
                     {
-                        string? svgData = IconHelper.GetSvgPathByKey(iconKey);
-                        if (!string.IsNullOrEmpty(svgData))
+                        if (iconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
                         {
-                            iconElement = new Path
+                            var custom = IconHelper.GetCustomIcons().FirstOrDefault(c => c.Key == iconKey);
+                            if (custom != null)
                             {
-                                Data = Geometry.Parse(svgData),
-                                Fill = _textColorBrush,
-                                Stretch = Stretch.Uniform,
-                                Width = iconSize,
-                                Height = iconSize,
-                                Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
-                                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
-                            };
+                                if (custom.IsSvg)
+                                {
+                                    iconElement = new Path
+                                    {
+                                        Data = Geometry.Parse(custom.SvgData),
+                                        Fill = _textColorBrush,
+                                        Stretch = Stretch.Uniform,
+                                        Width = iconSize,
+                                        Height = iconSize,
+                                        Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                                    };
+                                }
+                                else
+                                {
+                                    var img = new System.Windows.Controls.Image
+                                    {
+                                        Width = iconSize,
+                                        Height = iconSize,
+                                        Stretch = Stretch.Uniform,
+                                        Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                                    };
+                                    img.Source = IconHelper.GetCustomImageSource(custom.FilePath);
+                                    iconElement = img;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            string? svgData = IconHelper.GetSvgPathByKey(iconKey);
+                            if (!string.IsNullOrEmpty(svgData))
+                            {
+                                iconElement = new Path
+                                {
+                                    Data = Geometry.Parse(svgData),
+                                    Fill = _textColorBrush,
+                                    Stretch = Stretch.Uniform,
+                                    Width = iconSize,
+                                    Height = iconSize,
+                                    Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                                };
+                            }
                         }
                     }
 

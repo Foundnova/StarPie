@@ -122,7 +122,11 @@ namespace WinPieGestures
                 CustomTextTextBox.Text = ConfigManager.CurrentConfig.CustomText;
 
                 bool isCustomPreset = (ConfigManager.CurrentConfig.Theme ?? "").StartsWith("CustomPreset_");
-                CustomColorsPanel.Visibility = (ConfigManager.CurrentConfig.Theme == "Custom" || isCustomPreset) ? Visibility.Visible : Visibility.Collapsed;
+                if (CustomColorsPanel != null) CustomColorsPanel.Visibility = Visibility.Visible;
+                if ((ConfigManager.CurrentConfig.Theme == "Custom" || isCustomPreset) && CustomColorExpander != null)
+                {
+                    CustomColorExpander.IsExpanded = true;
+                }
                 if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
 
@@ -290,7 +294,7 @@ namespace WinPieGestures
             if (_notifyIcon == null) return;
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
             
-            var titleItem = new ToolStripMenuItem("StarPie v1.3.9")
+            var titleItem = new ToolStripMenuItem("StarPie v1.4.0")
             {
                 Enabled = false,
                 Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -364,6 +368,10 @@ namespace WinPieGestures
             if (NewBlacklistProcessTextBox != null) NewBlacklistProcessTextBox.ToolTip = I18n.T("BlacklistPlaceholder");
 
             // Tab 1: Appearance & Shapes
+            if (CustomColorsExpanderTitleText != null) CustomColorsExpanderTitleText.Text = I18n.T("CustomColorsExpanderTitle");
+            if (CustomColorsExpanderDescText != null) CustomColorsExpanderDescText.Text = I18n.T("CustomColorsExpanderDesc");
+            var olderExpander = this.FindName("OlderMilestonesExpander") as System.Windows.Controls.Expander;
+            if (olderExpander != null) olderExpander.Header = I18n.T("MilestonesOlderExpander");
             if (AppearancePageHeader != null) AppearancePageHeader.Text = I18n.T("AppearanceHeader");
             if (AppearancePageSubheader != null) AppearancePageSubheader.Text = I18n.T("AppearanceSubheader");
             if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Content = I18n.T("BtnDeletePreset");
@@ -1017,16 +1025,9 @@ namespace WinPieGestures
                         CustomHighlightBorderTextBox.Text = preset.HighlightBorder;
                         CustomTextTextBox.Text = preset.TextColor;
                     }
-                    if (CustomColorsPanel != null)
+                    if (CustomColorExpander != null)
                     {
-                        CustomColorsPanel.Visibility = Visibility.Visible;
-                    }
-                }
-                else
-                {
-                    if (CustomColorsPanel != null)
-                    {
-                        CustomColorsPanel.Visibility = theme == "Custom" ? Visibility.Visible : Visibility.Collapsed;
+                        CustomColorExpander.IsExpanded = true;
                     }
                 }
 
@@ -1060,7 +1061,7 @@ namespace WinPieGestures
 
                 if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = Visibility.Collapsed;
-                if (CustomColorsPanel != null) CustomColorsPanel.Visibility = Visibility.Collapsed;
+                
 
                 if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
                 {
@@ -2279,8 +2280,15 @@ namespace WinPieGestures
                         string? customSvg = (profile.Actions != null && i < profile.Actions.Count) ? profile.Actions[i]?.CustomIconSvg : null;
                         string? svgData = null;
 
+                        IconHelper.CustomIconItem? customItem = null;
+                        if (!string.IsNullOrEmpty(iconKey) && iconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            customItem = IconHelper.GetCustomIcons().FirstOrDefault(c => c.Key == iconKey);
+                        }
+
                         if (!string.IsNullOrEmpty(customSvg)) svgData = customSvg;
-                        else if (!string.IsNullOrEmpty(iconKey)) svgData = IconHelper.GetSvgPathByKey(iconKey);
+                        else if (customItem != null && customItem.IsSvg) svgData = customItem.SvgData;
+                        else if (!string.IsNullOrEmpty(iconKey) && customItem == null) svgData = IconHelper.GetSvgPathByKey(iconKey);
                         else if (actionType == "Folder" || actionType == "OpenFolder") svgData = IconHelper.GetSvgPathByKey("Folder");
                         else if (actionType == "System" && !string.IsNullOrEmpty(parameter)) svgData = IconHelper.GetSvgPathByKey(parameter);
 
@@ -2305,6 +2313,23 @@ namespace WinPieGestures
                                 sp.Children.Add(iconPath);
                             }
                             catch { }
+                        }
+                        else if (customItem != null && !customItem.IsSvg)
+                        {
+                            var iconSrc = IconHelper.GetCustomImageSource(customItem.FilePath);
+                            if (iconSrc != null)
+                            {
+                                var img = new System.Windows.Controls.Image
+                                {
+                                    Source = iconSrc,
+                                    Width = previewIconSize,
+                                    Height = previewIconSize,
+                                    Stretch = Stretch.Uniform,
+                                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                                    Margin = new Thickness(0, 0, 0, showText ? 1 : 0)
+                                };
+                                sp.Children.Add(img);
+                            }
                         }
                         else if (actionType == "Launch" && !string.IsNullOrEmpty(parameter))
                         {
@@ -2706,7 +2731,18 @@ namespace WinPieGestures
             {
                 string? data = null;
                 if (!string.IsNullOrEmpty(CustomIconSvg)) data = CustomIconSvg;
-                else if (!string.IsNullOrEmpty(IconKey)) data = IconHelper.GetSvgPathByKey(IconKey);
+                else if (!string.IsNullOrEmpty(IconKey))
+                {
+                    if (IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var custom = IconHelper.GetCustomIcons().FirstOrDefault(c => c.Key == IconKey);
+                        if (custom != null && custom.IsSvg) data = custom.SvgData;
+                    }
+                    else
+                    {
+                        data = IconHelper.GetSvgPathByKey(IconKey);
+                    }
+                }
                 
                 if (!string.IsNullOrEmpty(data))
                 {

@@ -512,5 +512,230 @@ namespace WinPieGestures
         }
 
         #endregion
+
+        #region Custom User Icons (SVG & Raster Image Import)
+
+        public class CustomIconItem
+        {
+            public string Key { get; set; } = "";
+            public string DisplayName { get; set; } = "";
+            public string FilePath { get; set; } = "";
+            public string SvgData { get; set; } = "";
+            public bool IsSvg => !string.IsNullOrEmpty(SvgData);
+        }
+
+        private static List<CustomIconItem>? _cachedCustomIcons;
+
+        public static string GetCustomIconsDirectory()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string dir = Path.Combine(appData, "StarPie", "CustomIcons");
+            if (!Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+            return dir;
+        }
+
+        public static List<CustomIconItem> GetCustomIcons()
+        {
+            if (_cachedCustomIcons != null) return _cachedCustomIcons;
+
+            var list = new List<CustomIconItem>();
+            try
+            {
+                string dir = GetCustomIconsDirectory();
+                if (Directory.Exists(dir))
+                {
+                    var files = Directory.GetFiles(dir);
+                    foreach (var file in files)
+                    {
+                        string ext = Path.GetExtension(file).ToLower();
+                        string fileName = Path.GetFileNameWithoutExtension(file);
+                        string key = "custom:" + fileName;
+
+                        if (ext == ".svg")
+                        {
+                            try
+                            {
+                                string text = File.ReadAllText(file);
+                                string pathData = ExtractSvgPathData(text);
+                                list.Add(new CustomIconItem
+                                {
+                                    Key = key,
+                                    DisplayName = fileName,
+                                    FilePath = file,
+                                    SvgData = pathData
+                                });
+                            }
+                            catch { }
+                        }
+                        else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".ico" || ext == ".bmp" || ext == ".webp")
+                        {
+                            list.Add(new CustomIconItem
+                            {
+                                Key = key,
+                                DisplayName = fileName,
+                                FilePath = file,
+                                SvgData = ""
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GetCustomIcons Error]: {ex.Message}");
+            }
+
+            _cachedCustomIcons = list;
+            return list;
+        }
+
+        public static string ExtractSvgPathData(string svgContent)
+        {
+            if (string.IsNullOrWhiteSpace(svgContent)) return "";
+
+            // Check if it's already a pure path string
+            if (svgContent.Trim().StartsWith("M", StringComparison.OrdinalIgnoreCase) && !svgContent.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+            {
+                return svgContent.Trim();
+            }
+
+            try
+            {
+                int dIndex = svgContent.IndexOf(" d=\"", StringComparison.OrdinalIgnoreCase);
+                if (dIndex < 0) dIndex = svgContent.IndexOf(" d='", StringComparison.OrdinalIgnoreCase);
+                if (dIndex >= 0)
+                {
+                    char quote = svgContent[dIndex + 3];
+                    int start = dIndex + 4;
+                    int end = svgContent.IndexOf(quote, start);
+                    if (end > start)
+                    {
+                        return svgContent.Substring(start, end - start).Trim();
+                    }
+                }
+            }
+            catch { }
+
+            return "";
+        }
+
+        public static CustomIconItem? ImportCustomIcon(string sourceFilePath, string? customName = null)
+        {
+            if (string.IsNullOrWhiteSpace(sourceFilePath) || !File.Exists(sourceFilePath))
+                return null;
+
+            try
+            {
+                string dir = GetCustomIconsDirectory();
+                string ext = Path.GetExtension(sourceFilePath).ToLower();
+                string safeName = string.IsNullOrWhiteSpace(customName) 
+                    ? Path.GetFileNameWithoutExtension(sourceFilePath)
+                    : customName.Trim();
+
+                // Clean illegal chars
+                foreach (char c in Path.GetInvalidFileNameChars())
+                {
+                    safeName = safeName.Replace(c, '_');
+                }
+
+                string targetFileName = $"{safeName}_{DateTime.Now:yyyyMMddHHmmss}{ext}";
+                string targetPath = Path.Combine(dir, targetFileName);
+
+                File.Copy(sourceFilePath, targetPath, true);
+
+                _cachedCustomIcons = null; // Invalidate cache
+                var all = GetCustomIcons();
+                return all.FirstOrDefault(i => i.FilePath == targetPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ImportCustomIcon Error]: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static CustomIconItem? ImportCustomSvgData(string svgPathData, string iconName)
+        {
+            if (string.IsNullOrWhiteSpace(svgPathData)) return null;
+
+            try
+            {
+                string dir = GetCustomIconsDirectory();
+                string safeName = string.IsNullOrWhiteSpace(iconName) ? "Vector" : iconName.Trim();
+                foreach (char c in Path.GetInvalidFileNameChars())
+                {
+                    safeName = safeName.Replace(c, '_');
+                }
+
+                string targetFileName = $"{safeName}_{DateTime.Now:yyyyMMddHHmmss}.svg";
+                string targetPath = Path.Combine(dir, targetFileName);
+
+                File.WriteAllText(targetPath, svgPathData.Trim());
+
+                _cachedCustomIcons = null;
+                var all = GetCustomIcons();
+                return all.FirstOrDefault(i => i.FilePath == targetPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ImportCustomSvgData Error]: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static bool DeleteCustomIcon(string key)
+        {
+            try
+            {
+                var item = GetCustomIcons().FirstOrDefault(i => i.Key == key);
+                if (item != null && File.Exists(item.FilePath))
+                {
+                    File.Delete(item.FilePath);
+                    _cachedCustomIcons = null;
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        public static ImageSource? GetCustomImageSource(string iconKeyOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(iconKeyOrPath)) return null;
+
+            try
+            {
+                string path = iconKeyOrPath;
+                if (iconKeyOrPath.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var item = GetCustomIcons().FirstOrDefault(i => i.Key == iconKeyOrPath);
+                    if (item != null) path = item.FilePath;
+                }
+
+                if (File.Exists(path))
+                {
+                    string ext = Path.GetExtension(path).ToLower();
+                    if (ext != ".svg")
+                    {
+                        var bi = new BitmapImage();
+                        bi.BeginInit();
+                        bi.CacheOption = BitmapCacheOption.OnLoad;
+                        bi.UriSource = new Uri(path, UriKind.Absolute);
+                        bi.EndInit();
+                        bi.Freeze();
+                        return bi;
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        #endregion
+
     }
 }
