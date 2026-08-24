@@ -519,6 +519,11 @@ namespace WinPieGestures
 
         private string? GetVectorIconPath(string type, string parameter)
         {
+            if (type == "Folder" || type == "OpenFolder")
+            {
+                return IconHelper.GetSvgPathByKey("Folder");
+            }
+
             if (type == "Hotkey")
             {
                 // Keyboard icon

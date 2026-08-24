@@ -19,6 +19,8 @@ namespace WinPieGestures
             PromptTextBlock.Text = prompt;
             InputTextBox.Text = defaultText;
             _validator = validator;
+            if (OkButton != null) OkButton.Content = I18n.T("BtnConfirm");
+            if (CancelButton != null) CancelButton.Content = I18n.T("BtnCancel");
 
             Loaded += (s, e) =>
             {
@@ -32,7 +34,7 @@ namespace WinPieGestures
             string trimmed = InputTextBox.Text.Trim();
             if (string.IsNullOrEmpty(trimmed))
             {
-                MessageBox.Show("名称不能为空，请输入有效的配置名称。", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(I18n.T("InputDialogEmpty"), I18n.T("Notice"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 InputTextBox.Focus();
                 return;
             }
@@ -42,7 +44,7 @@ namespace WinPieGestures
                 var (isValid, errorMessage) = _validator(trimmed);
                 if (!isValid)
                 {
-                    MessageBox.Show(errorMessage, "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(errorMessage, I18n.T("Notice"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     InputTextBox.Focus();
                     InputTextBox.SelectAll();
                     return;

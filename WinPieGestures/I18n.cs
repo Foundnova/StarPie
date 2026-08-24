@@ -90,6 +90,288 @@ namespace WinPieGestures
 
         private static readonly Dictionary<string, Dictionary<LanguageCode, string>> Translations = new()
         {
+            // Standard Global Buttons & Actions
+            ["BtnConfirm"] = new()
+            {
+                [LanguageCode.ZhCn] = "确定",
+                [LanguageCode.ZhTw] = "確定",
+                [LanguageCode.En] = "Confirm",
+                [LanguageCode.Ja] = "確定"
+            },
+            ["BtnCancel"] = new()
+            {
+                [LanguageCode.ZhCn] = "取消",
+                [LanguageCode.ZhTw] = "取消",
+                [LanguageCode.En] = "Cancel",
+                [LanguageCode.Ja] = "キャンセル"
+            },
+            ["BtnOk"] = new()
+            {
+                [LanguageCode.ZhCn] = "确定",
+                [LanguageCode.ZhTw] = "確定",
+                [LanguageCode.En] = "OK",
+                [LanguageCode.Ja] = "OK"
+            },
+            ["BtnApply"] = new()
+            {
+                [LanguageCode.ZhCn] = "应用",
+                [LanguageCode.ZhTw] = "套用",
+                [LanguageCode.En] = "Apply",
+                [LanguageCode.Ja] = "適用"
+            },
+            ["BtnTest"] = new()
+            {
+                [LanguageCode.ZhCn] = "测试",
+                [LanguageCode.ZhTw] = "測試",
+                [LanguageCode.En] = "Test",
+                [LanguageCode.Ja] = "テスト"
+            },
+            ["BtnBrowseFolder"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择文件夹...",
+                [LanguageCode.ZhTw] = "選擇資料夾...",
+                [LanguageCode.En] = "Browse Folder...",
+                [LanguageCode.Ja] = "フォルダーを選択..."
+            },
+            ["ActionTypeFolder"] = new()
+            {
+                [LanguageCode.ZhCn] = "📂 打开文件夹",
+                [LanguageCode.ZhTw] = "📂 開啟資料夾",
+                [LanguageCode.En] = "📂 Open Folder",
+                [LanguageCode.Ja] = "📂 フォルダーを開く"
+            },
+            ["ActionTypeHotkeyShort"] = new()
+            {
+                [LanguageCode.ZhCn] = "快捷热键",
+                [LanguageCode.ZhTw] = "快捷熱鍵",
+                [LanguageCode.En] = "Hotkey",
+                [LanguageCode.Ja] = "ショートカット"
+            },
+            ["ActionTypeLaunchShort"] = new()
+            {
+                [LanguageCode.ZhCn] = "启动程序",
+                [LanguageCode.ZhTw] = "啟動程式",
+                [LanguageCode.En] = "Run App",
+                [LanguageCode.Ja] = "アプリ起動"
+            },
+            ["ActionTypeFolderShort"] = new()
+            {
+                [LanguageCode.ZhCn] = "打开文件夹",
+                [LanguageCode.ZhTw] = "開啟資料夾",
+                [LanguageCode.En] = "Open Folder",
+                [LanguageCode.Ja] = "フォルダー"
+            },
+            ["ActionTypeSystemShort"] = new()
+            {
+                [LanguageCode.ZhCn] = "系统控制",
+                [LanguageCode.ZhTw] = "系統控制",
+                [LanguageCode.En] = "System",
+                [LanguageCode.Ja] = "システム"
+            },
+            ["ProfileCardTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "当前配置方案 (Profile)",
+                [LanguageCode.ZhTw] = "當前配置方案 (Profile)",
+                [LanguageCode.En] = "Active Profiles",
+                [LanguageCode.Ja] = "プロファイル設定"
+            },
+            ["ProfileCardDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择或新建针对特定程序（如 Chrome、VS Code）或特定工作流的轮盘配置方案（支持双击重命名）。",
+                [LanguageCode.ZhTw] = "選擇或新建針對特定程式（如 Chrome、VS Code）或特定工作流程的輪盤配置方案（支援按兩下重新命名）。",
+                [LanguageCode.En] = "Select or create dedicated pie wheel profiles for specific apps (e.g. Chrome, VS Code) or workflows (double-click to rename).",
+                [LanguageCode.Ja] = "アプリ（Chrome、VS Codeなど）やワークフローごとに専用のプロファイルを設定します（ダブルクリックで名前変更）。"
+            },
+            ["BtnAddAppProfile"] = new()
+            {
+                [LanguageCode.ZhCn] = "➕ 新增程序专属配置",
+                [LanguageCode.ZhTw] = "➕ 新增程式專屬配置",
+                [LanguageCode.En] = "➕ Add App Profile",
+                [LanguageCode.Ja] = "➕ アプリ専用設定を追加"
+            },
+            ["BtnAddCustomProfile"] = new()
+            {
+                [LanguageCode.ZhCn] = "➕ 新建自定义配置",
+                [LanguageCode.ZhTw] = "➕ 新建自訂配置",
+                [LanguageCode.En] = "➕ Add Custom Profile",
+                [LanguageCode.Ja] = "➕ カスタム設定を追加"
+            },
+            ["BtnRenameProfile"] = new()
+            {
+                [LanguageCode.ZhCn] = "✏️ 重命名当前配置",
+                [LanguageCode.ZhTw] = "✏️ 重新命名當前配置",
+                [LanguageCode.En] = "✏️ Rename Profile",
+                [LanguageCode.Ja] = "✏️ 名前を変更"
+            },
+            ["BtnDeleteProfile"] = new()
+            {
+                [LanguageCode.ZhCn] = "🗑️ 删除当前配置",
+                [LanguageCode.ZhTw] = "🗑️ 刪除當前配置",
+                [LanguageCode.En] = "🗑️ Delete Profile",
+                [LanguageCode.Ja] = "🗑️ 設定を削除"
+            },
+            ["SectorCountOptionTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "扇区方位数量 (Sector Count)",
+                [LanguageCode.ZhTw] = "扇區方位數量 (Sector Count)",
+                [LanguageCode.En] = "Sector Count",
+                [LanguageCode.Ja] = "セクター数（キー数）"
+            },
+            ["SectorCountOptionDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "切换手势轮盘的切分数量。4 键最快最不易误触，8 键为标准全能方位，12 键适合功能密集场景。",
+                [LanguageCode.ZhTw] = "切換手勢輪盤的切分數量。4 鍵最快最不易誤觸，8 鍵為標準全能方位，12 鍵適合功能密集場景。",
+                [LanguageCode.En] = "Switch sector counts: 4-way for fast blind flicks, 8-way for balanced productivity, 12-way for high-density actions.",
+                [LanguageCode.Ja] = "セクター数を切り替えます。4キー（誤操作防止）、8キー（標準全方位）、12キー（高密度機能）。"
+            },
+            ["SectorActionListTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "扇区动作映射列表",
+                [LanguageCode.ZhTw] = "扇區動作對應列表",
+                [LanguageCode.En] = "Sector Action Mappings",
+                [LanguageCode.Ja] = "セクターアクションマッピング"
+            },
+            ["SectorActionListDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "为每个方位指定触发动作与图标。支持热键组合（如 Ctrl+C）、启动本地程序、打开文件夹与系统级操作。",
+                [LanguageCode.ZhTw] = "為每個方位指定觸發動作與圖示。支援快捷熱鍵組合（如 Ctrl+C）、啟動本地程式、開啟資料夾與系統級操作。",
+                [LanguageCode.En] = "Assign actions and icons for each sector. Supports hotkeys (e.g. Ctrl+C), app launching, folder opening, and system actions.",
+                [LanguageCode.Ja] = "各方向の動作とアイコンを設定します。ショートカット（Ctrl+C等）、アプリ起動、フォルダー、システム制御に対応。"
+            },
+            ["IconPickerTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择动作矢量图标",
+                [LanguageCode.ZhTw] = "選擇動作向量圖示",
+                [LanguageCode.En] = "Select Vector Icon",
+                [LanguageCode.Ja] = "ベクターアイコンを選択"
+            },
+            ["IconPickerHeader"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择扇区动作矢量图标",
+                [LanguageCode.ZhTw] = "選擇扇區動作向量圖示",
+                [LanguageCode.En] = "Select Sector Vector Icon",
+                [LanguageCode.Ja] = "セクターアイコンを選択"
+            },
+            ["IconPickerSubtitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "精选 30+ 常用高保真矢量图形，支持在不同分辨率及 DPI 下无损清晰渲染。",
+                [LanguageCode.ZhTw] = "精選 30+ 常用高保真向量圖形，支援在不同解析度及 DPI 下無損清晰渲染。",
+                [LanguageCode.En] = "30+ high-fidelity vector icons with lossless crisp rendering across all DPI displays.",
+                [LanguageCode.Ja] = "30種類以上の高精細ベクターアイコン。あらゆるDPIで美しく描画されます。"
+            },
+            ["IconPickerSearchTooltip"] = new()
+            {
+                [LanguageCode.ZhCn] = "输入图标名称或分类进行快速过滤...",
+                [LanguageCode.ZhTw] = "輸入圖示名稱或分類進行快速篩選...",
+                [LanguageCode.En] = "Search icon name or category...",
+                [LanguageCode.Ja] = "アイコン名またはカテゴリで検索..."
+            },
+            ["IconPickerClear"] = new()
+            {
+                [LanguageCode.ZhCn] = "清空图标 (无图标)",
+                [LanguageCode.ZhTw] = "清空圖示 (無圖示)",
+                [LanguageCode.En] = "Clear Icon (No Icon)",
+                [LanguageCode.Ja] = "アイコンをクリア (なし)"
+            },
+            ["IconPickerSelected"] = new()
+            {
+                [LanguageCode.ZhCn] = "已选图标:",
+                [LanguageCode.ZhTw] = "已選圖示:",
+                [LanguageCode.En] = "Selected Icon:",
+                [LanguageCode.Ja] = "選択中のアイコン:"
+            },
+            ["IconPickerNone"] = new()
+            {
+                [LanguageCode.ZhCn] = "(未选择)",
+                [LanguageCode.ZhTw] = "(未選擇)",
+                [LanguageCode.En] = "(None)",
+                [LanguageCode.Ja] = "(未選択)"
+            },
+            ["ColorPickerTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "色彩选择器与屏幕吸管 (Color Picker)",
+                [LanguageCode.ZhTw] = "色彩選擇器與螢幕吸管 (Color Picker)",
+                [LanguageCode.En] = "Color Picker & Eyedropper",
+                [LanguageCode.Ja] = "カラーピッカー＆スポイト"
+            },
+            ["ColorPickerHue"] = new()
+            {
+                [LanguageCode.ZhCn] = "色相",
+                [LanguageCode.ZhTw] = "色相",
+                [LanguageCode.En] = "Hue",
+                [LanguageCode.Ja] = "色相"
+            },
+            ["ColorPickerAlpha"] = new()
+            {
+                [LanguageCode.ZhCn] = "不透明",
+                [LanguageCode.ZhTw] = "不透明",
+                [LanguageCode.En] = "Opacity",
+                [LanguageCode.Ja] = "不透明度"
+            },
+            ["ColorPickerEyedropperTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "🔍 屏幕取色吸管",
+                [LanguageCode.ZhTw] = "🔍 螢幕取色吸管",
+                [LanguageCode.En] = "🔍 Screen Eyedropper",
+                [LanguageCode.Ja] = "🔍 画面スポイト"
+            },
+            ["ColorPickerEyedropperDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "点击后在屏幕任意窗口吸取精准色彩",
+                [LanguageCode.ZhTw] = "點擊後在螢幕任意視窗吸取精準色彩",
+                [LanguageCode.En] = "Pick color accurately from any window or desktop on screen",
+                [LanguageCode.Ja] = "画面上の任意のウィンドウから正確な色を抽出します"
+            },
+            ["ColorPickerEyedropperBtn"] = new()
+            {
+                [LanguageCode.ZhCn] = "从屏幕吸色",
+                [LanguageCode.ZhTw] = "從螢幕吸色",
+                [LanguageCode.En] = "Pick Color",
+                [LanguageCode.Ja] = "画面から吸色"
+            },
+            ["ColorPickerSwatches"] = new()
+            {
+                [LanguageCode.ZhCn] = "预设经典配色卡 (Quick Swatches - 滚轮滚动查看全部):",
+                [LanguageCode.ZhTw] = "預設經典配色卡 (Quick Swatches - 滾輪滾動查看全部):",
+                [LanguageCode.En] = "Preset Color Swatches (Scroll to browse):",
+                [LanguageCode.Ja] = "プリセットカラーパレット (スクロールで全表示):"
+            },
+            ["ColorPickerApply"] = new()
+            {
+                [LanguageCode.ZhCn] = "应用色彩",
+                [LanguageCode.ZhTw] = "套用色彩",
+                [LanguageCode.En] = "Apply Color",
+                [LanguageCode.Ja] = "色を適用"
+            },
+            ["InputDialogTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "配置方案 - StarPie",
+                [LanguageCode.ZhTw] = "配置方案 - StarPie",
+                [LanguageCode.En] = "Profile - StarPie",
+                [LanguageCode.Ja] = "プロファイル - StarPie"
+            },
+            ["InputDialogEmpty"] = new()
+            {
+                [LanguageCode.ZhCn] = "名称不能为空，请输入有效的配置名称。",
+                [LanguageCode.ZhTw] = "名稱不能為空，請輸入有效的配置名稱。",
+                [LanguageCode.En] = "Name cannot be empty. Please enter a valid profile name.",
+                [LanguageCode.Ja] = "名前を入力してください。"
+            },
+            ["Notice"] = new()
+            {
+                [LanguageCode.ZhCn] = "提示",
+                [LanguageCode.ZhTw] = "提示",
+                [LanguageCode.En] = "Notice",
+                [LanguageCode.Ja] = "お知らせ"
+            },
+            ["Error"] = new()
+            {
+                [LanguageCode.ZhCn] = "错误",
+                [LanguageCode.ZhTw] = "錯誤",
+                [LanguageCode.En] = "Error",
+                [LanguageCode.Ja] = "エラー"
+            },
+
             // App Brand & Headers
             ["AppName"] = new()
             {
@@ -1015,10 +1297,10 @@ namespace WinPieGestures
             },
             ["TrayTooltip"] = new()
             {
-                [LanguageCode.ZhCn] = "StarPie v1.3.8 - 现代化鼠标轮盘笔势",
-                [LanguageCode.ZhTw] = "StarPie v1.3.8 - 現代化滑鼠輪盤手勢",
-                [LanguageCode.En] = "StarPie v1.3.8 - Modern Mouse Radial Gestures",
-                [LanguageCode.Ja] = "StarPie v1.3.8 - 次世代マウスラジアルジェスチャー"
+                [LanguageCode.ZhCn] = "StarPie v1.3.9 - 现代化鼠标轮盘笔势",
+                [LanguageCode.ZhTw] = "StarPie v1.3.9 - 現代化滑鼠輪盤手勢",
+                [LanguageCode.En] = "StarPie v1.3.9 - Modern Mouse Radial Gestures",
+                [LanguageCode.Ja] = "StarPie v1.3.9 - 次世代マウスラジアルジェスチャー"
             }
         };
     }

@@ -7,11 +7,11 @@
 ### Ultra-Lightweight, Blazing-Fast & Aesthetic Radial Pie Menu for Windows 10 / 11
 **现代化 Windows 鼠标轮盘手势与极速生产力增强系统**
 
-[![Release Version](https://img.shields.io/badge/Release-v1.3.8-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
+[![Release Version](https://img.shields.io/badge/Release-v1.3.9-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D4.svg?style=flat-square&logo=windows)](https://microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-15%2F15%20Passed-success.svg?style=flat-square&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-16%2F16%20Passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Language](https://img.shields.io/badge/Language-zh--CN%20%7C%20zh--TW%20%7C%20en%20%7C%20ja-8B5CF6.svg?style=flat-square)](#i18n)
 [![Co-Authored](https://img.shields.io/badge/Co--Authored%20with-AI%20Agent-6366F1.svg?style=flat-square&logo=openai)](#acknowledgements)
 
@@ -150,7 +150,7 @@ Hold the **Right Mouse Button and flick in any direction** within any desktop wi
 
 ## <a id="download"></a>🚀 Quick Start & Download
 
-### Latest Official Release: `v1.3.8`
+### Latest Official Release: `v1.3.9`
 
 | Package Type | Target Audience | Description | Download Link |
 | :--- | :--- | :--- | :--- |
@@ -203,13 +203,13 @@ dotnet run --project WinPieGestures/WinPieGestures.csproj
 ### Publish Release Packages
 ```bash
 # Generate Zero-Dependency Standalone Executable
-dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o releases/v1.3.8/StarPie-v1.3.8-Standalone-win-x64
+dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o releases/v1.3.9/StarPie-v1.3.9-Standalone-win-x64
 
 # Generate Framework-Dependent Lightweight Package
-dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained false -o releases/v1.3.8/StarPie-v1.3.8-Lightweight
+dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained false -o releases/v1.3.9/StarPie-v1.3.9-Lightweight
 ```
 
-### Run Automated Tests (15/15 Passed 🟢)
+### Run Automated Tests (16/16 Passed 🟢)
 ```bash
 # Install testing dependencies
 pip install pytest pywinauto
@@ -238,11 +238,11 @@ StarPie/
 │   ├── RadialWindow.xaml      # 60FPS transparent interactive radial window
 │   └── app_icon.ico           # Anti-aliased high-DPI squircle app icon
 ├── releases/                  # Version release binaries and source mirrors
-│   └── v1.3.8/                # v1.3.8 Standalone and Lightweight builds
+│   └── v1.3.9/                # v1.3.9 Standalone and Lightweight builds
 ├── attachments/               # Official GIF demonstrations and screenshot assets
 ├── tests/                     # pywinauto-based end-to-end automated GUI test suite
 │   ├── conftest.py            # Sandbox isolation and process lifecycle fixtures
-│   └── test_settings.py       # 15 integration and UI test cases
+│   └── test_settings.py       # 16 integration and UI test cases
 ├── CHANGELOG.md               # Version evolution and detailed changelogs
 ├── CONTRIBUTING.md            # Community contribution guidelines
 ├── SECURITY.md                # Security policy and vulnerability reporting
@@ -268,11 +268,11 @@ Please bear with any imperfections. If you encounter issues or have ideas for im
 
 ### 🤖 Human-AI Co-Creation (Co-Authored with AI Agent)
 StarPie was architected, designed, and tuned by the human developer in close collaboration with the advanced AI coding agent (**AI Agent - Antigravity**):
-- **Engineering Paradigm**: Built rigorously following **Specification-Driven Development (SDD)** and **Test-Driven Development (TDD)**, backed by a 15-suite end-to-end GUI automation test harness;
+- **Engineering Paradigm**: Built rigorously following **Specification-Driven Development (SDD)** and **Test-Driven Development (TDD)**, backed by a 16-suite end-to-end GUI automation test harness;
 - **Division of Responsibility**: The human developer steered Windows interaction intuition, Win32 safety boundaries, and multilingual terminology, while the AI Agent accelerated modular code construction, iterative refactoring, and boundary-case regressions.
 
 ### 📌 Maintenance Notice
-- **Current Status**: StarPie v1.3.8 is fully implemented, verified, and **Feature-Complete & Production-Ready** for daily driver workflows;
+- **Current Status**: StarPie v1.3.9 is fully implemented, verified, and **Feature-Complete & Production-Ready** for daily driver workflows;
 - **Future Roadmap**: As the developer is currently prioritizing academic studies and career transitions, subsequent updates will adopt a periodic maintenance cadence. Pull requests and community issues are always warmly welcomed!
 
 ---

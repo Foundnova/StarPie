@@ -7,11 +7,11 @@
 ### 极简 · 轻量 · 极速 现代化 Windows 鼠标轮盘笔势系统
 **Ultra-Lightweight, Blazing-Fast & Elegant Radial Pie Menu for Windows 10 / 11**
 
-[![Release Version](https://img.shields.io/badge/Release-v1.3.8-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
+[![Release Version](https://img.shields.io/badge/Release-v1.3.9-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D4.svg?style=flat-square&logo=windows)](https://microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-15%2F15%20Passed-success.svg?style=flat-square&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-16%2F16%20Passed-success.svg?style=flat-square&logo=pytest)](tests/)
 [![Language](https://img.shields.io/badge/Language-zh--CN%20%7C%20zh--TW%20%7C%20en%20%7C%20ja-8B5CF6.svg?style=flat-square)](#i18n)
 [![Co-Authored](https://img.shields.io/badge/Co--Authored%20with-AI%20Agent-6366F1.svg?style=flat-square&logo=openai)](#acknowledgements)
 
@@ -150,7 +150,7 @@
 
 ## <a id="download"></a>🚀 快速开始 / 下载 (Quick Start & Download)
 
-### 最新正式版：`v1.3.8`
+### 最新正式版：`v1.3.9`
 
 | 版本类型 | 适用人群 | 文件说明 | 下载入口 |
 | :--- | :--- | :--- | :--- |
@@ -203,18 +203,18 @@ dotnet run --project WinPieGestures/WinPieGestures.csproj
 ### 打包发布产物
 ```bash
 # 生成独立免安装单文件版 (Zero-Dependency Self-Contained)
-dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o releases/v1.3.8/StarPie-v1.3.8-Standalone-win-x64
+dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o releases/v1.3.9/StarPie-v1.3.9-Standalone-win-x64
 
 # 生成轻量框架依赖版 (Framework-Dependent)
-dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained false -o releases/v1.3.8/StarPie-v1.3.8-Lightweight
+dotnet publish WinPieGestures/WinPieGestures.csproj -c Release -r win-x64 --self-contained false -o releases/v1.3.9/StarPie-v1.3.9-Lightweight
 ```
 
-### 运行自动化测试 (15/15 Passed 🟢)
+### 运行自动化测试 (16/16 Passed 🟢)
 ```bash
 # 安装测试依赖
 pip install pytest pywinauto
 
-# 执行全量 15 项端到端 GUI 自动化测试
+# 执行全量 16 项端到端 GUI 自动化测试
 python -m pytest tests/test_settings.py -v
 ```
 
@@ -238,11 +238,11 @@ StarPie/
 │   ├── RadialWindow.xaml      # 60FPS 实时轮盘透明交互窗口
 │   └── app_icon.ico           # 高清 Squircle 嵌入式图标
 ├── releases/                  # 各版本发布包与归档镜像
-│   └── v1.3.8/                # v1.3.8 独立单文件与轻量版二进制
+│   └── v1.3.9/                # v1.3.9 独立单文件与轻量版二进制
 ├── attachments/               # 官方动图演练与截图资源
 ├── tests/                     # 基于 pywinauto 的端到端自动化测试套件
 │   ├── conftest.py            # 沙箱隔离与进程生命周期管理
-│   └── test_settings.py       # 15 项集成与界面测试用例
+│   └── test_settings.py       # 16 项集成与界面测试用例
 ├── CHANGELOG.md               # 完整版本演进与更新日志
 ├── CONTRIBUTING.md            # 社区贡献指南
 ├── SECURITY.md                # 安全策略与漏洞反馈
@@ -267,11 +267,11 @@ StarPie/
 
 ### 🤖 人机协同工程实践 (Co-Authored with AI Agent)
 本项目由开发者主导架构设计、产品交互原型与核心系统调优，并与先进 AI 编程智能体（**AI Agent - Antigravity**）深度协作完成：
-- **研发范式**：全流程践行**规格驱动开发 (SDD)** 与 **测试驱动开发 (TDD)**，通过 15 项端到端 GUI 自动化测试实现严苛的质量保障；
+- **研发范式**：全流程践行**规格驱动开发 (SDD)** 与 **测试驱动开发 (TDD)**，通过 16 项端到端 GUI 自动化测试实现严苛的质量保障；
 - **分工边界**：由人类开发者把控 Windows 交互直觉、Win32 钩子安全边界与多语言术语，AI Agent 协同加速模块化代码构建、多版本重构与极限场景回归测试。
 
 ### 📌 阶段性维护说明 (Maintenance Notice)
-- **当前状态**：StarPie v1.3.8 核心功能已完整实现并经过真机全面验证（**Feature-Complete & Production-Ready**），可直接作为生产力日常主力工具使用；
+- **当前状态**：StarPie v1.3.9 核心功能已完整实现并经过真机全面验证（**Feature-Complete & Production-Ready**），可直接作为生产力日常主力工具使用；
 - **后续规划**：近期开发者因**学业深造与求职事务**，版本迭代节奏将转为阶段性维护模式。欢迎社区伙伴提交 Issue 与 Pull Request 共同完善！
 
 ---

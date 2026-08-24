@@ -94,6 +94,10 @@ namespace WinPieGestures
                     case "Launch":
                         ExecuteLaunch(action.Parameter, action.Arguments);
                         break;
+                    case "Folder":
+                    case "OpenFolder":
+                        ExecuteFolder(action.Parameter);
+                        break;
                     case "Hotkey":
                         ExecuteHotkey(action.Parameter);
                         break;
@@ -108,6 +112,49 @@ namespace WinPieGestures
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"Failed to execute action '{action.Name}': {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static void ExecuteFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return;
+
+            try
+            {
+                string expandedPath = Environment.ExpandEnvironmentVariables(folderPath.Trim().Trim('"'));
+                if (System.IO.Directory.Exists(expandedPath))
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"\"{expandedPath}\"",
+                        UseShellExecute = true
+                    };
+                    Process.Start(startInfo);
+                }
+                else if (System.IO.File.Exists(expandedPath))
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{expandedPath}\"",
+                        UseShellExecute = true
+                    };
+                    Process.Start(startInfo);
+                }
+                else
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = expandedPath,
+                        UseShellExecute = true
+                    };
+                    Process.Start(startInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"无法打开文件夹 '{folderPath}':\n{ex.Message}", "StarPie", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

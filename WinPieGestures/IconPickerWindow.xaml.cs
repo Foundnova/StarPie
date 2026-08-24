@@ -28,6 +28,23 @@ namespace WinPieGestures
             AppThemeManager.ApplyTheme(this, AppThemeManager.CurrentEffectiveTheme);
             SelectedIconKey = initialKey;
             PopulateIcons();
+            ApplyLocalization();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = $"{I18n.T("IconPickerTitle")} - StarPie";
+            if (HeaderTitleText != null) HeaderTitleText.Text = I18n.T("IconPickerHeader");
+            if (HeaderSubtitleText != null) HeaderSubtitleText.Text = I18n.T("IconPickerSubtitle");
+            if (SearchTextBox != null) SearchTextBox.ToolTip = I18n.T("IconPickerSearchTooltip");
+            if (ClearIconButton != null) ClearIconButton.Content = I18n.T("IconPickerClear");
+            if (SelectedIconPrefixText != null) SelectedIconPrefixText.Text = I18n.T("IconPickerSelected") + " ";
+            if (ConfirmButton != null) ConfirmButton.Content = I18n.T("BtnConfirm");
+            if (CancelButton != null) CancelButton.Content = I18n.T("BtnCancel");
+            if (string.IsNullOrEmpty(SelectedIconKey) && SelectedIconNameLabel != null)
+            {
+                SelectedIconNameLabel.Text = I18n.T("IconPickerNone");
+            }
         }
 
         private void PopulateIcons(string filter = "")

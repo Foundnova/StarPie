@@ -85,8 +85,8 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="选择扇区动作矢量图标" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-            <TextBlock Text="精选 30+ 常用高保真矢量图形，支持在不同分辨率及 DPI 下无损清晰渲染。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+            <TextBlock x:Name="HeaderTitleText" Text="选择扇区动作矢量图标" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+            <TextBlock x:Name="HeaderSubtitleText" Text="精选 30+ 常用高保真矢量图形，支持在不同分辨率及 DPI 下无损清晰渲染。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
         </StackPanel>
 
         <!-- Category Filter & Search -->
@@ -100,7 +100,7 @@
                      Foreground="{DynamicResource TextPrimaryBrush}"
                      BorderBrush="{DynamicResource InputBorderBrush}"
                      TextChanged="SearchTextBox_TextChanged" Text="" ToolTip="输入图标名称进行快速过滤..."/>
-            <Button Grid.Column="1" Content="清空图标 (无图标)" Style="{StaticResource ModernButtonStyle}" Height="32" Margin="8,0,0,0" Click="ClearIcon_Click"/>
+            <Button Grid.Column="1" x:Name="ClearIconButton" Content="清空图标 (无图标)" Style="{StaticResource ModernButtonStyle}" Height="32" Margin="8,0,0,0" Click="ClearIcon_Click"/>
         </Grid>
 
         <!-- Icons Grid -->
@@ -118,12 +118,12 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="已选图标: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                <TextBlock x:Name="SelectedIconPrefixText" Text="已选图标: " Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
                 <TextBlock x:Name="SelectedIconNameLabel" Text="(未选择)" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" Margin="4,0,0,0"/>
             </StackPanel>
 
-            <Button Grid.Column="1" Content="确定应用" Style="{StaticResource PrimaryButtonStyle}" Width="90" Height="32" Margin="0,0,8,0" Click="Confirm_Click"/>
-            <Button Grid.Column="2" Content="取消" Style="{StaticResource ModernButtonStyle}" Width="80" Height="32" Click="Cancel_Click"/>
+            <Button Grid.Column="1" x:Name="ConfirmButton" Content="确定应用" Style="{StaticResource PrimaryButtonStyle}" Width="90" Height="32" Margin="0,0,8,0" Click="Confirm_Click"/>
+            <Button Grid.Column="2" x:Name="CancelButton" Content="取消" Style="{StaticResource ModernButtonStyle}" Width="80" Height="32" Click="Cancel_Click"/>
         </Grid>
     </Grid>
 </Window>

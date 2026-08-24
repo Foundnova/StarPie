@@ -45,6 +45,20 @@ namespace WinPieGestures
             AppThemeManager.ApplyTheme(this, AppThemeManager.CurrentEffectiveTheme);
             PopulateSwatches();
             SetColorFromHex(string.IsNullOrWhiteSpace(initialHex) ? "#FF2563EB" : initialHex);
+            ApplyLocalization();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = $"{I18n.T("ColorPickerTitle")} - StarPie";
+            if (HueLabelText != null) HueLabelText.Text = I18n.T("ColorPickerHue");
+            if (AlphaLabelText != null) AlphaLabelText.Text = I18n.T("ColorPickerAlpha");
+            if (EyedropperTitleText != null) EyedropperTitleText.Text = I18n.T("ColorPickerEyedropperTitle");
+            if (EyedropperDescText != null) EyedropperDescText.Text = I18n.T("ColorPickerEyedropperDesc");
+            if (EyedropperButton != null) EyedropperButton.Content = I18n.T("ColorPickerEyedropperBtn");
+            if (SwatchesTitleText != null) SwatchesTitleText.Text = I18n.T("ColorPickerSwatches");
+            if (CancelButton != null) CancelButton.Content = I18n.T("BtnCancel");
+            if (OkButton != null) OkButton.Content = I18n.T("ColorPickerApply");
         }
 
         private void PopulateSwatches()

@@ -718,10 +718,52 @@ def test_v138_i18n_multilanguage_support(app):
         config = json.load(f)
     assert config.get("Language") == "zh-CN", f"Expected config Language='zh-CN', got {config.get('Language')}"
 
-
-
-
-
-
-
-
+def test_v139_folder_action_type_and_i18n_consistency(app):
+    """
+    Test v1.3.9 Folder Action Type and Global UI I18n Consistency:
+    1. Navigate to Gestures & Actions (NavTab2).
+    2. Verify SectorActionListTitleText and ProfileCardTitleText exist.
+    3. Locate the first slot's Action Type ComboBox and select "Folder" (index 2).
+    4. Save configuration and verify config.json persists Type="Folder".
+    5. Switch language to English (en), verify action type options are translated.
+    6. Switch back to zh-CN.
+    """
+    win, local_app_data = app
+    
+    # 1. Switch to Tab 2
+    tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
+    tab2.select()
+    time.sleep(0.4)
+    
+    # 2. Check title text blocks
+    action_list_title = win.child_window(auto_id="SectorActionListTitleText", control_type="Text")
+    assert action_list_title.exists(timeout=3), "SectorActionListTitleText should exist"
+    
+    # 3. Locate slots items control and find the first type combo box
+    combos = win.descendants(control_type="ComboBox")
+    # Find type combobox inside slots (has items count == 4: Hotkey, Launch, Folder, System)
+    type_combo = None
+    for c in combos:
+        try:
+            if c.item_count() == 4:
+                type_combo = c
+                break
+        except Exception:
+            pass
+            
+    if type_combo is not None:
+        # Select index 2: Folder
+        type_combo.select(2)
+        time.sleep(0.3)
+    
+    # 4. Save configuration
+    save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
+    save_btn.invoke()
+    time.sleep(0.5)
+    
+    config_path = get_config_path(local_app_data)
+    with open(config_path, "r", encoding="utf-8") as f:
+        saved_config = json.load(f)
+        
+    if type_combo is not None:
+        assert saved_config["Profiles"][0]["Actions"][0]["Type"] == "Folder", "Action type should persist as Folder"

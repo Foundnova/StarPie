@@ -6,6 +6,27 @@
 
 ---
 
+## [v1.3.9] - 2026-08-24 (打开文件夹动作类型 & 全局界面语言统一性强化 & 弹窗国际化深度适配)
+### 📂 新增【打开文件夹】专属动作类型 (Open Folder Action)
+- **原生文件目录直达**：
+  - 在「手势与动作」扇区动作映射列表中，新增 `📂 打开文件夹 (Folder)` 专属动作类型；
+  - 接入现代 Windows 10/11 文件目录选择器（`Microsoft.Win32.OpenFolderDialog`），支持图形化一键选取本地任意文件夹目录；
+  - 自动根据选取的文件夹名称填充动作展示名称，并默认关联专属 `Folder` 矢量图标；
+  - 支持手动输入与环境变量路径解析（如 `%USERPROFILE%\Downloads`、`D:\Workspace`），点击测试或在轮盘中触发时调用 `explorer.exe` 毫秒级极速打开并前台聚焦。
+
+### 🌐 全局界面语言统一性强化与 Raw 字典键消除 (Global i18n Polish & Raw Key Elimination)
+- **消除未翻译 Raw 键名**：
+  - 修复「选择程序 (ProgramPickerWindow)」弹窗右下角按钮此前显示为 `BtnConfirm` 与 `BtnCancel` 原始字典键的 Bug，完整接入多语言本地化（中/繁/英/日）；
+  - 全面排查并修复 `ColorPickerWindow`（色彩选择器）、`IconPickerWindow`（矢量图标选择器）、`InputDialog`（配置方案命名输入框）中的标题、副标题、搜索提示、取色吸管与操作按钮，实现 100% 深度国际化；
+- **扇区动作下拉框与测试按钮动态国际化**：
+  - 扇区动作类型下拉框（`快捷热键` / `启动程序` / `打开文件夹` / `系统控制`）与每行的「测试 (Test)」按钮全面实现基于 `I18n.LanguageChanged` 事件的即时热刷新；
+  - 切换语言时，所有方位列表无需重置或重启即可瞬间刷新为对应语言。
+
+### 🛠️ 自动化测试与工程质量提升 (Automated Test Suite Expansion)
+- 自动化测试套件扩充至 **16 项端到端 GUI 自动化测试**，新增 `test_v139_folder_action_type_and_i18n_consistency` 专项用例，16/16 全部通过 (🟢 100% Passed)。
+
+---
+
 ## [v1.3.8] - 2026-08-23 (StarPie 品牌视觉升级 & 原生圆角星轨图标 & 托盘图标自愈修复 & 应用程序智能检索重构 & 控制台排版精修 & 四国多语言国际化)
 ### 🔍 应用程序智能检索重构与死链/冗余项过滤 (Smart Program Scanner & Ghost Item Cleanup)
 - **高召回率多源深度检索**：

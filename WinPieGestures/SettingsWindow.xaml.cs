@@ -290,7 +290,7 @@ namespace WinPieGestures
             if (_notifyIcon == null) return;
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
             
-            var titleItem = new ToolStripMenuItem("StarPie v1.3.8")
+            var titleItem = new ToolStripMenuItem("StarPie v1.3.9")
             {
                 Enabled = false,
                 Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -369,6 +369,19 @@ namespace WinPieGestures
 
             // Tab 2: Gestures & Actions
             if (GesturesPageHeader != null) GesturesPageHeader.Text = I18n.T("GesturesHeader");
+            if (ProfileCardTitleText != null) ProfileCardTitleText.Text = I18n.T("ProfileCardTitle");
+            if (ProfileCardDescText != null) ProfileCardDescText.Text = I18n.T("ProfileCardDesc");
+            if (AddProfileButton != null) AddProfileButton.Content = I18n.T("BtnAddAppProfile");
+            if (AddCustomProfileButton != null) AddCustomProfileButton.Content = I18n.T("BtnAddCustomProfile");
+            if (RenameProfileButton != null) RenameProfileButton.Content = I18n.T("BtnRenameProfile");
+            if (DeleteProfileButton != null) DeleteProfileButton.Content = I18n.T("BtnDeleteProfile");
+            if (SectorCountTitleText != null) SectorCountTitleText.Text = I18n.T("SectorCountOptionTitle");
+            if (SectorCountDescText != null) SectorCountDescText.Text = I18n.T("SectorCountOptionDesc");
+            if (SectorCount4Radio != null) SectorCount4Radio.Content = I18n.T("SectorCount4");
+            if (SectorCount8Radio != null) SectorCount8Radio.Content = I18n.T("SectorCount8");
+            if (SectorCount12Radio != null) SectorCount12Radio.Content = I18n.T("SectorCount12");
+            if (SectorActionListTitleText != null) SectorActionListTitleText.Text = I18n.T("SectorActionListTitle");
+            if (SectorActionListDescText != null) SectorActionListDescText.Text = I18n.T("SectorActionListDesc");
 
             // Tab 3: Advanced & System
             if (AdvancedPageHeader != null) AdvancedPageHeader.Text = I18n.T("AdvancedHeader");
@@ -1938,6 +1951,48 @@ namespace WinPieGestures
             }
         }
 
+        private void BrowseFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is SlotViewModel vm)
+            {
+                try
+                {
+                    var dialog = new Microsoft.Win32.OpenFolderDialog
+                    {
+                        Title = I18n.T("BtnBrowseFolder"),
+                        Multiselect = false
+                    };
+                    if (!string.IsNullOrWhiteSpace(vm.Parameter) && System.IO.Directory.Exists(vm.Parameter))
+                    {
+                        dialog.InitialDirectory = vm.Parameter;
+                    }
+
+                    if (dialog.ShowDialog(this) == true)
+                    {
+                        string selectedFolder = dialog.FolderName;
+                        if (!string.IsNullOrEmpty(selectedFolder))
+                        {
+                            vm.Parameter = selectedFolder;
+                            if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("快捷动作") || vm.Name.StartsWith("动作") || vm.Name == "打开文件夹")
+                            {
+                                var dirInfo = new System.IO.DirectoryInfo(selectedFolder);
+                                vm.Name = dirInfo.Name;
+                            }
+                            if (string.IsNullOrEmpty(vm.IconKey))
+                            {
+                                vm.IconKey = "Folder";
+                            }
+                            SyncUiToConfigAndSave();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[BrowseFolder_Click Error]: {ex}");
+                }
+            }
+        }
+
         private void Test_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement elem && elem.DataContext is SlotViewModel vm)
@@ -2163,6 +2218,7 @@ namespace WinPieGestures
 
                         if (!string.IsNullOrEmpty(customSvg)) svgData = customSvg;
                         else if (!string.IsNullOrEmpty(iconKey)) svgData = IconHelper.GetSvgPathByKey(iconKey);
+                        else if (actionType == "Folder" || actionType == "OpenFolder") svgData = IconHelper.GetSvgPathByKey("Folder");
                         else if (actionType == "System" && !string.IsNullOrEmpty(parameter)) svgData = IconHelper.GetSvgPathByKey(parameter);
 
                         double configuredIconSize = ConfigManager.CurrentConfig.SectorIconSize > 0 ? ConfigManager.CurrentConfig.SectorIconSize : 20.0;
@@ -2494,9 +2550,18 @@ namespace WinPieGestures
                 if (Action.Type != value && !string.IsNullOrEmpty(value))
                 {
                     Action.Type = value;
+                    if ((value == "Folder" || value == "OpenFolder") && string.IsNullOrEmpty(IconKey))
+                    {
+                        IconKey = "Folder";
+                        if (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作"))
+                        {
+                            Name = I18n.T("ActionTypeFolderShort");
+                        }
+                    }
                     OnPropertyChanged(nameof(Type));
                     OnPropertyChanged(nameof(IsHotkeyType));
                     OnPropertyChanged(nameof(IsLaunchType));
+                    OnPropertyChanged(nameof(IsFolderType));
                     OnPropertyChanged(nameof(IsSystemType));
                 }
             }
@@ -2622,12 +2687,36 @@ namespace WinPieGestures
 
         public bool IsHotkeyType => Type == "Hotkey";
         public bool IsLaunchType => Type == "Launch";
+        public bool IsFolderType => Type == "Folder" || Type == "OpenFolder";
         public bool IsSystemType => Type == "System";
+
+        public class ActionTypeOption
+        {
+            public string Tag { get; set; } = "";
+            public string DisplayText { get; set; } = "";
+        }
+
+        public List<ActionTypeOption> ActionTypes => new List<ActionTypeOption>
+        {
+            new ActionTypeOption { Tag = "Hotkey", DisplayText = I18n.T("ActionTypeHotkeyShort") },
+            new ActionTypeOption { Tag = "Launch", DisplayText = I18n.T("ActionTypeLaunchShort") },
+            new ActionTypeOption { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
+            new ActionTypeOption { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
+        };
+
+        public string TestButtonText => I18n.T("BtnTest");
 
         public SlotViewModel(string directionLabel, ActionItem action)
         {
             DirectionLabel = directionLabel;
             Action = action ?? new ActionItem { Type = "Hotkey", Name = "快捷动作", Parameter = "" };
+
+            I18n.LanguageChanged += () =>
+            {
+                OnPropertyChanged(nameof(ActionTypes));
+                OnPropertyChanged(nameof(TestButtonText));
+                OnPropertyChanged(nameof(IconDisplayText));
+            };
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
