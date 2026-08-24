@@ -49,6 +49,8 @@
 
 <div align="center">
   <img src="./attachments/01_radial_summon.gif" width="680" alt="鼠标手势快速呼出与动作触发演示" />
+  <br/><br/>
+  <img src="./attachments/01_1.gif" width="680" alt="实际场景下手势操作与动作执行演示" />
 </div>
 
 ---
@@ -71,6 +73,10 @@
 
 <div align="center">
   <img src="./attachments/03_themes_and_shapes.gif" width="680" alt="轮盘形态与主题风格切换演示" />
+  <br/><br/>
+  <img src="./attachments/03_1.gif" width="680" alt="多几何形态与视觉布局展示" />
+  <br/><br/>
+  <img src="./attachments/03_2.gif" width="680" alt="预设主题风格与画布实时渲染演示" />
 </div>
 
 ---
@@ -114,6 +120,8 @@
 
 <div align="center">
   <img src="./attachments/07_per_app_profiles.gif" width="680" alt="多程序专属方案演示" />
+  <br/><br/>
+  <img src="./attachments/07_1.gif" width="680" alt="应用程序智能检索与方案自适应切换" />
 </div>
 
 ---

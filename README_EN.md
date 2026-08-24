@@ -48,6 +48,8 @@ Hold and drag the right mouse button in any application to summon a fast radial 
 
 <div align="center">
   <img src="./attachments/01_radial_summon.gif" width="680" alt="Quick Radial Gesture Summon Demo" />
+  <br/><br/>
+  <img src="./attachments/01_1.gif" width="680" alt="Real-world Radial Gesture Interaction Demo" />
 </div>
 
 ---
@@ -70,6 +72,10 @@ Hold and drag the right mouse button in any application to summon a fast radial 
 
 <div align="center">
   <img src="./attachments/03_themes_and_shapes.gif" width="680" alt="Themes and Shapes Customization Demo" />
+  <br/><br/>
+  <img src="./attachments/03_1.gif" width="680" alt="Multiple Shapes and Layout Showcase" />
+  <br/><br/>
+  <img src="./attachments/03_2.gif" width="680" alt="Theme Presets and Live Canvas Preview Demo" />
 </div>
 
 ---
@@ -113,6 +119,8 @@ Hold and drag the right mouse button in any application to summon a fast radial 
 
 <div align="center">
   <img src="./attachments/07_per_app_profiles.gif" width="680" alt="Per-App Profiles Demo" />
+  <br/><br/>
+  <img src="./attachments/07_1.gif" width="680" alt="Application Scanner and Profile Switching Demo" />
 </div>
 
 ---
