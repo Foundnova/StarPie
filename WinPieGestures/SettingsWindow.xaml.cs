@@ -128,8 +128,6 @@ namespace WinPieGestures
                     CustomColorExpander.IsExpanded = true;
                 }
                 if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
-                if (RenamePresetInPanelButton != null) RenamePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
-                if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
 
                 // Load Highlight Glow settings
@@ -375,8 +373,7 @@ namespace WinPieGestures
             if (OuterEscapeDistanceTitleText != null) OuterEscapeDistanceTitleText.Text = I18n.T("OuterEscapeDistanceTitle");
             if (OuterEscapeDistanceDescText != null) OuterEscapeDistanceDescText.Text = I18n.T("OuterEscapeDistanceDesc");
             if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
-            if (RenamePresetInPanelButton != null) RenamePresetInPanelButton.Content = I18n.T("RenameCustomPresetButton");
-
+            
             // Tab 1: Appearance & Shapes
             if (CustomColorsExpanderTitleText != null) CustomColorsExpanderTitleText.Text = I18n.T("CustomColorsExpanderTitle");
             if (CustomColorsExpanderDescText != null) CustomColorsExpanderDescText.Text = I18n.T("CustomColorsExpanderDesc");
@@ -384,8 +381,7 @@ namespace WinPieGestures
             if (olderExpander != null) olderExpander.Header = I18n.T("MilestonesOlderExpander");
             if (AppearancePageHeader != null) AppearancePageHeader.Text = I18n.T("AppearanceHeader");
             if (AppearancePageSubheader != null) AppearancePageSubheader.Text = I18n.T("AppearanceSubheader");
-            if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Content = I18n.T("BtnDeletePreset");
-            if (ResetDimensionsButton != null) ResetDimensionsButton.Content = I18n.T("BtnResetGeometry");
+                        if (ResetDimensionsButton != null) ResetDimensionsButton.Content = I18n.T("BtnResetGeometry");
 
             // Tab 2: Gestures & Actions
             if (GesturesPageHeader != null) GesturesPageHeader.Text = I18n.T("GesturesHeader");
@@ -1014,9 +1010,9 @@ namespace WinPieGestures
 
                 bool isCustomPreset = theme.StartsWith("CustomPreset_");
 
-                if (DeleteCustomColorPresetButton != null)
+                if (RenameCustomColorPresetButton != null)
                 {
-                    DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
+                    RenameCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 }
                 if (DeletePresetInPanelButton != null)
                 {
@@ -1130,7 +1126,7 @@ namespace WinPieGestures
                 ReloadThemePresets();
                 SetComboBoxSelectedValue(ThemeComboBox, "System");
 
-                if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = Visibility.Collapsed;
+                if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Visibility = Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = Visibility.Collapsed;
                 
 

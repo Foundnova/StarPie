@@ -822,7 +822,6 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="ThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" SelectionChanged="ThemeComboBox_SelectionChanged">
                                                 <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System"/>
@@ -832,8 +831,7 @@
                                                 <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce"/>
                                                 <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted"/>
                                             </ComboBox>
-                                            <Button x:Name="RenameCustomColorPresetButton" Grid.Column="1" Content="✏️ 重命名" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="8,0,0,0" Padding="10,0" Visibility="Collapsed" Click="RenameCustomColorPresetButton_Click" ToolTip="重命名当前选中的自定义配色预设"/>
-                                            <Button x:Name="DeleteCustomColorPresetButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义配色方案预设"/>
+                                            <Button x:Name="RenameCustomColorPresetButton" Grid.Column="1" Content="✏️ 重命名预设" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="RenameCustomColorPresetButton_Click" ToolTip="重命名当前选中的自定义配色方案预设"/>
                                         </Grid>
 
                                                                         <!-- Card 1.5: Custom Advanced Colors (Collapsible) -->
@@ -935,11 +933,9 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Button x:Name="SaveCustomColorPresetButton" Content="💾 保存当前颜色为自定义配色预设..." Style="{StaticResource ModernButtonStyle}" Height="30" FontWeight="Medium" Click="SaveCustomColorPresetButton_Click"/>
-                                                <Button x:Name="RenamePresetInPanelButton" Grid.Column="1" Content="✏️ 重命名预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="8,0,0,0" Padding="10,0" Visibility="Collapsed" Click="RenameCustomColorPresetButton_Click" ToolTip="重命名当前自定义预设"/>
-                                                <Button x:Name="DeletePresetInPanelButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义预设方案"/>
+                                                <Button x:Name="DeletePresetInPanelButton" Grid.Column="1" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义配色方案预设"/>
                                             </Grid>
                                         </StackPanel>
                                     </Expander>
