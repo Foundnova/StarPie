@@ -1668,15 +1668,80 @@ namespace WinPieGestures
             }
         }
 
+        private void CustomColorExpander_Expanded(object sender, RoutedEventArgs e)
+        {
+            // When user expands custom colors, ensure inputs have colors and update live preview
+            PopulateCustomColorsIfEmpty();
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+        }
+
+        private void CustomColorExpander_Collapsed(object sender, RoutedEventArgs e)
+        {
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+        }
+
+        private void PopulateCustomColorsIfEmpty()
+        {
+            if (CustomSectorBgTextBox == null || _previewStyleRenderer == null) return;
+            if (string.IsNullOrWhiteSpace(CustomSectorBgTextBox.Text) && _previewDefaultBrush is SolidColorBrush sb)
+            {
+                CustomSectorBgTextBox.Text = $"#{sb.Color.A:X2}{sb.Color.R:X2}{sb.Color.G:X2}{sb.Color.B:X2}";
+            }
+            if (string.IsNullOrWhiteSpace(CustomSectorBorderTextBox.Text) && _previewBorderBrush is SolidColorBrush sbb)
+            {
+                CustomSectorBorderTextBox.Text = $"#{sbb.Color.A:X2}{sbb.Color.R:X2}{sbb.Color.G:X2}{sbb.Color.B:X2}";
+            }
+            if (string.IsNullOrWhiteSpace(CustomHighlightBgTextBox.Text) && _previewHighlightBrush is SolidColorBrush hb)
+            {
+                CustomHighlightBgTextBox.Text = $"#{hb.Color.A:X2}{hb.Color.R:X2}{hb.Color.G:X2}{hb.Color.B:X2}";
+            }
+            if (string.IsNullOrWhiteSpace(CustomHighlightBorderTextBox.Text) && _previewHighlightBorderBrush is SolidColorBrush hbb)
+            {
+                CustomHighlightBorderTextBox.Text = $"#{hbb.Color.A:X2}{hbb.Color.R:X2}{hbb.Color.G:X2}{hbb.Color.B:X2}";
+            }
+            if (string.IsNullOrWhiteSpace(CustomTextTextBox.Text) && _previewTextBrush is SolidColorBrush tb)
+            {
+                CustomTextTextBox.Text = $"#{tb.Color.A:X2}{tb.Color.R:X2}{tb.Color.G:X2}{tb.Color.B:X2}";
+            }
+            UpdateColorPreviews();
+        }
+
         private void CustomColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
 
-            ConfigManager.CurrentConfig.CustomSectorBg = CustomSectorBgTextBox.Text.Trim();
-            ConfigManager.CurrentConfig.CustomSectorBorder = CustomSectorBorderTextBox.Text.Trim();
-            ConfigManager.CurrentConfig.CustomHighlightBg = CustomHighlightBgTextBox.Text.Trim();
-            ConfigManager.CurrentConfig.CustomHighlightBorder = CustomHighlightBorderTextBox.Text.Trim();
-            ConfigManager.CurrentConfig.CustomText = CustomTextTextBox.Text.Trim();
+            string secBg = CustomSectorBgTextBox.Text.Trim();
+            string secBorder = CustomSectorBorderTextBox.Text.Trim();
+            string hlBg = CustomHighlightBgTextBox.Text.Trim();
+            string hlBorder = CustomHighlightBorderTextBox.Text.Trim();
+            string txtColor = CustomTextTextBox.Text.Trim();
+
+            ConfigManager.CurrentConfig.CustomSectorBg = secBg;
+            ConfigManager.CurrentConfig.CustomSectorBorder = secBorder;
+            ConfigManager.CurrentConfig.CustomHighlightBg = hlBg;
+            ConfigManager.CurrentConfig.CustomHighlightBorder = hlBorder;
+            ConfigManager.CurrentConfig.CustomText = txtColor;
+
+            string currentTheme = (ThemeComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? ConfigManager.CurrentConfig.Theme ?? "";
+            if (currentTheme.StartsWith("CustomPreset_"))
+            {
+                string presetId = currentTheme.Substring("CustomPreset_".Length);
+                var preset = ConfigManager.CurrentConfig.CustomColorPresets?.Find(p => p.Id == presetId);
+                if (preset != null)
+                {
+                    if (!string.IsNullOrEmpty(secBg)) preset.SectorBg = secBg;
+                    if (!string.IsNullOrEmpty(secBorder)) preset.SectorBorder = secBorder;
+                    if (!string.IsNullOrEmpty(hlBg)) preset.HighlightBg = hlBg;
+                    if (!string.IsNullOrEmpty(hlBorder)) preset.HighlightBorder = hlBorder;
+                    if (!string.IsNullOrEmpty(txtColor)) preset.TextColor = txtColor;
+                }
+            }
 
             UpdateColorPreviews();
 
@@ -1726,10 +1791,19 @@ namespace WinPieGestures
                 TextBox? targetBox = GetColorTextBoxByTag(tag);
                 if (targetBox != null)
                 {
-                    var dlg = new ColorPickerWindow(targetBox.Text) { Owner = this };
+                    string initialColor = targetBox.Text;
+                    var dlg = new ColorPickerWindow(initialColor) { Owner = this };
+                    dlg.ColorChangedCallback = hex =>
+                    {
+                        targetBox.Text = hex;
+                    };
                     if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.SelectedHexColor))
                     {
                         targetBox.Text = dlg.SelectedHexColor;
+                    }
+                    else
+                    {
+                        targetBox.Text = initialColor;
                     }
                 }
             }
@@ -2211,6 +2285,42 @@ namespace WinPieGestures
                 _previewTextBrush = _previewStyleRenderer.TextColorBrush;
                 _previewCoreBgBrush = _previewStyleRenderer.CoreBgBrush;
                 _previewCoreBorderBrush = _previewStyleRenderer.CoreBorderBrush;
+
+                // Real-time live color override: when CustomColorExpander is open or custom colors are being adjusted
+                if (CustomColorExpander != null && CustomColorExpander.IsExpanded)
+                {
+                    try
+                    {
+                        if (CustomSectorBgTextBox != null && !string.IsNullOrWhiteSpace(CustomSectorBgTextBox.Text))
+                        {
+                            var c = (Color)ColorConverter.ConvertFromString(CustomSectorBgTextBox.Text.Trim());
+                            _previewDefaultBrush = new SolidColorBrush(c);
+                            _previewCoreBgBrush = _previewDefaultBrush;
+                        }
+                        if (CustomSectorBorderTextBox != null && !string.IsNullOrWhiteSpace(CustomSectorBorderTextBox.Text))
+                        {
+                            var c = (Color)ColorConverter.ConvertFromString(CustomSectorBorderTextBox.Text.Trim());
+                            _previewBorderBrush = new SolidColorBrush(c);
+                            _previewCoreBorderBrush = _previewBorderBrush;
+                        }
+                        if (CustomHighlightBgTextBox != null && !string.IsNullOrWhiteSpace(CustomHighlightBgTextBox.Text))
+                        {
+                            var c = (Color)ColorConverter.ConvertFromString(CustomHighlightBgTextBox.Text.Trim());
+                            _previewHighlightBrush = new SolidColorBrush(c);
+                        }
+                        if (CustomHighlightBorderTextBox != null && !string.IsNullOrWhiteSpace(CustomHighlightBorderTextBox.Text))
+                        {
+                            var c = (Color)ColorConverter.ConvertFromString(CustomHighlightBorderTextBox.Text.Trim());
+                            _previewHighlightBorderBrush = new SolidColorBrush(c);
+                        }
+                        if (CustomTextTextBox != null && !string.IsNullOrWhiteSpace(CustomTextTextBox.Text))
+                        {
+                            var c = (Color)ColorConverter.ConvertFromString(CustomTextTextBox.Text.Trim());
+                            _previewTextBrush = new SolidColorBrush(c);
+                        }
+                    }
+                    catch { }
+                }
 
                 // Prepare preview core grid and render style decorations
                 var previewCoreGrid = new Grid

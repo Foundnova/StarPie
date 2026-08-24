@@ -839,7 +839,7 @@
                                     <Border.Effect>
                                         <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
                                     </Border.Effect>
-                                    <Expander x:Name="CustomColorExpander" IsExpanded="False" Background="Transparent" BorderThickness="0">
+                                    <Expander x:Name="CustomColorExpander" IsExpanded="False" Background="Transparent" BorderThickness="0" Expanded="CustomColorExpander_Expanded" Collapsed="CustomColorExpander_Collapsed">
                                         <Expander.Header>
                                             <StackPanel Margin="0,2,0,2">
                                                 <TextBlock x:Name="CustomColorsExpanderTitleText" Text="🎨 自定义高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>

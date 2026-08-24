@@ -23,6 +23,7 @@ namespace WinPieGestures
     public partial class ColorPickerWindow : Window
     {
         public string SelectedHexColor { get; private set; } = "#FF2563EB";
+        public Action<string>? ColorChangedCallback { get; set; }
 
         private double _hue = 0;        // 0 ~ 360
         private double _saturation = 1; // 0 ~ 1
@@ -137,6 +138,8 @@ namespace WinPieGestures
                 HexInputBox.Text = SelectedHexColor;
                 _isUpdating = false;
             }
+
+            ColorChangedCallback?.Invoke(SelectedHexColor);
         }
 
         private void SpectrumCanvas_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
