@@ -1,5 +1,7 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -7,11 +9,63 @@ namespace WinPieGestures
 {
     public partial class App : System.Windows.Application
     {
+        private static Mutex? _singleInstanceMutex;
+        private const string MutexName = @"Global\StarPie_SingleInstance_Mutex_9B8A7C";
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string? lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
+
         public static MouseHook? MainMouseHook { get; private set; }
         private GestureController? _gestureController;
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Allow bypassing mutex for automated test runners if explicitly specified
+            string cmdLine = Environment.CommandLine;
+            bool isTestMode = cmdLine.Contains("--allow-multiple", StringComparison.OrdinalIgnoreCase) ||
+                              cmdLine.Contains("--test-instance", StringComparison.OrdinalIgnoreCase);
+
+            if (!isTestMode)
+            {
+                bool isNewInstance;
+                try
+                {
+                    _singleInstanceMutex = new Mutex(true, MutexName, out isNewInstance);
+                }
+                catch
+                {
+                    isNewInstance = true;
+                }
+
+                if (!isNewInstance)
+                {
+                    // Existing instance is running, try to bring settings window to front if open
+                    try
+                    {
+                        IntPtr hWnd = FindWindow(null, "StarPie 设置控制台 (Preferences)");
+                        if (hWnd != IntPtr.Zero)
+                        {
+                            ShowWindow(hWnd, SW_RESTORE);
+                            SetForegroundWindow(hWnd);
+                        }
+                    }
+                    catch { }
+
+                    // Terminate current process immediately without initializing hooks or tray
+                    Shutdown(0);
+                    return;
+                }
+            }
+
             base.OnStartup(e);
 
             // Register global unhandled exception handlers to prevent unexpected process crashes
@@ -64,6 +118,18 @@ namespace WinPieGestures
 
             // Unregister mouse hook on exit
             MainMouseHook?.Stop();
+
+            if (_singleInstanceMutex != null)
+            {
+                try
+                {
+                    _singleInstanceMutex.ReleaseMutex();
+                }
+                catch { }
+                _singleInstanceMutex.Dispose();
+                _singleInstanceMutex = null;
+            }
+
             base.OnExit(e);
         }
     }

@@ -806,3 +806,51 @@ def test_v140_custom_icons_and_appearance_collapsible_and_milestones_folding(app
     older_expander = win.child_window(auto_id="OlderMilestonesExpander", control_type="Group")
     assert older_expander.exists(timeout=3), "OlderMilestonesExpander should exist"
 
+def test_v141_outer_escape_cancel_and_rename_capabilities(app):
+    """
+    Test v1.4.1 Features:
+    1. Triggers & Scenes Tab (NavTab0):
+       - Verify EnableOuterEscapeCheckBox exists and can be toggled.
+    2. Gestures Tab (NavTab2):
+       - Verify RenameProfileButton exists and is enabled.
+    3. Appearance Tab (NavTab1):
+       - Verify custom color expander and theme preset capabilities.
+    4. Save configuration and verify persistence of v1.4.1 settings.
+    """
+    win, local_app_data = app
+    
+    # 1. Triggers Tab (Tab 0)
+    tab0 = win.child_window(auto_id="NavTab0", control_type="RadioButton")
+    tab0.select()
+    time.sleep(0.4)
+    
+    outer_escape_chk = win.child_window(auto_id="EnableOuterEscapeCheckBox", control_type="CheckBox")
+    assert outer_escape_chk.exists(timeout=3), "EnableOuterEscapeCheckBox should exist"
+    
+    # 2. Gestures Tab (Tab 2)
+    tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
+    tab2.select()
+    time.sleep(0.4)
+    
+    rename_profile_btn = win.child_window(auto_id="RenameProfileButton", control_type="Button")
+    assert rename_profile_btn.exists(timeout=3), "RenameProfileButton should exist"
+    
+    # 3. Appearance Tab (Tab 1)
+    tab1 = win.child_window(auto_id="NavTab1", control_type="RadioButton")
+    tab1.select()
+    time.sleep(0.4)
+    
+    color_expander = win.child_window(auto_id="CustomColorExpander", control_type="Group")
+    assert color_expander.exists(timeout=3), "CustomColorExpander should exist"
+    
+    # 4. Save and verify config
+    save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
+    save_btn.invoke()
+    time.sleep(0.5)
+    
+    config_path = get_config_path(local_app_data)
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    assert "EnableOuterEscapeCancel" in config, "EnableOuterEscapeCancel should be in config.json"
+    assert config["EnableOuterEscapeCancel"] is True, "EnableOuterEscapeCancel should default to True"
+

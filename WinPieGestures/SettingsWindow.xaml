@@ -9,7 +9,13 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
         Closing="Window_Closing"
-        FontFamily="Segoe UI, Microsoft YaHei UI, Arial">
+        FontFamily="Segoe UI, Microsoft YaHei UI, Arial"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
+        RenderOptions.BitmapScalingMode="HighQuality">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
@@ -606,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.4.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock Text="v1.4.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -652,6 +658,22 @@
                                         <Slider x:Name="ThresholdSlider" Minimum="10" Maximum="60" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged"/>
                                         <TextBlock x:Name="ThresholdValueLabel" Grid.Column="1" Text="25" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                     </Grid>
+                                </StackPanel>
+                            </Border>
+                            <!-- Card 1.5: Outer Escape Cancel Setting Card -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock x:Name="OuterEscapeTitleText" Text="顺势外甩脱离取消 (Outer Escape Cancel)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="OuterEscapeDescText" Text="手势划出后若想放弃，无需拉回中心，直接顺势向外快速划出即可安全取消，0 误触。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap"/>
+                                    <CheckBox x:Name="EnableOuterEscapeCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="OuterEscapeCheckBox_Checked" Unchecked="OuterEscapeCheckBox_Unchecked">
+                                        <StackPanel Margin="6,0,0,0">
+                                            <TextBlock x:Name="OuterEscapeCheckboxTitleText" Text="启用向外顺势甩出取消手势 (推荐开启)" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="OuterEscapeCheckboxDescText" Text="超过轮盘外圈范围后立即解除高亮，松开右键 0 误触安全放弃。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </CheckBox>
                                 </StackPanel>
                             </Border>
 
@@ -782,6 +804,7 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <ComboBox x:Name="ThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" SelectionChanged="ThemeComboBox_SelectionChanged">
                                                 <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System"/>
@@ -791,7 +814,8 @@
                                                 <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce"/>
                                                 <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted"/>
                                             </ComboBox>
-                                            <Button x:Name="DeleteCustomColorPresetButton" Grid.Column="1" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义配色方案预设"/>
+                                            <Button x:Name="RenameCustomColorPresetButton" Grid.Column="1" Content="✏️ 重命名" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="8,0,0,0" Padding="10,0" Visibility="Collapsed" Click="RenameCustomColorPresetButton_Click" ToolTip="重命名当前选中的自定义配色预设"/>
+                                            <Button x:Name="DeleteCustomColorPresetButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="34" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义配色方案预设"/>
                                         </Grid>
 
                                                                         <!-- Card 1.5: Custom Advanced Colors (Collapsible) -->
@@ -893,9 +917,11 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Button x:Name="SaveCustomColorPresetButton" Content="💾 保存当前颜色为自定义配色预设..." Style="{StaticResource ModernButtonStyle}" Height="30" FontWeight="Medium" Click="SaveCustomColorPresetButton_Click"/>
-                                                <Button x:Name="DeletePresetInPanelButton" Grid.Column="1" Content="🗑️ 删除此预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="8,0,0,0" Padding="12,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义预设方案"/>
+                                                <Button x:Name="RenamePresetInPanelButton" Grid.Column="1" Content="✏️ 重命名预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="8,0,0,0" Padding="10,0" Visibility="Collapsed" Click="RenameCustomColorPresetButton_Click" ToolTip="重命名当前自定义预设"/>
+                                                <Button x:Name="DeletePresetInPanelButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" Click="DeleteCustomColorPresetButton_Click" ToolTip="删除当前选中的自定义预设方案"/>
                                             </Grid>
                                         </StackPanel>
                                     </Expander>
@@ -1486,7 +1512,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.4.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
@@ -1495,7 +1521,21 @@
                                  </Grid>
                             </Border>
 
-                                                                                    <!-- Card 2: v1.4.0 Highlights -->
+                                                                                                                <!-- Card 2: v1.4.1 Highlights -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock Text="v1.4.1 顺势外甩脱离取消 &amp; 防多开单实例 &amp; ClearType 字体锐化 &amp; 多维重命名" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                                    <TextBlock Text="• 🚀 新增【顺势外甩脱离取消】机制，超距向外甩出光标即可秒级安全取消，无需折返中心；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• 🛡️ 引入全局单实例 Mutex 互斥锁，彻底杜绝程序重复多开与多托盘图标驻留；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• 🔤 全面重构 WPF ClearType 亚像素抗锯齿与物理像素排版，彻底解决折叠面板文字发虚模糊；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="• ✏️ 为自定义配色预设与配置方案增加一键【重命名】按钮与快捷编辑入口。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 2: v1.4.0 Highlights -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
@@ -1550,7 +1590,7 @@
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.4.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock Text="自定义图标导入 &amp; 动作引导视觉强化 &amp; 配色折叠收纳 &amp; 架构精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>

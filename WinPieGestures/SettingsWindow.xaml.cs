@@ -127,6 +127,8 @@ namespace WinPieGestures
                 {
                     CustomColorExpander.IsExpanded = true;
                 }
+                if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
+                if (RenamePresetInPanelButton != null) RenamePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
 
@@ -294,7 +296,7 @@ namespace WinPieGestures
             if (_notifyIcon == null) return;
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
             
-            var titleItem = new ToolStripMenuItem("StarPie v1.4.0")
+            var titleItem = new ToolStripMenuItem("StarPie v1.4.1")
             {
                 Enabled = false,
                 Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -366,6 +368,12 @@ namespace WinPieGestures
             if (AddBlacklistButton != null) AddBlacklistButton.Content = I18n.T("BtnAddProcess");
             if (DeleteBlacklistButton != null) DeleteBlacklistButton.Content = I18n.T("BtnDeleteProcess");
             if (NewBlacklistProcessTextBox != null) NewBlacklistProcessTextBox.ToolTip = I18n.T("BlacklistPlaceholder");
+
+            if (OuterEscapeTitleText != null) OuterEscapeTitleText.Text = I18n.T("OuterEscapeTitle");
+            if (OuterEscapeDescText != null) OuterEscapeDescText.Text = I18n.T("OuterEscapeDesc");
+            if (OuterEscapeCheckboxTitleText != null) OuterEscapeCheckboxTitleText.Text = I18n.T("OuterEscapeCheckbox");
+            if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
+            if (RenamePresetInPanelButton != null) RenamePresetInPanelButton.Content = I18n.T("RenameCustomPresetButton");
 
             // Tab 1: Appearance & Shapes
             if (CustomColorsExpanderTitleText != null) CustomColorsExpanderTitleText.Text = I18n.T("CustomColorsExpanderTitle");
@@ -1035,6 +1043,53 @@ namespace WinPieGestures
                 {
                     RenderLiveWheelPreview();
                 }
+                SyncUiToConfigAndSave(true);
+            }
+        }
+
+        private void OuterEscapeCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            ConfigManager.CurrentConfig.EnableOuterEscapeCancel = true;
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void OuterEscapeCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            ConfigManager.CurrentConfig.EnableOuterEscapeCancel = false;
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void RenameCustomColorPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            string theme = (ThemeComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? ConfigManager.CurrentConfig.Theme ?? "";
+            if (!theme.StartsWith("CustomPreset_")) return;
+
+            string presetId = theme.Substring("CustomPreset_".Length);
+            var preset = ConfigManager.CurrentConfig.CustomColorPresets?.Find(p => p.Id == presetId);
+            if (preset == null) return;
+
+            string oldName = preset.Name;
+            var dialog = new InputDialog(
+                title: I18n.T("RenameCustomPresetTitle"),
+                prompt: $"{I18n.T("RenameCustomPresetPrompt")}「{oldName}」",
+                defaultText: oldName,
+                validator: input =>
+                {
+                    if (string.IsNullOrWhiteSpace(input)) return (false, "配色方案名称不能为空！");
+                    return (true, "");
+                });
+
+            dialog.Owner = this;
+            if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.InputText))
+            {
+                preset.Name = dialog.InputText.Trim();
+                ConfigManager.SaveConfig();
+
+                ReloadThemePresets();
+                SetComboBoxSelectedValue(ThemeComboBox, $"CustomPreset_{preset.Id}");
                 SyncUiToConfigAndSave(true);
             }
         }

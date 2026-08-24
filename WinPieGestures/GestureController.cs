@@ -167,12 +167,32 @@ namespace WinPieGestures
             double dy = currentPoint.Y - _startPoint.Y;
             double distance = Math.Sqrt(dx * dx + dy * dy);
 
-            // If user drags back close to the center, select no sector
+            // 1. Center deadzone cancel (拖回中心核圆取消)
             if (distance < ConfigManager.CurrentConfig.DragThreshold * 0.6)
             {
                 _selectedSectorIndex = -1;
                 _radialWindow.HighlightSector(-1);
+                _radialWindow.SetOuterEscapeState(false);
                 return;
+            }
+
+            // 2. Scheme 2: Outer Escape Cancel (顺势外甩脱离取消)
+            bool enableOuterEscape = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
+            double outerRadius = ConfigManager.CurrentConfig.WheelRadius > 0 ? ConfigManager.CurrentConfig.WheelRadius : 138.0;
+            double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
+                ? ConfigManager.CurrentConfig.OuterEscapeDistance 
+                : outerRadius * 1.50;
+
+            if (enableOuterEscape && distance > escapeThreshold)
+            {
+                _selectedSectorIndex = -1;
+                _radialWindow.HighlightSector(-1);
+                _radialWindow.SetOuterEscapeState(true);
+                return;
+            }
+            else
+            {
+                _radialWindow.SetOuterEscapeState(false);
             }
 
             // Calculate angle in degrees from [0, 360)

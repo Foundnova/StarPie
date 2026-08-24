@@ -41,7 +41,7 @@ def app(sandbox_env, request):
         pytest.fail(f"Executable not found in {candidates}. Please build the project first.")
         
     # Start the process with sandboxed environment variables
-    proc = subprocess.Popen([app_path], env=env)
+    proc = subprocess.Popen([app_path, "--allow-multiple"], env=env)
     
     # Connect pywinauto using PID
     time.sleep(1.5)

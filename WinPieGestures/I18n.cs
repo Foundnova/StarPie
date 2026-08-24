@@ -91,6 +91,48 @@ namespace WinPieGestures
         private static readonly Dictionary<string, Dictionary<LanguageCode, string>> Translations = new()
         {
             // Standard Global Buttons & Actions
+            ["RenameCustomPresetButton"] = new()
+            {
+                [LanguageCode.ZhCn] = "✏️ 重命名预设",
+                [LanguageCode.ZhTw] = "✏️ 重新命名預設",
+                [LanguageCode.En] = "✏️ Rename Preset",
+                [LanguageCode.Ja] = "✏️ プリセット名を変更"
+            },
+            ["RenameCustomPresetTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "重命名配色方案预设",
+                [LanguageCode.ZhTw] = "重新命名配色方案預設",
+                [LanguageCode.En] = "Rename Color Preset",
+                [LanguageCode.Ja] = "カラープリセット名を変更"
+            },
+            ["RenameCustomPresetPrompt"] = new()
+            {
+                [LanguageCode.ZhCn] = "请输入配色方案预设的新名称：",
+                [LanguageCode.ZhTw] = "請輸入配色方案預設的新名稱：",
+                [LanguageCode.En] = "Enter a new name for the color preset:",
+                [LanguageCode.Ja] = "カラープリセットの新しい名前を入力してください:"
+            },
+            ["OuterEscapeTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "顺势外甩脱离取消 (Outer Escape Cancel)",
+                [LanguageCode.ZhTw] = "順勢外甩脫離取消 (Outer Escape Cancel)",
+                [LanguageCode.En] = "Outer Escape Cancel",
+                [LanguageCode.Ja] = "外側スワイプでキャンセル (Outer Escape)"
+            },
+            ["OuterEscapeDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "手势划出后若想放弃，无需拉回中心，直接顺势向外快速划出即可安全取消，0 误触。",
+                [LanguageCode.ZhTw] = "手勢劃出後若想放棄，無需拉回中心，直接順勢向外快速劃出即可安全取消，0 誤觸。",
+                [LanguageCode.En] = "Flick cursor outwards past the wheel radius to safely cancel without returning to center.",
+                [LanguageCode.Ja] = "ホイールの外側へ素早くスワイプすることで、安全に操作をキャンセルできます。"
+            },
+            ["OuterEscapeCheckbox"] = new()
+            {
+                [LanguageCode.ZhCn] = "启用向外顺势甩出取消手势 (推荐开启)",
+                [LanguageCode.ZhTw] = "啟用向外順勢甩出取消手勢 (推薦開啟)",
+                [LanguageCode.En] = "Enable Outer Escape Cancel (Recommended)",
+                [LanguageCode.Ja] = "外側スワイプキャンセルを有効化 (推奨)"
+            },
             ["IconPickerImport"] = new()
             {
                 [LanguageCode.ZhCn] = "➕ 导入自定义图标...",
@@ -1346,10 +1388,10 @@ namespace WinPieGestures
             },
             ["TrayTooltip"] = new()
             {
-                [LanguageCode.ZhCn] = "StarPie v1.4.0 - 现代化鼠标轮盘笔势",
-                [LanguageCode.ZhTw] = "StarPie v1.4.0 - 現代化滑鼠輪盤手勢",
-                [LanguageCode.En] = "StarPie v1.4.0 - Modern Mouse Radial Gestures",
-                [LanguageCode.Ja] = "StarPie v1.4.0 - 次世代マウスラジアルジェスチャー"
+                [LanguageCode.ZhCn] = "StarPie v1.4.1 - 现代化鼠标轮盘笔势",
+                [LanguageCode.ZhTw] = "StarPie v1.4.1 - 現代化滑鼠輪盤手勢",
+                [LanguageCode.En] = "StarPie v1.4.1 - Modern Mouse Radial Gestures",
+                [LanguageCode.Ja] = "StarPie v1.4.1 - 次世代マウスラジアルジェスチャー"
             }
         };
     }

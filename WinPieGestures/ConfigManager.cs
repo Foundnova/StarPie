@@ -42,7 +42,9 @@ namespace WinPieGestures
     public class AppConfig
     {
         public string Language { get; set; } = "Auto"; // "Auto", "zh-CN", "zh-TW", "en", "ja"
-        public double DragThreshold { get; set; } = 25.0; // Distance in pixels to trigger radial menu
+        public double DragThreshold { get; set; } = 25.0;
+        public bool EnableOuterEscapeCancel { get; set; } = true;
+        public double OuterEscapeDistance { get; set; } = 186.0; // Distance in pixels to trigger radial menu
         public string AppTheme { get; set; } = "System"; // "System", "Light", "Dark", "MidnightNavy", "RoyalViolet", "TitaniumGray"
         public string Theme { get; set; } = "System"; // Radial Wheel Color Theme: "System", "Dark", "Light", "MatchaForest", "GlacialIce", "MorandiMuted", "Custom"
         public string UiStyle { get; set; } = "ClassicRing"; // "ClassicRing", "CleanSectors", "Glassmorphism", "CatPaw"

@@ -6,6 +6,37 @@
 
 ---
 
+## [v1.4.1] - 2026-08-24 (顺势外甩脱离取消 & 全局防多开单实例 & ClearType 字体锐化 & 多维重命名)
+### 🚀 顺势外甩脱离取消机制 (Outer Escape / Overshoot Cancel)
+- **最自然、最符合肌肉记忆的取消手势**：
+  - 彻底打破以往手势唤出后放弃必须“艰难原路折返拉回中心核圆”的僵硬操作限制；
+  - 引入「顺势外甩脱离」算法：按住右键划出扇区后若想放弃，只需**顺势向外稍作加速外甩（光标滑出轮盘外半径约 1.5 倍超距范围）**，系统自动解除当前扇区高亮并进入半透明虚化安全状态；
+  - 松开右键时不触发任何动作，实现零误触的极致丝滑放弃体验；
+  - 在「触发与场景 (Tab 1)」设置中新增 `顺势外甩脱离取消 (Outer Escape Cancel)` 独立开关（默认开启），支持个性化启用。
+
+### 🛡️ 全局单实例运行保护与防多开互斥锁 (Single-Instance Protection)
+- **杜绝多进程与多托盘图标堆积**：
+  - 引入系统级跨进程命名互斥体 `Mutex("Global\StarPie_SingleInstance_Mutex_9B8A7C")`；
+  - 当重复启动或双击应用快捷方式时，新实例自动检测并安全静默退出，同时自动将已在后台运行的 StarPie 实例窗口呼出并置于顶层（SetForegroundWindow）；
+  - 彻底解决任务栏系统托盘重复出现多个 StarPie 图标与底层按键钩子冲突的问题。
+
+### 🔤 WPF ClearType 亚像素字体全链路高清锐化 (ClearType & Typography Polish)
+- **消除不同区域字形发虚与灰阶失真**：
+  - 针对 WPF 中挂载 `DropShadowEffect` 阴影容器时子文本被降级为软件离屏位图光栅化、丢失亚像素抗锯齿的底层问题进行针对性重构；
+  - 全局根节点与基础控件库统一注入 `TextOptions.TextFormattingMode="Display"`、`TextOptions.TextRenderingMode="ClearType"`、`RenderOptions.ClearTypeHint="Enabled"` 与 `UseLayoutRounding="True"`；
+  - 无论是主界面文本、折叠 Expander 卡片内文字还是输入框提示，在 100%、125%、150% 等各类 Windows DPI 缩放比例下均呈现 100% 锐利高对比度的清晰质感。
+
+### ✏️ 实用「重命名」功能多维度补齐 (Multi-Dimensional Rename Support)
+- **个性化配置命名更自由**：
+  - **自定义配色预设重命名**：在 Tab 1（外观与形态）自定义配色区域与折叠调色板中新增 `✏️ 重命名预设...` 按钮，一键为保存的自定义调色方案修改别名（如“赛博朋克紫”、“日落微光”等）；
+  - **配置方案管理重命名**：在 Tab 2（手势与动作）方案列表中强化 `✏️ 重命名配置` 按钮与双击快捷重命名；
+  - 全量接入中/英/繁/日四国语言国际化（`I18n.cs`）。
+
+### 🧪 自动化测试与工程质量提升 (Automated Test Suite Expansion)
+- 自动化测试套件扩充至 **18 项端到端 GUI 自动化测试**，新增 `test_v141_outer_escape_cancel_and_rename_capabilities` 专项用例，18/18 全部通过 (🟢 100% Passed)。
+
+---
+
 ## [v1.4.0] - 2026-08-24 (自定义矢量/图片图标导入 & 启动动作视觉引导强化 & 自定义配色折叠收纳 & 历史演进里程碑折叠)
 ### 🎨 自定义图标导入支持 (Custom Vector & Image Icons Support)
 - **多格式图标一键导入**：

@@ -28,5 +28,20 @@
         <SolidColorBrush x:Key="AccentPrimaryBrush" Color="#2563EB"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#1D4ED8"/>
         <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF"/>
+        <!-- Global Crisp Typography & ClearType Rules -->
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="UseLayoutRounding" Value="True"/>
+        </Style>
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="UseLayoutRounding" Value="True"/>
+        </Style>
     </Application.Resources>
 </Application>

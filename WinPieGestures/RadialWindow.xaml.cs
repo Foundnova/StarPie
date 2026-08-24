@@ -616,6 +616,21 @@ namespace WinPieGestures
             return geometry;
         }
 
+        private bool _isOuterEscaped = false;
+        public void SetOuterEscapeState(bool isEscaped)
+        {
+            if (_isOuterEscaped == isEscaped) return;
+            _isOuterEscaped = isEscaped;
+
+            var anim = new DoubleAnimation
+            {
+                To = isEscaped ? 0.38 : 1.0,
+                Duration = TimeSpan.FromMilliseconds(120),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            this.BeginAnimation(UIElement.OpacityProperty, anim);
+        }
+
         public void HighlightSector(int index)
         {
             // Center Exit Hover Feedback
