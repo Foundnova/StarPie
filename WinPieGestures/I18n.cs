@@ -91,6 +91,48 @@ namespace WinPieGestures
         private static readonly Dictionary<string, Dictionary<LanguageCode, string>> Translations = new()
         {
             // Standard Global Buttons & Actions
+                        ["NewCustomPresetButton"] = new()
+            {
+                [LanguageCode.ZhCn] = "➕ 新建配色",
+                [LanguageCode.ZhTw] = "➕ 新建配色",
+                [LanguageCode.En] = "➕ New Theme",
+                [LanguageCode.Ja] = "➕ 新規配色"
+            },
+            ["NewCustomPresetTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "新建配色方案",
+                [LanguageCode.ZhTw] = "新建配色方案",
+                [LanguageCode.En] = "New Color Theme Preset",
+                [LanguageCode.Ja] = "新しいカラーテーマ"
+            },
+            ["NewCustomPresetPrompt"] = new()
+            {
+                [LanguageCode.ZhCn] = "请输入新配色方案名称：",
+                [LanguageCode.ZhTw] = "請輸入新配色方案名稱：",
+                [LanguageCode.En] = "Enter a name for the new color theme:",
+                [LanguageCode.Ja] = "新しいカラーテーマ名を入力してください:"
+            },
+            ["SavePresetChangesButton"] = new()
+            {
+                [LanguageCode.ZhCn] = "💾 保存当前配色修改",
+                [LanguageCode.ZhTw] = "💾 儲存當前配色修改",
+                [LanguageCode.En] = "💾 Save Color Changes",
+                [LanguageCode.Ja] = "💾 現在の配色変更を保存"
+            },
+            ["SaveAsNewPresetButton"] = new()
+            {
+                [LanguageCode.ZhCn] = "➕ 另存为新预设...",
+                [LanguageCode.ZhTw] = "➕ 另存為新預設...",
+                [LanguageCode.En] = "➕ Save as New Preset...",
+                [LanguageCode.Ja] = "➕ 新規プリセットとして保存..."
+            },
+            ["DeletePresetButton"] = new()
+            {
+                [LanguageCode.ZhCn] = "🗑️ 删除预设",
+                [LanguageCode.ZhTw] = "🗑️ 刪除預設",
+                [LanguageCode.En] = "🗑️ Delete Preset",
+                [LanguageCode.Ja] = "🗑️ プリセットを削除"
+            },
             ["RenameCustomPresetButton"] = new()
             {
                 [LanguageCode.ZhCn] = "✏️ 重命名预设",

@@ -128,7 +128,9 @@ namespace WinPieGestures
                     CustomColorExpander.IsExpanded = true;
                 }
                 if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
+                if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
+                if (SavePresetChangesButton != null) SavePresetChangesButton.Content = isCustomPreset ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton");
 
                 // Load Highlight Glow settings
                 SetComboBoxSelectedValue(HighlightGlowPresetComboBox, ConfigManager.CurrentConfig.HighlightGlowPreset ?? "Auto");
@@ -372,7 +374,11 @@ namespace WinPieGestures
             if (OuterEscapeCheckboxTitleText != null) OuterEscapeCheckboxTitleText.Text = I18n.T("OuterEscapeCheckbox");
             if (OuterEscapeDistanceTitleText != null) OuterEscapeDistanceTitleText.Text = I18n.T("OuterEscapeDistanceTitle");
             if (OuterEscapeDistanceDescText != null) OuterEscapeDistanceDescText.Text = I18n.T("OuterEscapeDistanceDesc");
+            if (NewCustomColorPresetButton != null) NewCustomColorPresetButton.Content = I18n.T("NewCustomPresetButton");
             if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
+            if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Content = I18n.T("DeletePresetButton");
+            if (SaveAsNewPresetButton != null) SaveAsNewPresetButton.Content = I18n.T("SaveAsNewPresetButton");
+            if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Content = I18n.T("DeletePresetButton");
             
             // Tab 1: Appearance & Shapes
             if (CustomColorsExpanderTitleText != null) CustomColorsExpanderTitleText.Text = I18n.T("CustomColorsExpanderTitle");
@@ -1014,11 +1020,20 @@ namespace WinPieGestures
                 {
                     RenameCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 }
+                if (DeleteCustomColorPresetButton != null)
+                {
+                    DeleteCustomColorPresetButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
+                }
                 if (DeletePresetInPanelButton != null)
                 {
                     DeletePresetInPanelButton.Visibility = isCustomPreset ? Visibility.Visible : Visibility.Collapsed;
                 }
+                if (SavePresetChangesButton != null)
+                {
+                    SavePresetChangesButton.Content = isCustomPreset ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton");
+                }
 
+                _isUpdatingUi = true;
                 if (isCustomPreset)
                 {
                     string presetId = theme.Substring("CustomPreset_".Length);
@@ -1031,11 +1046,21 @@ namespace WinPieGestures
                         CustomHighlightBorderTextBox.Text = preset.HighlightBorder;
                         CustomTextTextBox.Text = preset.TextColor;
                     }
-                    if (CustomColorExpander != null)
-                    {
-                        CustomColorExpander.IsExpanded = true;
-                    }
                 }
+                else
+                {
+                    // Load default colors for built-in theme
+                    var tempRenderer = StyleRendererFactory.CreateRenderer(ConfigManager.CurrentConfig.UiStyle ?? "ClassicRing");
+                    tempRenderer.Initialize(theme, ConfigManager.CurrentConfig);
+                    if (tempRenderer.DefaultSectorBrush is SolidColorBrush sb) CustomSectorBgTextBox.Text = $"#{sb.Color.A:X2}{sb.Color.R:X2}{sb.Color.G:X2}{sb.Color.B:X2}";
+                    if (tempRenderer.SectorBorderBrush is SolidColorBrush sbb) CustomSectorBorderTextBox.Text = $"#{sbb.Color.A:X2}{sbb.Color.R:X2}{sbb.Color.G:X2}{sbb.Color.B:X2}";
+                    if (tempRenderer.HighlightSectorBrush is SolidColorBrush hb) CustomHighlightBgTextBox.Text = $"#{hb.Color.A:X2}{hb.Color.R:X2}{hb.Color.G:X2}{hb.Color.B:X2}";
+                    if (tempRenderer.HighlightBorderBrush is SolidColorBrush hbb) CustomHighlightBorderTextBox.Text = $"#{hbb.Color.A:X2}{hbb.Color.R:X2}{hbb.Color.G:X2}{hbb.Color.B:X2}";
+                    if (tempRenderer.TextColorBrush is SolidColorBrush tb) CustomTextTextBox.Text = $"#{tb.Color.A:X2}{tb.Color.R:X2}{tb.Color.G:X2}{tb.Color.B:X2}";
+                }
+                _isUpdatingUi = false;
+
+                UpdateColorPreviews();
 
                 if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
                 {
@@ -1073,6 +1098,149 @@ namespace WinPieGestures
             SyncUiToConfigAndSave(true);
         }
 
+        private void NewCustomColorPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+
+            string defaultName = $"自定义配色 {DateTime.Now:MMdd-HHmm}";
+            var dialog = new InputDialog(
+                title: I18n.T("NewCustomPresetTitle"),
+                prompt: I18n.T("NewCustomPresetPrompt"),
+                defaultText: defaultName,
+                validator: input =>
+                {
+                    if (string.IsNullOrWhiteSpace(input)) return (false, "配色方案名称不能为空！");
+                    return (true, "");
+                })
+            {
+                Owner = this
+            };
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+            {
+                string presetName = dialog.InputText.Trim();
+                if (ConfigManager.CurrentConfig.CustomColorPresets == null)
+                {
+                    ConfigManager.CurrentConfig.CustomColorPresets = new List<CustomColorPreset>();
+                }
+
+                // If textboxes are empty, read from current style renderer
+                PopulateCustomColorsIfEmpty();
+
+                var newPreset = new CustomColorPreset
+                {
+                    Name = presetName,
+                    SectorBg = !string.IsNullOrWhiteSpace(CustomSectorBgTextBox.Text) ? CustomSectorBgTextBox.Text.Trim() : "#EB18181B",
+                    SectorBorder = !string.IsNullOrWhiteSpace(CustomSectorBorderTextBox.Text) ? CustomSectorBorderTextBox.Text.Trim() : "#30FFFFFF",
+                    HighlightBg = !string.IsNullOrWhiteSpace(CustomHighlightBgTextBox.Text) ? CustomHighlightBgTextBox.Text.Trim() : "#FF2563EB",
+                    HighlightBorder = !string.IsNullOrWhiteSpace(CustomHighlightBorderTextBox.Text) ? CustomHighlightBorderTextBox.Text.Trim() : "#FF60A5FA",
+                    TextColor = !string.IsNullOrWhiteSpace(CustomTextTextBox.Text) ? CustomTextTextBox.Text.Trim() : "#FFF8FAFC"
+                };
+
+                ConfigManager.CurrentConfig.CustomColorPresets.Add(newPreset);
+                ConfigManager.CurrentConfig.Theme = "CustomPreset_" + newPreset.Id;
+                ConfigManager.SaveConfig();
+
+                ReloadThemePresets();
+                SetComboBoxSelectedValue(ThemeComboBox, "CustomPreset_" + newPreset.Id);
+
+                if (CustomColorExpander != null)
+                {
+                    CustomColorExpander.IsExpanded = true;
+                }
+
+                SyncUiToConfigAndSave(true);
+                MessageBox.Show(this, $"已成功创建自定义配色方案【{presetName}】！\n您可以在下方色彩微调面板中继续定制各项颜色。", "新建配色成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void SavePresetChangesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            string theme = (ThemeComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? ConfigManager.CurrentConfig.Theme ?? "";
+
+            if (theme.StartsWith("CustomPreset_"))
+            {
+                string presetId = theme.Substring("CustomPreset_".Length);
+                var preset = ConfigManager.CurrentConfig.CustomColorPresets?.Find(p => p.Id == presetId);
+                if (preset != null)
+                {
+                    preset.SectorBg = CustomSectorBgTextBox.Text.Trim();
+                    preset.SectorBorder = CustomSectorBorderTextBox.Text.Trim();
+                    preset.HighlightBg = CustomHighlightBgTextBox.Text.Trim();
+                    preset.HighlightBorder = CustomHighlightBorderTextBox.Text.Trim();
+                    preset.TextColor = CustomTextTextBox.Text.Trim();
+
+                    ConfigManager.SaveConfig();
+                    SyncUiToConfigAndSave(true);
+
+                    if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                    {
+                        RenderLiveWheelPreview();
+                    }
+
+                    MessageBox.Show(this, $"已成功保存对配色预设【{preset.Name}】的修改！", "保存配色修改", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            // If on a built-in theme, prompt user to save as a new custom preset
+            SaveAsNewPresetButton_Click(sender, e);
+        }
+
+        private void SaveAsNewPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+
+            string defaultName = $"自定义配色 {DateTime.Now:MMdd-HHmm}";
+            var dialog = new InputDialog(
+                title: "另存为新配色方案",
+                prompt: "请输入新配色方案名称：",
+                defaultText: defaultName,
+                validator: input =>
+                {
+                    if (string.IsNullOrWhiteSpace(input)) return (false, "配色方案名称不能为空！");
+                    return (true, "");
+                })
+            {
+                Owner = this
+            };
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
+            {
+                string presetName = dialog.InputText.Trim();
+                if (ConfigManager.CurrentConfig.CustomColorPresets == null)
+                {
+                    ConfigManager.CurrentConfig.CustomColorPresets = new List<CustomColorPreset>();
+                }
+
+                var newPreset = new CustomColorPreset
+                {
+                    Name = presetName,
+                    SectorBg = !string.IsNullOrWhiteSpace(CustomSectorBgTextBox.Text) ? CustomSectorBgTextBox.Text.Trim() : "#EB18181B",
+                    SectorBorder = !string.IsNullOrWhiteSpace(CustomSectorBorderTextBox.Text) ? CustomSectorBorderTextBox.Text.Trim() : "#30FFFFFF",
+                    HighlightBg = !string.IsNullOrWhiteSpace(CustomHighlightBgTextBox.Text) ? CustomHighlightBgTextBox.Text.Trim() : "#FF2563EB",
+                    HighlightBorder = !string.IsNullOrWhiteSpace(CustomHighlightBorderTextBox.Text) ? CustomHighlightBorderTextBox.Text.Trim() : "#FF60A5FA",
+                    TextColor = !string.IsNullOrWhiteSpace(CustomTextTextBox.Text) ? CustomTextTextBox.Text.Trim() : "#FFF8FAFC"
+                };
+
+                ConfigManager.CurrentConfig.CustomColorPresets.Add(newPreset);
+                ConfigManager.CurrentConfig.Theme = "CustomPreset_" + newPreset.Id;
+                ConfigManager.SaveConfig();
+
+                ReloadThemePresets();
+                SetComboBoxSelectedValue(ThemeComboBox, "CustomPreset_" + newPreset.Id);
+
+                if (CustomColorExpander != null)
+                {
+                    CustomColorExpander.IsExpanded = true;
+                }
+
+                SyncUiToConfigAndSave(true);
+                MessageBox.Show(this, $"配色方案【{presetName}】已成功另存为独立预设！", "另存预设成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void RenameCustomColorPresetButton_Click(object sender, RoutedEventArgs e)
         {
             if (ConfigManager.CurrentConfig == null) return;
@@ -1092,9 +1260,11 @@ namespace WinPieGestures
                 {
                     if (string.IsNullOrWhiteSpace(input)) return (false, "配色方案名称不能为空！");
                     return (true, "");
-                });
+                })
+            {
+                Owner = this
+            };
 
-            dialog.Owner = this;
             if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.InputText))
             {
                 preset.Name = dialog.InputText.Trim();
@@ -1127,8 +1297,8 @@ namespace WinPieGestures
                 SetComboBoxSelectedValue(ThemeComboBox, "System");
 
                 if (RenameCustomColorPresetButton != null) RenameCustomColorPresetButton.Visibility = Visibility.Collapsed;
+                if (DeleteCustomColorPresetButton != null) DeleteCustomColorPresetButton.Visibility = Visibility.Collapsed;
                 if (DeletePresetInPanelButton != null) DeletePresetInPanelButton.Visibility = Visibility.Collapsed;
-                
 
                 if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
                 {
@@ -1137,43 +1307,6 @@ namespace WinPieGestures
                 SyncUiToConfigAndSave(true);
 
                 MessageBox.Show(this, $"自定义配色方案【{preset.Name}】已成功删除！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void SaveCustomColorPresetButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new InputDialog("保存配色预设", "请输入自定义配色方案名称:", $"自定义配色 {DateTime.Now:MMdd-HHmm}")
-            {
-                Owner = this
-            };
-
-            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.InputText))
-            {
-                string presetName = dialog.InputText.Trim();
-                if (ConfigManager.CurrentConfig.CustomColorPresets == null)
-                {
-                    ConfigManager.CurrentConfig.CustomColorPresets = new List<CustomColorPreset>();
-                }
-
-                var newPreset = new CustomColorPreset
-                {
-                    Name = presetName,
-                    SectorBg = CustomSectorBgTextBox.Text.Trim(),
-                    SectorBorder = CustomSectorBorderTextBox.Text.Trim(),
-                    HighlightBg = CustomHighlightBgTextBox.Text.Trim(),
-                    HighlightBorder = CustomHighlightBorderTextBox.Text.Trim(),
-                    TextColor = CustomTextTextBox.Text.Trim()
-                };
-
-                ConfigManager.CurrentConfig.CustomColorPresets.Add(newPreset);
-                ConfigManager.CurrentConfig.Theme = "CustomPreset_" + newPreset.Id;
-                ConfigManager.SaveConfig();
-
-                ReloadThemePresets();
-                SetComboBoxSelectedValue(ThemeComboBox, "CustomPreset_" + newPreset.Id);
-                RenderLiveWheelPreview();
-
-                System.Windows.MessageBox.Show($"配色预设【{presetName}】已成功保存！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -1716,32 +1849,11 @@ namespace WinPieGestures
         {
             if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
 
-            string secBg = CustomSectorBgTextBox.Text.Trim();
-            string secBorder = CustomSectorBorderTextBox.Text.Trim();
-            string hlBg = CustomHighlightBgTextBox.Text.Trim();
-            string hlBorder = CustomHighlightBorderTextBox.Text.Trim();
-            string txtColor = CustomTextTextBox.Text.Trim();
-
-            ConfigManager.CurrentConfig.CustomSectorBg = secBg;
-            ConfigManager.CurrentConfig.CustomSectorBorder = secBorder;
-            ConfigManager.CurrentConfig.CustomHighlightBg = hlBg;
-            ConfigManager.CurrentConfig.CustomHighlightBorder = hlBorder;
-            ConfigManager.CurrentConfig.CustomText = txtColor;
-
-            string currentTheme = (ThemeComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? ConfigManager.CurrentConfig.Theme ?? "";
-            if (currentTheme.StartsWith("CustomPreset_"))
-            {
-                string presetId = currentTheme.Substring("CustomPreset_".Length);
-                var preset = ConfigManager.CurrentConfig.CustomColorPresets?.Find(p => p.Id == presetId);
-                if (preset != null)
-                {
-                    if (!string.IsNullOrEmpty(secBg)) preset.SectorBg = secBg;
-                    if (!string.IsNullOrEmpty(secBorder)) preset.SectorBorder = secBorder;
-                    if (!string.IsNullOrEmpty(hlBg)) preset.HighlightBg = hlBg;
-                    if (!string.IsNullOrEmpty(hlBorder)) preset.HighlightBorder = hlBorder;
-                    if (!string.IsNullOrEmpty(txtColor)) preset.TextColor = txtColor;
-                }
-            }
+            ConfigManager.CurrentConfig.CustomSectorBg = CustomSectorBgTextBox.Text.Trim();
+            ConfigManager.CurrentConfig.CustomSectorBorder = CustomSectorBorderTextBox.Text.Trim();
+            ConfigManager.CurrentConfig.CustomHighlightBg = CustomHighlightBgTextBox.Text.Trim();
+            ConfigManager.CurrentConfig.CustomHighlightBorder = CustomHighlightBorderTextBox.Text.Trim();
+            ConfigManager.CurrentConfig.CustomText = CustomTextTextBox.Text.Trim();
 
             UpdateColorPreviews();
 

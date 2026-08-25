@@ -843,6 +843,9 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     tab1.select()
     time.sleep(0.4)
     
+    new_preset_btn = win.child_window(auto_id="NewCustomColorPresetButton", control_type="Button")
+    assert new_preset_btn.exists(timeout=3), "NewCustomColorPresetButton should exist"
+    
     color_expander = win.child_window(auto_id="CustomColorExpander", control_type="Group")
     assert color_expander.exists(timeout=3), "CustomColorExpander should exist"
     
