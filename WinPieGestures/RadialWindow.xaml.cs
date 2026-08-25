@@ -168,7 +168,8 @@ namespace WinPieGestures
 
             if (showCoreIcon && !isCatPaw)
             {
-                if (coreType == "Image" && !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath))
+                bool hasCustomImage = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
+                if ((coreType == "Image" || (hasCustomImage && coreType != "Custom" && coreType != "Exit")) && hasCustomImage)
                 {
                     try
                     {
@@ -178,7 +179,7 @@ namespace WinPieGestures
                         bmp.CacheOption = BitmapCacheOption.OnLoad;
                         bmp.EndInit();
 
-                        double imgSize = coreRadius * 1.6;
+                        double imgSize = coreRadius * 1.85;
                         CoreCustomImage.Source = bmp;
                         CoreCustomImage.Width = imgSize;
                         CoreCustomImage.Height = imgSize;

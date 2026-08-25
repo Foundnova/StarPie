@@ -1047,7 +1047,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="45"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="WheelRadiusSlider" Minimum="100" Maximum="200" Value="138" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged"/>
+                                            <Slider x:Name="WheelRadiusSlider" Minimum="90" Maximum="220" Value="138" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged"/>
                                             <TextBlock x:Name="WheelRadiusLabel" Grid.Column="1" Text="138" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
 
@@ -1058,7 +1058,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="45"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="InnerRadiusSlider" Minimum="30" Maximum="90" Value="52" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged"/>
+                                            <Slider x:Name="InnerRadiusSlider" Minimum="25" Maximum="140" Value="52" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged"/>
                                             <TextBlock x:Name="InnerRadiusLabel" Grid.Column="1" Text="52" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
 
@@ -1069,7 +1069,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="45"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="CoreRadiusSlider" Minimum="30" Maximum="80" Value="50" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged"/>
+                                            <Slider x:Name="CoreRadiusSlider" Minimum="20" Maximum="120" Value="50" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged"/>
                                             <TextBlock x:Name="CoreRadiusLabel" Grid.Column="1" Text="50" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
                                     </StackPanel>

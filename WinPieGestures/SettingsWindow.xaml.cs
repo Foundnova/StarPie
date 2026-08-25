@@ -1312,44 +1312,135 @@ namespace WinPieGestures
 
         private void WheelRadiusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (WheelRadiusLabel != null && ConfigManager.CurrentConfig != null)
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null || WheelRadiusLabel == null) return;
+
+            double wheelR = Math.Round(e.NewValue);
+            WheelRadiusLabel.Text = wheelR.ToString("0");
+            ConfigManager.CurrentConfig.WheelRadius = wheelR;
+
+            // Enforce relative geometric consistency: Outer Radius > Inner Radius >= Core Radius
+            _isUpdatingUi = true;
+            try
             {
-                WheelRadiusLabel.Text = e.NewValue.ToString("0");
-                ConfigManager.CurrentConfig.WheelRadius = e.NewValue;
-                if (!_isUpdatingUi && AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                double maxInner = Math.Max(25.0, wheelR - 18.0);
+                if (InnerRadiusSlider != null)
                 {
-                    RenderLiveWheelPreview();
+                    InnerRadiusSlider.Maximum = maxInner;
+                    if (InnerRadiusSlider.Value > maxInner)
+                    {
+                        InnerRadiusSlider.Value = maxInner;
+                        InnerRadiusLabel.Text = maxInner.ToString("0");
+                        ConfigManager.CurrentConfig.InnerRadius = maxInner;
+                    }
                 }
-                ScheduleAutoSave();
+
+                double maxCore = Math.Max(20.0, (InnerRadiusSlider?.Value ?? ConfigManager.CurrentConfig.InnerRadius));
+                if (CoreRadiusSlider != null)
+                {
+                    CoreRadiusSlider.Maximum = maxCore;
+                    if (CoreRadiusSlider.Value > maxCore)
+                    {
+                        CoreRadiusSlider.Value = maxCore;
+                        CoreRadiusLabel.Text = maxCore.ToString("0");
+                        ConfigManager.CurrentConfig.CoreRadius = maxCore;
+                    }
+                }
             }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            ScheduleAutoSave();
         }
 
         private void InnerRadiusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (InnerRadiusLabel != null && ConfigManager.CurrentConfig != null)
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null || InnerRadiusLabel == null) return;
+
+            double innerR = Math.Round(e.NewValue);
+            InnerRadiusLabel.Text = innerR.ToString("0");
+            ConfigManager.CurrentConfig.InnerRadius = innerR;
+
+            _isUpdatingUi = true;
+            try
             {
-                InnerRadiusLabel.Text = e.NewValue.ToString("0");
-                ConfigManager.CurrentConfig.InnerRadius = e.NewValue;
-                if (!_isUpdatingUi && AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                // If inner radius approaches outer radius, smoothly push outer radius outward
+                if (WheelRadiusSlider != null && innerR + 18.0 > WheelRadiusSlider.Value)
                 {
-                    RenderLiveWheelPreview();
+                    double newOuter = Math.Min(WheelRadiusSlider.Maximum, innerR + 18.0);
+                    WheelRadiusSlider.Value = newOuter;
+                    WheelRadiusLabel.Text = newOuter.ToString("0");
+                    ConfigManager.CurrentConfig.WheelRadius = newOuter;
                 }
-                ScheduleAutoSave();
+
+                // If inner radius becomes smaller than core radius, pull core radius inward
+                if (CoreRadiusSlider != null)
+                {
+                    CoreRadiusSlider.Maximum = innerR;
+                    if (CoreRadiusSlider.Value > innerR)
+                    {
+                        CoreRadiusSlider.Value = innerR;
+                        CoreRadiusLabel.Text = innerR.ToString("0");
+                        ConfigManager.CurrentConfig.CoreRadius = innerR;
+                    }
+                }
             }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            ScheduleAutoSave();
         }
 
         private void CoreRadiusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (CoreRadiusLabel != null && ConfigManager.CurrentConfig != null)
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null || CoreRadiusLabel == null) return;
+
+            double coreR = Math.Round(e.NewValue);
+            CoreRadiusLabel.Text = coreR.ToString("0");
+            ConfigManager.CurrentConfig.CoreRadius = coreR;
+
+            _isUpdatingUi = true;
+            try
             {
-                CoreRadiusLabel.Text = e.NewValue.ToString("0");
-                ConfigManager.CurrentConfig.CoreRadius = e.NewValue;
-                if (!_isUpdatingUi && AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                // If core radius expands beyond inner radius, smoothly expand inner radius
+                if (InnerRadiusSlider != null && coreR > InnerRadiusSlider.Value)
                 {
-                    RenderLiveWheelPreview();
+                    double newInner = Math.Min(InnerRadiusSlider.Maximum, coreR);
+                    InnerRadiusSlider.Value = newInner;
+                    InnerRadiusLabel.Text = newInner.ToString("0");
+                    ConfigManager.CurrentConfig.InnerRadius = newInner;
+
+                    // And push outer if needed
+                    if (WheelRadiusSlider != null && newInner + 18.0 > WheelRadiusSlider.Value)
+                    {
+                        double newOuter = Math.Min(WheelRadiusSlider.Maximum, newInner + 18.0);
+                        WheelRadiusSlider.Value = newOuter;
+                        WheelRadiusLabel.Text = newOuter.ToString("0");
+                        ConfigManager.CurrentConfig.WheelRadius = newOuter;
+                    }
                 }
-                ScheduleAutoSave();
             }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            ScheduleAutoSave();
         }
 
         private void SectorGapSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1639,7 +1730,16 @@ namespace WinPieGestures
         private void CoreImagePathTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_isUpdatingUi || ConfigManager.CurrentConfig == null || CoreImagePathTextBox == null) return;
-            ConfigManager.CurrentConfig.CoreCustomImagePath = CoreImagePathTextBox.Text.Trim();
+            string path = CoreImagePathTextBox.Text.Trim();
+            ConfigManager.CurrentConfig.CoreCustomImagePath = path;
+            if (!string.IsNullOrEmpty(path))
+            {
+                ConfigManager.CurrentConfig.CoreIconType = "Image";
+                ConfigManager.CurrentConfig.ShowCoreIcon = true;
+                SetComboBoxSelectedValue(CoreIconTypeComboBox, "Image");
+                if (ShowCoreIconCheckBox != null) ShowCoreIconCheckBox.IsChecked = true;
+            }
+            UpdateCoreIconPreviewUI();
             UpdateCoreImageThumbnail(ConfigManager.CurrentConfig.CoreCustomImagePath);
             if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
             {
@@ -1665,6 +1765,13 @@ namespace WinPieGestures
                     CoreImagePathTextBox.Text = selectedPath;
                 }
                 ConfigManager.CurrentConfig.CoreCustomImagePath = selectedPath;
+                ConfigManager.CurrentConfig.CoreIconType = "Image";
+                ConfigManager.CurrentConfig.ShowCoreIcon = true;
+
+                SetComboBoxSelectedValue(CoreIconTypeComboBox, "Image");
+                if (ShowCoreIconCheckBox != null) ShowCoreIconCheckBox.IsChecked = true;
+
+                UpdateCoreIconPreviewUI();
                 UpdateCoreImageThumbnail(selectedPath);
                 if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
                 {
@@ -2453,9 +2560,9 @@ namespace WinPieGestures
                 double exitSize = Math.Max(12, coreR * 0.42);
                 string coreType = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
 
-                if (coreType == "Image")
+                if (coreType == "Image" || (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath) && coreType != "Custom" && coreType != "Exit"))
                 {
-                    double imgSize = coreR * 1.6;
+                    double imgSize = coreR * 1.85;
                     var coreImg = new System.Windows.Controls.Image
                     {
                         Width = imgSize,
