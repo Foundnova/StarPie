@@ -95,10 +95,11 @@ namespace WinPieGestures
 
         public SettingsWindow()
         {
+            _isUpdatingUi = true;
+            ConfigManager.LoadConfig();
             InitializeComponent();
             InitializeTrayIcon();
 
-            _isUpdatingUi = true;
             try
             {
                 // Load profiles to listbox
@@ -941,7 +942,7 @@ namespace WinPieGestures
 
         private void UiStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (UiStyleComboBox == null || ConfigManager.CurrentConfig == null) return;
+            if (_isUpdatingUi || UiStyleComboBox == null || ConfigManager.CurrentConfig == null) return;
             var selectedItem = UiStyleComboBox.SelectedItem as ComboBoxItem;
             if (selectedItem != null)
             {
@@ -1007,7 +1008,7 @@ namespace WinPieGestures
 
         private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ThemeComboBox == null || ConfigManager.CurrentConfig == null) return;
+            if (_isUpdatingUi || ThemeComboBox == null || ConfigManager.CurrentConfig == null) return;
             var selectedItem = ThemeComboBox.SelectedItem as ComboBoxItem;
             if (selectedItem != null)
             {
@@ -1072,6 +1073,7 @@ namespace WinPieGestures
 
         private void OuterEscapeCheckBox_Checked(object sender, RoutedEventArgs e)
         {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
             if (ConfigManager.CurrentConfig == null) return;
             ConfigManager.CurrentConfig.EnableOuterEscapeCancel = true;
             if (OuterEscapeDistancePanel != null) OuterEscapeDistancePanel.Visibility = Visibility.Visible;
@@ -1080,6 +1082,7 @@ namespace WinPieGestures
 
         private void OuterEscapeCheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
             if (ConfigManager.CurrentConfig == null) return;
             ConfigManager.CurrentConfig.EnableOuterEscapeCancel = false;
             if (OuterEscapeDistancePanel != null) OuterEscapeDistancePanel.Visibility = Visibility.Collapsed;
@@ -1473,7 +1476,7 @@ namespace WinPieGestures
 
         private void ShapeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ShapeComboBox == null || ConfigManager.CurrentConfig == null) return;
+            if (_isUpdatingUi || ShapeComboBox == null || ConfigManager.CurrentConfig == null) return;
             var selectedItem = ShapeComboBox.SelectedItem as ComboBoxItem;
             if (selectedItem != null)
             {

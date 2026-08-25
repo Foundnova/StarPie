@@ -10,6 +10,7 @@ namespace WinPieGestures
     public partial class App : System.Windows.Application
     {
         private static Mutex? _singleInstanceMutex;
+        private static bool _isDuplicateInstance = false;
         private const string MutexName = @"Global\StarPie_SingleInstance_Mutex_9B8A7C";
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -29,6 +30,9 @@ namespace WinPieGestures
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Load configuration from disk immediately BEFORE any windows or UI components instantiate
+            ConfigManager.LoadConfig();
+
             // Allow bypassing mutex for automated test runners if explicitly specified
             string cmdLine = Environment.CommandLine;
             bool isTestMode = cmdLine.Contains("--allow-multiple", StringComparison.OrdinalIgnoreCase) ||
@@ -60,7 +64,8 @@ namespace WinPieGestures
                     }
                     catch { }
 
-                    // Terminate current process immediately without initializing hooks or tray
+                    // Terminate current process immediately without initializing hooks or saving uninitialized config
+                    _isDuplicateInstance = true;
                     Shutdown(0);
                     return;
                 }
@@ -74,9 +79,6 @@ namespace WinPieGestures
 
             try
             {
-                // Initialize configuration
-                ConfigManager.LoadConfig();
-
                 // Initialize mouse hook
                 MainMouseHook = new MouseHook();
                 MainMouseHook.Start();
@@ -109,6 +111,13 @@ namespace WinPieGestures
 
         protected override void OnExit(ExitEventArgs e)
         {
+            if (_isDuplicateInstance)
+            {
+                // Never overwrite config.json from a terminated duplicate instance
+                base.OnExit(e);
+                return;
+            }
+
             // Auto-persist latest configuration on application exit
             try
             {
