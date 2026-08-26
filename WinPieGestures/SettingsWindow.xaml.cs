@@ -469,23 +469,39 @@ namespace WinPieGestures
 
         public void ShowSettings(int tabIndex = 0)
         {
+            if (!this.Dispatcher.CheckAccess())
+            {
+                this.Dispatcher.Invoke(() => ShowSettings(tabIndex));
+                return;
+            }
+
             SwitchToTab(tabIndex);
 
-            this.Opacity = 0.0;
-            this.Show();
+            this.BeginAnimation(Window.OpacityProperty, null);
+            this.Opacity = 1.0;
+
+            if (this.Visibility != Visibility.Visible)
+            {
+                this.Show();
+            }
+
             if (this.WindowState == WindowState.Minimized)
             {
                 this.WindowState = WindowState.Normal;
             }
+
             this.Activate();
             this.Focus();
 
-            // Smooth fade-in animation
-            var anim = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(160)))
+            try
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            this.BeginAnimation(Window.OpacityProperty, anim);
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    SetForegroundWindow(hwnd);
+                }
+            }
+            catch { }
         }
 
         private void NavTab_Checked(object sender, RoutedEventArgs e)
