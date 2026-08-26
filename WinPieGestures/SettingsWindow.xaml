@@ -612,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.4.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock Text="v1.4.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -668,7 +668,7 @@
                                 <StackPanel>
                                     <TextBlock x:Name="OuterEscapeTitleText" Text="顺势外甩脱离取消 (Outer Escape Cancel)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     <TextBlock x:Name="OuterEscapeDescText" Text="手势划出后若想放弃，无需拉回中心，直接顺势向外快速划出即可安全取消，0 误触。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap"/>
-                                    <CheckBox x:Name="EnableOuterEscapeCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="OuterEscapeCheckBox_Checked" Unchecked="OuterEscapeCheckBox_Unchecked">
+                                    <CheckBox x:Name="EnableOuterEscapeCheckBox" AutomationProperties.AutomationId="EnableOuterEscapeCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="OuterEscapeCheckBox_Checked" Unchecked="OuterEscapeCheckBox_Unchecked">
                                         <StackPanel Margin="6,0,0,0">
                                             <TextBlock x:Name="OuterEscapeCheckboxTitleText" Text="启用向外顺势甩出取消手势 (推荐开启)" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <TextBlock x:Name="OuterEscapeCheckboxDescText" Text="超过轮盘外圈范围后立即解除高亮，松开右键 0 误触安全放弃。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
@@ -676,7 +676,7 @@
                                     </CheckBox>
 
                                     <!-- Escape Distance Slider (Shown when enabled) -->
-                                    <StackPanel x:Name="OuterEscapeDistancePanel" Margin="0,10,0,0">
+                                    <StackPanel x:Name="OuterEscapeDistancePanel" Margin="0,10,0,0" Visibility="Collapsed">
                                         <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                                             <StackPanel>
                                                 <TextBlock x:Name="OuterEscapeDistanceTitleText" Text="外甩取消距离灵敏度 (Escape Distance):" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -686,7 +686,7 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="70"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <Slider x:Name="OuterEscapeDistanceSlider" Minimum="140" Maximum="320" Value="190" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OuterEscapeDistanceSlider_ValueChanged"/>
+                                                    <Slider x:Name="OuterEscapeDistanceSlider" AutomationProperties.AutomationId="OuterEscapeDistanceSlider" Minimum="140" Maximum="320" Value="190" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OuterEscapeDistanceSlider_ValueChanged"/>
                                                     <TextBlock x:Name="OuterEscapeDistanceLabel" Grid.Column="1" Text="190 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                                 </Grid>
                                             </StackPanel>
@@ -1532,7 +1532,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.4.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
@@ -1610,7 +1610,7 @@
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.4.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock Text="自定义图标导入 &amp; 动作引导视觉强化 &amp; 配色折叠收纳 &amp; 架构精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>

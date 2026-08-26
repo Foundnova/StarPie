@@ -6,7 +6,7 @@
 
 ### Lightweight, Fast & Configurable Radial Pie Menu for Windows 10 / 11
 
-[![Release Version](https://img.shields.io/badge/Release-v1.4.1-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
+[![Release Version](https://img.shields.io/badge/Release-v1.4.2-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D4.svg?style=flat-square&logo=windows)](https://microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg?style=flat-square)](LICENSE)
@@ -139,7 +139,7 @@ Hold and drag the right mouse button in any application to summon a fast radial 
 
 ## <a id="download"></a>🚀 Download & Quick Start
 
-### Latest Release: `v1.4.1`
+### Latest Release: `v1.4.2`
 
 | Package | Recommended For | Description | Download |
 | :--- | :--- | :--- | :--- |
@@ -203,7 +203,7 @@ Feedback, bug reports, and pull requests are always welcome!
 Designed and architected by the developer, with implementation and test automation co-authored with **AI Agent - Antigravity**.
 
 ### 📌 Maintenance Note
-StarPie v1.4.1 is feature-complete and ready for daily use. Due to academic commitments, updates will follow a phased maintenance schedule.
+StarPie v1.4.2 is feature-complete and ready for daily use. Due to academic commitments, updates will follow a phased maintenance schedule.
 
 ---
 

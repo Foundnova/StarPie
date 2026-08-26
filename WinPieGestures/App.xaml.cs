@@ -12,18 +12,16 @@ namespace WinPieGestures
         private static Mutex? _singleInstanceMutex;
         private static bool _isDuplicateInstance = false;
         private const string MutexName = @"Global\StarPie_SingleInstance_Mutex_9B8A7C";
+        public const string WmShowStarPieMessageName = "WM_SHOW_STARPIE_SETTINGS_MESSAGE_UUID_4A2B";
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern uint RegisterWindowMessage(string lpString);
 
         [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr FindWindow(string? lpClassName, string lpWindowName);
-
-        [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        private const int SW_RESTORE = 9;
+        public static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
 
         public static MouseHook? MainMouseHook { get; private set; }
         private GestureController? _gestureController;
@@ -52,14 +50,13 @@ namespace WinPieGestures
 
                 if (!isNewInstance)
                 {
-                    // Existing instance is running, try to bring settings window to front if open
+                    // Existing instance is running, signal it via Windows Message to cleanly restore SettingsWindow
                     try
                     {
-                        IntPtr hWnd = FindWindow(null, "StarPie 设置控制台 (Preferences)");
-                        if (hWnd != IntPtr.Zero)
+                        uint msg = RegisterWindowMessage(WmShowStarPieMessageName);
+                        if (msg != 0)
                         {
-                            ShowWindow(hWnd, SW_RESTORE);
-                            SetForegroundWindow(hWnd);
+                            PostMessage(HWND_BROADCAST, msg, IntPtr.Zero, IntPtr.Zero);
                         }
                     }
                     catch { }

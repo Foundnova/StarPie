@@ -1444,10 +1444,10 @@ namespace WinPieGestures
             },
             ["TrayTooltip"] = new()
             {
-                [LanguageCode.ZhCn] = "StarPie v1.4.1 - 现代化鼠标轮盘笔势",
-                [LanguageCode.ZhTw] = "StarPie v1.4.1 - 現代化滑鼠輪盤手勢",
-                [LanguageCode.En] = "StarPie v1.4.1 - Modern Mouse Radial Gestures",
-                [LanguageCode.Ja] = "StarPie v1.4.1 - 次世代マウスラジアルジェスチャー"
+                [LanguageCode.ZhCn] = "StarPie v1.4.2 - 现代化鼠标轮盘笔势",
+                [LanguageCode.ZhTw] = "StarPie v1.4.2 - 現代化滑鼠輪盤手勢",
+                [LanguageCode.En] = "StarPie v1.4.2 - Modern Mouse Radial Gestures",
+                [LanguageCode.Ja] = "StarPie v1.4.2 - 次世代マウスラジアルジェスチャー"
             }
         };
     }

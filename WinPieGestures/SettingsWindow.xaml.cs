@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -106,6 +108,24 @@ namespace WinPieGestures
                 ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
                 ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
                 ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
+
+                // Outer Escape Cancel initialization
+                if (EnableOuterEscapeCheckBox != null)
+                {
+                    EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
+                }
+                if (OuterEscapeDistancePanel != null)
+                {
+                    OuterEscapeDistancePanel.Visibility = ConfigManager.CurrentConfig.EnableOuterEscapeCancel ? Visibility.Visible : Visibility.Collapsed;
+                }
+                if (OuterEscapeDistanceSlider != null)
+                {
+                    OuterEscapeDistanceSlider.Value = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 ? ConfigManager.CurrentConfig.OuterEscapeDistance : 190.0;
+                }
+                if (OuterEscapeDistanceLabel != null)
+                {
+                    OuterEscapeDistanceLabel.Text = $"{OuterEscapeDistanceSlider?.Value ?? 190:0} px";
+                }
 
                 // Load App Interface Theme
                 SetComboBoxSelectedValue(AppThemeComboBox, ConfigManager.CurrentConfig.AppTheme ?? "System");
@@ -226,6 +246,32 @@ namespace WinPieGestures
         }
 
         private ToolStripMenuItem? _pauseResumeMenuItem;
+        private static readonly uint WmShowStarPie = App.RegisterWindowMessage(App.WmShowStarPieMessageName);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            HwndSource? source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            source?.AddHook(WndProc);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WmShowStarPie && WmShowStarPie != 0)
+            {
+                this.Dispatcher.Invoke(() =>
+                {
+                    ShowSettings(0);
+                    SetForegroundWindow(new WindowInteropHelper(this).Handle);
+                });
+                handled = true;
+            }
+            return IntPtr.Zero;
+        }
 
         private void InitializeTrayIcon()
         {
@@ -297,7 +343,7 @@ namespace WinPieGestures
             if (_notifyIcon == null) return;
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
             
-            var titleItem = new ToolStripMenuItem("StarPie v1.4.1")
+            var titleItem = new ToolStripMenuItem("StarPie v1.4.2")
             {
                 Enabled = false,
                 Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -615,6 +661,8 @@ namespace WinPieGestures
                 if (SectorIconSizeSlider != null) ConfigManager.CurrentConfig.SectorIconSize = SectorIconSizeSlider.Value;
                 if (SectorFontSizeSlider != null) ConfigManager.CurrentConfig.SectorFontSize = SectorFontSizeSlider.Value;
                 if (ThresholdSlider != null) ConfigManager.CurrentConfig.DragThreshold = ThresholdSlider.Value;
+                if (EnableOuterEscapeCheckBox != null) ConfigManager.CurrentConfig.EnableOuterEscapeCancel = EnableOuterEscapeCheckBox.IsChecked == true;
+                if (OuterEscapeDistanceSlider != null) ConfigManager.CurrentConfig.OuterEscapeDistance = OuterEscapeDistanceSlider.Value;
 
                 if (CustomSectorBgTextBox != null) ConfigManager.CurrentConfig.CustomSectorBg = CustomSectorBgTextBox.Text.Trim();
                 if (CustomSectorBorderTextBox != null) ConfigManager.CurrentConfig.CustomSectorBorder = CustomSectorBorderTextBox.Text.Trim();

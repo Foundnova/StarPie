@@ -7,7 +7,7 @@
 ### 轻量、快捷的 Windows 鼠标轮盘手势与效率工具
 **Lightweight, Fast & Configurable Radial Pie Menu for Windows 10 / 11**
 
-[![Release Version](https://img.shields.io/badge/Release-v1.4.1-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
+[![Release Version](https://img.shields.io/badge/Release-v1.4.2-2563EB.svg?style=flat-square&logo=github)](https://github.com/SoftBlack42/StarPie/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D4.svg?style=flat-square&logo=windows)](https://microsoft.com/windows)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20WPF-512BD4.svg?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg?style=flat-square)](LICENSE)
@@ -140,7 +140,7 @@
 
 ## <a id="download"></a>🚀 快速开始与下载
 
-### 最新正式版本：`v1.4.1`
+### 最新正式版本：`v1.4.2`
 
 | 版本包 | 适用场景 | 说明 | 下载入口 |
 | :--- | :--- | :--- | :--- |
@@ -244,7 +244,7 @@ StarPie/
 本项目由开发者主导架构设计、交互逻辑规划与系统调优，并由 AI 智能体（**AI Agent - Antigravity**）协同完成代码构建、多语言支持与 18 项 GUI 自动化测试验证。
 
 ### 📌 阶段性维护说明
-- **当前状态**：StarPie v1.4.1 核心功能已完整实现并经过验证，可直接作为日常主力工具使用；
+- **当前状态**：StarPie v1.4.2 核心功能已完整实现并经过验证，可直接作为日常主力工具使用；
 - **后续节奏**：近期因学业与求职事务，版本更新将转为阶段性维护模式。欢迎社区伙伴提交 Pull Request 共同完善。
 
 ---
