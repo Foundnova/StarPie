@@ -1,8 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace WinPieGestures
@@ -10,26 +12,32 @@ namespace WinPieGestures
     public partial class App : System.Windows.Application
     {
         private static Mutex? _singleInstanceMutex;
+        private static EventWaitHandle? _instanceWakeEvent;
+        private static RegisteredWaitHandle? _waitHandleRegistration;
         private static bool _isDuplicateInstance = false;
+        
         private const string MutexName = @"Global\StarPie_SingleInstance_Mutex_9B8A7C";
-        public const string WmShowStarPieMessageName = "WM_SHOW_STARPIE_SETTINGS_MESSAGE_UUID_4A2B";
+        private const string WakeEventName = @"Global\StarPie_Wakeup_Event_9B8A7C";
+        private const string AppId = "SoftBlack42.StarPie.App";
 
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern uint RegisterWindowMessage(string lpString);
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
-        [DllImport("user32.dll", SetLastError = true)]
+        [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-        public static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         public static MouseHook? MainMouseHook { get; private set; }
         private GestureController? _gestureController;
+        public static SettingsWindow? MainSettingsWindow { get; private set; }
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            // Load configuration from disk immediately BEFORE any windows or UI components instantiate
-            ConfigManager.LoadConfig();
+            try
+            {
+                SetCurrentProcessExplicitAppUserModelID(AppId);
+            }
+            catch { }
 
             // Allow bypassing mutex for automated test runners if explicitly specified
             string cmdLine = Environment.CommandLine;
@@ -50,22 +58,32 @@ namespace WinPieGestures
 
                 if (!isNewInstance)
                 {
-                    // Existing instance is running, signal it via Windows Message to cleanly restore SettingsWindow
+                    // Existing instance is running: signal it to restore the settings window
                     try
                     {
-                        uint msg = RegisterWindowMessage(WmShowStarPieMessageName);
-                        if (msg != 0)
-                        {
-                            PostMessage(HWND_BROADCAST, msg, IntPtr.Zero, IntPtr.Zero);
-                        }
+                        using var wakeEvent = EventWaitHandle.OpenExisting(WakeEventName);
+                        wakeEvent.Set();
                     }
                     catch { }
 
-                    // Terminate current process immediately without initializing hooks or saving uninitialized config
                     _isDuplicateInstance = true;
                     Shutdown(0);
                     return;
                 }
+
+                // Primary instance: create wake event
+                try
+                {
+                    _instanceWakeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, WakeEventName);
+                    _waitHandleRegistration = ThreadPool.RegisterWaitForSingleObject(_instanceWakeEvent, (state, timedOut) =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            WakeUpSettingsWindow();
+                        }));
+                    }, null, -1, false);
+                }
+                catch { }
             }
 
             base.OnStartup(e);
@@ -76,12 +94,27 @@ namespace WinPieGestures
 
             try
             {
-                // Initialize mouse hook
+                // 1. Load configuration
+                ConfigManager.LoadConfig();
+
+                // 2. Initialize mouse hook
                 MainMouseHook = new MouseHook();
                 MainMouseHook.Start();
 
-                // Initialize gesture controller
+                // 3. Initialize gesture controller
                 _gestureController = new GestureController(MainMouseHook);
+
+                // 4. Create and show settings window
+                MainSettingsWindow = new SettingsWindow();
+                this.MainWindow = MainSettingsWindow;
+
+                bool startMinimized = cmdLine.Contains("--minimized", StringComparison.OrdinalIgnoreCase) ||
+                                      cmdLine.Contains("--autostart", StringComparison.OrdinalIgnoreCase);
+
+                if (!startMinimized)
+                {
+                    MainSettingsWindow.Show();
+                }
 
                 // Initial memory optimization after startup
                 MemoryOptimizer.TrimMemory(true);
@@ -93,27 +126,62 @@ namespace WinPieGestures
             }
         }
 
+        public static void WakeUpSettingsWindow()
+        {
+            if (MainSettingsWindow != null)
+            {
+                MainSettingsWindow.ShowSettings(0);
+                try
+                {
+                    IntPtr hwnd = new WindowInteropHelper(MainSettingsWindow).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        SetForegroundWindow(hwnd);
+                    }
+                }
+                catch { }
+            }
+        }
+
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
-            Console.Error.WriteLine($"[App Dispatcher Exception]: {e.Exception}");
-            Debug.WriteLine($"[App Dispatcher Exception]: {e.Exception}");
-            e.Handled = true; // Mark as handled to prevent app crash
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[DispatcherUnhandledException]: {e.Exception.Message}");
+                // Mark handled so app doesn't crash from non-fatal UI dispatch exceptions
+                e.Handled = true;
+            }
+            catch { }
         }
 
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Console.Error.WriteLine($"[App Domain Exception]: {e.ExceptionObject}");
-            Debug.WriteLine($"[App Domain Exception]: {e.ExceptionObject}");
+            try
+            {
+                if (e.ExceptionObject is Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AppDomain UnhandledException]: {ex.Message}");
+                }
+            }
+            catch { }
         }
 
         protected override void OnExit(ExitEventArgs e)
         {
             if (_isDuplicateInstance)
             {
-                // Never overwrite config.json from a terminated duplicate instance
                 base.OnExit(e);
                 return;
             }
+
+            try
+            {
+                _waitHandleRegistration?.Unregister(null);
+                _instanceWakeEvent?.Dispose();
+                _singleInstanceMutex?.ReleaseMutex();
+                _singleInstanceMutex?.Dispose();
+            }
+            catch { }
 
             // Auto-persist latest configuration on application exit
             try
@@ -122,19 +190,12 @@ namespace WinPieGestures
             }
             catch { }
 
-            // Unregister mouse hook on exit
-            MainMouseHook?.Stop();
-
-            if (_singleInstanceMutex != null)
+            try
             {
-                try
-                {
-                    _singleInstanceMutex.ReleaseMutex();
-                }
-                catch { }
-                _singleInstanceMutex.Dispose();
-                _singleInstanceMutex = null;
+                MainMouseHook?.Stop();
+                
             }
+            catch { }
 
             base.OnExit(e);
         }

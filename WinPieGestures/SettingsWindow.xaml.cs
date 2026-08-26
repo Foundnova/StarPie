@@ -246,32 +246,10 @@ namespace WinPieGestures
         }
 
         private ToolStripMenuItem? _pauseResumeMenuItem;
-        private static readonly uint WmShowStarPie = App.RegisterWindowMessage(App.WmShowStarPieMessageName);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        protected override void OnSourceInitialized(EventArgs e)
-        {
-            base.OnSourceInitialized(e);
-            HwndSource? source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
-            source?.AddHook(WndProc);
-        }
-
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            if (msg == WmShowStarPie && WmShowStarPie != 0)
-            {
-                this.Dispatcher.Invoke(() =>
-                {
-                    ShowSettings(0);
-                    SetForegroundWindow(new WindowInteropHelper(this).Handle);
-                });
-                handled = true;
-            }
-            return IntPtr.Zero;
-        }
 
         private void InitializeTrayIcon()
         {
@@ -495,8 +473,12 @@ namespace WinPieGestures
 
             this.Opacity = 0.0;
             this.Show();
-            this.WindowState = WindowState.Normal;
+            if (this.WindowState == WindowState.Minimized)
+            {
+                this.WindowState = WindowState.Normal;
+            }
             this.Activate();
+            this.Focus();
 
             // Smooth fade-in animation
             var anim = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(160)))
