@@ -57,6 +57,9 @@ namespace WinPieGestures
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
+        [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
         private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
@@ -125,6 +128,16 @@ namespace WinPieGestures
             }
         }
 
+        public static ModifierKeys GetCurrentModifiers()
+        {
+            ModifierKeys modifiers = ModifierKeys.None;
+            if ((GetKeyState(0x11) & 0x8000) != 0) modifiers |= ModifierKeys.Control; // VK_CONTROL
+            if ((GetKeyState(0x10) & 0x8000) != 0) modifiers |= ModifierKeys.Shift;   // VK_SHIFT
+            if ((GetKeyState(0x12) & 0x8000) != 0) modifiers |= ModifierKeys.Alt;     // VK_MENU
+            if ((GetKeyState(0x5B) & 0x8000) != 0 || (GetKeyState(0x5C) & 0x8000) != 0) modifiers |= ModifierKeys.Windows;
+            return modifiers;
+        }
+
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             System.Threading.Interlocked.Increment(ref _hookEventsCountSinceLastCheck);
@@ -140,11 +153,7 @@ namespace WinPieGestures
                 KBDLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 uint vk = hookStruct.vkCode;
 
-                ModifierKeys modifiers = ModifierKeys.None;
-                if ((GetKeyState(0x11) & 0x8000) != 0) modifiers |= ModifierKeys.Control; // VK_CONTROL
-                if ((GetKeyState(0x10) & 0x8000) != 0) modifiers |= ModifierKeys.Shift;   // VK_SHIFT
-                if ((GetKeyState(0x12) & 0x8000) != 0) modifiers |= ModifierKeys.Alt;     // VK_MENU
-                if ((GetKeyState(0x5B) & 0x8000) != 0 || (GetKeyState(0x5C) & 0x8000) != 0) modifiers |= ModifierKeys.Windows;
+                ModifierKeys modifiers = GetCurrentModifiers();
 
                 var rawArgs = new GlobalKeyEventArgs(vk, modifiers);
                 OnRawKeyEvent?.Invoke(this, rawArgs);
@@ -184,11 +193,9 @@ namespace WinPieGestures
             return CallNextHookEx(_hookId, nCode, wParam, lParam);
         }
 
-        [DllImport("user32.dll")]
-        private static extern short GetKeyState(int nVirtKey);
-
         public void ReplayKeyPress(uint vkCode)
         {
+            if (vkCode == 0) return;
             _ignoreNextKeyDown = true;
             _ignoreNextKeyUp = true;
             keybd_event((byte)vkCode, 0, 0, UIntPtr.Zero);

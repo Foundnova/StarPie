@@ -1039,6 +1039,10 @@ namespace WinPieGestures
                 else if (trigger.VkCode == 0xC0 || keyName == "Oem3" || keyName == "OemTilde") keyName = "~ (波浪键)";
                 else if (trigger.VkCode == 0x20 || keyName == "Space") keyName = "Space (空格)";
                 else if (trigger.VkCode == 0x09 || keyName == "Tab") keyName = "Tab (制表键)";
+                else if (keyName == "None" || string.IsNullOrEmpty(keyName))
+                {
+                    return string.IsNullOrEmpty(mod) ? "🖱️ 鼠标右键 (Right Button)" : $"⌨️ {mod.TrimEnd(' ', '+')} (长按拖动)";
+                }
                 return $"{mod}⌨️ {keyName} (长按拖动)";
             }
             else
