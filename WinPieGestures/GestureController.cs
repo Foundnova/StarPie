@@ -307,7 +307,10 @@ namespace WinPieGestures
             int sectorIndex = -1;
             bool isEscaped = false;
 
-            if (distance >= ConfigManager.CurrentConfig.InnerRadius)
+            double deadzone = Math.Min(ConfigManager.CurrentConfig.CoreRadius, ConfigManager.CurrentConfig.DragThreshold * 0.6);
+            if (deadzone <= 0) deadzone = 15.0;
+
+            if (distance >= deadzone)
             {
                 if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
                 {
@@ -350,7 +353,7 @@ namespace WinPieGestures
             {
                 if (_radialWindow != null)
                 {
-                    _radialWindow.Opacity = targetEscape ? 0.45 : 1.0;
+                    _radialWindow.SetOuterEscapeState(targetEscape);
                     _radialWindow.HighlightSector(targetSector);
                 }
             }), DispatcherPriority.Input);

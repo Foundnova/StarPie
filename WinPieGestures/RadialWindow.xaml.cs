@@ -636,7 +636,9 @@ namespace WinPieGestures
         public void HighlightSector(int index)
         {
             if (_currentHighlightedSector == index) return;
+            int previousIndex = _currentHighlightedSector;
             _currentHighlightedSector = index;
+
             // Center Exit Hover Feedback
             if (index == -1)
             {
@@ -654,7 +656,7 @@ namespace WinPieGestures
                 CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
                 CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
             }
-            else
+            else if (previousIndex == -1 || previousIndex == -999)
             {
                 CoreExitIcon.Fill = _textColorBrush;
                 if (_styleRenderer != null)
@@ -674,87 +676,94 @@ namespace WinPieGestures
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
             var animDuration = new Duration(TimeSpan.FromMilliseconds(80));
 
-            for (int i = 0; i < _sectorPaths.Count; i++)
+            // 1. Reset previously highlighted sector (only the departing active sector)
+            if (previousIndex >= 0 && previousIndex < _sectorPaths.Count && previousIndex != index)
             {
-                var path = _sectorPaths[i];
-                var panel = i < _contentPanels.Count ? _contentPanels[i] : null;
-                var pTransform = i < _sectorTransforms.Count ? _sectorTransforms[i] : null;
-                var cTransform = i < _containerTransforms.Count ? _containerTransforms[i] : null;
-                double angleRad = i < _sectorAngles.Count ? _sectorAngles[i] : 0;
+                var prevPath = _sectorPaths[previousIndex];
+                var prevPanel = previousIndex < _contentPanels.Count ? _contentPanels[previousIndex] : null;
+                var prevPTransform = previousIndex < _sectorTransforms.Count ? _sectorTransforms[previousIndex] : null;
+                var prevCTransform = previousIndex < _containerTransforms.Count ? _containerTransforms[previousIndex] : null;
+
+                prevPath.Fill = _defaultSectorBrush;
+                prevPath.Stroke = _sectorBorderBrush;
+                prevPath.StrokeThickness = _borderThickness;
+                System.Windows.Controls.Panel.SetZIndex(prevPath, 1);
+
+                if (prevPTransform != null)
+                {
+                    prevPTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
+                    prevPTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
+                }
+                if (prevCTransform != null)
+                {
+                    prevCTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
+                    prevCTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
+                }
+
+                if (_styleRenderer != null)
+                {
+                    _styleRenderer.ApplySectorHighlight(prevPath, false);
+                }
+
+                TextBlock prevTextBlock = prevPanel?.Children.OfType<TextBlock>().FirstOrDefault();
+                Path prevVectorIcon = prevPanel?.Children.OfType<Path>().FirstOrDefault();
+
+                if (prevTextBlock != null)
+                {
+                    prevTextBlock.Foreground = _textColorBrush;
+                    prevTextBlock.FontWeight = FontWeights.Medium;
+                }
+                if (prevVectorIcon != null)
+                {
+                    prevVectorIcon.Fill = _textColorBrush;
+                }
+            }
+
+            // 2. Highlight newly active sector (only the arriving target sector)
+            if (index >= 0 && index < _sectorPaths.Count)
+            {
+                var path = _sectorPaths[index];
+                var panel = index < _contentPanels.Count ? _contentPanels[index] : null;
+                var pTransform = index < _sectorTransforms.Count ? _sectorTransforms[index] : null;
+                var cTransform = index < _containerTransforms.Count ? _containerTransforms[index] : null;
+                double angleRad = index < _sectorAngles.Count ? _sectorAngles[index] : 0;
+
+                path.Fill = _highlightSectorBrush;
+                path.Stroke = _highlightBorderBrush;
+                path.StrokeThickness = _highlightBorderThickness;
+                System.Windows.Controls.Panel.SetZIndex(path, 5);
+
+                // Magnetic pop-out: Translate outward by 5.5px along the radial vector
+                double targetX = Math.Cos(angleRad) * 5.5;
+                double targetY = Math.Sin(angleRad) * 5.5;
+
+                if (pTransform != null)
+                {
+                    pTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(targetX, animDuration) { EasingFunction = ease });
+                    pTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, animDuration) { EasingFunction = ease });
+                }
+                if (cTransform != null)
+                {
+                    cTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(targetX, animDuration) { EasingFunction = ease });
+                    cTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, animDuration) { EasingFunction = ease });
+                }
 
                 TextBlock textBlock = panel?.Children.OfType<TextBlock>().FirstOrDefault();
                 Path vectorIcon = panel?.Children.OfType<Path>().FirstOrDefault();
 
-                if (i == index)
+                if (textBlock != null)
                 {
-                    path.Fill = _highlightSectorBrush;
-                    path.Stroke = _highlightBorderBrush;
-                    path.StrokeThickness = _highlightBorderThickness;
-                    System.Windows.Controls.Panel.SetZIndex(path, 5);
-
-                    // Magnetic pop-out: Translate outward by 5.5px along the radial vector
-                    double targetX = Math.Cos(angleRad) * 5.5;
-                    double targetY = Math.Sin(angleRad) * 5.5;
-
-                    if (pTransform != null)
-                    {
-                        pTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(targetX, animDuration) { EasingFunction = ease });
-                        pTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, animDuration) { EasingFunction = ease });
-                    }
-                    if (cTransform != null)
-                    {
-                        cTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(targetX, animDuration) { EasingFunction = ease });
-                        cTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(targetY, animDuration) { EasingFunction = ease });
-                    }
-
-                    if (textBlock != null)
-                    {
-                        textBlock.Foreground = Brushes.White;
-                        textBlock.FontWeight = FontWeights.Bold;
-                    }
-                    if (vectorIcon != null)
-                    {
-                        vectorIcon.Fill = Brushes.White;
-                    }
-
-                    if (_styleRenderer != null)
-                    {
-                        _styleRenderer.ApplySectorHighlight(path, true);
-                    }
+                    textBlock.Foreground = Brushes.White;
+                    textBlock.FontWeight = FontWeights.Bold;
                 }
-                else
+                if (vectorIcon != null)
                 {
-                    path.Fill = _defaultSectorBrush;
-                    path.Stroke = _sectorBorderBrush;
-                    path.StrokeThickness = _borderThickness;
-                    System.Windows.Controls.Panel.SetZIndex(path, 1);
+                    vectorIcon.Fill = Brushes.White;
+                }
 
-                    // Spring back to 0,0
-                    if (pTransform != null)
-                    {
-                        pTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
-                        pTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
-                    }
-                    if (cTransform != null)
-                    {
-                        cTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
-                        cTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, animDuration) { EasingFunction = ease });
-                    }
-                    
-                    if (_styleRenderer != null)
-                    {
-                        _styleRenderer.ApplySectorHighlight(path, false);
-                    }
-
-                    if (textBlock != null)
-                    {
-                        textBlock.Foreground = _textColorBrush;
-                        textBlock.FontWeight = FontWeights.Medium;
-                    }
-                    if (vectorIcon != null)
-                    {
-                        vectorIcon.Fill = _textColorBrush;
-                    }
+                if (_styleRenderer != null)
+                {
+                    _styleRenderer.ApplySectorHighlight(path, true);
                 }
             }
         }
