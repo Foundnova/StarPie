@@ -260,7 +260,7 @@ namespace WinPieGestures
                     }
                 }
 
-                return CreateStandardSectorGeometry(cx, cy, effStartAngle, effEndAngle, innerR, outerR);
+                return CreateRoundedAnnularSectorGeometry(cx, cy, effStartAngle, effEndAngle, innerR, outerR, cornerRadius);
             }
         }
 
@@ -277,6 +277,88 @@ namespace WinPieGestures
             var geom = new PathGeometry();
             geom.Figures.Add(figure);
             return geom;
+        }
+
+        public static Geometry CreateRoundedAnnularSectorGeometry(
+            double cx, double cy, 
+            double startAngle, double endAngle, 
+            double innerRadius, double outerRadius, 
+            double cornerRadius)
+        {
+            double angleSpan = endAngle - startAngle;
+            if (angleSpan <= 0) return Geometry.Empty;
+
+            double radialThickness = outerRadius - innerRadius;
+            double chordInner = 2.0 * innerRadius * Math.Sin((angleSpan / 2.0) * (Math.PI / 180.0));
+            double maxR = Math.Max(0.0, Math.Min(radialThickness / 2.2, chordInner / 2.2));
+            double r = Math.Max(0.0, Math.Min(cornerRadius, maxR));
+
+            if (r < 0.8)
+            {
+                return CreateStandardSectorGeometry(cx, cy, startAngle, endAngle, innerRadius, outerRadius);
+            }
+
+            try
+            {
+                double startRad = startAngle * (Math.PI / 180.0);
+                double endRad = endAngle * (Math.PI / 180.0);
+
+                double dThetaOut = Math.Asin(Math.Min(0.95, r / Math.Max(1.0, outerRadius - r)));
+                double dThetaIn = Math.Asin(Math.Min(0.95, r / Math.Max(1.0, innerRadius + r)));
+
+                // Angles for arcs
+                double outStartRad = startRad + dThetaOut;
+                double outEndRad = endRad - dThetaOut;
+                double inStartRad = startRad + dThetaIn;
+                double inEndRad = endRad - dThetaIn;
+
+                if (outEndRad <= outStartRad || inEndRad <= inStartRad)
+                {
+                    return CreateStandardSectorGeometry(cx, cy, startAngle, endAngle, innerRadius, outerRadius);
+                }
+
+                // Arc Points
+                Point pOutStart = new Point(cx + Math.Cos(outStartRad) * outerRadius, cy + Math.Sin(outStartRad) * outerRadius);
+                Point pOutEnd = new Point(cx + Math.Cos(outEndRad) * outerRadius, cy + Math.Sin(outEndRad) * outerRadius);
+
+                Point pRadEndOuter = new Point(cx + Math.Cos(endRad) * (outerRadius - r), cy + Math.Sin(endRad) * (outerRadius - r));
+                Point pRadEndInner = new Point(cx + Math.Cos(endRad) * (innerRadius + r), cy + Math.Sin(endRad) * (innerRadius + r));
+
+                Point pInEnd = new Point(cx + Math.Cos(inEndRad) * innerRadius, cy + Math.Sin(inEndRad) * innerRadius);
+                Point pInStart = new Point(cx + Math.Cos(inStartRad) * innerRadius, cy + Math.Sin(inStartRad) * innerRadius);
+
+                Point pRadStartInner = new Point(cx + Math.Cos(startRad) * (innerRadius + r), cy + Math.Sin(startRad) * (innerRadius + r));
+                Point pRadStartOuter = new Point(cx + Math.Cos(startRad) * (outerRadius - r), cy + Math.Sin(startRad) * (outerRadius - r));
+
+                bool isLargeArc = Math.Abs(angleSpan) > 180.0;
+                Size filletSize = new Size(r, r);
+
+                var figure = new PathFigure { StartPoint = pOutStart, IsClosed = true, IsFilled = true };
+                // 1. Outer Arc
+                figure.Segments.Add(new ArcSegment(pOutEnd, new Size(outerRadius, outerRadius), 0, isLargeArc, SweepDirection.Clockwise, true));
+                // 2. Outer-End Fillet
+                figure.Segments.Add(new ArcSegment(pRadEndOuter, filletSize, 0, false, SweepDirection.Clockwise, true));
+                // 3. Radial End Edge
+                figure.Segments.Add(new LineSegment(pRadEndInner, true));
+                // 4. Inner-End Fillet
+                figure.Segments.Add(new ArcSegment(pInEnd, filletSize, 0, false, SweepDirection.Clockwise, true));
+                // 5. Inner Arc
+                figure.Segments.Add(new ArcSegment(pInStart, new Size(innerRadius, innerRadius), 0, isLargeArc, SweepDirection.Counterclockwise, true));
+                // 6. Inner-Start Fillet
+                figure.Segments.Add(new ArcSegment(pRadStartInner, filletSize, 0, false, SweepDirection.Clockwise, true));
+                // 7. Radial Start Edge
+                figure.Segments.Add(new LineSegment(pRadStartOuter, true));
+                // 8. Outer-Start Fillet
+                figure.Segments.Add(new ArcSegment(pOutStart, filletSize, 0, false, SweepDirection.Clockwise, true));
+
+                var geometry = new PathGeometry();
+                geometry.Figures.Add(figure);
+                return geometry;
+            }
+            catch
+            {
+                return CreateStandardSectorGeometry(cx, cy, startAngle, endAngle, innerRadius, outerRadius);
+            }
         }
 
         private static Geometry CreateStandardSectorGeometry(double cx, double cy, double startAngle, double endAngle, double innerRadius, double outerRadius)

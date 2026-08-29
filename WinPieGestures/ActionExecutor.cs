@@ -12,6 +12,43 @@ namespace WinPieGestures
         [DllImport("user32.dll")]
         private static extern bool LockWorkStation();
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        private const int SW_HIDE = 0;
+        private const int SW_SHOWNORMAL = 1;
+        private const int SW_SHOWMINIMIZED = 2;
+        private const int SW_SHOWMAXIMIZED = 3;
+        private const int SW_SHOW = 5;
+        private const int SW_MINIMIZE = 6;
+        private const int SW_RESTORE = 9;
+
         // P/Invoke for key simulation
         [StructLayout(LayoutKind.Sequential)]
         private struct MOUSEINPUT
@@ -115,6 +152,142 @@ namespace WinPieGestures
             }
         }
 
+        public static bool TryToggleProcessWindow(string processOrExePath)
+        {
+            if (string.IsNullOrWhiteSpace(processOrExePath)) return false;
+            string cleanName = System.IO.Path.GetFileNameWithoutExtension(processOrExePath).ToLower();
+
+            var processes = Process.GetProcessesByName(cleanName);
+            if ((processes == null || processes.Length == 0) && cleanName.EndsWith("64"))
+            {
+                processes = Process.GetProcessesByName(cleanName.Substring(0, cleanName.Length - 2));
+            }
+
+            if (processes == null || processes.Length == 0) return false;
+
+            IntPtr fg = GetForegroundWindow();
+            List<IntPtr> windowHandles = new List<IntPtr>();
+
+            foreach (var proc in processes)
+            {
+                try
+                {
+                    if (proc.MainWindowHandle != IntPtr.Zero && IsWindowVisible(proc.MainWindowHandle))
+                    {
+                        windowHandles.Add(proc.MainWindowHandle);
+                    }
+                    else
+                    {
+                        int pid = proc.Id;
+                        EnumWindows((hWnd, lParam) =>
+                        {
+                            GetWindowThreadProcessId(hWnd, out uint wPid);
+                            if (wPid == pid && IsWindowVisible(hWnd))
+                            {
+                                var sb = new System.Text.StringBuilder(256);
+                                GetWindowText(hWnd, sb, 256);
+                                if (sb.Length > 0)
+                                {
+                                    windowHandles.Add(hWnd);
+                                }
+                            }
+                            return true;
+                        }, IntPtr.Zero);
+                    }
+                }
+                catch { }
+            }
+
+            if (windowHandles.Count == 0) return false;
+
+            // Check if any window of this process is currently the foreground window
+            foreach (var hWnd in windowHandles)
+            {
+                if (hWnd == fg && !IsIconic(hWnd))
+                {
+                    // Minimize it! (收起 / 最小化)
+                    ShowWindow(hWnd, SW_MINIMIZE);
+                    return true;
+                }
+            }
+
+            // Otherwise, bring the window to the foreground (呼出 / 置顶激活)
+            var targetHwnd = windowHandles[0];
+            if (IsIconic(targetHwnd))
+            {
+                ShowWindow(targetHwnd, SW_RESTORE);
+            }
+            else
+            {
+                ShowWindow(targetHwnd, SW_SHOW);
+            }
+            SetForegroundWindow(targetHwnd);
+            BringWindowToTop(targetHwnd);
+            return true;
+        }
+
+        public static bool TryToggleFolderWindow(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return false;
+            string targetPath = folderPath.Trim().Trim('"').TrimEnd('\\', '/');
+
+            try
+            {
+                Type? shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType != null)
+                {
+                    dynamic? shell = Activator.CreateInstance(shellType);
+                    if (shell != null)
+                    {
+                        dynamic windows = shell.Windows();
+                        int count = windows.Count;
+                        IntPtr fg = GetForegroundWindow();
+
+                        for (int i = 0; i < count; i++)
+                        {
+                            try
+                            {
+                                dynamic item = windows.Item(i);
+                                if (item != null)
+                                {
+                                    string locUrl = item.LocationURL?.ToString() ?? "";
+                                    if (!string.IsNullOrEmpty(locUrl) && locUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        string openedPath = Uri.UnescapeDataString(new Uri(locUrl).LocalPath).TrimEnd('\\', '/');
+                                        if (string.Equals(openedPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            IntPtr hwnd = (IntPtr)item.HWND;
+                                            if (hwnd != IntPtr.Zero)
+                                            {
+                                                if (hwnd == fg && !IsIconic(hwnd))
+                                                {
+                                                    // Minimize
+                                                    ShowWindow(hwnd, SW_MINIMIZE);
+                                                }
+                                                else
+                                                {
+                                                    // Restore & Activate
+                                                    if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+                                                    else ShowWindow(hwnd, SW_SHOW);
+                                                    SetForegroundWindow(hwnd);
+                                                    BringWindowToTop(hwnd);
+                                                }
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         private static void ExecuteFolder(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath)) return;
@@ -122,6 +295,11 @@ namespace WinPieGestures
             try
             {
                 string expandedPath = Environment.ExpandEnvironmentVariables(folderPath.Trim().Trim('"'));
+                if (TryToggleFolderWindow(expandedPath))
+                {
+                    return;
+                }
+
                 if (System.IO.Directory.Exists(expandedPath))
                 {
                     var startInfo = new ProcessStartInfo
@@ -163,6 +341,15 @@ namespace WinPieGestures
             if (string.IsNullOrWhiteSpace(path)) return;
 
             string expandedPath = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
+
+            // Smart Toggle: if process has an open window, toggle activate/minimize
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                if (TryToggleProcessWindow(expandedPath))
+                {
+                    return;
+                }
+            }
 
             var startInfo = new ProcessStartInfo
             {
@@ -272,20 +459,29 @@ namespace WinPieGestures
 
                 // System & Utilities
                 case "taskmanager":
-                    try { Process.Start(new ProcessStartInfo { FileName = "taskmgr.exe", UseShellExecute = true }); }
-                    catch { ExecuteHotkey("Ctrl+Shift+Esc"); }
+                    if (!TryToggleProcessWindow("taskmgr"))
+                    {
+                        try { Process.Start(new ProcessStartInfo { FileName = "taskmgr.exe", UseShellExecute = true }); }
+                        catch { ExecuteHotkey("Ctrl+Shift+Esc"); }
+                    }
                     break;
                 case "explorer":
                     try { Process.Start(new ProcessStartInfo { FileName = "explorer.exe", UseShellExecute = true }); }
                     catch { ExecuteHotkey("Win+E"); }
                     break;
                 case "settings":
-                    try { Process.Start(new ProcessStartInfo { FileName = "ms-settings:", UseShellExecute = true }); }
-                    catch { ExecuteHotkey("Win+I"); }
+                    if (!TryToggleProcessWindow("SystemSettings"))
+                    {
+                        try { Process.Start(new ProcessStartInfo { FileName = "ms-settings:", UseShellExecute = true }); }
+                        catch { ExecuteHotkey("Win+I"); }
+                    }
                     break;
                 case "calculator":
-                    try { Process.Start(new ProcessStartInfo { FileName = "calc.exe", UseShellExecute = true }); }
-                    catch { ExecuteHotkey("Win+R"); }
+                    if (!TryToggleProcessWindow("calc") && !TryToggleProcessWindow("CalculatorApp") && !TryToggleProcessWindow("Calculator"))
+                    {
+                        try { Process.Start(new ProcessStartInfo { FileName = "calc.exe", UseShellExecute = true }); }
+                        catch { ExecuteHotkey("Win+R"); }
+                    }
                     break;
                 case "rundialog":
                     ExecuteHotkey("Win+R");

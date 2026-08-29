@@ -280,6 +280,27 @@ namespace WinPieGestures
                 [LanguageCode.En] = "Tip: Recommended image size is 256×256 ~ 512×512 px or SVG vectors. Importing ultra-high resolution images (e.g. 4K/8K) increases GPU memory and texture sampling overhead, which may impact gesture responsiveness.",
                 [LanguageCode.Ja] = "ヒント: 256×256～512×512 px の画像または SVG ベクター画像の使用を推奨します。超高解像度画像（4K/8K など）を使用すると、GPU メモリ使用量と再サンプリング負荷が増加し、応答性に影響を与える場合があります。"
             },
+            ["EnableMultiTier"] = new()
+            {
+                [LanguageCode.ZhCn] = "启用多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)",
+                [LanguageCode.ZhTw] = "啟用多級輪盤與級聯子選單 (Multi-Tier Sub-Wheels)",
+                [LanguageCode.En] = "Enable Multi-Tier Cascading Sub-Wheels",
+                [LanguageCode.Ja] = "マルチ階層サブホイール機能を有効化"
+            },
+            ["EnableMultiTierDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。",
+                [LanguageCode.ZhTw] = "開啟後，若扇區配置了二級子動作，游標懸停時外圈將平滑展開扇形級聯子選單，向外劃動即可精準觸發子功能。",
+                [LanguageCode.En] = "When enabled, hovering over a sector with sub-actions will smoothly expand cascading outer sub-sectors. Flick outward to trigger.",
+                [LanguageCode.Ja] = "有効にすると、サブアクションが設定されたセクターにホバーした際に外側にカスケードサブメニューが展開され、外側へスワイプしてトリガーできます。"
+            },
+            ["SubActionColumnHeader"] = new()
+            {
+                [LanguageCode.ZhCn] = "级联子菜单",
+                [LanguageCode.ZhTw] = "級聯子選單",
+                [LanguageCode.En] = "Sub-Menu",
+                [LanguageCode.Ja] = "サブメニュー"
+            },
             ["CustomColorsExpander"] = new()
             {
                 [LanguageCode.ZhCn] = "展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。",

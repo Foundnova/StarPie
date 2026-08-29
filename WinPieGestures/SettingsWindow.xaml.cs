@@ -202,6 +202,7 @@ namespace WinPieGestures
                 SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
                 SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
                 ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
+                if (EnableMultiTierCheckBox != null) EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
 
                 // Center Core Pattern, Image & Visibility
                 ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
@@ -461,6 +462,8 @@ namespace WinPieGestures
             if (CoreImageOffsetYTitleText != null) CoreImageOffsetYTitleText.Text = I18n.T("CoreImageOffsetYTitle");
             if (ResetCoreTransformButton != null) ResetCoreTransformButton.Content = I18n.T("BtnResetCoreTransform");
             if (CoreImagePerformanceTipText != null) CoreImagePerformanceTipText.Text = I18n.T("CoreImagePerformanceTip");
+            if (EnableMultiTierCheckBox != null) EnableMultiTierCheckBox.Content = I18n.T("EnableMultiTier");
+            if (EnableMultiTierDescText != null) EnableMultiTierDescText.Text = I18n.T("EnableMultiTierDesc");
 
             // Tab 2: Gestures & Actions
             if (GesturesPageHeader != null) GesturesPageHeader.Text = I18n.T("GesturesHeader");
@@ -2360,6 +2363,36 @@ namespace WinPieGestures
             }
         }
 
+        private void ManageSubActions_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is SlotViewModel vm)
+            {
+                var editor = new SubActionEditorWindow(vm.DirectionLabel, vm.Name, vm.Action.SubActions);
+                editor.Owner = this;
+                if (editor.ShowDialog() == true)
+                {
+                    vm.Action.SubActions = editor.ResultSubActions;
+                    vm.NotifySubActionsChanged();
+                    ConfigManager.SaveConfig();
+                    if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                    {
+                        RenderLiveWheelPreview();
+                    }
+                }
+            }
+        }
+
+        private void EnableMultiTierCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null || EnableMultiTierCheckBox == null) return;
+            ConfigManager.CurrentConfig.EnableMultiTier = (EnableMultiTierCheckBox.IsChecked == true);
+            ConfigManager.SaveConfig();
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+        }
+
         private void CustomColorExpander_Expanded(object sender, RoutedEventArgs e)
         {
             // When user expands custom colors, ensure inputs have colors and update live preview
@@ -3679,10 +3712,12 @@ namespace WinPieGestures
         public bool IsFolderType => Type == "Folder" || Type == "OpenFolder";
         public bool IsSystemType => Type == "System";
 
-        public class ActionTypeOption
+        public int SubActionCount => Action.SubActions?.Count ?? 0;
+        public string SubActionButtonText => SubActionCount > 0 ? $"⚙️ 级联 ({SubActionCount})" : "➕ 级联";
+        public void NotifySubActionsChanged()
         {
-            public string Tag { get; set; } = "";
-            public string DisplayText { get; set; } = "";
+            OnPropertyChanged(nameof(SubActionCount));
+            OnPropertyChanged(nameof(SubActionButtonText));
         }
 
         public List<ActionTypeOption> ActionTypes => new List<ActionTypeOption>
@@ -3691,6 +3726,14 @@ namespace WinPieGestures
             new ActionTypeOption { Tag = "Launch", DisplayText = I18n.T("ActionTypeLaunchShort") },
             new ActionTypeOption { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
             new ActionTypeOption { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
+        };
+
+        public static List<ActionTypeItem> LocalizedActionTypes => new List<ActionTypeItem>
+        {
+            new ActionTypeItem { Tag = "Hotkey", DisplayText = I18n.T("ActionTypeHotkeyShort") },
+            new ActionTypeItem { Tag = "Launch", DisplayText = I18n.T("ActionTypeLaunchShort") },
+            new ActionTypeItem { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
+            new ActionTypeItem { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
         };
 
         public string TestButtonText => I18n.T("BtnTest");
@@ -3705,11 +3748,24 @@ namespace WinPieGestures
                 OnPropertyChanged(nameof(ActionTypes));
                 OnPropertyChanged(nameof(TestButtonText));
                 OnPropertyChanged(nameof(IconDisplayText));
+                OnPropertyChanged(nameof(SubActionButtonText));
             };
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public class ActionTypeOption
+    {
+        public string Tag { get; set; } = "";
+        public string DisplayText { get; set; } = "";
+    }
+
+    public class ActionTypeItem
+    {
+        public string Tag { get; set; } = "";
+        public string DisplayText { get; set; } = "";
     }
 }

@@ -13,6 +13,7 @@ namespace WinPieGestures
         public string Arguments { get; set; } = ""; // Optional arguments for launching
         public string IconKey { get; set; } = ""; // Vector icon key or emoji or empty
         public string CustomIconSvg { get; set; } = ""; // Custom SVG path geometry
+        public List<ActionItem> SubActions { get; set; } = new List<ActionItem>(); // Multi-tier cascading sub-actions
         
         public override string ToString() => Name;
     }
@@ -64,6 +65,10 @@ namespace WinPieGestures
         public string AppTheme { get; set; } = "System"; // "System", "Light", "Dark", "MidnightNavy", "RoyalViolet", "TitaniumGray"
         public string Theme { get; set; } = "System"; // Radial Wheel Color Theme: "System", "Dark", "Light", "MatchaForest", "GlacialIce", "MorandiMuted", "Custom"
         public string UiStyle { get; set; } = "ClassicRing"; // "ClassicRing", "CleanSectors", "Glassmorphism", "CatPaw"
+        
+        // Multi-Tier Sub-Wheel (多级轮盘与级联子菜单)
+        public bool EnableMultiTier { get; set; } = true; // Multi-Tier feature toggle
+        public double SubWheelRadiusRatio { get; set; } = 1.55; // Outer ring radius multiplier
         
         public bool ShowText { get; set; } = true;
         public double WheelRadius { get; set; } = 138.0;
@@ -256,7 +261,19 @@ namespace WinPieGestures
                     new ActionItem { Type = "System", Name = "屏幕截图 (Capture)", Parameter = "Screenshot", IconKey = "Screenshot" }, // Index 3: Down-Left (SW)
                     new ActionItem { Type = "Hotkey", Name = "粘贴 (Paste)", Parameter = "Ctrl+V", IconKey = "Paste" },          // Index 4: Left (W)
                     new ActionItem { Type = "System", Name = "音量减 (Vol Down)", Parameter = "VolumeDown", IconKey = "VolumeDown" },  // Index 5: Up-Left (NW)
-                    new ActionItem { Type = "Launch", Name = "记事本 (Notepad)", Parameter = "notepad.exe", IconKey = "Code" },   // Index 6: Up (N)
+                    new ActionItem 
+                    { 
+                        Type = "Launch", 
+                        Name = "系统工具 (Tools)", 
+                        Parameter = "notepad.exe", 
+                        IconKey = "Code",
+                        SubActions = new List<ActionItem>
+                        {
+                            new ActionItem { Type = "Launch", Name = "记事本", Parameter = "notepad.exe", IconKey = "Code" },
+                            new ActionItem { Type = "System", Name = "计算器", Parameter = "Calculator", IconKey = "Code" },
+                            new ActionItem { Type = "System", Name = "任务管理器", Parameter = "TaskManager", IconKey = "Terminal" }
+                        }
+                    },   // Index 6: Up (N)
                     new ActionItem { Type = "System", Name = "音量增 (Vol Up)", Parameter = "VolumeUp", IconKey = "VolumeUp" }       // Index 7: Up-Right (NE)
                 }
             };

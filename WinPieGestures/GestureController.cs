@@ -20,6 +20,7 @@ namespace WinPieGestures
         private bool _isGestureActive = false;
         private WheelProfile? _activeProfile;
         private int _selectedSectorIndex = -1;
+        private int _selectedSubSectorIndex = -1;
         private bool _lastEscapedState = false;
 
         [DllImport("user32.dll")]
@@ -63,15 +64,10 @@ namespace WinPieGestures
                 }
             }
 
-            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
-            var curMods = KeyboardHook.GetCurrentModifiers();
-
-            bool isCtrlPressed = ConfigManager.CurrentConfig.DisableOnCtrl && !trigger.RequireCtrl &&
-                                 (curMods & ModifierKeys.Control) != 0;
-            bool isShiftPressed = ConfigManager.CurrentConfig.DisableOnShift && !trigger.RequireShift &&
-                                  (curMods & ModifierKeys.Shift) != 0;
-            bool isAltPressed = ConfigManager.CurrentConfig.DisableOnAlt && !trigger.RequireAlt &&
-                                (curMods & ModifierKeys.Alt) != 0;
+            // Modifier safety check: don't trigger if Ctrl/Shift/Alt are held down (e.g. Right Click + Ctrl)
+            bool isCtrlPressed = (Keyboard.GetKeyStates(Key.LeftCtrl) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightCtrl) & KeyStates.Down) > 0;
+            bool isShiftPressed = (Keyboard.GetKeyStates(Key.LeftShift) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightShift) & KeyStates.Down) > 0;
+            bool isAltPressed = (Keyboard.GetKeyStates(Key.LeftAlt) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightAlt) & KeyStates.Down) > 0;
             bool isModifierPressed = isCtrlPressed || isShiftPressed || isAltPressed;
 
             bool isFullScreen = ConfigManager.CurrentConfig.DisableOnFullScreen && FullScreenHelper.IsActiveWindowFullScreen();
@@ -110,6 +106,7 @@ namespace WinPieGestures
             _isWaitingForThreshold = true;
             _isGestureActive = false;
             _selectedSectorIndex = -1;
+            _selectedSubSectorIndex = -1;
             _lastEscapedState = false;
 
             e.Handled = true; // Block initial mouse down for gesture assessment
@@ -137,9 +134,10 @@ namespace WinPieGestures
             {
                 _isGestureActive = false;
                 int finalSector = _selectedSectorIndex;
+                int finalSubSector = _selectedSubSectorIndex;
                 var finalProfile = _activeProfile;
 
-                Debug.WriteLine($"Gesture completed. Selected sector: {finalSector}");
+                Debug.WriteLine($"Gesture completed. Selected sector: {finalSector}, sub: {finalSubSector}");
 
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -148,10 +146,24 @@ namespace WinPieGestures
                     if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
                     {
                         var action = finalProfile.Actions[finalSector];
-                        if (action != null && !string.IsNullOrEmpty(action.Type))
+                        if (action != null)
                         {
-                            Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
-                            ActionExecutor.Execute(action);
+                            if (finalSubSector >= 0 && action.SubActions != null && finalSubSector < action.SubActions.Count)
+                            {
+                                var subAction = action.SubActions[finalSubSector];
+                                if (subAction != null && !string.IsNullOrEmpty(subAction.Type))
+                                {
+                                    Debug.WriteLine($"Executing sub-action: {subAction.Name} ({subAction.Type}: {subAction.Parameter})");
+                                    ActionExecutor.Execute(subAction);
+                                    return;
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(action.Type))
+                            {
+                                Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
+                                ActionExecutor.Execute(action);
+                            }
                         }
                     }
                 }), DispatcherPriority.Input);
@@ -200,6 +212,7 @@ namespace WinPieGestures
             _isWaitingForThreshold = true;
             _isGestureActive = false;
             _selectedSectorIndex = -1;
+            _selectedSubSectorIndex = -1;
             _lastEscapedState = false;
 
             e.Handled = true;
@@ -236,9 +249,10 @@ namespace WinPieGestures
             {
                 _isGestureActive = false;
                 int finalSector = _selectedSectorIndex;
+                int finalSubSector = _selectedSubSectorIndex;
                 var finalProfile = _activeProfile;
 
-                Debug.WriteLine($"Keyboard gesture completed. Selected sector: {finalSector}");
+                Debug.WriteLine($"Keyboard gesture completed. Selected sector: {finalSector}, sub: {finalSubSector}");
 
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -247,10 +261,24 @@ namespace WinPieGestures
                     if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
                     {
                         var action = finalProfile.Actions[finalSector];
-                        if (action != null && !string.IsNullOrEmpty(action.Type))
+                        if (action != null)
                         {
-                            Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
-                            ActionExecutor.Execute(action);
+                            if (finalSubSector >= 0 && action.SubActions != null && finalSubSector < action.SubActions.Count)
+                            {
+                                var subAction = action.SubActions[finalSubSector];
+                                if (subAction != null && !string.IsNullOrEmpty(subAction.Type))
+                                {
+                                    Debug.WriteLine($"Executing sub-action: {subAction.Name} ({subAction.Type}: {subAction.Parameter})");
+                                    ActionExecutor.Execute(subAction);
+                                    return;
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(action.Type))
+                            {
+                                Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
+                                ActionExecutor.Execute(action);
+                            }
                         }
                     }
                 }), DispatcherPriority.Input);
@@ -305,6 +333,7 @@ namespace WinPieGestures
             double distance = Math.Sqrt(dx * dx + dy * dy);
 
             int sectorIndex = -1;
+            int subSectorIndex = -1;
             bool isEscaped = false;
 
             double deadzone = Math.Min(ConfigManager.CurrentConfig.CoreRadius, ConfigManager.CurrentConfig.DragThreshold * 0.6);
@@ -312,16 +341,22 @@ namespace WinPieGestures
 
             if (distance >= deadzone)
             {
+                double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
+                bool multiTierEnabled = ConfigManager.CurrentConfig.EnableMultiTier;
+                double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
+                double maxRadius = multiTierEnabled ? (wheelRadius * subRatio + 20.0) : wheelRadius;
+
                 if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
                 {
                     double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
                         ? ConfigManager.CurrentConfig.OuterEscapeDistance 
-                        : ConfigManager.CurrentConfig.WheelRadius * 1.5;
+                        : maxRadius * 1.5;
 
                     if (distance > escapeThreshold)
                     {
                         isEscaped = true;
                         sectorIndex = -1;
+                        subSectorIndex = -1;
                     }
                 }
 
@@ -334,19 +369,43 @@ namespace WinPieGestures
                     if (sectorCount <= 0) sectorCount = 8;
                     double sectorAngle = 360.0 / sectorCount;
                     sectorIndex = (int)Math.Floor((angle + (sectorAngle / 2.0)) / sectorAngle) % sectorCount;
+
+                    // Check if mouse moved into outer sub-tier zone
+                    if (multiTierEnabled && distance >= (wheelRadius + 6.0) && _activeProfile != null && sectorIndex >= 0 && sectorIndex < _activeProfile.Actions.Count)
+                    {
+                        var parentAction = _activeProfile.Actions[sectorIndex];
+                        if (parentAction != null && parentAction.SubActions != null && parentAction.SubActions.Count > 0)
+                        {
+                            int subCount = parentAction.SubActions.Count;
+                            double parentCenterAngle = sectorIndex * sectorAngle;
+                            double parentStartAngle = parentCenterAngle - (sectorAngle / 2.0);
+
+                            double relAngle = angle - parentStartAngle;
+                            while (relAngle < 0) relAngle += 360.0;
+                            while (relAngle >= 360.0) relAngle -= 360.0;
+
+                            if (relAngle <= sectorAngle)
+                            {
+                                int calculatedSub = (int)(relAngle / (sectorAngle / subCount));
+                                subSectorIndex = Math.Clamp(calculatedSub, 0, subCount - 1);
+                            }
+                        }
+                    }
                 }
             }
 
             // Zero-overhead check: if nothing changed, do NOT dispatch to UI thread!
-            if (sectorIndex == _selectedSectorIndex && isEscaped == _lastEscapedState)
+            if (sectorIndex == _selectedSectorIndex && subSectorIndex == _selectedSubSectorIndex && isEscaped == _lastEscapedState)
             {
                 return;
             }
 
             _selectedSectorIndex = sectorIndex;
+            _selectedSubSectorIndex = subSectorIndex;
             _lastEscapedState = isEscaped;
 
             int targetSector = sectorIndex;
+            int targetSubSector = subSectorIndex;
             bool targetEscape = isEscaped;
 
             Application.Current.Dispatcher.BeginInvoke(new Action(() =>
@@ -354,7 +413,7 @@ namespace WinPieGestures
                 if (_radialWindow != null)
                 {
                     _radialWindow.SetOuterEscapeState(targetEscape);
-                    _radialWindow.HighlightSector(targetSector);
+                    _radialWindow.HighlightSector(targetSector, targetSubSector);
                 }
             }), DispatcherPriority.Input);
         }

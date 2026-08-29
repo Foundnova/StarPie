@@ -21,6 +21,8 @@ namespace WinPieGestures
     public partial class RadialWindow : Window
     {
         private int _currentHighlightedSector = -999;
+        private int _currentHighlightedSubSector = -1;
+        private int _activeSubTierParentSector = -1;
         private readonly Point _centerPoint;
         private readonly WheelProfile _profile;
         private readonly List<Path> _sectorPaths = new List<Path>();
@@ -28,6 +30,8 @@ namespace WinPieGestures
         private readonly List<TranslateTransform> _sectorTransforms = new List<TranslateTransform>();
         private readonly List<TranslateTransform> _containerTransforms = new List<TranslateTransform>();
         private readonly List<double> _sectorAngles = new List<double>();
+        private readonly List<Path> _subSectorPaths = new List<Path>();
+        private readonly List<Grid> _subContentContainers = new List<Grid>();
         private IRadialStyleRenderer _styleRenderer;
 
         // Styling brushes and dimensions (instantiated dynamically)
@@ -95,9 +99,12 @@ namespace WinPieGestures
         {
             double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
             double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
+            bool multiTier = ConfigManager.CurrentConfig.EnableMultiTier;
+            double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
+            double maxRadius = multiTier ? (wheelRadius * subRatio + 25.0) : wheelRadius;
 
-            // Adjust window size dynamically based on outer radius
-            double winSize = wheelRadius * 2.0 + 40.0; // Margin for shadow
+            // Adjust window size dynamically based on max outer radius
+            double winSize = maxRadius * 2.0 + 40.0; // Margin for shadow
             this.Width = winSize;
             this.Height = winSize;
 
@@ -679,11 +686,222 @@ namespace WinPieGestures
             this.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
+        private void ClearSubTier()
+        {
+            foreach (var p in _subSectorPaths)
+            {
+                WheelCanvas.Children.Remove(p);
+            }
+            foreach (var g in _subContentContainers)
+            {
+                WheelCanvas.Children.Remove(g);
+            }
+            _subSectorPaths.Clear();
+            _subContentContainers.Clear();
+            _activeSubTierParentSector = -1;
+            _currentHighlightedSubSector = -1;
+        }
+
+        private void ShowSubTier(int parentIndex)
+        {
+            ClearSubTier();
+
+            if (!ConfigManager.CurrentConfig.EnableMultiTier) return;
+            if (parentIndex < 0 || parentIndex >= _profile.Actions.Count) return;
+
+            var parentAction = _profile.Actions[parentIndex];
+            if (parentAction == null || parentAction.SubActions == null || parentAction.SubActions.Count == 0) return;
+
+            int n = _profile.SectorCount;
+            double sectorSize = 360.0 / n;
+            double winSize = this.Width;
+            double cx = winSize / 2.0;
+            double cy = winSize / 2.0;
+
+            string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
+            double gap = Math.Max(0.0, ConfigManager.CurrentConfig.SectorGap);
+            double cornerRadius = Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius);
+            string layoutMode = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
+            bool showText = ConfigManager.CurrentConfig.ShowText && layoutMode != "IconOnly";
+
+            double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
+            double innerSubR = _outerRadius + gap + 4.0;
+            double outerSubR = _outerRadius * subRatio;
+
+            double parentMidAngle = parentIndex * sectorSize;
+            double parentStartAngle = parentMidAngle - (sectorSize / 2.0);
+
+            var subActions = parentAction.SubActions;
+            int subCount = subActions.Count;
+            double subAngleSpan = sectorSize / subCount;
+
+            _activeSubTierParentSector = parentIndex;
+
+            for (int j = 0; j < subCount; j++)
+            {
+                double subStart = parentStartAngle + j * subAngleSpan;
+                double subEnd = subStart + subAngleSpan;
+                double subMid = (subStart + subEnd) / 2.0;
+                double subMidRad = subMid * (Math.PI / 180.0);
+
+                double layoutRadius = (innerSubR + outerSubR) / 2.0;
+                double lx = cx + Math.Cos(subMidRad) * layoutRadius;
+                double ly = cy + Math.Sin(subMidRad) * layoutRadius;
+
+                Geometry subGeom = IconHelper.CreateAdvancedSectorGeometry(
+                    cx, cy, subStart, subEnd, innerSubR, outerSubR, shape, gap, cornerRadius);
+
+                var subPath = new Path
+                {
+                    Data = subGeom,
+                    Fill = _defaultSectorBrush,
+                    Stroke = _sectorBorderBrush,
+                    StrokeThickness = _borderThickness,
+                    Tag = $"sub_{parentIndex}_{j}",
+                    Opacity = 0.0
+                };
+                System.Windows.Controls.Panel.SetZIndex(subPath, 15);
+                WheelCanvas.Children.Add(subPath);
+                _subSectorPaths.Add(subPath);
+
+                // Content Container
+                double containerW = subCount >= 4 ? 64.0 : 80.0;
+                double containerH = subCount >= 4 ? 50.0 : 60.0;
+
+                var container = new Grid
+                {
+                    Width = containerW,
+                    Height = containerH,
+                    Opacity = 0.0
+                };
+
+                var stackPanel = new StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Vertical,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                container.Children.Add(stackPanel);
+
+                var subAction = subActions[j];
+                string actionText = subAction?.Name ?? "子动作";
+                string actionType = subAction?.Type ?? "Hotkey";
+                string parameter = subAction?.Parameter ?? "";
+                string iconKey = subAction?.IconKey ?? "";
+                string customSvg = subAction?.CustomIconSvg ?? "";
+
+                FrameworkElement? iconElem = null;
+                double iconSize = (layoutMode == "IconOnly" ? 22.0 : 17.0);
+
+                if (layoutMode != "TextOnly")
+                {
+                    if (!string.IsNullOrEmpty(customSvg))
+                    {
+                        try
+                        {
+                            iconElem = new Path
+                            {
+                                Data = Geometry.Parse(customSvg),
+                                Fill = _textColorBrush,
+                                Stretch = Stretch.Uniform,
+                                Width = iconSize,
+                                Height = iconSize,
+                                Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                            };
+                        }
+                        catch { }
+                    }
+                    if (iconElem == null && !string.IsNullOrEmpty(iconKey))
+                    {
+                        string? svg = IconHelper.GetSvgPathByKey(iconKey);
+                        if (!string.IsNullOrEmpty(svg))
+                        {
+                            iconElem = new Path
+                            {
+                                Data = Geometry.Parse(svg),
+                                Fill = _textColorBrush,
+                                Stretch = Stretch.Uniform,
+                                Width = iconSize,
+                                Height = iconSize,
+                                Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                            };
+                        }
+                    }
+                    if (iconElem == null)
+                    {
+                        string? autoSvg = GetVectorIconPath(actionType, parameter);
+                        if (!string.IsNullOrEmpty(autoSvg))
+                        {
+                            iconElem = new Path
+                            {
+                                Data = Geometry.Parse(autoSvg),
+                                Fill = _textColorBrush,
+                                Stretch = Stretch.Uniform,
+                                Width = iconSize,
+                                Height = iconSize,
+                                Margin = new Thickness(0, 0, 0, showText ? 2 : 0),
+                                HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                            };
+                        }
+                    }
+
+                    if (iconElem != null)
+                    {
+                        stackPanel.Children.Add(iconElem);
+                    }
+                }
+
+                if (showText && !string.IsNullOrEmpty(actionText))
+                {
+                    var tb = new TextBlock
+                    {
+                        Text = actionText,
+                        Foreground = _textColorBrush,
+                        FontSize = Math.Max(8.5, ConfigManager.CurrentConfig.SectorFontSize - 1.0),
+                        FontWeight = FontWeights.Medium,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = containerW - 4.0,
+                        MaxHeight = 24,
+                        Margin = new Thickness(0, 1, 0, 0),
+                        Effect = (System.Windows.Media.Effects.Effect)Resources["TextShadow"]
+                    };
+                    stackPanel.Children.Add(tb);
+                }
+
+                Canvas.SetLeft(container, lx - container.Width / 2.0);
+                Canvas.SetTop(container, ly - container.Height / 2.0);
+                System.Windows.Controls.Panel.SetZIndex(container, 16);
+                WheelCanvas.Children.Add(container);
+                _subContentContainers.Add(container);
+
+                // Spring entrance animation
+                var fadeInAnim = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(110)))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+                subPath.BeginAnimation(UIElement.OpacityProperty, fadeInAnim);
+                container.BeginAnimation(UIElement.OpacityProperty, fadeInAnim);
+            }
+        }
+
         public void HighlightSector(int index)
         {
-            if (_currentHighlightedSector == index) return;
-            int previousIndex = _currentHighlightedSector;
-            _currentHighlightedSector = index;
+            HighlightSector(index, -1);
+        }
+
+        public void HighlightSector(int mainIndex, int subIndex)
+        {
+            bool mainChanged = (_currentHighlightedSector != mainIndex);
+            int previousMainIndex = _currentHighlightedSector;
+            _currentHighlightedSector = mainIndex;
+
+            bool subChanged = (_currentHighlightedSubSector != subIndex);
+            int previousSubIndex = _currentHighlightedSubSector;
+            _currentHighlightedSubSector = subIndex;
 
             int durationMs = ConfigManager.CurrentConfig?.AnimationSpeed switch
             {
@@ -698,7 +916,7 @@ namespace WinPieGestures
             var coreDuration = new Duration(TimeSpan.FromMilliseconds(coreDurationMs));
 
             // Center Exit Hover Feedback
-            if (index == -1)
+            if (mainIndex == -1)
             {
                 CoreExitIcon.Fill = new SolidColorBrush(Color.FromRgb(244, 63, 94)); // Warm rose cancel
                 if (_styleRenderer != null)
@@ -714,7 +932,7 @@ namespace WinPieGestures
                 CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
                 CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
             }
-            else if (previousIndex == -1 || previousIndex == -999)
+            else if (previousMainIndex == -1 || previousMainIndex == -999)
             {
                 CoreExitIcon.Fill = _textColorBrush;
                 if (_styleRenderer != null)
@@ -731,13 +949,13 @@ namespace WinPieGestures
                 CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
             }
 
-            // 1. Reset previously highlighted sector (only the departing active sector)
-            if (previousIndex >= 0 && previousIndex < _sectorPaths.Count && previousIndex != index)
+            // 1. Reset previously highlighted main sector (only the departing active sector)
+            if (previousMainIndex >= 0 && previousMainIndex < _sectorPaths.Count && previousMainIndex != mainIndex)
             {
-                var prevPath = _sectorPaths[previousIndex];
-                var prevPanel = previousIndex < _contentPanels.Count ? _contentPanels[previousIndex] : null;
-                var prevPTransform = previousIndex < _sectorTransforms.Count ? _sectorTransforms[previousIndex] : null;
-                var prevCTransform = previousIndex < _containerTransforms.Count ? _containerTransforms[previousIndex] : null;
+                var prevPath = _sectorPaths[previousMainIndex];
+                var prevPanel = previousMainIndex < _contentPanels.Count ? _contentPanels[previousMainIndex] : null;
+                var prevPTransform = previousMainIndex < _sectorTransforms.Count ? _sectorTransforms[previousMainIndex] : null;
+                var prevCTransform = previousMainIndex < _containerTransforms.Count ? _containerTransforms[previousMainIndex] : null;
 
                 prevPath.Fill = _defaultSectorBrush;
                 prevPath.Stroke = _sectorBorderBrush;
@@ -774,14 +992,14 @@ namespace WinPieGestures
                 }
             }
 
-            // 2. Highlight newly active sector (only the arriving target sector)
-            if (index >= 0 && index < _sectorPaths.Count)
+            // 2. Highlight newly active main sector (only the arriving target sector)
+            if (mainIndex >= 0 && mainIndex < _sectorPaths.Count)
             {
-                var path = _sectorPaths[index];
-                var panel = index < _contentPanels.Count ? _contentPanels[index] : null;
-                var pTransform = index < _sectorTransforms.Count ? _sectorTransforms[index] : null;
-                var cTransform = index < _containerTransforms.Count ? _containerTransforms[index] : null;
-                double angleRad = index < _sectorAngles.Count ? _sectorAngles[index] : 0;
+                var path = _sectorPaths[mainIndex];
+                var panel = mainIndex < _contentPanels.Count ? _contentPanels[mainIndex] : null;
+                var pTransform = mainIndex < _sectorTransforms.Count ? _sectorTransforms[mainIndex] : null;
+                var cTransform = mainIndex < _containerTransforms.Count ? _containerTransforms[mainIndex] : null;
+                double angleRad = mainIndex < _sectorAngles.Count ? _sectorAngles[mainIndex] : 0;
 
                 path.Fill = _highlightSectorBrush;
                 path.Stroke = _highlightBorderBrush;
@@ -819,6 +1037,66 @@ namespace WinPieGestures
                 if (_styleRenderer != null)
                 {
                     _styleRenderer.ApplySectorHighlight(path, true);
+                }
+            }
+
+            // 3. Multi-tier sub-wheel expansion management
+            if (mainChanged)
+            {
+                if (mainIndex >= 0 && mainIndex < _profile.Actions.Count)
+                {
+                    ShowSubTier(mainIndex);
+                }
+                else
+                {
+                    ClearSubTier();
+                }
+            }
+
+            // 4. Sub-sector highlight management
+            if (_subSectorPaths.Count > 0)
+            {
+                for (int s = 0; s < _subSectorPaths.Count; s++)
+                {
+                    var sPath = _subSectorPaths[s];
+                    var sContainer = s < _subContentContainers.Count ? _subContentContainers[s] : null;
+                    var sTextBlock = sContainer?.Children.OfType<StackPanel>().FirstOrDefault()?.Children.OfType<TextBlock>().FirstOrDefault();
+                    var sIcon = sContainer?.Children.OfType<StackPanel>().FirstOrDefault()?.Children.OfType<Path>().FirstOrDefault();
+
+                    if (s == subIndex)
+                    {
+                        sPath.Fill = _highlightSectorBrush;
+                        sPath.Stroke = _highlightBorderBrush;
+                        sPath.StrokeThickness = _highlightBorderThickness;
+                        System.Windows.Controls.Panel.SetZIndex(sPath, 20);
+
+                        if (sTextBlock != null)
+                        {
+                            sTextBlock.Foreground = Brushes.White;
+                            sTextBlock.FontWeight = FontWeights.Bold;
+                        }
+                        if (sIcon != null)
+                        {
+                            sIcon.Fill = Brushes.White;
+                        }
+                    }
+                    else
+                    {
+                        sPath.Fill = _defaultSectorBrush;
+                        sPath.Stroke = _sectorBorderBrush;
+                        sPath.StrokeThickness = _borderThickness;
+                        System.Windows.Controls.Panel.SetZIndex(sPath, 15);
+
+                        if (sTextBlock != null)
+                        {
+                            sTextBlock.Foreground = _textColorBrush;
+                            sTextBlock.FontWeight = FontWeights.Medium;
+                        }
+                        if (sIcon != null)
+                        {
+                            sIcon.Fill = _textColorBrush;
+                        }
+                    }
                 }
             }
         }
