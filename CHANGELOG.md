@@ -4,6 +4,28 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.4.3] - 2026-08-29 (自定义长按唤醒按键 & 原生按键智能透传 & 内核级极速唤醒)
+### 🖱️ 自定义鼠标唤醒触发按键 (Custom Mouse Trigger Button)
+- **支持多按键长按拖动触发**：
+  - 在「🎯 触发与场景 (Tab 0)」首项新增「轮盘唤醒触发按键」设置，告别单一固定右键唤醒模式；
+  - 支持 4 大主流鼠标按键自由选择：
+    1. 🖱️ **鼠标右键 (Right Button)** [推荐 / 默认]
+    2. 🖱️ **鼠标中键 / 滚轮按压 (Middle Button)**
+    3. 🖱️ **鼠标侧键 1 / 后退键 (XButton 1 / Back)**
+    4. 🖱️ **鼠标侧键 2 / 前进键 (XButton 2 / Forward)**
+- **原生单次点击智能放行 (Smart Native Click Pass-Through)**：
+  - 未达到拖动阈值（DragThreshold）的轻点或短按操作，底层手势引擎将毫秒级自动重放/放行对应按键的原生单次点击事件（如中键在新标签页打开链接、侧键前进后退等），0 干扰日常浏览器、办公及游戏体验。
+- **动态多语言全量支持**：
+  - 触发按键配置项已全面适配简体中文、繁体中文、英文（English）与日文（日本語）。
+
+### 🪟 Windows 内核级 EventWaitHandle 极速无感唤醒 (Zero-DWM Artifact Activation)
+- **彻底根除任务栏固定图标二次点击黑屏与无法关闭异常**：
+  - 移除 XAML 自动 `StartupUri` 规避 Windows DWM 抢占创建僵尸空壳视口；
+  - 引入内核级 `EventWaitHandle` + `ThreadPool.RegisterWaitForSingleObject` 跨进程即时通信；
+  - 移除 WPF 软件级 Opacity 动画锁，实现托盘后台驻留进程瞬间置顶弹出并 100% 完整响应窗口生命周期事件。
+
+---
+
 ## [v1.4.2] - 2026-08-26 (任务栏唤醒优化 & 外甩取消严谨化 & 几何关联与持久化记忆)
 ### 🪟 任务栏固定快捷方式唤醒机制深度重构 (Taskbar Activation IPC)
 - **告别后台隐藏状态下再次点击任务栏出现的黑屏/无法关闭异常**：

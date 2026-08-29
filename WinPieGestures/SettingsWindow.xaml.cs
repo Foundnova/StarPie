@@ -106,6 +106,7 @@ namespace WinPieGestures
             {
                 // Load profiles to listbox
                 ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
+                SetComboBoxSelectedValue(TriggerButtonComboBox, ConfigManager.CurrentConfig.TriggerButton ?? "RightButton");
                 ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
                 ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
 
@@ -321,7 +322,7 @@ namespace WinPieGestures
             if (_notifyIcon == null) return;
             var contextMenu = new System.Windows.Forms.ContextMenuStrip();
             
-            var titleItem = new ToolStripMenuItem("StarPie v1.4.2")
+            var titleItem = new ToolStripMenuItem("StarPie v1.4.3")
             {
                 Enabled = false,
                 Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -377,6 +378,12 @@ namespace WinPieGestures
             // Tab 0: Trigger & Scenes
             if (TriggerPageHeader != null) TriggerPageHeader.Text = I18n.T("TriggerHeader");
             if (TriggerPageSubheader != null) TriggerPageSubheader.Text = I18n.T("TriggerSubheader");
+            if (TriggerButtonTitleText != null) TriggerButtonTitleText.Text = I18n.T("TriggerButtonTitle");
+            if (TriggerButtonDescText != null) TriggerButtonDescText.Text = I18n.T("TriggerButtonDesc");
+            if (TriggerBtnRightItem != null) TriggerBtnRightItem.Content = I18n.T("TriggerBtnRight");
+            if (TriggerBtnMiddleItem != null) TriggerBtnMiddleItem.Content = I18n.T("TriggerBtnMiddle");
+            if (TriggerBtnX1Item != null) TriggerBtnX1Item.Content = I18n.T("TriggerBtnX1");
+            if (TriggerBtnX2Item != null) TriggerBtnX2Item.Content = I18n.T("TriggerBtnX2");
             if (SensitivityTitleText != null) SensitivityTitleText.Text = I18n.T("SensitivityTitle");
             if (SensitivityDescText != null) SensitivityDescText.Text = I18n.T("SensitivityDesc");
             if (SceneIsolationTitleText != null) SceneIsolationTitleText.Text = I18n.T("SceneIsolationTitle");
@@ -658,6 +665,10 @@ namespace WinPieGestures
                 if (SectorCornerRadiusSlider != null) ConfigManager.CurrentConfig.SectorCornerRadius = SectorCornerRadiusSlider.Value;
                 if (SectorIconSizeSlider != null) ConfigManager.CurrentConfig.SectorIconSize = SectorIconSizeSlider.Value;
                 if (SectorFontSizeSlider != null) ConfigManager.CurrentConfig.SectorFontSize = SectorFontSizeSlider.Value;
+                if (TriggerButtonComboBox != null && TriggerButtonComboBox.SelectedItem is ComboBoxItem tbi && tbi.Tag != null)
+                {
+                    ConfigManager.CurrentConfig.TriggerButton = tbi.Tag.ToString() ?? "RightButton";
+                }
                 if (ThresholdSlider != null) ConfigManager.CurrentConfig.DragThreshold = ThresholdSlider.Value;
                 if (EnableOuterEscapeCheckBox != null) ConfigManager.CurrentConfig.EnableOuterEscapeCancel = EnableOuterEscapeCheckBox.IsChecked == true;
                 if (OuterEscapeDistanceSlider != null) ConfigManager.CurrentConfig.OuterEscapeDistance = OuterEscapeDistanceSlider.Value;
@@ -973,6 +984,17 @@ namespace WinPieGestures
                 ProfilesListBox.Items.Refresh();
                 ProfilesListBox.SelectedIndex = 0;
                 SyncUiToConfigAndSave(true);
+            }
+        }
+
+                private void TriggerButtonComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingUi || TriggerButtonComboBox == null || ConfigManager.CurrentConfig == null) return;
+            var selectedItem = TriggerButtonComboBox.SelectedItem as ComboBoxItem;
+            if (selectedItem != null && selectedItem.Tag != null)
+            {
+                ConfigManager.CurrentConfig.TriggerButton = selectedItem.Tag.ToString() ?? "RightButton";
+                ScheduleAutoSave();
             }
         }
 

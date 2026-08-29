@@ -610,6 +610,49 @@ namespace WinPieGestures
                 [LanguageCode.En] = "Configure mouse gesture sensitivity, full-screen gaming bypass, and exclusion blacklist.",
                 [LanguageCode.Ja] = "マウスジェスチャーの感度、フルスクリーンゲームでの自動回避、除外プロセスを設定します。"
             },
+            
+            ["TriggerButtonTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "轮盘唤醒触发按键",
+                [LanguageCode.ZhTw] = "輪盤喚醒觸發按鍵",
+                [LanguageCode.En] = "Radial Menu Trigger Button",
+                [LanguageCode.Ja] = "ラジアルメニュー起動トリガーボタン"
+            },
+            ["TriggerButtonDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "选择按住并拖动唤醒轮盘手势的鼠标按键。未触发手势的轻点将自动放行原生按键点击。",
+                [LanguageCode.ZhTw] = "選擇按住並拖動喚醒輪盤手勢的滑鼠按鍵。未觸發手勢的輕點將自動放行原生按鍵點擊。",
+                [LanguageCode.En] = "Select which mouse button to hold and drag to summon the radial menu. Quick clicks without dragging will naturally pass through native click events.",
+                [LanguageCode.Ja] = "長押しドラッグでラジアルメニューを起動するマウスボタンを選択します。短押しクリックは通常のクリックとして処理されます。"
+            },
+            ["TriggerBtnRight"] = new()
+            {
+                [LanguageCode.ZhCn] = "🖱️ 鼠标右键 (Right Button) [推荐 / 默认]",
+                [LanguageCode.ZhTw] = "🖱️ 滑鼠右鍵 (Right Button) [推薦 / 默認]",
+                [LanguageCode.En] = "🖱️ Right Mouse Button [Default / Recommended]",
+                [LanguageCode.Ja] = "🖱️ マウス右ボタン [推奨 / デフォルト]"
+            },
+            ["TriggerBtnMiddle"] = new()
+            {
+                [LanguageCode.ZhCn] = "🖱️ 鼠标中键 / 滚轮按压 (Middle Button)",
+                [LanguageCode.ZhTw] = "🖱️ 滑鼠中鍵 / 滾輪按壓 (Middle Button)",
+                [LanguageCode.En] = "🖱️ Middle Mouse Button / Wheel Click",
+                [LanguageCode.Ja] = "🖱️ マウス中央ボタン / ホイールクリック"
+            },
+            ["TriggerBtnX1"] = new()
+            {
+                [LanguageCode.ZhCn] = "🖱️ 鼠标侧键 1 / 后退键 (XButton 1 / Back)",
+                [LanguageCode.ZhTw] = "🖱️ 滑鼠側鍵 1 / 後退鍵 (XButton 1 / Back)",
+                [LanguageCode.En] = "🖱️ Mouse Side Button 1 / Back (XButton 1)",
+                [LanguageCode.Ja] = "🖱️ マウスサイドボタン 1 / 戻る (XButton 1)"
+            },
+            ["TriggerBtnX2"] = new()
+            {
+                [LanguageCode.ZhCn] = "🖱️ 鼠标侧键 2 / 前进键 (XButton 2 / Forward)",
+                [LanguageCode.ZhTw] = "🖱️ 滑鼠側鍵 2 / 前進鍵 (XButton 2 / Forward)",
+                [LanguageCode.En] = "🖱️ Mouse Side Button 2 / Forward (XButton 2)",
+                [LanguageCode.Ja] = "🖱️ マウスサイドボタン 2 / 進む (XButton 2)"
+            },
             ["SensitivityTitle"] = new()
             {
                 [LanguageCode.ZhCn] = "手势触发灵敏度",
@@ -1444,10 +1487,10 @@ namespace WinPieGestures
             },
             ["TrayTooltip"] = new()
             {
-                [LanguageCode.ZhCn] = "StarPie v1.4.2 - 现代化鼠标轮盘笔势",
-                [LanguageCode.ZhTw] = "StarPie v1.4.2 - 現代化滑鼠輪盤手勢",
-                [LanguageCode.En] = "StarPie v1.4.2 - Modern Mouse Radial Gestures",
-                [LanguageCode.Ja] = "StarPie v1.4.2 - 次世代マウスラジアルジェスチャー"
+                [LanguageCode.ZhCn] = "StarPie v1.4.3 - 现代化鼠标轮盘笔势",
+                [LanguageCode.ZhTw] = "StarPie v1.4.3 - 現代化滑鼠輪盤手勢",
+                [LanguageCode.En] = "StarPie v1.4.3 - Modern Mouse Radial Gestures",
+                [LanguageCode.Ja] = "StarPie v1.4.3 - 次世代マウスラジアルジェスチャー"
             }
         };
     }

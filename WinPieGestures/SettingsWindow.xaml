@@ -612,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.4.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock Text="v1.4.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -642,6 +642,23 @@
                     
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,10,0">
+                                                        <!-- Card 0: Trigger Button Selector -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock x:Name="TriggerButtonTitleText" Text="轮盘唤醒触发按键" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TriggerButtonDescText" Text="选择按住并拖动唤醒轮盘手势的鼠标按键。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap"/>
+                                    <ComboBox x:Name="TriggerButtonComboBox" AutomationProperties.AutomationId="TriggerButtonComboBox" Height="34" Style="{StaticResource FlatComboBoxStyle}" SelectionChanged="TriggerButtonComboBox_SelectionChanged">
+                                        <ComboBoxItem x:Name="TriggerBtnRightItem" Tag="RightButton" IsSelected="True">🖱️ 鼠标右键 (Right Button) [推荐 / 默认]</ComboBoxItem>
+                                        <ComboBoxItem x:Name="TriggerBtnMiddleItem" Tag="MiddleButton">🖱️ 鼠标中键 / 滚轮按压 (Middle Button)</ComboBoxItem>
+                                        <ComboBoxItem x:Name="TriggerBtnX1Item" Tag="XButton1">🖱️ 鼠标侧键 1 / 后退键 (XButton 1 / Back)</ComboBoxItem>
+                                        <ComboBoxItem x:Name="TriggerBtnX2Item" Tag="XButton2">🖱️ 鼠标侧键 2 / 前进键 (XButton 2 / Forward)</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Card 1: Trigger Sensitivity -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                                 <Border.Effect>
@@ -1532,7 +1549,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.4.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
@@ -1610,7 +1627,7 @@
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.4.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock Text="自定义图标导入 &amp; 动作引导视觉强化 &amp; 配色折叠收纳 &amp; 架构精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>

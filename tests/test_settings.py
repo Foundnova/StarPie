@@ -864,3 +864,37 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     assert "EnableOuterEscapeCancel" in config, "EnableOuterEscapeCancel should be in config.json"
     assert config["EnableOuterEscapeCancel"] is True, "EnableOuterEscapeCancel should default to True"
 
+def test_v143_trigger_button_customization(app):
+    win, local_app_data = app
+    
+    # 1. Triggers Tab (Tab 0)
+    tab0 = win.child_window(auto_id="NavTab0", control_type="RadioButton")
+    tab0.select()
+    time.sleep(0.4)
+    
+    trigger_cb = win.child_window(auto_id="TriggerButtonComboBox", control_type="ComboBox")
+    assert trigger_cb.exists(timeout=3), "TriggerButtonComboBox should exist on Tab 0"
+    
+    # 2. Select MiddleButton (Index 1)
+    trigger_cb.select(1)
+    time.sleep(0.3)
+    
+    # 3. Save
+    save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
+    save_btn.invoke()
+    time.sleep(0.5)
+    
+    try:
+        dialog = Desktop(backend="uia").window(class_name="#32770")
+        if dialog.exists(timeout=2):
+            ok_btn = dialog.child_window(control_type="Button")
+            ok_btn.invoke()
+    except:
+        pass
+        
+    config_path = get_config_path(local_app_data)
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+    assert config.get("TriggerButton") == "MiddleButton", f"Expected MiddleButton in config, got {config.get('TriggerButton')}"
+
+

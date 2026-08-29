@@ -20,12 +20,12 @@ namespace WinPieGestures
         public GestureController(MouseHook mouseHook)
         {
             _mouseHook = mouseHook;
-            _mouseHook.OnRightButtonDown += Hook_OnRightButtonDown;
-            _mouseHook.OnRightButtonUp += Hook_OnRightButtonUp;
+            _mouseHook.OnTriggerButtonDown += Hook_OnTriggerButtonDown;
+            _mouseHook.OnTriggerButtonUp += Hook_OnTriggerButtonUp;
             _mouseHook.OnMouseMove += Hook_OnMouseMove;
         }
 
-        private void Hook_OnRightButtonDown(object sender, MouseEventArgs e)
+        private void Hook_OnTriggerButtonDown(object sender, MouseEventArgs e)
         {
             // Check if gesture should be isolated (blacklisted, modifiers pressed, or active window full-screen)
             string processName = ActiveWindowHelper.GetActiveWindowProcessName();
@@ -110,7 +110,7 @@ namespace WinPieGestures
             }
         }
 
-        private void Hook_OnRightButtonUp(object sender, MouseEventArgs e)
+        private void Hook_OnTriggerButtonUp(object sender, MouseEventArgs e)
         {
             if (_isWaitingForThreshold)
             {
@@ -120,7 +120,7 @@ namespace WinPieGestures
                 // Replay the right click on another thread to avoid blocking the hook thread
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    _mouseHook.ReplayRightClick();
+                    _mouseHook.ReplayTriggerClick(ConfigManager.CurrentConfig.TriggerButton);
                 }));
                 e.Handled = true;
             }

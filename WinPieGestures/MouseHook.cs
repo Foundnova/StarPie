@@ -24,6 +24,10 @@ namespace WinPieGestures
         private const int WM_MOUSEMOVE = 0x0200;
         private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_RBUTTONUP = 0x0205;
+        private const int WM_MBUTTONDOWN = 0x0207;
+        private const int WM_MBUTTONUP = 0x0208;
+        private const int WM_XBUTTONDOWN = 0x020B;
+        private const int WM_XBUTTONUP = 0x020C;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -66,22 +70,40 @@ namespace WinPieGestures
 
         private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
         private const uint MOUSEEVENTF_RIGHTUP = 0x0010;
+        private const uint MOUSEEVENTF_MIDDLEDOWN = 0x0020;
+        private const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
+        private const uint MOUSEEVENTF_XDOWN = 0x0080;
+        private const uint MOUSEEVENTF_XUP = 0x0100;
+        private const uint XBUTTON1 = 0x0001;
+        private const uint XBUTTON2 = 0x0002;
 
         public bool IsPaused { get; set; } = false;
 
-        public event EventHandler<MouseEventArgs> OnRightButtonDown;
-        public event EventHandler<MouseEventArgs> OnRightButtonUp;
-        public event EventHandler<MouseEventArgs> OnMouseMove;
+        public event EventHandler<MouseEventArgs>? OnTriggerButtonDown;
+        public event EventHandler<MouseEventArgs>? OnTriggerButtonUp;
+        public event EventHandler<MouseEventArgs>? OnMouseMove;
+
+        // Legacy compatibility events
+        public event EventHandler<MouseEventArgs>? OnRightButtonDown
+        {
+            add => OnTriggerButtonDown += value;
+            remove => OnTriggerButtonDown -= value;
+        }
+        public event EventHandler<MouseEventArgs>? OnRightButtonUp
+        {
+            add => OnTriggerButtonUp += value;
+            remove => OnTriggerButtonUp -= value;
+        }
 
         private LowLevelMouseProc _proc;
         private IntPtr _hookId = IntPtr.Zero;
 
-        // Flags to prevent recursive hook interception when we replay right click events
-        private bool _ignoreNextRButtonDown = false;
-        private bool _ignoreNextRButtonUp = false;
+        // Flags to prevent recursive hook interception when we replay click events
+        private bool _ignoreNextButtonDown = false;
+        private bool _ignoreNextButtonUp = false;
 
         // Hook stability and health check variables
-        private System.Threading.Timer _healthCheckTimer;
+        private System.Threading.Timer? _healthCheckTimer;
         private POINT _lastSystemCursorPos;
         private int _hookEventsCountSinceLastCheck = 0;
 
@@ -122,7 +144,7 @@ namespace WinPieGestures
             }
         }
 
-        private void CheckHookHealth(object state)
+        private void CheckHookHealth(object? state)
         {
             if (_hookId == IntPtr.Zero) return;
 
@@ -163,8 +185,9 @@ namespace WinPieGestures
         private IntPtr SetHook(LowLevelMouseProc proc)
         {
             using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
+            using (ProcessModule? curModule = curProcess.MainModule)
             {
+                if (curModule == null) throw new InvalidOperationException("MainModule is null.");
                 return SetWindowsHookEx(WH_MOUSE_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
             }
         }
@@ -183,40 +206,69 @@ namespace WinPieGestures
                 int message = (int)wParam;
                 MSLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
 
-                if (message == WM_RBUTTONDOWN)
-                {
-                    if (_ignoreNextRButtonDown)
-                    {
-                        _ignoreNextRButtonDown = false;
-                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
-                    }
-
-                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                    OnRightButtonDown?.Invoke(this, args);
-                    if (args.Handled)
-                    {
-                        return (IntPtr)1; // Block the event from propagating
-                    }
-                }
-                else if (message == WM_RBUTTONUP)
-                {
-                    if (_ignoreNextRButtonUp)
-                    {
-                        _ignoreNextRButtonUp = false;
-                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
-                    }
-
-                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                    OnRightButtonUp?.Invoke(this, args);
-                    if (args.Handled)
-                    {
-                        return (IntPtr)1; // Block the event from propagating
-                    }
-                }
-                else if (message == WM_MOUSEMOVE)
+                if (message == WM_MOUSEMOVE)
                 {
                     var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
                     OnMouseMove?.Invoke(this, args);
+                    if (args.Handled)
+                    {
+                        return (IntPtr)1; // Block event
+                    }
+                    return CallNextHookEx(_hookId, nCode, wParam, lParam);
+                }
+
+                string trigger = ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+                bool isTargetDown = false;
+                bool isTargetUp = false;
+
+                if (trigger == "MiddleButton")
+                {
+                    isTargetDown = (message == WM_MBUTTONDOWN);
+                    isTargetUp = (message == WM_MBUTTONUP);
+                }
+                else if (trigger == "XButton1")
+                {
+                    uint xBtn = (hookStruct.mouseData >> 16) & 0xFFFF;
+                    isTargetDown = (message == WM_XBUTTONDOWN && xBtn == 1);
+                    isTargetUp = (message == WM_XBUTTONUP && xBtn == 1);
+                }
+                else if (trigger == "XButton2")
+                {
+                    uint xBtn = (hookStruct.mouseData >> 16) & 0xFFFF;
+                    isTargetDown = (message == WM_XBUTTONDOWN && xBtn == 2);
+                    isTargetUp = (message == WM_XBUTTONUP && xBtn == 2);
+                }
+                else // Default RightButton
+                {
+                    isTargetDown = (message == WM_RBUTTONDOWN);
+                    isTargetUp = (message == WM_RBUTTONUP);
+                }
+
+                if (isTargetDown)
+                {
+                    if (_ignoreNextButtonDown)
+                    {
+                        _ignoreNextButtonDown = false;
+                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
+                    }
+
+                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
+                    OnTriggerButtonDown?.Invoke(this, args);
+                    if (args.Handled)
+                    {
+                        return (IntPtr)1; // Block the event from propagating
+                    }
+                }
+                else if (isTargetUp)
+                {
+                    if (_ignoreNextButtonUp)
+                    {
+                        _ignoreNextButtonUp = false;
+                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
+                    }
+
+                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
+                    OnTriggerButtonUp?.Invoke(this, args);
                     if (args.Handled)
                     {
                         return (IntPtr)1; // Block the event from propagating
@@ -228,15 +280,40 @@ namespace WinPieGestures
         }
 
         /// <summary>
-        /// Replays a right mouse click at the current position.
+        /// Replays a mouse click for the designated trigger button at the current position.
         /// Temporarily ignores our own hook to avoid infinite loop.
         /// </summary>
+        public void ReplayTriggerClick(string? triggerButton = null)
+        {
+            string button = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+            _ignoreNextButtonDown = true;
+            _ignoreNextButtonUp = true;
+
+            if (button == "MiddleButton")
+            {
+                mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
+                mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
+            }
+            else if (button == "XButton1")
+            {
+                mouse_event(MOUSEEVENTF_XDOWN, 0, 0, XBUTTON1, 0);
+                mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON1, 0);
+            }
+            else if (button == "XButton2")
+            {
+                mouse_event(MOUSEEVENTF_XDOWN, 0, 0, XBUTTON2, 0);
+                mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON2, 0);
+            }
+            else // RightButton
+            {
+                mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+                mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+            }
+        }
+
         public void ReplayRightClick()
         {
-            _ignoreNextRButtonDown = true;
-            _ignoreNextRButtonUp = true;
-            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+            ReplayTriggerClick("RightButton");
         }
     }
 }
