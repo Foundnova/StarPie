@@ -52,6 +52,11 @@ namespace WinPieGestures
         private readonly List<System.Windows.Shapes.Path> _previewSectorPaths = new List<System.Windows.Shapes.Path>();
         private readonly List<TranslateTransform> _previewTransforms = new List<TranslateTransform>();
         private readonly List<double> _previewAngles = new List<double>();
+        private readonly List<System.Windows.Shapes.Path> _previewSubSectorPaths = new List<System.Windows.Shapes.Path>();
+        private readonly List<TranslateTransform> _previewSubTransforms = new List<TranslateTransform>();
+        private readonly List<int> _previewSubParentIndices = new List<int>();
+        private readonly List<int> _previewSubIndices = new List<int>();
+        private readonly List<double> _previewSubAngles = new List<double>();
         private IRadialStyleRenderer? _previewStyleRenderer;
         private Brush? _previewDefaultBrush;
         private Brush? _previewHighlightBrush;
@@ -63,6 +68,7 @@ namespace WinPieGestures
         private Ellipse? _previewCoreCircle;
         private System.Windows.Shapes.Path? _previewExitIcon;
         private int _lastHoveredSector = -2;
+        private int _lastHoveredSubIndex = -2;
 
         // Direction Labels
         private static readonly string[] Directions4 = { "右 (E / 0°)", "下 (S / 90°)", "左 (W / 180°)", "上 (N / 270°)" };
@@ -227,13 +233,10 @@ namespace WinPieGestures
                 ShiftModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnShift;
                 AltModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnAlt;
 
-                if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
-                {
-                    foreach (var proc in ConfigManager.CurrentConfig.BlacklistedProcesses)
-                    {
-                        BlacklistListBox.Items.Add(proc);
-                    }
-                }
+                bool isWhitelist = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+                if (IsolationWhitelistRadio != null) IsolationWhitelistRadio.IsChecked = isWhitelist;
+                if (IsolationBlacklistRadio != null) IsolationBlacklistRadio.IsChecked = !isWhitelist;
+                RefreshProcessListUI();
 
                 // Auto-start setting
                 AutoStartCheckBox.IsChecked = ConfigManager.IsAutoStartEnabled();
@@ -430,8 +433,14 @@ namespace WinPieGestures
             if (CtrlModifierCheckBox != null) CtrlModifierCheckBox.Content = I18n.T("ModifierCtrl");
             if (ShiftModifierCheckBox != null) ShiftModifierCheckBox.Content = I18n.T("ModifierShift");
             if (AltModifierCheckBox != null) AltModifierCheckBox.Content = I18n.T("ModifierAlt");
-            if (BlacklistTitleText != null) BlacklistTitleText.Text = I18n.T("BlacklistTitle");
-            if (BlacklistDescText != null) BlacklistDescText.Text = I18n.T("BlacklistDesc");
+            if (IsolationModeTitleText != null) IsolationModeTitleText.Text = I18n.T("IsolationModeTitle");
+            if (IsolationBlacklistRadio != null) IsolationBlacklistRadio.Content = I18n.T("IsolationBlacklistRadio");
+            if (IsolationWhitelistRadio != null) IsolationWhitelistRadio.Content = I18n.T("IsolationWhitelistRadio");
+            if (ProcessListDescText != null)
+            {
+                bool isWhite = string.Equals(ConfigManager.CurrentConfig?.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+                ProcessListDescText.Text = isWhite ? I18n.T("WhitelistDesc") : I18n.T("BlacklistDesc");
+            }
             if (BrowseBlacklistButton != null) BrowseBlacklistButton.Content = I18n.T("BtnPickProcess");
             if (AddBlacklistButton != null) AddBlacklistButton.Content = I18n.T("BtnAddProcess");
             if (DeleteBlacklistButton != null) DeleteBlacklistButton.Content = I18n.T("BtnDeleteProcess");
@@ -2612,6 +2621,39 @@ namespace WinPieGestures
             }
         }
 
+        private void IsolationModeRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+            string newMode = (IsolationWhitelistRadio?.IsChecked == true) ? "Whitelist" : "Blacklist";
+            ConfigManager.CurrentConfig.IsolationMode = newMode;
+            RefreshProcessListUI();
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void RefreshProcessListUI()
+        {
+            if (BlacklistListBox == null || ConfigManager.CurrentConfig == null) return;
+
+            bool isWhitelist = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+            if (IsolationWhitelistRadio != null) IsolationWhitelistRadio.IsChecked = isWhitelist;
+            if (IsolationBlacklistRadio != null) IsolationBlacklistRadio.IsChecked = !isWhitelist;
+
+            if (ProcessListDescText != null)
+            {
+                ProcessListDescText.Text = isWhitelist ? I18n.T("WhitelistDesc") : I18n.T("BlacklistDesc");
+            }
+
+            BlacklistListBox.Items.Clear();
+            var list = isWhitelist ? ConfigManager.CurrentConfig.WhitelistedProcesses : ConfigManager.CurrentConfig.BlacklistedProcesses;
+            if (list != null)
+            {
+                foreach (var proc in list)
+                {
+                    BlacklistListBox.Items.Add(proc);
+                }
+            }
+        }
+
         private void BlacklistListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             if (e.Key == System.Windows.Input.Key.Delete || e.Key == System.Windows.Input.Key.Back)
@@ -2630,19 +2672,20 @@ namespace WinPieGestures
                 proc += ".exe";
             }
 
+            bool isWhitelist = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+            var targetList = isWhitelist 
+                ? (ConfigManager.CurrentConfig.WhitelistedProcesses ??= new List<string>())
+                : (ConfigManager.CurrentConfig.BlacklistedProcesses ??= new List<string>());
+
             if (!BlacklistListBox.Items.Contains(proc))
             {
                 BlacklistListBox.Items.Add(proc);
                 BlacklistListBox.SelectedItem = proc;
                 BlacklistListBox.ScrollIntoView(proc);
 
-                if (ConfigManager.CurrentConfig.BlacklistedProcesses == null)
+                if (!targetList.Contains(proc))
                 {
-                    ConfigManager.CurrentConfig.BlacklistedProcesses = new List<string>();
-                }
-                if (!ConfigManager.CurrentConfig.BlacklistedProcesses.Contains(proc))
-                {
-                    ConfigManager.CurrentConfig.BlacklistedProcesses.Add(proc);
+                    targetList.Add(proc);
                 }
                 NewBlacklistProcessTextBox.Clear();
                 SyncUiToConfigAndSave(true);
@@ -2665,7 +2708,15 @@ namespace WinPieGestures
             if (!string.IsNullOrEmpty(selected))
             {
                 BlacklistListBox.Items.Remove(selected);
-                ConfigManager.CurrentConfig.BlacklistedProcesses?.Remove(selected);
+                bool isWhitelist = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+                if (isWhitelist)
+                {
+                    ConfigManager.CurrentConfig.WhitelistedProcesses?.Remove(selected);
+                }
+                else
+                {
+                    ConfigManager.CurrentConfig.BlacklistedProcesses?.Remove(selected);
+                }
                 SyncUiToConfigAndSave(true);
             }
         }
@@ -2958,20 +3009,35 @@ namespace WinPieGestures
                 _previewSectorPaths.Clear();
                 _previewTransforms.Clear();
                 _previewAngles.Clear();
+                _previewSubSectorPaths.Clear();
+                _previewSubTransforms.Clear();
+                _previewSubParentIndices.Clear();
+                _previewSubIndices.Clear();
+                _previewSubAngles.Clear();
                 _lastHoveredSector = -2;
+                _lastHoveredSubIndex = -2;
 
                 double canvasSize = 300.0;
                 double cx = canvasSize / 2.0;
                 double cy = canvasSize / 2.0;
 
+                bool multiTierEnabled = ConfigManager.CurrentConfig.EnableMultiTier;
+                double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.45;
+
+                var profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault() ?? new WheelProfile { SectorCount = 8, Actions = new List<ActionItem>() };
+                bool hasSubActions = multiTierEnabled && profile.Actions != null && profile.Actions.Any(a => a != null && a.SubActions != null && a.SubActions.Count > 0);
+
                 double maxR = Math.Max(80.0, ConfigManager.CurrentConfig.WheelRadius);
-                double scale = 135.0 / Math.Max(135.0, maxR);
+                double effectiveMaxR = hasSubActions ? (maxR * subRatio + 10.0) : maxR;
+                double scale = 135.0 / Math.Max(135.0, effectiveMaxR);
 
                 double outerR = Math.Max(30.0, ConfigManager.CurrentConfig.WheelRadius * scale);
                 double innerR = Math.Max(15.0, ConfigManager.CurrentConfig.InnerRadius * scale);
                 double coreR = Math.Max(10.0, ConfigManager.CurrentConfig.CoreRadius * scale);
                 double gap = Math.Max(0.0, ConfigManager.CurrentConfig.SectorGap * scale);
                 double cornerRadius = Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius * scale);
+                double innerSubR = outerR + gap + 2.0;
+                double outerSubR = outerR * subRatio;
 
                 if (innerR >= outerR) innerR = outerR * 0.5;
                 if (coreR >= innerR) coreR = innerR * 0.8;
@@ -2992,7 +3058,6 @@ namespace WinPieGestures
                 _previewCoreBgBrush = _previewStyleRenderer.CoreBgBrush;
                 _previewCoreBorderBrush = _previewStyleRenderer.CoreBorderBrush;
 
-                // Real-time live color override: when CustomColorExpander is open or custom colors are being adjusted
                 if (CustomColorExpander != null && CustomColorExpander.IsExpanded)
                 {
                     try
@@ -3028,7 +3093,6 @@ namespace WinPieGestures
                     catch { }
                 }
 
-                // Prepare preview core grid and render style decorations
                 var previewCoreGrid = new Grid
                 {
                     Width = coreR * 2.0,
@@ -3089,7 +3153,7 @@ namespace WinPieGestures
 
                         var brush = new ImageBrush(bmp)
                         {
-                            Stretch = Stretch.UniformToFill,
+                            Stretch = ParseStretchMode(ConfigManager.CurrentConfig.CoreCustomImageStretch),
                             AlignmentX = AlignmentX.Center,
                             AlignmentY = AlignmentY.Center
                         };
@@ -3139,11 +3203,9 @@ namespace WinPieGestures
 
                 _previewStyleRenderer.RenderDecorations(LiveWheelPreviewCanvas, previewCoreGrid, cx, cy, outerR, coreR, 1);
 
-                var profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault() ?? new WheelProfile { SectorCount = 8, Actions = new List<ActionItem>() };
                 int n = profile.SectorCount > 0 ? profile.SectorCount : 8;
                 double sectorSize = 360.0 / n;
 
-                // Draw sectors
                 for (int i = 0; i < n; i++)
                 {
                     double midAngle = i * sectorSize;
@@ -3175,7 +3237,6 @@ namespace WinPieGestures
                     _previewTransforms.Add(transform);
                     _previewAngles.Add(midAngleRad);
 
-                    // Add icon & mini text inside sector
                     var sp = new StackPanel
                     {
                         Orientation = System.Windows.Controls.Orientation.Vertical,
@@ -3217,7 +3278,7 @@ namespace WinPieGestures
 
                         double configuredIconSize = ConfigManager.CurrentConfig.SectorIconSize > 0 ? ConfigManager.CurrentConfig.SectorIconSize : 20.0;
                         double scaleFactor = n == 12 ? 0.80 : (n == 4 ? 1.20 : 1.0);
-                        double previewIconSize = ((layoutMode == "IconOnly") ? configuredIconSize * 1.35 : configuredIconSize) * 0.72 * scaleFactor;
+                        double previewIconSize = ((layoutMode == "IconOnly") ? configuredIconSize * 1.35 : configuredIconSize) * 0.72 * scaleFactor * (scale / (135.0 / maxR));
 
                         if (!string.IsNullOrEmpty(svgData))
                         {
@@ -3273,7 +3334,6 @@ namespace WinPieGestures
                         }
                         else
                         {
-                            // Hotkey keyboard fallback icon
                             try
                             {
                                 var iconPath = new System.Windows.Shapes.Path
@@ -3296,13 +3356,13 @@ namespace WinPieGestures
                     {
                         double baseFontSize = ConfigManager.CurrentConfig.SectorFontSize > 0 ? ConfigManager.CurrentConfig.SectorFontSize : 10.5;
                         double scaleFactor = n == 12 ? 0.80 : (n == 4 ? 1.20 : 1.0);
-                        double previewFs = ((layoutMode == "TextOnly") ? baseFontSize + 1.0 : baseFontSize) * 0.85 * scaleFactor;
-                        double textMaxW = n == 12 ? 44.0 : (n == 4 ? 76.0 : 64.0);
+                        double previewFs = ((layoutMode == "TextOnly") ? baseFontSize + 1.0 : baseFontSize) * 0.82 * scaleFactor * (scale / (135.0 / maxR));
+                        double textMaxW = (n == 12 ? 44.0 : (n == 4 ? 76.0 : 64.0)) * scale;
 
                         var tb = new TextBlock
                         {
                             Text = actionName,
-                            FontSize = Math.Max(6.5, previewFs),
+                            FontSize = Math.Max(6.0, previewFs),
                             Foreground = _previewTextBrush,
                             FontWeight = FontWeights.Medium,
                             HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -3313,8 +3373,8 @@ namespace WinPieGestures
                         sp.Children.Add(tb);
                     }
 
-                    double containerW = n == 12 ? 46.0 : (n == 4 ? 76.0 : 60.0);
-                    double containerH = n == 12 ? 38.0 : (n == 4 ? 54.0 : 44.0);
+                    double containerW = (n == 12 ? 46.0 : (n == 4 ? 76.0 : 60.0)) * scale;
+                    double containerH = (n == 12 ? 38.0 : (n == 4 ? 54.0 : 44.0)) * scale;
 
                     var container = new Grid
                     {
@@ -3328,9 +3388,133 @@ namespace WinPieGestures
                     Canvas.SetTop(container, ly - containerH / 2.0);
                     System.Windows.Controls.Panel.SetZIndex(container, 10);
                     LiveWheelPreviewCanvas.Children.Add(container);
+
+                    if (multiTierEnabled && profile.Actions != null && i < profile.Actions.Count && profile.Actions[i] != null)
+                    {
+                        var parentAction = profile.Actions[i];
+                        if (parentAction.SubActions != null && parentAction.SubActions.Count > 0)
+                        {
+                            int subCount = parentAction.SubActions.Count;
+                            double subAngleSpan = sectorSize / subCount;
+
+                            for (int j = 0; j < subCount; j++)
+                            {
+                                double subStart = startAngle + j * subAngleSpan;
+                                double subEnd = subStart + subAngleSpan;
+                                double subMid = (subStart + subEnd) / 2.0;
+                                double subMidRad = subMid * (Math.PI / 180.0);
+
+                                double subLayoutRadius = (innerSubR + outerSubR) / 2.0;
+                                double subLx = cx + Math.Cos(subMidRad) * subLayoutRadius;
+                                double subLy = cy + Math.Sin(subMidRad) * subLayoutRadius;
+
+                                Geometry subGeom = IconHelper.CreateAdvancedSectorGeometry(
+                                    cx, cy, subStart, subEnd, innerSubR, outerSubR, shape, gap, cornerRadius * 0.75);
+
+                                var subTransform = new TranslateTransform(0, 0);
+                                var subPath = new System.Windows.Shapes.Path
+                                {
+                                    Data = subGeom,
+                                    Fill = _previewDefaultBrush,
+                                    Stroke = _previewBorderBrush,
+                                    StrokeThickness = (_previewStyleRenderer?.BorderThickness ?? 1.2),
+                                    RenderTransform = subTransform,
+                                    Tag = $"sub_{i}_{j}",
+                                    Opacity = 0.88
+                                };
+                                LiveWheelPreviewCanvas.Children.Add(subPath);
+                                _previewSubSectorPaths.Add(subPath);
+                                _previewSubTransforms.Add(subTransform);
+                                _previewSubParentIndices.Add(i);
+                                _previewSubIndices.Add(j);
+                                _previewSubAngles.Add(subMidRad);
+
+                                var subAction = parentAction.SubActions[j];
+                                var subSp = new StackPanel
+                                {
+                                    Orientation = System.Windows.Controls.Orientation.Vertical,
+                                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    IsHitTestVisible = false,
+                                    RenderTransform = subTransform
+                                };
+
+                                double subIconSize = 11.5 * scale;
+                                string? subSvg = null;
+                                if (!string.IsNullOrEmpty(subAction.CustomIconSvg)) subSvg = subAction.CustomIconSvg;
+                                else if (!string.IsNullOrEmpty(subAction.IconKey)) subSvg = IconHelper.GetSvgPathByKey(subAction.IconKey);
+                                else if (subAction.Type == "Folder" || subAction.Type == "OpenFolder") subSvg = IconHelper.GetSvgPathByKey("Folder");
+                                else if (subAction.Type == "System" && !string.IsNullOrEmpty(subAction.Parameter)) subSvg = IconHelper.GetSvgPathByKey(subAction.Parameter);
+
+                                if (!string.IsNullOrEmpty(subSvg))
+                                {
+                                    try
+                                    {
+                                        var subIconPath = new System.Windows.Shapes.Path
+                                        {
+                                            Data = Geometry.Parse(subSvg),
+                                            Fill = _previewTextBrush,
+                                            Width = subIconSize,
+                                            Height = subIconSize,
+                                            Stretch = Stretch.Uniform,
+                                            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                                        };
+                                        subSp.Children.Add(subIconPath);
+                                    }
+                                    catch { }
+                                }
+                                else if (subAction.Type == "Launch" && !string.IsNullOrEmpty(subAction.Parameter))
+                                {
+                                    var subIconSrc = IconHelper.GetIcon(subAction.Parameter);
+                                    if (subIconSrc != null)
+                                    {
+                                        var subImg = new System.Windows.Controls.Image
+                                        {
+                                            Source = subIconSrc,
+                                            Width = subIconSize,
+                                            Height = subIconSize,
+                                            Stretch = Stretch.Uniform,
+                                            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                                        };
+                                        subSp.Children.Add(subImg);
+                                    }
+                                }
+
+                                if (showText && !string.IsNullOrEmpty(subAction.Name))
+                                {
+                                    var subTb = new TextBlock
+                                    {
+                                        Text = subAction.Name,
+                                        FontSize = Math.Max(5.0, 7.0 * scale),
+                                        Foreground = _previewTextBrush,
+                                        FontWeight = FontWeights.Normal,
+                                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                                        TextAlignment = TextAlignment.Center,
+                                        TextTrimming = TextTrimming.CharacterEllipsis,
+                                        MaxWidth = 34.0 * scale
+                                    };
+                                    subSp.Children.Add(subTb);
+                                }
+
+                                double subContainerW = 34.0 * scale;
+                                double subContainerH = 26.0 * scale;
+                                var subContainer = new Grid
+                                {
+                                    Width = subContainerW,
+                                    Height = subContainerH,
+                                    IsHitTestVisible = false,
+                                    RenderTransform = subTransform
+                                };
+                                subContainer.Children.Add(subSp);
+                                Canvas.SetLeft(subContainer, subLx - subContainerW / 2.0);
+                                Canvas.SetTop(subContainer, subLy - subContainerH / 2.0);
+                                System.Windows.Controls.Panel.SetZIndex(subContainer, 12);
+                                LiveWheelPreviewCanvas.Children.Add(subContainer);
+                            }
+                        }
+                    }
                 }
 
-                // Position and add preview core grid
                 Canvas.SetLeft(previewCoreGrid, cx - coreR);
                 Canvas.SetTop(previewCoreGrid, cy - coreR);
                 System.Windows.Controls.Panel.SetZIndex(previewCoreGrid, 15);
@@ -3365,29 +3549,60 @@ namespace WinPieGestures
                 double dy = p.Y - 150.0;
                 double dist = Math.Sqrt(dx * dx + dy * dy);
 
+                bool multiTierEnabled = ConfigManager.CurrentConfig.EnableMultiTier;
+                double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.45;
+
+                var profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+                bool hasSubActions = multiTierEnabled && profile?.Actions != null && profile.Actions.Any(a => a != null && a.SubActions != null && a.SubActions.Count > 0);
+
                 double maxR = Math.Max(80.0, ConfigManager.CurrentConfig.WheelRadius);
-                double scale = 135.0 / Math.Max(135.0, maxR);
+                double effectiveMaxR = hasSubActions ? (maxR * subRatio + 10.0) : maxR;
+                double scale = 135.0 / Math.Max(135.0, effectiveMaxR);
+
                 double outerR = ConfigManager.CurrentConfig.WheelRadius * scale;
                 double innerR = ConfigManager.CurrentConfig.InnerRadius * scale;
                 double coreR = ConfigManager.CurrentConfig.CoreRadius * scale;
+                double innerSubR = outerR + (ConfigManager.CurrentConfig.SectorGap * scale) + 2.0;
+                double outerSubR = outerR * subRatio;
 
                 int hoveredIndex = -2;
+                int hoveredSubGlobalIndex = -1;
 
                 if (dist <= coreR)
                 {
-                    hoveredIndex = -1; // Core hovered
+                    hoveredIndex = -1;
                 }
-                else if (dist >= innerR * 0.75 && dist <= outerR * 1.2)
+                else if (dist >= innerR * 0.75 && dist < innerSubR)
                 {
                     double angleDeg = (Math.Atan2(dy, dx) * (180.0 / Math.PI) + 360.0) % 360.0;
                     double sectorSize = 360.0 / _previewSectorPaths.Count;
                     hoveredIndex = (int)Math.Round(angleDeg / sectorSize) % _previewSectorPaths.Count;
                 }
+                else if (multiTierEnabled && dist >= innerSubR && dist <= (outerSubR + 25.0 * scale))
+                {
+                    double angleDeg = (Math.Atan2(dy, dx) * (180.0 / Math.PI) + 360.0) % 360.0;
+                    double sectorSize = 360.0 / _previewSectorPaths.Count;
+                    int parentSector = (int)Math.Round(angleDeg / sectorSize) % _previewSectorPaths.Count;
+                    hoveredIndex = parentSector;
 
-                if (hoveredIndex == _lastHoveredSector) return;
+                    for (int k = 0; k < _previewSubSectorPaths.Count; k++)
+                    {
+                        if (_previewSubParentIndices[k] == parentSector)
+                        {
+                            var subPath = _previewSubSectorPaths[k];
+                            if (subPath.Data != null && subPath.Data.FillContains(p))
+                            {
+                                hoveredSubGlobalIndex = k;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (hoveredIndex == _lastHoveredSector && hoveredSubGlobalIndex == _lastHoveredSubIndex) return;
                 _lastHoveredSector = hoveredIndex;
+                _lastHoveredSubIndex = hoveredSubGlobalIndex;
 
-                // Update sector highlights & magnetic pop-out
                 for (int i = 0; i < _previewSectorPaths.Count; i++)
                 {
                     var path = _previewSectorPaths[i];
@@ -3401,9 +3616,8 @@ namespace WinPieGestures
                         path.StrokeThickness = (_previewStyleRenderer?.HighlightBorderThickness ?? 2.0);
                         _previewStyleRenderer?.ApplySectorHighlight(path, true);
 
-                        // Pop out
-                        trans.X = Math.Cos(angleRad) * 4.5;
-                        trans.Y = Math.Sin(angleRad) * 4.5;
+                        trans.X = Math.Cos(angleRad) * 4.0;
+                        trans.Y = Math.Sin(angleRad) * 4.0;
                     }
                     else
                     {
@@ -3417,7 +3631,42 @@ namespace WinPieGestures
                     }
                 }
 
-                // Core highlight
+                for (int k = 0; k < _previewSubSectorPaths.Count; k++)
+                {
+                    var subPath = _previewSubSectorPaths[k];
+                    var subTrans = _previewSubTransforms[k];
+                    int parentIdx = _previewSubParentIndices[k];
+                    double subAngleRad = _previewSubAngles[k];
+
+                    if (k == hoveredSubGlobalIndex)
+                    {
+                        subPath.Fill = _previewHighlightBrush;
+                        subPath.Stroke = _previewHighlightBorderBrush;
+                        subPath.StrokeThickness = (_previewStyleRenderer?.HighlightBorderThickness ?? 2.0);
+                        subPath.Opacity = 1.0;
+                        subTrans.X = Math.Cos(subAngleRad) * 4.0;
+                        subTrans.Y = Math.Sin(subAngleRad) * 4.0;
+                    }
+                    else if (parentIdx == hoveredIndex)
+                    {
+                        subPath.Fill = _previewDefaultBrush;
+                        subPath.Stroke = _previewHighlightBorderBrush;
+                        subPath.StrokeThickness = (_previewStyleRenderer?.BorderThickness ?? 1.5);
+                        subPath.Opacity = 1.0;
+                        subTrans.X = 0;
+                        subTrans.Y = 0;
+                    }
+                    else
+                    {
+                        subPath.Fill = _previewDefaultBrush;
+                        subPath.Stroke = _previewBorderBrush;
+                        subPath.StrokeThickness = (_previewStyleRenderer?.BorderThickness ?? 1.2);
+                        subPath.Opacity = 0.85;
+                        subTrans.X = 0;
+                        subTrans.Y = 0;
+                    }
+                }
+
                 if (_previewCoreCircle != null)
                 {
                     if (hoveredIndex == -1)
@@ -3451,6 +3700,7 @@ namespace WinPieGestures
             try
             {
                 _lastHoveredSector = -2;
+                _lastHoveredSubIndex = -2;
                 for (int i = 0; i < _previewSectorPaths.Count; i++)
                 {
                     var path = _previewSectorPaths[i];

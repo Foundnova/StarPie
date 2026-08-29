@@ -50,29 +50,51 @@ namespace WinPieGestures
         {
             processName = ActiveWindowHelper.GetActiveWindowProcessName();
 
-            bool isBlacklisted = false;
-            if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
+            bool isIsolatedByProcess = false;
+            string normProc = processName.Trim().ToLowerInvariant();
+
+            if (string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
             {
-                string normProc = processName.Trim().ToLower();
-                foreach (var blacklisted in ConfigManager.CurrentConfig.BlacklistedProcesses)
+                // Whitelist mode: ONLY allowed if process is in Whitelist
+                bool inWhitelist = false;
+                if (ConfigManager.CurrentConfig.WhitelistedProcesses != null)
                 {
-                    if (blacklisted.Trim().ToLower() == normProc)
+                    foreach (var white in ConfigManager.CurrentConfig.WhitelistedProcesses)
                     {
-                        isBlacklisted = true;
-                        break;
+                        if (string.Equals(white.Trim(), normProc, StringComparison.OrdinalIgnoreCase))
+                        {
+                            inWhitelist = true;
+                            break;
+                        }
+                    }
+                }
+                isIsolatedByProcess = !inWhitelist;
+            }
+            else
+            {
+                // Blacklist mode: bypassed if process is in Blacklist
+                if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
+                {
+                    foreach (var blacklisted in ConfigManager.CurrentConfig.BlacklistedProcesses)
+                    {
+                        if (string.Equals(blacklisted.Trim(), normProc, StringComparison.OrdinalIgnoreCase))
+                        {
+                            isIsolatedByProcess = true;
+                            break;
+                        }
                     }
                 }
             }
 
-            // Modifier safety check: don't trigger if Ctrl/Shift/Alt are held down (e.g. Right Click + Ctrl)
-            bool isCtrlPressed = (Keyboard.GetKeyStates(Key.LeftCtrl) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightCtrl) & KeyStates.Down) > 0;
-            bool isShiftPressed = (Keyboard.GetKeyStates(Key.LeftShift) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightShift) & KeyStates.Down) > 0;
-            bool isAltPressed = (Keyboard.GetKeyStates(Key.LeftAlt) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightAlt) & KeyStates.Down) > 0;
+            // Modifier safety check: don't trigger if configured bypass keys are pressed
+            bool isCtrlPressed = ConfigManager.CurrentConfig.DisableOnCtrl && ((Keyboard.GetKeyStates(Key.LeftCtrl) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightCtrl) & KeyStates.Down) > 0);
+            bool isShiftPressed = ConfigManager.CurrentConfig.DisableOnShift && ((Keyboard.GetKeyStates(Key.LeftShift) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightShift) & KeyStates.Down) > 0);
+            bool isAltPressed = ConfigManager.CurrentConfig.DisableOnAlt && ((Keyboard.GetKeyStates(Key.LeftAlt) & KeyStates.Down) > 0 || (Keyboard.GetKeyStates(Key.RightAlt) & KeyStates.Down) > 0);
             bool isModifierPressed = isCtrlPressed || isShiftPressed || isAltPressed;
 
             bool isFullScreen = ConfigManager.CurrentConfig.DisableOnFullScreen && FullScreenHelper.IsActiveWindowFullScreen();
 
-            return isBlacklisted || isModifierPressed || isFullScreen;
+            return isIsolatedByProcess || isModifierPressed || isFullScreen;
         }
 
         private bool IsModifierKey(uint vkCode)

@@ -119,7 +119,9 @@ namespace WinPieGestures
         public List<WheelProfile> Profiles { get; set; } = new List<WheelProfile>();
 
         // Scene Isolation Settings
+        public string IsolationMode { get; set; } = "Blacklist"; // "Blacklist" or "Whitelist"
         public List<string> BlacklistedProcesses { get; set; } = new List<string> { "mstsc.exe", "paint.exe" };
+        public List<string> WhitelistedProcesses { get; set; } = new List<string>();
         public bool DisableOnCtrl { get; set; } = false;
         public bool DisableOnShift { get; set; } = false;
         public bool DisableOnAlt { get; set; } = false;
@@ -188,6 +190,54 @@ namespace WinPieGestures
                 {
                     CurrentConfig = CreateDefaultConfig();
                     SaveConfig();
+                }
+
+                // Ensure non-null collections and migration integrity
+                CurrentConfig.BlacklistedProcesses ??= new List<string> { "mstsc.exe", "paint.exe" };
+                CurrentConfig.WhitelistedProcesses ??= new List<string>();
+                if (string.IsNullOrEmpty(CurrentConfig.IsolationMode)) CurrentConfig.IsolationMode = "Blacklist";
+
+                if (CurrentConfig.Profiles != null)
+                {
+                    foreach (var profile in CurrentConfig.Profiles)
+                    {
+                        if (profile.Actions != null)
+                        {
+                            foreach (var act in profile.Actions)
+                            {
+                                act.SubActions ??= new List<ActionItem>();
+                            }
+                        }
+                    }
+
+                    var globalProf = CurrentConfig.Profiles.FirstOrDefault(p => string.Equals(p.ProcessName, "Global", StringComparison.OrdinalIgnoreCase));
+                    if (globalProf != null && globalProf.Actions != null)
+                    {
+                        int totalSubs = globalProf.Actions.Sum(a => a.SubActions?.Count ?? 0);
+                        if (totalSubs == 0)
+                        {
+                            if (globalProf.Actions.Count > 0 && globalProf.Actions[0] != null)
+                            {
+                                globalProf.Actions[0].SubActions = new List<ActionItem>
+                                {
+                                    new ActionItem { Type = "Hotkey", Name = "复制", Parameter = "Ctrl+C", IconKey = "Copy" },
+                                    new ActionItem { Type = "Hotkey", Name = "剪切", Parameter = "Ctrl+X", IconKey = "Cut" },
+                                    new ActionItem { Type = "Hotkey", Name = "粘贴", Parameter = "Ctrl+V", IconKey = "Paste" },
+                                    new ActionItem { Type = "Hotkey", Name = "全选", Parameter = "Ctrl+A", IconKey = "Edit" }
+                                };
+                            }
+                            if (globalProf.Actions.Count > 6 && globalProf.Actions[6] != null)
+                            {
+                                globalProf.Actions[6].SubActions = new List<ActionItem>
+                                {
+                                    new ActionItem { Type = "Launch", Name = "记事本", Parameter = "notepad.exe", IconKey = "Code" },
+                                    new ActionItem { Type = "System", Name = "计算器", Parameter = "Calculator", IconKey = "Code" },
+                                    new ActionItem { Type = "System", Name = "任务管理器", Parameter = "TaskManager", IconKey = "Terminal" }
+                                };
+                            }
+                            SaveConfig();
+                        }
+                    }
                 }
 
                 // Initialize internationalization language

@@ -294,6 +294,55 @@ namespace WinPieGestures
                 [LanguageCode.En] = "When enabled, hovering over a sector with sub-actions will smoothly expand cascading outer sub-sectors. Flick outward to trigger.",
                 [LanguageCode.Ja] = "有効にすると、サブアクションが設定されたセクターにホバーした際に外側にカスケードサブメニューが展開され、外側へスワイプしてトリガーできます。"
             },
+            ["IsolationModeTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "进程隔离与生效模式 (Process Isolation Mode)",
+                [LanguageCode.ZhTw] = "處理程序隔離與生效模式 (Process Isolation Mode)",
+                [LanguageCode.En] = "Process Isolation & Activation Mode",
+                [LanguageCode.Ja] = "プロセス分離と有効化モード"
+            },
+            ["IsolationBlacklistRadio"] = new()
+            {
+                [LanguageCode.ZhCn] = "🚫 排除黑名单模式 (默认：全局生效，仅在黑名单程序中放行右键)",
+                [LanguageCode.ZhTw] = "🚫 排除黑名單模式 (預設：全域生效，僅在黑名單程式中放行右鍵)",
+                [LanguageCode.En] = "🚫 Blacklist Mode (Global active, bypass in blacklisted apps)",
+                [LanguageCode.Ja] = "🚫 ブラックリストモード (既定: 全体有効、除外アプリのみ右クリック通過)"
+            },
+            ["IsolationWhitelistRadio"] = new()
+            {
+                [LanguageCode.ZhCn] = "🛡️ 启用白名单模式 (仅在白名单程序中生效，其余程序完全放行右键)",
+                [LanguageCode.ZhTw] = "🛡️ 啟用白名單模式 (僅在白名單程式中生效，其餘程式完全放行右鍵)",
+                [LanguageCode.En] = "🛡️ Whitelist Mode (Only active in whitelisted apps, bypass elsewhere)",
+                [LanguageCode.Ja] = "🛡️ ホワイトリストモード (登録アプリのみ有効、他は右クリック通過)"
+            },
+            ["BlacklistTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "进程排除黑名单",
+                [LanguageCode.ZhTw] = "處理程序排除黑名單",
+                [LanguageCode.En] = "Process Exclusion Blacklist",
+                [LanguageCode.Ja] = "プロセス除外ブラックリスト"
+            },
+            ["BlacklistDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "在排除黑名单中的应用程序（如远程桌面、画图、3D建模软件）中，完全放行鼠标右键。",
+                [LanguageCode.ZhTw] = "在排除黑名單中的應用程式（如遠端桌面、小畫家、3D建模軟體）中，完全放行滑鼠右鍵。",
+                [LanguageCode.En] = "Bypass mouse gestures in blacklisted applications (e.g. Remote Desktop, Paint, CAD tools).",
+                [LanguageCode.Ja] = "ブラックリストに登録されたアプリ（リモートデスクトップ、ペイントなど）ではジェスチャーを無効化します。"
+            },
+            ["WhitelistTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "进程启用白名单",
+                [LanguageCode.ZhTw] = "處理程序啟用白名單",
+                [LanguageCode.En] = "Process Activation Whitelist",
+                [LanguageCode.Ja] = "プロセス有効化ホワイトリスト"
+            },
+            ["WhitelistDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "手势轮盘仅在白名单列表中的应用程序中生效，其他所有程序完全放行鼠标右键。",
+                [LanguageCode.ZhTw] = "手勢輪盤僅在白名單列表中的應用程式中生效，其他所有程式完全放行滑鼠右鍵。",
+                [LanguageCode.En] = "Mouse gestures will ONLY activate in whitelisted applications, bypassing everywhere else.",
+                [LanguageCode.Ja] = "ホワイトリストに登録されたアプリのみでジェスチャーが有効になり、他のアプリでは通過します。"
+            },
             ["SubActionColumnHeader"] = new()
             {
                 [LanguageCode.ZhCn] = "级联子菜单",

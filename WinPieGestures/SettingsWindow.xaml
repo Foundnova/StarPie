@@ -612,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.4.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock x:Name="SidebarVersionText" Text="v1.4.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -785,14 +785,21 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- Card 3: Process Exclusion Blacklist -->
+                            <!-- Card 3: Process Isolation (Blacklist & Whitelist) -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
                                 </Border.Effect>
                                 <StackPanel>
-                                    <TextBlock x:Name="BlacklistTitleText" Text="进程排除黑名单" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock x:Name="BlacklistDescText" Text="在排除名单中的应用程序（如远程桌面、画图、3D建模软件）中，完全放行鼠标右键。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12"/>
+                                    <TextBlock x:Name="IsolationModeTitleText" Text="进程隔离与生效名单" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    
+                                    <!-- Isolation Mode Selector -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,12">
+                                        <RadioButton x:Name="IsolationBlacklistRadio" GroupName="IsolationModeGroup" Content="🚫 排除黑名单模式" Margin="0,0,20,0" IsChecked="True" Checked="IsolationModeRadio_Checked"/>
+                                        <RadioButton x:Name="IsolationWhitelistRadio" GroupName="IsolationModeGroup" Content="🛡️ 启用白名单模式" Checked="IsolationModeRadio_Checked"/>
+                                    </StackPanel>
+
+                                    <TextBlock x:Name="ProcessListDescText" Text="在排除名单中的应用程序（如远程桌面、画图、3D建模软件）中，完全放行鼠标右键。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12" TextWrapping="Wrap"/>
                                     
                                     <Grid Margin="0,0,0,10">
                                         <Grid.ColumnDefinitions>
@@ -806,10 +813,10 @@
                                                  KeyDown="NewBlacklistProcessTextBox_KeyDown"/>
                                         <Button x:Name="BrowseBlacklistButton" Grid.Column="1" Content="🔍 选择应用..." 
                                                 Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" 
-                                                Click="BrowseBlacklistButton_Click" ToolTip="从已安装软件列表中快速选择要排除的程序"/>
+                                                Click="BrowseBlacklistButton_Click" ToolTip="从已安装软件列表中快速选择要添加的程序"/>
                                         <Button x:Name="AddBlacklistButton" Grid.Column="2" Content="➕ 添加进程" 
                                                 Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="16,0" 
-                                                Click="AddBlacklistButton_Click" ToolTip="将输入框中的进程名称加入排除黑名单"/>
+                                                Click="AddBlacklistButton_Click" ToolTip="将输入框中的进程名称加入名单"/>
                                     </Grid>
 
                                     <ListBox x:Name="BlacklistListBox" Height="110" Margin="0,0,0,8" KeyDown="BlacklistListBox_KeyDown"/>
@@ -1177,18 +1184,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Multi-Tier Sub-Wheel Card -->
-                                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
-                                    </Border.Effect>
-                                    <StackPanel>
-                                        <TextBlock Text="多级轮盘与级联子菜单 (Multi-Tier)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
-                                        <CheckBox x:Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed"/>
-                                        <TextBlock x:Name="EnableMultiTierDescText" Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0"/>
-                                    </StackPanel>
-                                </Border>
-
                                 <!-- Center Core & Pattern Options -->
                                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
                                     <Border.Effect>
@@ -1400,6 +1395,18 @@
                                         <RadioButton x:Name="SectorCount8Radio" GroupName="SectorCountGroup" Content="8 键全向方位 (推荐)" Margin="0,0,24,0" IsChecked="True" Checked="SectorCountRadio_Checked"/>
                                         <RadioButton x:Name="SectorCount12Radio" GroupName="SectorCountGroup" Content="12 键钟表方位" Checked="SectorCountRadio_Checked"/>
                                     </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Multi-Tier Sub-Wheel Card -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock x:Name="MultiTierCardTitleText" Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                                    <CheckBox x:Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed"/>
+                                    <TextBlock x:Name="EnableMultiTierDescText" Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。点击下方各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0"/>
                                 </StackPanel>
                             </Border>
 
