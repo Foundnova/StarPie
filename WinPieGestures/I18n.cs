@@ -203,7 +203,42 @@ namespace WinPieGestures
                 [LanguageCode.En] = "🎨 Custom Advanced Color Tuning",
                 [LanguageCode.Ja] = "🎨 高度なカラーカスタマイズ"
             },
-            ["CustomColorsExpanderDesc"] = new()
+            ["AnimSpeedTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "功能区高亮与过渡动效速度",
+                [LanguageCode.ZhTw] = "功能區高亮與過渡動效速度",
+                [LanguageCode.En] = "Hover & Transition Animation Speed",
+                [LanguageCode.Ja] = "ホバー・遷移アニメーション速度"
+            },
+            ["AnimSpeedDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "调节鼠标划向不同功能扇区时的高亮弹出与平滑过渡动画响应速度，定制专属跟手体验。",
+                [LanguageCode.ZhTw] = "調節滑鼠滑向不同功能扇區時的高亮彈出與平滑過渡動畫響應速度，定制專屬手感。",
+                [LanguageCode.En] = "Adjust the response animation speed when hovering and transitioning across sectors.",
+                [LanguageCode.Ja] = "セクター間をホバー・移動する際のアニメーション速度を調整します。"
+            },
+            ["AnimSpeedElegant"] = new()
+            {
+                [LanguageCode.ZhCn] = "🌸 优雅 (130ms / 柔和细腻)",
+                [LanguageCode.ZhTw] = "🌸 優雅 (130ms / 柔和細膩)",
+                [LanguageCode.En] = "🌸 Elegant (130ms / Smooth & Soft)",
+                [LanguageCode.Ja] = "🌸 エレガント (130ms / 滑らか)"
+            },
+            ["AnimSpeedBalanced"] = new()
+            {
+                [LanguageCode.ZhCn] = "⚡ 流畅 (80ms / 推荐默认)",
+                [LanguageCode.ZhTw] = "⚡ 流暢 (80ms / 推薦預設)",
+                [LanguageCode.En] = "⚡ Fluent (80ms / Recommended)",
+                [LanguageCode.Ja] = "⚡ スムーズ (80ms / 推奨)"
+            },
+            ["AnimSpeedFast"] = new()
+            {
+                [LanguageCode.ZhCn] = "🚀 快速 (35ms / 极速响应)",
+                [LanguageCode.ZhTw] = "🚀 快速 (35ms / 極速響應)",
+                [LanguageCode.En] = "🚀 Snappy (35ms / Ultra-Fast)",
+                [LanguageCode.Ja] = "🚀 高速 (35ms / 即座に応答)"
+            },
+            ["CustomColorsExpander"] = new()
             {
                 [LanguageCode.ZhCn] = "展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。",
                 [LanguageCode.ZhTw] = "展開後可精準微調扇區底色、高亮光暈、邊框線條、文字與光弧等各項色彩。",

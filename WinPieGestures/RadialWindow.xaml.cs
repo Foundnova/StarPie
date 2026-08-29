@@ -639,6 +639,18 @@ namespace WinPieGestures
             int previousIndex = _currentHighlightedSector;
             _currentHighlightedSector = index;
 
+            int durationMs = ConfigManager.CurrentConfig?.AnimationSpeed switch
+            {
+                "Elegant" => 130,
+                "Fast" => 35,
+                _ => 80
+            };
+
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var animDuration = new Duration(TimeSpan.FromMilliseconds(durationMs));
+            int coreDurationMs = Math.Max(30, (int)(durationMs * 1.12));
+            var coreDuration = new Duration(TimeSpan.FromMilliseconds(coreDurationMs));
+
             // Center Exit Hover Feedback
             if (index == -1)
             {
@@ -649,9 +661,9 @@ namespace WinPieGestures
                 }
 
                 // Animate CoreScale up
-                var scaleAnim = new DoubleAnimation(1.12, new Duration(TimeSpan.FromMilliseconds(90)))
+                var scaleAnim = new DoubleAnimation(1.12, coreDuration)
                 {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    EasingFunction = ease
                 };
                 CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
                 CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
@@ -665,16 +677,13 @@ namespace WinPieGestures
                 }
 
                 // Animate CoreScale back to normal
-                var scaleAnim = new DoubleAnimation(1.0, new Duration(TimeSpan.FromMilliseconds(90)))
+                var scaleAnim = new DoubleAnimation(1.0, coreDuration)
                 {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    EasingFunction = ease
                 };
                 CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
                 CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
             }
-
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var animDuration = new Duration(TimeSpan.FromMilliseconds(80));
 
             // 1. Reset previously highlighted sector (only the departing active sector)
             if (previousIndex >= 0 && previousIndex < _sectorPaths.Count && previousIndex != index)

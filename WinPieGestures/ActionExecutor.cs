@@ -160,14 +160,35 @@ namespace WinPieGestures
 
         private static void ExecuteLaunch(string path, string arguments)
         {
-            if (string.IsNullOrEmpty(path)) return;
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            string expandedPath = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = path,
+                FileName = expandedPath,
                 Arguments = arguments ?? string.Empty,
                 UseShellExecute = true
             };
+
+            // Set WorkingDirectory to the target executable's parent directory to avoid resource loading failures
+            try
+            {
+                if (System.IO.File.Exists(expandedPath))
+                {
+                    string? dir = System.IO.Path.GetDirectoryName(expandedPath);
+                    if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                    {
+                        startInfo.WorkingDirectory = dir;
+                    }
+                }
+                else if (System.IO.Directory.Exists(expandedPath))
+                {
+                    startInfo.WorkingDirectory = expandedPath;
+                }
+            }
+            catch { }
+
             Process.Start(startInfo);
         }
 

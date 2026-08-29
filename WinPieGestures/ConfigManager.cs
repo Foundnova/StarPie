@@ -58,6 +58,7 @@ namespace WinPieGestures
         public string TriggerButton { get; set; } = "RightButton";
         public TriggerConfig Trigger { get; set; } = new TriggerConfig(); // "RightButton", "MiddleButton", "XButton1", "XButton2" // "Auto", "zh-CN", "zh-TW", "en", "ja"
         public double DragThreshold { get; set; } = 25.0;
+        public string AnimationSpeed { get; set; } = "Balanced"; // "Elegant" (130ms), "Balanced" (80ms), "Fast" (35ms)
         public bool EnableOuterEscapeCancel { get; set; } = false;
         public double OuterEscapeDistance { get; set; } = 186.0; // Distance in pixels to trigger radial menu
         public string AppTheme { get; set; } = "System"; // "System", "Light", "Dark", "MidnightNavy", "RoyalViolet", "TitaniumGray"

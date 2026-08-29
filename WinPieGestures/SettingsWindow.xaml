@@ -612,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock Text="v1.4.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock Text="v1.4.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -704,6 +704,23 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <!-- Card 1.2: Sector Transition Animation Speed -->
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <TextBlock x:Name="AnimSpeedTitleText" Text="功能区高亮与过渡动效速度" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="AnimSpeedDescText" Text="调节鼠标划向不同功能扇区时的高亮弹出与平滑过渡动画响应速度，定制专属跟手体验。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="AnimSpeedElegantRadio" AutomationProperties.AutomationId="AnimSpeedElegantRadio" GroupName="AnimSpeedGroup" Content="🌸 优雅 (130ms / 柔和细腻)" Margin="0,0,24,0" Checked="AnimSpeedRadio_Checked"/>
+                                        <RadioButton x:Name="AnimSpeedBalancedRadio" AutomationProperties.AutomationId="AnimSpeedBalancedRadio" GroupName="AnimSpeedGroup" Content="⚡ 流畅 (80ms / 推荐默认)" Margin="0,0,24,0" IsChecked="True" Checked="AnimSpeedRadio_Checked"/>
+                                        <RadioButton x:Name="AnimSpeedFastRadio" AutomationProperties.AutomationId="AnimSpeedFastRadio" GroupName="AnimSpeedGroup" Content="🚀 快速 (35ms / 极速响应)" Checked="AnimSpeedRadio_Checked"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Card 1.5: Outer Escape Cancel Setting Card -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                                 <Border.Effect>
@@ -1576,7 +1593,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.4.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>
@@ -1654,7 +1671,7 @@
                                                 <ColumnDefinition Width="90"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                <TextBlock Text="v1.4.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.4.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                 <TextBlock Text="自定义图标导入 &amp; 动作引导视觉强化 &amp; 配色折叠收纳 &amp; 架构精简" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>

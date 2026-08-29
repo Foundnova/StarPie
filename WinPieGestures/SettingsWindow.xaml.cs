@@ -132,6 +132,21 @@ namespace WinPieGestures
                     OuterEscapeDistanceLabel.Text = $"{OuterEscapeDistanceSlider?.Value ?? 190:0} px";
                 }
 
+                // Load Sector Transition Animation Speed
+                string animSpeed = ConfigManager.CurrentConfig.AnimationSpeed ?? "Balanced";
+                if (animSpeed == "Elegant")
+                {
+                    if (AnimSpeedElegantRadio != null) AnimSpeedElegantRadio.IsChecked = true;
+                }
+                else if (animSpeed == "Fast")
+                {
+                    if (AnimSpeedFastRadio != null) AnimSpeedFastRadio.IsChecked = true;
+                }
+                else
+                {
+                    if (AnimSpeedBalancedRadio != null) AnimSpeedBalancedRadio.IsChecked = true;
+                }
+
                 // Load App Interface Theme
                 SetComboBoxSelectedValue(AppThemeComboBox, ConfigManager.CurrentConfig.AppTheme ?? "System");
                 AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
@@ -390,6 +405,11 @@ namespace WinPieGestures
             UpdateTriggerBadgeDisplay();
             if (SensitivityTitleText != null) SensitivityTitleText.Text = I18n.T("SensitivityTitle");
             if (SensitivityDescText != null) SensitivityDescText.Text = I18n.T("SensitivityDesc");
+            if (AnimSpeedTitleText != null) AnimSpeedTitleText.Text = I18n.T("AnimSpeedTitle");
+            if (AnimSpeedDescText != null) AnimSpeedDescText.Text = I18n.T("AnimSpeedDesc");
+            if (AnimSpeedElegantRadio != null) AnimSpeedElegantRadio.Content = I18n.T("AnimSpeedElegant");
+            if (AnimSpeedBalancedRadio != null) AnimSpeedBalancedRadio.Content = I18n.T("AnimSpeedBalanced");
+            if (AnimSpeedFastRadio != null) AnimSpeedFastRadio.Content = I18n.T("AnimSpeedFast");
             if (SceneIsolationTitleText != null) SceneIsolationTitleText.Text = I18n.T("SceneIsolationTitle");
             if (SceneIsolationDescText != null) SceneIsolationDescText.Text = I18n.T("SceneIsolationDesc");
             if (FullScreenOptionTitleText != null) FullScreenOptionTitleText.Text = I18n.T("FullScreenOption");
@@ -1413,6 +1433,26 @@ namespace WinPieGestures
             {
                 OuterEscapeDistanceLabel.Text = $"{val:0} px";
             }
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void AnimSpeedRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+
+            if (AnimSpeedElegantRadio?.IsChecked == true)
+            {
+                ConfigManager.CurrentConfig.AnimationSpeed = "Elegant";
+            }
+            else if (AnimSpeedFastRadio?.IsChecked == true)
+            {
+                ConfigManager.CurrentConfig.AnimationSpeed = "Fast";
+            }
+            else
+            {
+                ConfigManager.CurrentConfig.AnimationSpeed = "Balanced";
+            }
+
             SyncUiToConfigAndSave(true);
         }
 
