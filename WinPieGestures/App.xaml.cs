@@ -28,6 +28,7 @@ namespace WinPieGestures
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         public static MouseHook? MainMouseHook { get; private set; }
+        public static KeyboardHook? MainKeyboardHook { get; private set; }
         private GestureController? _gestureController;
         public static SettingsWindow? MainSettingsWindow { get; private set; }
 
@@ -101,8 +102,11 @@ namespace WinPieGestures
                 MainMouseHook = new MouseHook();
                 MainMouseHook.Start();
 
+                MainKeyboardHook = new KeyboardHook();
+                MainKeyboardHook.Start();
+
                 // 3. Initialize gesture controller
-                _gestureController = new GestureController(MainMouseHook);
+                _gestureController = new GestureController(MainMouseHook, MainKeyboardHook);
 
                 // 4. Create and show settings window
                 MainSettingsWindow = new SettingsWindow();
@@ -193,6 +197,7 @@ namespace WinPieGestures
             try
             {
                 MainMouseHook?.Stop();
+                MainKeyboardHook?.Stop();
                 
             }
             catch { }

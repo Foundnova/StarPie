@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Input;
 using Point = System.Windows.Point;
 using Application = System.Windows.Application;
 
@@ -9,27 +11,42 @@ namespace WinPieGestures
     public class GestureController
     {
         private readonly MouseHook _mouseHook;
-        private RadialWindow _radialWindow;
+        private readonly KeyboardHook? _keyboardHook;
+        private RadialWindow? _radialWindow;
 
         private Point _startPoint;
         private bool _isWaitingForThreshold = false;
         private bool _isGestureActive = false;
-        private WheelProfile _activeProfile;
+        private WheelProfile? _activeProfile;
         private int _selectedSectorIndex = -1;
 
-        public GestureController(MouseHook mouseHook)
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT { public int x; public int y; }
+
+        public GestureController(MouseHook mouseHook, KeyboardHook? keyboardHook = null)
         {
             _mouseHook = mouseHook;
+            _keyboardHook = keyboardHook;
+
             _mouseHook.OnTriggerButtonDown += Hook_OnTriggerButtonDown;
             _mouseHook.OnTriggerButtonUp += Hook_OnTriggerButtonUp;
             _mouseHook.OnMouseMove += Hook_OnMouseMove;
+
+            if (_keyboardHook != null)
+            {
+                _keyboardHook.OnKeyDown += KeyboardHook_OnKeyDown;
+                _keyboardHook.OnKeyUp += KeyboardHook_OnKeyUp;
+            }
         }
 
-        private void Hook_OnTriggerButtonDown(object sender, MouseEventArgs e)
+        private bool CheckIsIsolated(out string processName)
         {
-            // Check if gesture should be isolated (blacklisted, modifiers pressed, or active window full-screen)
-            string processName = ActiveWindowHelper.GetActiveWindowProcessName();
-            
+            processName = ActiveWindowHelper.GetActiveWindowProcessName();
+
             bool isBlacklisted = false;
             if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
             {
@@ -44,22 +61,37 @@ namespace WinPieGestures
                 }
             }
 
-            bool isCtrlPressed = ConfigManager.CurrentConfig.DisableOnCtrl && 
-                                 (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
-            bool isShiftPressed = ConfigManager.CurrentConfig.DisableOnShift && 
-                                  (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
-            bool isAltPressed = ConfigManager.CurrentConfig.DisableOnAlt && 
-                                (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Alt) != 0;
+            // Only check general modifier bypass if Trigger is NOT explicitly configured with those modifiers
+            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+            bool isCtrlPressed = ConfigManager.CurrentConfig.DisableOnCtrl && !trigger.RequireCtrl &&
+                                 (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+            bool isShiftPressed = ConfigManager.CurrentConfig.DisableOnShift && !trigger.RequireShift &&
+                                  (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            bool isAltPressed = ConfigManager.CurrentConfig.DisableOnAlt && !trigger.RequireAlt &&
+                                (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
             bool isModifierPressed = isCtrlPressed || isShiftPressed || isAltPressed;
 
             bool isFullScreen = ConfigManager.CurrentConfig.DisableOnFullScreen && FullScreenHelper.IsActiveWindowFullScreen();
 
-            if (isBlacklisted || isModifierPressed || isFullScreen)
+            return isBlacklisted || isModifierPressed || isFullScreen;
+        }
+
+        private void Hook_OnTriggerButtonDown(object sender, MouseEventArgs e)
+        {
+            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+            if (trigger.TriggerType != "Mouse") return;
+
+            // Check if required modifiers match
+            if (trigger.RequireCtrl && (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+            if (trigger.RequireShift && (Keyboard.Modifiers & ModifierKeys.Shift) == 0) return;
+            if (trigger.RequireAlt && (Keyboard.Modifiers & ModifierKeys.Alt) == 0) return;
+            if (trigger.RequireWin && (Keyboard.Modifiers & ModifierKeys.Windows) == 0) return;
+
+            if (CheckIsIsolated(out string processName))
             {
-                Debug.WriteLine($"Gesture trigger isolated. Process: {processName}, Blacklisted: {isBlacklisted}, Modifier: {isModifierPressed}, FullScreen: {isFullScreen}. Passing right click through.");
                 _isWaitingForThreshold = false;
                 _isGestureActive = false;
-                e.Handled = false; // Do not block the right-down event
+                e.Handled = false;
                 return;
             }
 
@@ -68,9 +100,123 @@ namespace WinPieGestures
             _isGestureActive = false;
             _selectedSectorIndex = -1;
 
-            // Block the initial right down, we will replay it if it's just a click
-            e.Handled = true;
-            Debug.WriteLine($"RightMouseDown at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
+            e.Handled = true; // Block initial mouse down for gesture assessment
+            Debug.WriteLine($"TriggerMouseDown at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
+        }
+
+        private void Hook_OnTriggerButtonUp(object sender, MouseEventArgs e)
+        {
+            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+            if (trigger.TriggerType != "Mouse") return;
+
+            if (_isWaitingForThreshold)
+            {
+                _isWaitingForThreshold = false;
+                Debug.WriteLine("Normal click detected. Replaying trigger click.");
+
+                string btn = trigger.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _mouseHook.ReplayTriggerClick(btn);
+                }));
+                e.Handled = true;
+            }
+            else if (_isGestureActive)
+            {
+                _isGestureActive = false;
+                Debug.WriteLine($"Gesture completed. Selected sector: {_selectedSectorIndex}");
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HideRadialUI();
+
+                    if (_activeProfile != null && _selectedSectorIndex >= 0 && _selectedSectorIndex < _activeProfile.Actions.Count)
+                    {
+                        var action = _activeProfile.Actions[_selectedSectorIndex];
+                        if (action != null && !string.IsNullOrEmpty(action.Type))
+                        {
+                            Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
+                            ActionExecutor.Execute(action);
+                        }
+                    }
+                });
+
+                e.Handled = true;
+            }
+        }
+
+        private void KeyboardHook_OnKeyDown(object? sender, GlobalKeyEventArgs e)
+        {
+            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+            if (trigger.TriggerType != "Keyboard") return;
+
+            if (trigger.VkCode != 0 && e.VkCode != trigger.VkCode) return;
+
+            if (trigger.RequireCtrl && (e.Modifiers & ModifierKeys.Control) == 0) return;
+            if (trigger.RequireShift && (e.Modifiers & ModifierKeys.Shift) == 0) return;
+            if (trigger.RequireAlt && (e.Modifiers & ModifierKeys.Alt) == 0) return;
+            if (trigger.RequireWin && (e.Modifiers & ModifierKeys.Windows) == 0) return;
+
+            if (CheckIsIsolated(out string processName))
+            {
+                _isWaitingForThreshold = false;
+                _isGestureActive = false;
+                e.Handled = false;
+                return;
+            }
+
+            POINT pt;
+            GetCursorPos(out pt);
+            _startPoint = new Point(pt.x, pt.y);
+            _isWaitingForThreshold = true;
+            _isGestureActive = false;
+            _selectedSectorIndex = -1;
+
+            e.Handled = true; // Intercept key
+            Debug.WriteLine($"TriggerKeyDown ({e.VkCode}) at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
+        }
+
+        private void KeyboardHook_OnKeyUp(object? sender, GlobalKeyEventArgs e)
+        {
+            var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+            if (trigger.TriggerType != "Keyboard") return;
+
+            if (trigger.VkCode != 0 && e.VkCode != trigger.VkCode) return;
+
+            if (_isWaitingForThreshold)
+            {
+                _isWaitingForThreshold = false;
+                Debug.WriteLine("Normal key tap detected. Replaying key press.");
+
+                uint vk = trigger.VkCode;
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _keyboardHook?.ReplayKeyPress(vk);
+                }));
+                e.Handled = true;
+            }
+            else if (_isGestureActive)
+            {
+                _isGestureActive = false;
+                Debug.WriteLine($"Keyboard gesture completed. Selected sector: {_selectedSectorIndex}");
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HideRadialUI();
+
+                    if (_activeProfile != null && _selectedSectorIndex >= 0 && _selectedSectorIndex < _activeProfile.Actions.Count)
+                    {
+                        var action = _activeProfile.Actions[_selectedSectorIndex];
+                        if (action != null && !string.IsNullOrEmpty(action.Type))
+                        {
+                            Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
+                            ActionExecutor.Execute(action);
+                        }
+                    }
+                });
+
+                e.Handled = true;
+            }
         }
 
         private void Hook_OnMouseMove(object sender, MouseEventArgs e)
@@ -102,49 +248,10 @@ namespace WinPieGestures
             }
             else if (_isGestureActive)
             {
-                // Update selected sector
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     UpdateSelectedSector(e.Position);
                 });
-            }
-        }
-
-        private void Hook_OnTriggerButtonUp(object sender, MouseEventArgs e)
-        {
-            if (_isWaitingForThreshold)
-            {
-                _isWaitingForThreshold = false;
-                Debug.WriteLine("Normal click detected. Replaying right click.");
-
-                // Replay the right click on another thread to avoid blocking the hook thread
-                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    _mouseHook.ReplayTriggerClick(ConfigManager.CurrentConfig.TriggerButton);
-                }));
-                e.Handled = true;
-            }
-            else if (_isGestureActive)
-            {
-                _isGestureActive = false;
-                Debug.WriteLine($"Gesture completed. Selected sector: {_selectedSectorIndex}");
-
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    HideRadialUI();
-
-                    if (_activeProfile != null && _selectedSectorIndex >= 0 && _selectedSectorIndex < _activeProfile.Actions.Count)
-                    {
-                        var action = _activeProfile.Actions[_selectedSectorIndex];
-                        if (action != null && !string.IsNullOrEmpty(action.Type))
-                        {
-                            Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
-                            ActionExecutor.Execute(action);
-                        }
-                    }
-                });
-
-                e.Handled = true;
             }
         }
 
@@ -167,50 +274,49 @@ namespace WinPieGestures
             double dy = currentPoint.Y - _startPoint.Y;
             double distance = Math.Sqrt(dx * dx + dy * dy);
 
-            // 1. Center deadzone cancel (拖回中心核圆取消)
-            if (distance < ConfigManager.CurrentConfig.DragThreshold * 0.6)
+            // Center Deadzone check
+            if (distance < ConfigManager.CurrentConfig.InnerRadius)
             {
                 _selectedSectorIndex = -1;
                 _radialWindow.HighlightSector(-1);
-                _radialWindow.SetOuterEscapeState(false);
+                _radialWindow.Opacity = 1.0;
                 return;
             }
 
-            // 2. Scheme 2: Outer Escape Cancel (顺势外甩脱离取消)
-            bool enableOuterEscape = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
-            double outerRadius = ConfigManager.CurrentConfig.WheelRadius > 0 ? ConfigManager.CurrentConfig.WheelRadius : 138.0;
-            double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
-                ? ConfigManager.CurrentConfig.OuterEscapeDistance 
-                : outerRadius * 1.50;
+            // Outer Escape (Overshoot) Cancel check
+            if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
+            {
+                double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
+                    ? ConfigManager.CurrentConfig.OuterEscapeDistance 
+                    : ConfigManager.CurrentConfig.WheelRadius * 1.5;
 
-            if (enableOuterEscape && distance > escapeThreshold)
-            {
-                _selectedSectorIndex = -1;
-                _radialWindow.HighlightSector(-1);
-                _radialWindow.SetOuterEscapeState(true);
-                return;
-            }
-            else
-            {
-                _radialWindow.SetOuterEscapeState(false);
-            }
-
-            // Calculate angle in degrees from [0, 360)
-            double radians = Math.Atan2(dy, dx);
-            double degrees = radians * (180.0 / Math.PI);
-            if (degrees < 0)
-            {
-                degrees += 360.0;
+                if (distance > escapeThreshold)
+                {
+                    _selectedSectorIndex = -1;
+                    _radialWindow.HighlightSector(-1);
+                    _radialWindow.Opacity = 0.45;
+                    return;
+                }
+                else
+                {
+                    _radialWindow.Opacity = 1.0;
+                }
             }
 
-            int n = _activeProfile.SectorCount;
-            double sectorSize = 360.0 / n;
+            // Calculate Angle: 0 is North (Up), clockwise
+            double angle = Math.Atan2(dx, -dy) * (180 / Math.PI);
+            if (angle < 0)
+            {
+                angle += 360;
+            }
 
-            // Math.Round aligns 0 degrees (Right) as the center of sector 0
-            int index = (int)Math.Round(degrees / sectorSize) % n;
+            int sectorCount = _activeProfile.SectorCount;
+            if (sectorCount <= 0) sectorCount = 8;
+            double sectorAngle = 360.0 / sectorCount;
 
-            _selectedSectorIndex = index;
-            _radialWindow.HighlightSector(index);
+            int sectorIndex = (int)Math.Floor((angle + (sectorAngle / 2.0)) / sectorAngle) % sectorCount;
+            _selectedSectorIndex = sectorIndex;
+            _radialWindow.HighlightSector(sectorIndex);
         }
 
         private void HideRadialUI()
@@ -219,7 +325,6 @@ namespace WinPieGestures
             {
                 _radialWindow.Close();
                 _radialWindow = null;
-                MemoryOptimizer.TrimMemory();
             }
         }
     }

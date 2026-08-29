@@ -611,6 +611,42 @@ namespace WinPieGestures
                 [LanguageCode.Ja] = "マウスジェスチャーの感度、フルスクリーンゲームでの自動回避、除外プロセスを設定します。"
             },
             
+            
+            ["TriggerRecorderTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "轮盘唤醒触发按键 & 组合键录制",
+                [LanguageCode.ZhTw] = "輪盤喚醒觸發按鍵 & 組合鍵錄製",
+                [LanguageCode.En] = "Radial Menu Trigger & Combo Key Recorder",
+                [LanguageCode.Ja] = "ラジアルメニュー起動トリガー＆コンボキー録画"
+            },
+            ["TriggerRecorderDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "支持鼠标所有按键（右键/中键/侧键1/侧键2）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键（如 Alt+拖动、Ctrl+侧键）一键物理录制绑定。未触发手势的轻点将自动放行原生按键点击。",
+                [LanguageCode.ZhTw] = "支持滑鼠所有按鍵（右鍵/中鍵/側鍵1/側鍵2）與鍵盤單鍵（如 CapsLock、波浪鍵~、空格、字母鍵、F區鍵等）及組合鍵（如 Alt+拖動、Ctrl+側鍵）一鍵物理錄製綁定。未觸發手勢的輕點將自動放行原生按鍵點擊。",
+                [LanguageCode.En] = "Supports one-click physical recording for all mouse buttons (Right, Middle, Side 1/2) and keyboard keys (CapsLock, ~, Space, Letters, F-keys) as well as combos (Alt+Drag, Ctrl+SideButton). Quick clicks naturally pass through native click events.",
+                [LanguageCode.Ja] = "すべてのマウスボタン（右、中央、サイド1/2）およびキーボード単キー（CapsLock、〜、スペース、ファンクションキー）やコンボ（Alt+ドラッグ、Ctrl+サイドキー）の物理録画に対応。短押しクリックは通常通り処理されます。"
+            },
+            ["BtnRecordTrigger"] = new()
+            {
+                [LanguageCode.ZhCn] = "🔴 点击录制触发键 / 组合键",
+                [LanguageCode.ZhTw] = "🔴 點擊錄製觸發鍵 / 組合鍵",
+                [LanguageCode.En] = "🔴 Record Trigger / Combo Key",
+                [LanguageCode.Ja] = "🔴 トリガーキー/コンボを録画"
+            },
+            ["BtnResetDefaultTrigger"] = new()
+            {
+                [LanguageCode.ZhCn] = "🔄 恢复默认 (鼠标右键)",
+                [LanguageCode.ZhTw] = "🔄 恢復默認 (滑鼠右鍵)",
+                [LanguageCode.En] = "🔄 Reset Default (Right Mouse)",
+                [LanguageCode.Ja] = "🔄 デフォルトに戻す (マウス右ボタン)"
+            },
+            ["CurrentBindingLabel"] = new()
+            {
+                [LanguageCode.ZhCn] = "当前生效触发键：",
+                [LanguageCode.ZhTw] = "當前生效觸發鍵：",
+                [LanguageCode.En] = "Active Trigger Binding:",
+                [LanguageCode.Ja] = "現在の有効トリガー："
+            },
             ["TriggerButtonTitle"] = new()
             {
                 [LanguageCode.ZhCn] = "轮盘唤醒触发按键",

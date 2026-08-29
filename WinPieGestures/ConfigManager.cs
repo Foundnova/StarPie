@@ -39,10 +39,24 @@ namespace WinPieGestures
         public override string ToString() => Name;
     }
 
+    public class TriggerConfig
+    {
+        public string TriggerType { get; set; } = "Mouse"; // "Mouse", "Keyboard"
+        public string MouseButton { get; set; } = "RightButton"; // "RightButton", "MiddleButton", "XButton1", "XButton2", "LeftButton"
+        public string Key { get; set; } = "None"; // e.g. "Capital" (CapsLock), "Oem3" (~), "Space", "Tab", "F1", "A"
+        public uint VkCode { get; set; } = 0;
+        public bool RequireCtrl { get; set; } = false;
+        public bool RequireShift { get; set; } = false;
+        public bool RequireAlt { get; set; } = false;
+        public bool RequireWin { get; set; } = false;
+        public string DisplayText { get; set; } = "🖱️ 鼠标右键 (Right Button)";
+    }
+
     public class AppConfig
     {
         public string Language { get; set; } = "Auto";
-        public string TriggerButton { get; set; } = "RightButton"; // "RightButton", "MiddleButton", "XButton1", "XButton2" // "Auto", "zh-CN", "zh-TW", "en", "ja"
+        public string TriggerButton { get; set; } = "RightButton";
+        public TriggerConfig Trigger { get; set; } = new TriggerConfig(); // "RightButton", "MiddleButton", "XButton1", "XButton2" // "Auto", "zh-CN", "zh-TW", "en", "ja"
         public double DragThreshold { get; set; } = 25.0;
         public bool EnableOuterEscapeCancel { get; set; } = false;
         public double OuterEscapeDistance { get; set; } = 186.0; // Distance in pixels to trigger radial menu

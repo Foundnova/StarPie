@@ -642,20 +642,47 @@
                     
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,10,0">
-                                                        <!-- Card 0: Trigger Button Selector -->
+                                                        <!-- Card 0: Trigger & Combo Key Recorder and Live Sensor -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03"/>
                                 </Border.Effect>
                                 <StackPanel>
-                                    <TextBlock x:Name="TriggerButtonTitleText" Text="轮盘唤醒触发按键" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock x:Name="TriggerButtonDescText" Text="选择按住并拖动唤醒轮盘手势的鼠标按键。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap"/>
-                                    <ComboBox x:Name="TriggerButtonComboBox" AutomationProperties.AutomationId="TriggerButtonComboBox" Height="34" Style="{StaticResource FlatComboBoxStyle}" SelectionChanged="TriggerButtonComboBox_SelectionChanged">
-                                        <ComboBoxItem x:Name="TriggerBtnRightItem" Tag="RightButton" IsSelected="True">🖱️ 鼠标右键 (Right Button) [推荐 / 默认]</ComboBoxItem>
-                                        <ComboBoxItem x:Name="TriggerBtnMiddleItem" Tag="MiddleButton">🖱️ 鼠标中键 / 滚轮按压 (Middle Button)</ComboBoxItem>
-                                        <ComboBoxItem x:Name="TriggerBtnX1Item" Tag="XButton1">🖱️ 鼠标侧键 1 / 后退键 (XButton 1 / Back)</ComboBoxItem>
-                                        <ComboBoxItem x:Name="TriggerBtnX2Item" Tag="XButton2">🖱️ 鼠标侧键 2 / 前进键 (XButton 2 / Forward)</ComboBoxItem>
-                                    </ComboBox>
+                                    <TextBlock x:Name="TriggerRecorderTitleText" Text="轮盘唤醒触发按键 &amp; 组合键录制" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TriggerRecorderDescText" Text="支持鼠标所有按键（右键/中键/侧键1/侧键2）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键（如 Alt+拖动、Ctrl+侧键）一键物理录制绑定。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap"/>
+                                    
+                                    <!-- Current Binding Badge & Action Buttons -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock x:Name="CurrentBindingLabelText" Text="当前生效触发键：" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Border x:Name="CurrentTriggerBadgeBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,6" VerticalAlignment="Center">
+                                                <TextBlock x:Name="CurrentTriggerBadgeText" AutomationProperties.AutomationId="CurrentTriggerBadgeText" Text="🖱️ 鼠标右键 (Right Button)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Button x:Name="RecordTriggerButton" AutomationProperties.AutomationId="RecordTriggerButton" Content="🔴 点击录制触发键 / 组合键" Height="36" Padding="14,0" Style="{StaticResource PrimaryButtonStyle}" Click="RecordTriggerButton_Click" Cursor="Hand"/>
+                                            <Button x:Name="ResetDefaultTriggerButton" AutomationProperties.AutomationId="ResetDefaultTriggerButton" Content="🔄 恢复默认 (鼠标右键)" Height="36" Padding="12,0" Margin="8,0,0,0" Style="{StaticResource ModernButtonStyle}" Click="ResetDefaultTriggerButton_Click" Cursor="Hand"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Live Hardware Input Sensor & Diagnostics Area -->
+                                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse x:Name="LiveSensorDot" Width="10" Height="10" Fill="#10B981" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBlock x:Name="LiveSensorStatusText" Grid.Column="1" AutomationProperties.AutomationId="LiveSensorStatusText" Text="💡 硬件感知器已就绪：随时按下鼠标任意侧键、中键或键盘按键，此处将实时高亮反馈对应按键与键码。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 

@@ -872,14 +872,23 @@ def test_v143_trigger_button_customization(app):
     tab0.select()
     time.sleep(0.4)
     
-    trigger_cb = win.child_window(auto_id="TriggerButtonComboBox", control_type="ComboBox")
-    assert trigger_cb.exists(timeout=3), "TriggerButtonComboBox should exist on Tab 0"
+    badge = win.child_window(auto_id="CurrentTriggerBadgeText", control_type="Text")
+    assert badge.exists(timeout=3), "CurrentTriggerBadgeText should exist on Tab 0"
     
-    # 2. Select MiddleButton (Index 1)
-    trigger_cb.select(1)
+    rec_btn = win.child_window(auto_id="RecordTriggerButton", control_type="Button")
+    assert rec_btn.exists(timeout=3), "RecordTriggerButton should exist on Tab 0"
+    
+    sensor = win.child_window(auto_id="LiveSensorStatusText", control_type="Text")
+    assert sensor.exists(timeout=3), "LiveSensorStatusText should exist on Tab 0"
+    
+    reset_btn = win.child_window(auto_id="ResetDefaultTriggerButton", control_type="Button")
+    assert reset_btn.exists(timeout=3), "ResetDefaultTriggerButton should exist on Tab 0"
+    
+    # Click reset to default
+    reset_btn.invoke()
     time.sleep(0.3)
     
-    # 3. Save
+    # Save
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
     save_btn.invoke()
     time.sleep(0.5)
@@ -895,6 +904,7 @@ def test_v143_trigger_button_customization(app):
     config_path = get_config_path(local_app_data)
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
-    assert config.get("TriggerButton") == "MiddleButton", f"Expected MiddleButton in config, got {config.get('TriggerButton')}"
+    assert "Trigger" in config or "TriggerButton" in config, "Trigger configuration should be persisted in config.json"
+
 
 

@@ -82,6 +82,7 @@ namespace WinPieGestures
         public event EventHandler<MouseEventArgs>? OnTriggerButtonDown;
         public event EventHandler<MouseEventArgs>? OnTriggerButtonUp;
         public event EventHandler<MouseEventArgs>? OnMouseMove;
+        public event EventHandler<MouseEventArgs>? OnRawMouseEvent;
 
         // Legacy compatibility events
         public event EventHandler<MouseEventArgs>? OnRightButtonDown
@@ -205,6 +206,9 @@ namespace WinPieGestures
             {
                 int message = (int)wParam;
                 MSLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+
+                var rawArgs = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
+                OnRawMouseEvent?.Invoke(this, rawArgs);
 
                 if (message == WM_MOUSEMOVE)
                 {

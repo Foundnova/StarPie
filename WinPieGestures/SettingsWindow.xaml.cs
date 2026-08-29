@@ -37,6 +37,8 @@ namespace WinPieGestures
 {
     public partial class SettingsWindow : Window
     {
+        private bool _isRecordingTrigger = false;
+        private Brush? _originalBadgeBorderBrush;
         private NotifyIcon _notifyIcon;
         private bool _isClosingFromTray = false;
         private WheelProfile? _selectedProfile;
@@ -106,7 +108,9 @@ namespace WinPieGestures
             {
                 // Load profiles to listbox
                 ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
-                SetComboBoxSelectedValue(TriggerButtonComboBox, ConfigManager.CurrentConfig.TriggerButton ?? "RightButton");
+                
+                                UpdateTriggerBadgeDisplay();
+                HookRawInputForSensorAndRecorder();
                 ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
                 ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
 
@@ -378,12 +382,12 @@ namespace WinPieGestures
             // Tab 0: Trigger & Scenes
             if (TriggerPageHeader != null) TriggerPageHeader.Text = I18n.T("TriggerHeader");
             if (TriggerPageSubheader != null) TriggerPageSubheader.Text = I18n.T("TriggerSubheader");
-            if (TriggerButtonTitleText != null) TriggerButtonTitleText.Text = I18n.T("TriggerButtonTitle");
-            if (TriggerButtonDescText != null) TriggerButtonDescText.Text = I18n.T("TriggerButtonDesc");
-            if (TriggerBtnRightItem != null) TriggerBtnRightItem.Content = I18n.T("TriggerBtnRight");
-            if (TriggerBtnMiddleItem != null) TriggerBtnMiddleItem.Content = I18n.T("TriggerBtnMiddle");
-            if (TriggerBtnX1Item != null) TriggerBtnX1Item.Content = I18n.T("TriggerBtnX1");
-            if (TriggerBtnX2Item != null) TriggerBtnX2Item.Content = I18n.T("TriggerBtnX2");
+            if (TriggerRecorderTitleText != null) TriggerRecorderTitleText.Text = I18n.T("TriggerRecorderTitle");
+            if (TriggerRecorderDescText != null) TriggerRecorderDescText.Text = I18n.T("TriggerRecorderDesc");
+            if (CurrentBindingLabelText != null) CurrentBindingLabelText.Text = I18n.T("CurrentBindingLabel");
+            if (RecordTriggerButton != null && !_isRecordingTrigger) RecordTriggerButton.Content = I18n.T("BtnRecordTrigger");
+            if (ResetDefaultTriggerButton != null) ResetDefaultTriggerButton.Content = I18n.T("BtnResetDefaultTrigger");
+            UpdateTriggerBadgeDisplay();
             if (SensitivityTitleText != null) SensitivityTitleText.Text = I18n.T("SensitivityTitle");
             if (SensitivityDescText != null) SensitivityDescText.Text = I18n.T("SensitivityDesc");
             if (SceneIsolationTitleText != null) SceneIsolationTitleText.Text = I18n.T("SceneIsolationTitle");
@@ -665,10 +669,7 @@ namespace WinPieGestures
                 if (SectorCornerRadiusSlider != null) ConfigManager.CurrentConfig.SectorCornerRadius = SectorCornerRadiusSlider.Value;
                 if (SectorIconSizeSlider != null) ConfigManager.CurrentConfig.SectorIconSize = SectorIconSizeSlider.Value;
                 if (SectorFontSizeSlider != null) ConfigManager.CurrentConfig.SectorFontSize = SectorFontSizeSlider.Value;
-                if (TriggerButtonComboBox != null && TriggerButtonComboBox.SelectedItem is ComboBoxItem tbi && tbi.Tag != null)
-                {
-                    ConfigManager.CurrentConfig.TriggerButton = tbi.Tag.ToString() ?? "RightButton";
-                }
+
                 if (ThresholdSlider != null) ConfigManager.CurrentConfig.DragThreshold = ThresholdSlider.Value;
                 if (EnableOuterEscapeCheckBox != null) ConfigManager.CurrentConfig.EnableOuterEscapeCancel = EnableOuterEscapeCheckBox.IsChecked == true;
                 if (OuterEscapeDistanceSlider != null) ConfigManager.CurrentConfig.OuterEscapeDistance = OuterEscapeDistanceSlider.Value;
@@ -987,16 +988,251 @@ namespace WinPieGestures
             }
         }
 
-                private void TriggerButtonComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+                        private void HookRawInputForSensorAndRecorder()
         {
-            if (_isUpdatingUi || TriggerButtonComboBox == null || ConfigManager.CurrentConfig == null) return;
-            var selectedItem = TriggerButtonComboBox.SelectedItem as ComboBoxItem;
-            if (selectedItem != null && selectedItem.Tag != null)
+            if (App.MainMouseHook != null)
             {
-                ConfigManager.CurrentConfig.TriggerButton = selectedItem.Tag.ToString() ?? "RightButton";
-                ScheduleAutoSave();
+                App.MainMouseHook.OnRawMouseEvent += (s, e) =>
+                {
+                    // Update sensor display on mouse movement / button actions
+                };
+            }
+
+            if (App.MainKeyboardHook != null)
+            {
+                App.MainKeyboardHook.OnRawKeyEvent += (s, e) =>
+                {
+                    this.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        ProcessRawKeyEvent(e);
+                    }));
+                };
             }
         }
+
+        private void UpdateTriggerBadgeDisplay()
+        {
+            if (CurrentTriggerBadgeText == null || ConfigManager.CurrentConfig == null) return;
+            var trigger = ConfigManager.CurrentConfig.Trigger;
+            if (trigger == null)
+            {
+                trigger = new TriggerConfig();
+                ConfigManager.CurrentConfig.Trigger = trigger;
+            }
+
+            string text = FormatTriggerDisplay(trigger);
+            CurrentTriggerBadgeText.Text = text;
+        }
+
+        private string FormatTriggerDisplay(TriggerConfig trigger)
+        {
+            string mod = "";
+            if (trigger.RequireCtrl) mod += "Ctrl + ";
+            if (trigger.RequireShift) mod += "Shift + ";
+            if (trigger.RequireAlt) mod += "Alt + ";
+            if (trigger.RequireWin) mod += "Win + ";
+
+            if (trigger.TriggerType == "Keyboard")
+            {
+                string keyName = trigger.Key;
+                if (trigger.VkCode == 0x14 || keyName == "Capital") keyName = "CapsLock (大写锁定)";
+                else if (trigger.VkCode == 0xC0 || keyName == "Oem3" || keyName == "OemTilde") keyName = "~ (波浪键)";
+                else if (trigger.VkCode == 0x20 || keyName == "Space") keyName = "Space (空格)";
+                else if (trigger.VkCode == 0x09 || keyName == "Tab") keyName = "Tab (制表键)";
+                return $"{mod}⌨️ {keyName} (长按拖动)";
+            }
+            else
+            {
+                string btnName = trigger.MouseButton switch
+                {
+                    "MiddleButton" => "🖱️ 鼠标中键 / 滚轮按压 (Middle Button)",
+                    "XButton1" => "🖱️ 鼠标侧键 1 / 后退键 (XButton 1 / Back)",
+                    "XButton2" => "🖱️ 鼠标侧键 2 / 前进键 (XButton 2 / Forward)",
+                    "LeftButton" => "🖱️ 鼠标左键 (Left Button)",
+                    _ => "🖱️ 鼠标右键 (Right Button) [推荐 / 默认]"
+                };
+                return string.IsNullOrEmpty(mod) ? btnName : $"{mod}{btnName}";
+            }
+        }
+
+        private void RecordTriggerButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isRecordingTrigger)
+            {
+                StartTriggerRecording();
+            }
+            else
+            {
+                StopTriggerRecording(false);
+            }
+        }
+
+        private void StartTriggerRecording()
+        {
+            _isRecordingTrigger = true;
+            if (RecordTriggerButton != null)
+            {
+                RecordTriggerButton.Content = "⚡ 正在监听... 请按下任意按键 / 组合键 (ESC取消)";
+                RecordTriggerButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
+            }
+            if (LiveSensorStatusText != null)
+            {
+                LiveSensorStatusText.Text = "🔴 录制模式中：请直接按下你想作为轮盘唤醒键的鼠标按键、键盘按键或组合键（按 ESC 键取消录制）...";
+            }
+            if (LiveSensorDot != null)
+            {
+                LiveSensorDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EF4444"));
+            }
+        }
+
+        private void StopTriggerRecording(bool saved)
+        {
+            _isRecordingTrigger = false;
+            if (RecordTriggerButton != null)
+            {
+                RecordTriggerButton.Content = "🔴 点击录制触发键 / 组合键";
+                RecordTriggerButton.ClearValue(System.Windows.Controls.Button.BackgroundProperty);
+            }
+            if (LiveSensorStatusText != null)
+            {
+                LiveSensorStatusText.Text = saved 
+                    ? "🟢 触发按键录制成功并已保存！" 
+                    : "💡 硬件感知器已就绪：随时按下鼠标任意侧键、中键或键盘按键，此处将实时高亮反馈对应按键与键码。";
+            }
+            if (LiveSensorDot != null)
+            {
+                LiveSensorDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+            }
+            UpdateTriggerBadgeDisplay();
+        }
+
+        private void ResetDefaultTriggerButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            ConfigManager.CurrentConfig.Trigger = new TriggerConfig
+            {
+                TriggerType = "Mouse",
+                MouseButton = "RightButton",
+                DisplayText = "🖱️ 鼠标右键 (Right Button)"
+            };
+            ConfigManager.CurrentConfig.TriggerButton = "RightButton";
+            StopTriggerRecording(true);
+            ScheduleAutoSave();
+            if (LiveSensorStatusText != null)
+            {
+                LiveSensorStatusText.Text = "🟢 已恢复默认触发按键：🖱️ 鼠标右键 (Right Button)";
+            }
+        }
+
+        public void ProcessRawMouseButton(string mouseButton, uint mouseData = 0)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+
+            string btnName = mouseButton switch
+            {
+                "MiddleButton" => "鼠标中键 (Middle Button)",
+                "XButton1" => "鼠标侧键 1 (后退 / XButton1)",
+                "XButton2" => "鼠标侧键 2 (前进 / XButton2)",
+                "LeftButton" => "鼠标左键 (Left Button)",
+                _ => "鼠标右键 (Right Button)"
+            };
+
+            var mods = Keyboard.Modifiers;
+            string modText = "";
+            if ((mods & ModifierKeys.Control) != 0) modText += "Ctrl + ";
+            if ((mods & ModifierKeys.Shift) != 0) modText += "Shift + ";
+            if ((mods & ModifierKeys.Alt) != 0) modText += "Alt + ";
+            if ((mods & ModifierKeys.Windows) != 0) modText += "Win + ";
+
+            if (LiveSensorStatusText != null)
+            {
+                LiveSensorStatusText.Text = $"🟢 实时捕获输入: {modText}{btnName} | 状态: 硬件信号正常响应";
+            }
+            if (LiveSensorDot != null)
+            {
+                LiveSensorDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+            }
+
+            if (_isRecordingTrigger)
+            {
+                ConfigManager.CurrentConfig.Trigger = new TriggerConfig
+                {
+                    TriggerType = "Mouse",
+                    MouseButton = mouseButton,
+                    RequireCtrl = (mods & ModifierKeys.Control) != 0,
+                    RequireShift = (mods & ModifierKeys.Shift) != 0,
+                    RequireAlt = (mods & ModifierKeys.Alt) != 0,
+                    RequireWin = (mods & ModifierKeys.Windows) != 0
+                };
+                ConfigManager.CurrentConfig.Trigger.DisplayText = FormatTriggerDisplay(ConfigManager.CurrentConfig.Trigger);
+                ConfigManager.CurrentConfig.TriggerButton = mouseButton;
+
+                ScheduleAutoSave();
+                StopTriggerRecording(true);
+            }
+        }
+
+        private void ProcessRawKeyEvent(GlobalKeyEventArgs e)
+        {
+            if (e.Key == Key.None) return;
+
+            if (e.Key == Key.Escape && _isRecordingTrigger)
+            {
+                StopTriggerRecording(false);
+                return;
+            }
+
+            string keyName = e.Key.ToString();
+            if (e.VkCode == 0x14) keyName = "CapsLock (大写锁定)";
+            else if (e.VkCode == 0xC0) keyName = "~ (波浪键)";
+            else if (e.VkCode == 0x20) keyName = "Space (空格)";
+            else if (e.VkCode == 0x09) keyName = "Tab (制表键)";
+
+            var mods = e.Modifiers;
+            string modText = "";
+            if ((mods & ModifierKeys.Control) != 0 && e.Key != Key.LeftCtrl && e.Key != Key.RightCtrl) modText += "Ctrl + ";
+            if ((mods & ModifierKeys.Shift) != 0 && e.Key != Key.LeftShift && e.Key != Key.RightShift) modText += "Shift + ";
+            if ((mods & ModifierKeys.Alt) != 0 && e.Key != Key.LeftAlt && e.Key != Key.RightAlt) modText += "Alt + ";
+            if ((mods & ModifierKeys.Windows) != 0 && e.Key != Key.LWin && e.Key != Key.RWin) modText += "Win + ";
+
+            if (LiveSensorStatusText != null)
+            {
+                LiveSensorStatusText.Text = $"🟢 实时捕获键盘输入: {modText}⌨️ {keyName} | 虚拟键码 VkCode: 0x{e.VkCode:X2}";
+            }
+            if (LiveSensorDot != null)
+            {
+                LiveSensorDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#10B981"));
+            }
+
+            if (_isRecordingTrigger)
+            {
+                // Ignore standalone modifiers
+                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                    e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                    e.Key == Key.LWin || e.Key == Key.RWin)
+                {
+                    return;
+                }
+
+                ConfigManager.CurrentConfig.Trigger = new TriggerConfig
+                {
+                    TriggerType = "Keyboard",
+                    Key = e.Key.ToString(),
+                    VkCode = e.VkCode,
+                    RequireCtrl = (mods & ModifierKeys.Control) != 0,
+                    RequireShift = (mods & ModifierKeys.Shift) != 0,
+                    RequireAlt = (mods & ModifierKeys.Alt) != 0,
+                    RequireWin = (mods & ModifierKeys.Windows) != 0
+                };
+                ConfigManager.CurrentConfig.Trigger.DisplayText = FormatTriggerDisplay(ConfigManager.CurrentConfig.Trigger);
+
+                ScheduleAutoSave();
+                StopTriggerRecording(true);
+            }
+        }
+
+
 
         private void ThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
@@ -2330,7 +2566,9 @@ namespace WinPieGestures
                         ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
                         ProfilesListBox.SelectedIndex = 0;
 
-                        ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
+                                        UpdateTriggerBadgeDisplay();
+                HookRawInputForSensorAndRecorder();
+                ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
                         SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
                         SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
                         SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
