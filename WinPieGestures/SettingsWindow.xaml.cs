@@ -3035,14 +3035,13 @@ namespace WinPieGestures
 
                 if (useImageMode && !string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                 {
-                    double imgSize = coreR * 1.85 * coreScale;
+                    double imgSize = coreR * 1.85;
                     var coreImgEllipse = new System.Windows.Shapes.Ellipse
                     {
                         Width = imgSize,
                         Height = imgSize,
                         HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                         VerticalAlignment = System.Windows.VerticalAlignment.Center,
-                        RenderTransform = coreTransform,
                         IsHitTestVisible = false,
                         Visibility = (ConfigManager.CurrentConfig.ShowCoreIcon && ConfigManager.CurrentConfig.UiStyle != "CatPaw") ? Visibility.Visible : Visibility.Collapsed
                     };
@@ -3061,6 +3060,21 @@ namespace WinPieGestures
                             AlignmentX = AlignmentX.Center,
                             AlignmentY = AlignmentY.Center
                         };
+
+                        var transformGroup = new TransformGroup();
+                        if (Math.Abs(coreScale - 1.0) > 0.001)
+                        {
+                            transformGroup.Children.Add(new ScaleTransform(coreScale, coreScale, imgSize / 2.0, imgSize / 2.0));
+                        }
+                        if (Math.Abs(offsetX) > 0.001 || Math.Abs(offsetY) > 0.001)
+                        {
+                            transformGroup.Children.Add(new TranslateTransform(offsetX, offsetY));
+                        }
+                        if (transformGroup.Children.Count > 0)
+                        {
+                            brush.Transform = transformGroup;
+                        }
+
                         RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
                         RenderOptions.SetEdgeMode(coreImgEllipse, EdgeMode.Unspecified);
                         coreImgEllipse.Fill = brush;

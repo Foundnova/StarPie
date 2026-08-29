@@ -198,10 +198,10 @@ namespace WinPieGestures
                         bmp.EndInit();
                         bmp.Freeze();
 
-                        double imgSize = coreRadius * 1.85 * coreScale;
+                        double imgSize = coreRadius * 1.85;
                         CoreCustomImageEllipse.Width = imgSize;
                         CoreCustomImageEllipse.Height = imgSize;
-                        CoreCustomImageEllipse.RenderTransform = coreTransform;
+                        CoreCustomImageEllipse.RenderTransform = null;
 
                         var brush = new ImageBrush(bmp)
                         {
@@ -209,6 +209,21 @@ namespace WinPieGestures
                             AlignmentX = AlignmentX.Center,
                             AlignmentY = AlignmentY.Center
                         };
+
+                        var transformGroup = new TransformGroup();
+                        if (Math.Abs(coreScale - 1.0) > 0.001)
+                        {
+                            transformGroup.Children.Add(new ScaleTransform(coreScale, coreScale, imgSize / 2.0, imgSize / 2.0));
+                        }
+                        if (Math.Abs(offsetX) > 0.001 || Math.Abs(offsetY) > 0.001)
+                        {
+                            transformGroup.Children.Add(new TranslateTransform(offsetX, offsetY));
+                        }
+                        if (transformGroup.Children.Count > 0)
+                        {
+                            brush.Transform = transformGroup;
+                        }
+
                         RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
                         RenderOptions.SetEdgeMode(CoreCustomImageEllipse, EdgeMode.Unspecified);
 
