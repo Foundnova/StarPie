@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Point = System.Windows.Point;
 using Application = System.Windows.Application;
 
@@ -19,6 +20,7 @@ namespace WinPieGestures
         private bool _isGestureActive = false;
         private WheelProfile? _activeProfile;
         private int _selectedSectorIndex = -1;
+        private bool _lastEscapedState = false;
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -108,9 +110,10 @@ namespace WinPieGestures
             _isWaitingForThreshold = true;
             _isGestureActive = false;
             _selectedSectorIndex = -1;
+            _lastEscapedState = false;
 
             e.Handled = true; // Block initial mouse down for gesture assessment
-            Debug.WriteLine($"TriggerMouseDown at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
+            Debug.WriteLine($"TriggerMouseDown pinned at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
         }
 
         private void Hook_OnTriggerButtonUp(object? sender, MouseEventArgs e)
@@ -127,28 +130,31 @@ namespace WinPieGestures
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _mouseHook.ReplayTriggerClick(btn);
-                }));
+                }), DispatcherPriority.Input);
                 e.Handled = true;
             }
             else if (_isGestureActive)
             {
                 _isGestureActive = false;
-                Debug.WriteLine($"Gesture completed. Selected sector: {_selectedSectorIndex}");
+                int finalSector = _selectedSectorIndex;
+                var finalProfile = _activeProfile;
 
-                Application.Current.Dispatcher.Invoke(() =>
+                Debug.WriteLine($"Gesture completed. Selected sector: {finalSector}");
+
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     HideRadialUI();
 
-                    if (_activeProfile != null && _selectedSectorIndex >= 0 && _selectedSectorIndex < _activeProfile.Actions.Count)
+                    if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
                     {
-                        var action = _activeProfile.Actions[_selectedSectorIndex];
+                        var action = finalProfile.Actions[finalSector];
                         if (action != null && !string.IsNullOrEmpty(action.Type))
                         {
                             Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
                             ActionExecutor.Execute(action);
                         }
                     }
-                });
+                }), DispatcherPriority.Input);
 
                 e.Handled = true;
             }
@@ -173,12 +179,10 @@ namespace WinPieGestures
                 if (e.VkCode != trigger.VkCode) return;
             }
 
-            // CRITICAL FIX FOR TYPEMATIC AUTO-REPEAT:
-            // When holding a keyboard key (like Ctrl, Alt, CapsLock, ~), Windows continuously fires KeyDown events (30Hz).
-            // If we are ALREADY waiting for threshold or the gesture is active, DO NOT reset _startPoint or re-trigger!
+            // Pinning anchor: ignore typematic auto-repeat
             if (_isWaitingForThreshold || _isGestureActive)
             {
-                e.Handled = true; // Continue intercepting without resetting state
+                e.Handled = true;
                 return;
             }
 
@@ -196,8 +200,9 @@ namespace WinPieGestures
             _isWaitingForThreshold = true;
             _isGestureActive = false;
             _selectedSectorIndex = -1;
+            _lastEscapedState = false;
 
-            e.Handled = true; // Intercept initial key
+            e.Handled = true;
             Debug.WriteLine($"TriggerKeyDown ({e.VkCode}) pinned at {_startPoint.X}, {_startPoint.Y}. Waiting for threshold.");
         }
 
@@ -206,7 +211,6 @@ namespace WinPieGestures
             var trigger = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
             if (trigger.TriggerType != "Keyboard") return;
 
-            // Determine if the released key affects our active trigger
             bool isOurKey = false;
             if (trigger.VkCode != 0 && e.VkCode == trigger.VkCode) isOurKey = true;
             if (trigger.RequireCtrl && (e.VkCode == 0x11 || e.VkCode == 0xA2 || e.VkCode == 0xA3)) isOurKey = true;
@@ -225,28 +229,31 @@ namespace WinPieGestures
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _keyboardHook?.ReplayKeyPress(vk);
-                }));
+                }), DispatcherPriority.Input);
                 e.Handled = true;
             }
             else if (_isGestureActive)
             {
                 _isGestureActive = false;
-                Debug.WriteLine($"Keyboard gesture completed. Selected sector: {_selectedSectorIndex}");
+                int finalSector = _selectedSectorIndex;
+                var finalProfile = _activeProfile;
 
-                Application.Current.Dispatcher.Invoke(() =>
+                Debug.WriteLine($"Keyboard gesture completed. Selected sector: {finalSector}");
+
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     HideRadialUI();
 
-                    if (_activeProfile != null && _selectedSectorIndex >= 0 && _selectedSectorIndex < _activeProfile.Actions.Count)
+                    if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
                     {
-                        var action = _activeProfile.Actions[_selectedSectorIndex];
+                        var action = finalProfile.Actions[finalSector];
                         if (action != null && !string.IsNullOrEmpty(action.Type))
                         {
                             Debug.WriteLine($"Executing action: {action.Name} ({action.Type}: {action.Parameter})");
                             ActionExecutor.Execute(action);
                         }
                     }
-                });
+                }), DispatcherPriority.Input);
 
                 e.Handled = true;
             }
@@ -258,9 +265,10 @@ namespace WinPieGestures
             {
                 double dx = e.Position.X - _startPoint.X;
                 double dy = e.Position.Y - _startPoint.Y;
-                double distance = Math.Sqrt(dx * dx + dy * dy);
+                double distanceSq = dx * dx + dy * dy;
+                double threshold = ConfigManager.CurrentConfig.DragThreshold;
 
-                if (distance >= ConfigManager.CurrentConfig.DragThreshold)
+                if (distanceSq >= threshold * threshold)
                 {
                     _isWaitingForThreshold = false;
                     _isGestureActive = true;
@@ -271,21 +279,81 @@ namespace WinPieGestures
 
                     Debug.WriteLine($"Gesture activated at pinned start point ({_startPoint.X}, {_startPoint.Y}). Process: {processName}");
 
-                    // Show the UI on the main thread
-                    Application.Current.Dispatcher.Invoke(() =>
+                    // Show the UI on the main thread non-blockingly
+                    var center = _startPoint;
+                    var profile = _activeProfile;
+                    var initialPos = e.Position;
+
+                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        ShowRadialUI(_startPoint, _activeProfile);
-                        UpdateSelectedSector(e.Position);
-                    });
+                        ShowRadialUI(center, profile);
+                        ProcessMove(initialPos);
+                    }), DispatcherPriority.Render);
                 }
             }
             else if (_isGestureActive)
             {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    UpdateSelectedSector(e.Position);
-                });
+                // Pure nanosecond hook thread math without blocking
+                ProcessMove(e.Position);
             }
+        }
+
+        private void ProcessMove(Point currentPoint)
+        {
+            double dx = currentPoint.X - _startPoint.X;
+            double dy = currentPoint.Y - _startPoint.Y;
+            double distance = Math.Sqrt(dx * dx + dy * dy);
+
+            int sectorIndex = -1;
+            bool isEscaped = false;
+
+            if (distance >= ConfigManager.CurrentConfig.InnerRadius)
+            {
+                if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
+                {
+                    double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
+                        ? ConfigManager.CurrentConfig.OuterEscapeDistance 
+                        : ConfigManager.CurrentConfig.WheelRadius * 1.5;
+
+                    if (distance > escapeThreshold)
+                    {
+                        isEscaped = true;
+                        sectorIndex = -1;
+                    }
+                }
+
+                if (!isEscaped)
+                {
+                    double angle = Math.Atan2(dx, -dy) * (180.0 / Math.PI);
+                    if (angle < 0) angle += 360.0;
+
+                    int sectorCount = _activeProfile?.SectorCount ?? 8;
+                    if (sectorCount <= 0) sectorCount = 8;
+                    double sectorAngle = 360.0 / sectorCount;
+                    sectorIndex = (int)Math.Floor((angle + (sectorAngle / 2.0)) / sectorAngle) % sectorCount;
+                }
+            }
+
+            // Zero-overhead check: if nothing changed, do NOT dispatch to UI thread!
+            if (sectorIndex == _selectedSectorIndex && isEscaped == _lastEscapedState)
+            {
+                return;
+            }
+
+            _selectedSectorIndex = sectorIndex;
+            _lastEscapedState = isEscaped;
+
+            int targetSector = sectorIndex;
+            bool targetEscape = isEscaped;
+
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_radialWindow != null)
+                {
+                    _radialWindow.Opacity = targetEscape ? 0.45 : 1.0;
+                    _radialWindow.HighlightSector(targetSector);
+                }
+            }), DispatcherPriority.Input);
         }
 
         private void ShowRadialUI(Point center, WheelProfile profile)
@@ -297,59 +365,6 @@ namespace WinPieGestures
 
             _radialWindow = new RadialWindow(center, profile);
             _radialWindow.Show();
-        }
-
-        private void UpdateSelectedSector(Point currentPoint)
-        {
-            if (_radialWindow == null || _activeProfile == null) return;
-
-            double dx = currentPoint.X - _startPoint.X;
-            double dy = currentPoint.Y - _startPoint.Y;
-            double distance = Math.Sqrt(dx * dx + dy * dy);
-
-            // Center Deadzone check
-            if (distance < ConfigManager.CurrentConfig.InnerRadius)
-            {
-                _selectedSectorIndex = -1;
-                _radialWindow.HighlightSector(-1);
-                _radialWindow.Opacity = 1.0;
-                return;
-            }
-
-            // Outer Escape (Overshoot) Cancel check
-            if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
-            {
-                double escapeThreshold = ConfigManager.CurrentConfig.OuterEscapeDistance > 0 
-                    ? ConfigManager.CurrentConfig.OuterEscapeDistance 
-                    : ConfigManager.CurrentConfig.WheelRadius * 1.5;
-
-                if (distance > escapeThreshold)
-                {
-                    _selectedSectorIndex = -1;
-                    _radialWindow.HighlightSector(-1);
-                    _radialWindow.Opacity = 0.45;
-                    return;
-                }
-                else
-                {
-                    _radialWindow.Opacity = 1.0;
-                }
-            }
-
-            // Calculate Angle: 0 is North (Up), clockwise
-            double angle = Math.Atan2(dx, -dy) * (180 / Math.PI);
-            if (angle < 0)
-            {
-                angle += 360;
-            }
-
-            int sectorCount = _activeProfile.SectorCount;
-            if (sectorCount <= 0) sectorCount = 8;
-            double sectorAngle = 360.0 / sectorCount;
-
-            int sectorIndex = (int)Math.Floor((angle + (sectorAngle / 2.0)) / sectorAngle) % sectorCount;
-            _selectedSectorIndex = sectorIndex;
-            _radialWindow.HighlightSector(sectorIndex);
         }
 
         private void HideRadialUI()

@@ -20,6 +20,7 @@ namespace WinPieGestures
 {
     public partial class RadialWindow : Window
     {
+        private int _currentHighlightedSector = -999;
         private readonly Point _centerPoint;
         private readonly WheelProfile _profile;
         private readonly List<Path> _sectorPaths = new List<Path>();
@@ -634,6 +635,8 @@ namespace WinPieGestures
 
         public void HighlightSector(int index)
         {
+            if (_currentHighlightedSector == index) return;
+            _currentHighlightedSector = index;
             // Center Exit Hover Feedback
             if (index == -1)
             {

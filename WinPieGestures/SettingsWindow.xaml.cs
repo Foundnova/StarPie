@@ -1130,6 +1130,7 @@ namespace WinPieGestures
 
         public void ProcessRawMouseButton(string mouseButton, uint mouseData = 0)
         {
+            if (!this.IsVisible && !_isRecordingTrigger) return;
             if (ConfigManager.CurrentConfig == null) return;
 
             string btnName = mouseButton switch

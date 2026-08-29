@@ -207,9 +207,6 @@ namespace WinPieGestures
                 int message = (int)wParam;
                 MSLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
 
-                var rawArgs = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                OnRawMouseEvent?.Invoke(this, rawArgs);
-
                 if (message == WM_MOUSEMOVE)
                 {
                     var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
@@ -220,6 +217,9 @@ namespace WinPieGestures
                     }
                     return CallNextHookEx(_hookId, nCode, wParam, lParam);
                 }
+
+                var rawArgs = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
+                OnRawMouseEvent?.Invoke(this, rawArgs);
 
                 string trigger = ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
                 bool isTargetDown = false;
