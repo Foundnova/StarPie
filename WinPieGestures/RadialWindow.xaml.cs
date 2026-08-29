@@ -166,37 +166,59 @@ namespace WinPieGestures
 
             CoreTitle.Visibility = Visibility.Collapsed;
             CoreSubtitle.Visibility = Visibility.Collapsed;
-
             if (showCoreIcon && !isCatPaw)
             {
-                bool hasCustomImage = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
-                if ((coreType == "Image" || (hasCustomImage && coreType != "Custom" && coreType != "Exit")) && hasCustomImage)
+                bool isCustomIcon = coreType == "Custom";
+                IconHelper.CustomIconItem? customItem = null;
+                if (isCustomIcon && !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey))
+                {
+                    customItem = IconHelper.GetCustomIcons().FirstOrDefault(c => 
+                        string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
+                }
+
+                bool isCustomRasterImage = customItem != null && !customItem.IsSvg && File.Exists(customItem.FilePath);
+                bool hasConfigCustomImage = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
+
+                bool useImageMode = coreType == "Image" || isCustomRasterImage || (hasConfigCustomImage && coreType != "Custom" && coreType != "Exit");
+                string? imagePath = isCustomRasterImage ? customItem!.FilePath : (hasConfigCustomImage ? ConfigManager.CurrentConfig.CoreCustomImagePath : null);
+
+                if (useImageMode && !string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                 {
                     try
                     {
                         var bmp = new BitmapImage();
                         bmp.BeginInit();
-                        bmp.UriSource = new Uri(ConfigManager.CurrentConfig.CoreCustomImagePath, UriKind.Absolute);
+                        bmp.UriSource = new Uri(imagePath, UriKind.Absolute);
                         bmp.CacheOption = BitmapCacheOption.OnLoad;
                         bmp.EndInit();
+                        bmp.Freeze();
 
                         double imgSize = coreRadius * 1.85;
-                        CoreCustomImage.Source = bmp;
-                        CoreCustomImage.Width = imgSize;
-                        CoreCustomImage.Height = imgSize;
-                        CoreCustomImage.Clip = new EllipseGeometry(new Point(imgSize / 2, imgSize / 2), imgSize / 2, imgSize / 2);
-                        CoreCustomImage.Visibility = Visibility.Visible;
+                        CoreCustomImageEllipse.Width = imgSize;
+                        CoreCustomImageEllipse.Height = imgSize;
+
+                        var brush = new ImageBrush(bmp)
+                        {
+                            Stretch = Stretch.UniformToFill,
+                            AlignmentX = AlignmentX.Center,
+                            AlignmentY = AlignmentY.Center
+                        };
+                        RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
+                        RenderOptions.SetEdgeMode(CoreCustomImageEllipse, EdgeMode.Unspecified);
+
+                        CoreCustomImageEllipse.Fill = brush;
+                        CoreCustomImageEllipse.Visibility = Visibility.Visible;
                         CoreExitIcon.Visibility = Visibility.Collapsed;
                     }
                     catch
                     {
-                        CoreCustomImage.Visibility = Visibility.Collapsed;
+                        CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
                         CoreExitIcon.Visibility = Visibility.Collapsed;
                     }
                 }
                 else
                 {
-                    CoreCustomImage.Visibility = Visibility.Collapsed;
+                    CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
                     var coreGeom = IconHelper.GetCoreIconGeometry(
                         coreType,
                         ConfigManager.CurrentConfig.CoreCustomIconKey,
@@ -210,7 +232,7 @@ namespace WinPieGestures
             }
             else
             {
-                CoreCustomImage.Visibility = Visibility.Collapsed;
+                CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
                 CoreExitIcon.Visibility = Visibility.Collapsed;
             }
 

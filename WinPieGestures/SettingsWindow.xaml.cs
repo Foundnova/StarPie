@@ -2920,34 +2920,53 @@ namespace WinPieGestures
                 double exitSize = Math.Max(12, coreR * 0.42);
                 string coreType = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
 
-                if (coreType == "Image" || (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath) && coreType != "Custom" && coreType != "Exit"))
+                bool isCustomIcon = coreType == "Custom";
+                IconHelper.CustomIconItem? coreCustomItem = null;
+                if (isCustomIcon && !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey))
+                {
+                    coreCustomItem = IconHelper.GetCustomIcons().FirstOrDefault(c => 
+                        string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
+                }
+
+                bool isCustomRasterImage = coreCustomItem != null && !coreCustomItem.IsSvg && File.Exists(coreCustomItem.FilePath);
+                bool hasConfigCustomImage = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
+
+                bool useImageMode = coreType == "Image" || isCustomRasterImage || (hasConfigCustomImage && coreType != "Custom" && coreType != "Exit");
+                string? imagePath = isCustomRasterImage ? coreCustomItem!.FilePath : (hasConfigCustomImage ? ConfigManager.CurrentConfig.CoreCustomImagePath : null);
+
+                if (useImageMode && !string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                 {
                     double imgSize = coreR * 1.85;
-                    var coreImg = new System.Windows.Controls.Image
+                    var coreImgEllipse = new System.Windows.Shapes.Ellipse
                     {
                         Width = imgSize,
                         Height = imgSize,
-                        Stretch = Stretch.UniformToFill,
                         HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                         VerticalAlignment = System.Windows.VerticalAlignment.Center,
                         IsHitTestVisible = false,
-                        Clip = new EllipseGeometry(new Point(imgSize / 2, imgSize / 2), imgSize / 2, imgSize / 2),
                         Visibility = (ConfigManager.CurrentConfig.ShowCoreIcon && ConfigManager.CurrentConfig.UiStyle != "CatPaw") ? Visibility.Visible : Visibility.Collapsed
                     };
-                    if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath))
+                    try
                     {
-                        try
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(imagePath, UriKind.Absolute);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+
+                        var brush = new ImageBrush(bmp)
                         {
-                            var bmp = new BitmapImage();
-                            bmp.BeginInit();
-                            bmp.UriSource = new Uri(ConfigManager.CurrentConfig.CoreCustomImagePath, UriKind.Absolute);
-                            bmp.CacheOption = BitmapCacheOption.OnLoad;
-                            bmp.EndInit();
-                            coreImg.Source = bmp;
-                        }
-                        catch { }
+                            Stretch = Stretch.UniformToFill,
+                            AlignmentX = AlignmentX.Center,
+                            AlignmentY = AlignmentY.Center
+                        };
+                        RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
+                        RenderOptions.SetEdgeMode(coreImgEllipse, EdgeMode.Unspecified);
+                        coreImgEllipse.Fill = brush;
                     }
-                    previewCoreGrid.Children.Add(coreImg);
+                    catch { }
+                    previewCoreGrid.Children.Add(coreImgEllipse);
                 }
                 else
                 {

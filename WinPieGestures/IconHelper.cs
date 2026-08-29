@@ -167,6 +167,36 @@ namespace WinPieGestures
         {
             if (string.IsNullOrEmpty(key)) return null;
             if (IconMap.TryGetValue(key, out string? svg)) return svg;
+
+            // Check if key is raw SVG path string
+            if (key.Trim().StartsWith("M", StringComparison.OrdinalIgnoreCase) && key.Contains(","))
+            {
+                return key.Trim();
+            }
+
+            // Check custom user icons
+            var custom = GetCustomIcons().FirstOrDefault(c => 
+                string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase) || 
+                string.Equals(c.DisplayName, key, StringComparison.OrdinalIgnoreCase));
+            if (custom != null)
+            {
+                if (!string.IsNullOrEmpty(custom.SvgData)) return custom.SvgData;
+                if (custom.IsSvg && File.Exists(custom.FilePath))
+                {
+                    try
+                    {
+                        string text = File.ReadAllText(custom.FilePath);
+                        string extracted = ExtractSvgPathData(text);
+                        if (!string.IsNullOrEmpty(extracted))
+                        {
+                            custom.SvgData = extracted;
+                            return extracted;
+                        }
+                    }
+                    catch { }
+                }
+            }
+
             return null;
         }
 
@@ -604,17 +634,36 @@ namespace WinPieGestures
 
             try
             {
-                int dIndex = svgContent.IndexOf(" d=\"", StringComparison.OrdinalIgnoreCase);
-                if (dIndex < 0) dIndex = svgContent.IndexOf(" d='", StringComparison.OrdinalIgnoreCase);
-                if (dIndex >= 0)
+                var list = new List<string>();
+                int index = 0;
+                while (index < svgContent.Length)
                 {
-                    char quote = svgContent[dIndex + 3];
-                    int start = dIndex + 4;
-                    int end = svgContent.IndexOf(quote, start);
-                    if (end > start)
+                    int dIndex = svgContent.IndexOf(" d=", index, StringComparison.OrdinalIgnoreCase);
+                    if (dIndex < 0) dIndex = svgContent.IndexOf("\nd=", index, StringComparison.OrdinalIgnoreCase);
+                    if (dIndex < 0) dIndex = svgContent.IndexOf("\td=", index, StringComparison.OrdinalIgnoreCase);
+                    if (dIndex < 0) break;
+
+                    int quoteStart = dIndex + 3;
+                    while (quoteStart < svgContent.Length && (svgContent[quoteStart] == ' ' || svgContent[quoteStart] == '\t')) quoteStart++;
+                    if (quoteStart < svgContent.Length && (svgContent[quoteStart] == '"' || svgContent[quoteStart] == '\''))
                     {
-                        return svgContent.Substring(start, end - start).Trim();
+                        char quote = svgContent[quoteStart];
+                        int start = quoteStart + 1;
+                        int end = svgContent.IndexOf(quote, start);
+                        if (end > start)
+                        {
+                            string d = svgContent.Substring(start, end - start).Trim();
+                            if (!string.IsNullOrEmpty(d)) list.Add(d);
+                            index = end + 1;
+                            continue;
+                        }
                     }
+                    index = dIndex + 3;
+                }
+
+                if (list.Count > 0)
+                {
+                    return string.Join(" ", list);
                 }
             }
             catch { }

@@ -8,7 +8,12 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
-        WindowStartupLocation="Manual">
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        RenderOptions.EdgeMode="Unspecified"
+        RenderOptions.ClearTypeHint="Enabled">
     
     <Window.Resources>
         <!-- Premium Radial Shadow -->
@@ -74,8 +79,9 @@
                       Width="16" Height="16"
                       Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
                 
-                <!-- Center Core Custom Local Image (Rounded) -->
-                <Image Name="CoreCustomImage" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+                <!-- Center Core Custom Local Image (Anti-aliased Smooth Geometry with ImageBrush) -->
+                <Ellipse Name="CoreCustomImageEllipse" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"
+                         RenderOptions.BitmapScalingMode="HighQuality" RenderOptions.EdgeMode="Unspecified"/>
             </Grid>
         </Canvas>
     </Grid>
