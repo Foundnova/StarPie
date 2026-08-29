@@ -746,30 +746,14 @@ namespace WinPieGestures
                         _styleRenderer.ApplySectorHighlight(path, false);
                     }
 
-                    if (_textColorBrush is SolidColorBrush sc)
+                    if (textBlock != null)
                     {
-                        var dimColor = new SolidColorBrush(Color.FromArgb(170, sc.Color.R, sc.Color.G, sc.Color.B));
-                        if (textBlock != null)
-                        {
-                            textBlock.Foreground = dimColor;
-                            textBlock.FontWeight = FontWeights.Medium;
-                        }
-                        if (vectorIcon != null)
-                        {
-                            vectorIcon.Fill = dimColor;
-                        }
+                        textBlock.Foreground = _textColorBrush;
+                        textBlock.FontWeight = FontWeights.Medium;
                     }
-                    else
+                    if (vectorIcon != null)
                     {
-                        if (textBlock != null)
-                        {
-                            textBlock.Foreground = _textColorBrush;
-                            textBlock.FontWeight = FontWeights.Medium;
-                        }
-                        if (vectorIcon != null)
-                        {
-                            vectorIcon.Fill = _textColorBrush;
-                        }
+                        vectorIcon.Fill = _textColorBrush;
                     }
                 }
             }
