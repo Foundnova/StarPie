@@ -83,6 +83,9 @@ namespace WinPieGestures
         public string CoreCustomIconSvg { get; set; } = "";
         public string CoreCustomImagePath { get; set; } = "";
         public string CoreCustomImageStretch { get; set; } = "UniformToFill";
+        public double CoreIconScale { get; set; } = 1.0; // 0.4 ~ 2.5 (40% ~ 250%)
+        public double CoreImageOffsetX { get; set; } = 0.0; // -60.0 ~ +60.0 px
+        public double CoreImageOffsetY { get; set; } = 0.0; // -60.0 ~ +60.0 px
 
         // Highlight Glow Customization (高亮边缘光晕自定义)
         public string HighlightGlowPreset { get; set; } = "Auto"; // "Auto", "Lilac", "Blue", "Emerald", "Rose", "Amber", "Red", "White", "Custom"

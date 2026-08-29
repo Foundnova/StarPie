@@ -238,6 +238,48 @@ namespace WinPieGestures
                 [LanguageCode.En] = "🚀 Snappy (35ms / Ultra-Fast)",
                 [LanguageCode.Ja] = "🚀 高速 (35ms / 即座に応答)"
             },
+            ["CoreTransformSectionTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "图案与贴图尺寸及显示位置微调",
+                [LanguageCode.ZhTw] = "圖案與貼圖尺寸及顯示位置微調",
+                [LanguageCode.En] = "Core Pattern & Image Size and Position Tuning",
+                [LanguageCode.Ja] = "コアパターン・画像のサイズと位置の微調整"
+            },
+            ["CoreIconScaleTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "中心图案大小缩放 (Scale / Zoom):",
+                [LanguageCode.ZhTw] = "中心圖案大小縮放 (Scale / Zoom):",
+                [LanguageCode.En] = "Core Pattern / Image Scale (Zoom):",
+                [LanguageCode.Ja] = "中央パターン／画像のスケーリング (ズーム):"
+            },
+            ["CoreImageOffsetXTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "水平显示位置偏移 (Offset X):",
+                [LanguageCode.ZhTw] = "水平顯示位置偏移 (Offset X):",
+                [LanguageCode.En] = "Horizontal Position Offset (X):",
+                [LanguageCode.Ja] = "水平表示位置オフセット (X):"
+            },
+            ["CoreImageOffsetYTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "垂直显示位置偏移 (Offset Y):",
+                [LanguageCode.ZhTw] = "垂直顯示位置偏移 (Offset Y):",
+                [LanguageCode.En] = "Vertical Position Offset (Y):",
+                [LanguageCode.Ja] = "垂直表示位置オフセット (Y):"
+            },
+            ["BtnResetCoreTransform"] = new()
+            {
+                [LanguageCode.ZhCn] = "🔄 重置图案大小与居中位置",
+                [LanguageCode.ZhTw] = "🔄 重設圖案大小與置中位置",
+                [LanguageCode.En] = "🔄 Reset Size & Center Position",
+                [LanguageCode.Ja] = "🔄 サイズと中央位置をリセット"
+            },
+            ["CoreImagePerformanceTip"] = new()
+            {
+                [LanguageCode.ZhCn] = "提示：推荐使用 256×256 ~ 512×512 适中分辨率的图片或 SVG 矢量图。导入超高分辨率（如 4K/8K 原图）会增加 GPU 内存占用与重采样计算开销，可能影响手势呼出与高刷响应性能。",
+                [LanguageCode.ZhTw] = "提示：建議使用 256×256 ~ 512×512 適中解析度的圖片或 SVG 向量圖。匯入超高解析度（如 4K/8K 原圖）會增加 GPU 記憶體佔用與重採樣計算開銷，可能影響手勢呼出與高刷響應效能。",
+                [LanguageCode.En] = "Tip: Recommended image size is 256×256 ~ 512×512 px or SVG vectors. Importing ultra-high resolution images (e.g. 4K/8K) increases GPU memory and texture sampling overhead, which may impact gesture responsiveness.",
+                [LanguageCode.Ja] = "ヒント: 256×256～512×512 px の画像または SVG ベクター画像の使用を推奨します。超高解像度画像（4K/8K など）を使用すると、GPU メモリ使用量と再サンプリング負荷が増加し、応答性に影響を与える場合があります。"
+            },
             ["CustomColorsExpander"] = new()
             {
                 [LanguageCode.ZhCn] = "展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。",

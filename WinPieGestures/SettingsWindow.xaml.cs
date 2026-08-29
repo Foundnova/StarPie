@@ -207,6 +207,17 @@ namespace WinPieGestures
                 ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
                 SetComboBoxSelectedValue(CoreIconTypeComboBox, ConfigManager.CurrentConfig.CoreIconType ?? "Exit");
                 CoreImagePathTextBox.Text = ConfigManager.CurrentConfig.CoreCustomImagePath ?? "";
+
+                double scaleVal = ConfigManager.CurrentConfig.CoreIconScale > 0 ? ConfigManager.CurrentConfig.CoreIconScale : 1.0;
+                if (CoreIconScaleSlider != null) CoreIconScaleSlider.Value = scaleVal;
+                if (CoreIconScaleLabel != null) CoreIconScaleLabel.Text = $"{Math.Round(scaleVal * 100)}%";
+
+                if (CoreImageOffsetXSlider != null) CoreImageOffsetXSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetX;
+                if (CoreImageOffsetXLabel != null) CoreImageOffsetXLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetX} px";
+
+                if (CoreImageOffsetYSlider != null) CoreImageOffsetYSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetY;
+                if (CoreImageOffsetYLabel != null) CoreImageOffsetYLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetY} px";
+
                 UpdateCoreIconPreviewUI();
 
                 // Load Scene Isolation settings
@@ -443,7 +454,13 @@ namespace WinPieGestures
             if (olderExpander != null) olderExpander.Header = I18n.T("MilestonesOlderExpander");
             if (AppearancePageHeader != null) AppearancePageHeader.Text = I18n.T("AppearanceHeader");
             if (AppearancePageSubheader != null) AppearancePageSubheader.Text = I18n.T("AppearanceSubheader");
-                        if (ResetDimensionsButton != null) ResetDimensionsButton.Content = I18n.T("BtnResetGeometry");
+            if (ResetDimensionsButton != null) ResetDimensionsButton.Content = I18n.T("BtnResetGeometry");
+            if (CoreTransformSectionTitle != null) CoreTransformSectionTitle.Text = I18n.T("CoreTransformSectionTitle");
+            if (CoreIconScaleTitleText != null) CoreIconScaleTitleText.Text = I18n.T("CoreIconScaleTitle");
+            if (CoreImageOffsetXTitleText != null) CoreImageOffsetXTitleText.Text = I18n.T("CoreImageOffsetXTitle");
+            if (CoreImageOffsetYTitleText != null) CoreImageOffsetYTitleText.Text = I18n.T("CoreImageOffsetYTitle");
+            if (ResetCoreTransformButton != null) ResetCoreTransformButton.Content = I18n.T("BtnResetCoreTransform");
+            if (CoreImagePerformanceTipText != null) CoreImagePerformanceTipText.Text = I18n.T("CoreImagePerformanceTip");
 
             // Tab 2: Gestures & Actions
             if (GesturesPageHeader != null) GesturesPageHeader.Text = I18n.T("GesturesHeader");
@@ -663,6 +680,18 @@ namespace WinPieGestures
                 if (CoreImagePathTextBox != null)
                 {
                     ConfigManager.CurrentConfig.CoreCustomImagePath = CoreImagePathTextBox.Text.Trim();
+                }
+                if (CoreIconScaleSlider != null)
+                {
+                    ConfigManager.CurrentConfig.CoreIconScale = CoreIconScaleSlider.Value;
+                }
+                if (CoreImageOffsetXSlider != null)
+                {
+                    ConfigManager.CurrentConfig.CoreImageOffsetX = CoreImageOffsetXSlider.Value;
+                }
+                if (CoreImageOffsetYSlider != null)
+                {
+                    ConfigManager.CurrentConfig.CoreImageOffsetY = CoreImageOffsetYSlider.Value;
                 }
 
                 if (HighlightGlowPresetComboBox?.SelectedItem is ComboBoxItem glowPresetItem)
@@ -2154,6 +2183,71 @@ namespace WinPieGestures
             SyncUiToConfigAndSave(true);
         }
 
+        private void CoreIconScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+            if (CoreIconScaleLabel != null && CoreIconScaleSlider != null)
+            {
+                CoreIconScaleLabel.Text = $"{Math.Round(CoreIconScaleSlider.Value * 100)}%";
+            }
+            if (CoreIconScaleSlider != null)
+            {
+                ConfigManager.CurrentConfig.CoreIconScale = CoreIconScaleSlider.Value;
+            }
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void CoreImageOffsetSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+            if (CoreImageOffsetXLabel != null && CoreImageOffsetXSlider != null)
+            {
+                CoreImageOffsetXLabel.Text = $"{(int)CoreImageOffsetXSlider.Value} px";
+            }
+            if (CoreImageOffsetYLabel != null && CoreImageOffsetYSlider != null)
+            {
+                CoreImageOffsetYLabel.Text = $"{(int)CoreImageOffsetYSlider.Value} px";
+            }
+            if (CoreImageOffsetXSlider != null)
+            {
+                ConfigManager.CurrentConfig.CoreImageOffsetX = CoreImageOffsetXSlider.Value;
+            }
+            if (CoreImageOffsetYSlider != null)
+            {
+                ConfigManager.CurrentConfig.CoreImageOffsetY = CoreImageOffsetYSlider.Value;
+            }
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            SyncUiToConfigAndSave(true);
+        }
+
+        private void ResetCoreTransformButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.CurrentConfig == null) return;
+            _isUpdatingUi = true;
+            if (CoreIconScaleSlider != null) CoreIconScaleSlider.Value = 1.0;
+            if (CoreIconScaleLabel != null) CoreIconScaleLabel.Text = "100%";
+            if (CoreImageOffsetXSlider != null) CoreImageOffsetXSlider.Value = 0;
+            if (CoreImageOffsetXLabel != null) CoreImageOffsetXLabel.Text = "0 px";
+            if (CoreImageOffsetYSlider != null) CoreImageOffsetYSlider.Value = 0;
+            if (CoreImageOffsetYLabel != null) CoreImageOffsetYLabel.Text = "0 px";
+            ConfigManager.CurrentConfig.CoreIconScale = 1.0;
+            ConfigManager.CurrentConfig.CoreImageOffsetX = 0.0;
+            ConfigManager.CurrentConfig.CoreImageOffsetY = 0.0;
+            _isUpdatingUi = false;
+            if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+            {
+                RenderLiveWheelPreview();
+            }
+            SyncUiToConfigAndSave(true);
+        }
+
         private void HighlightGlowPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isUpdatingUi || HighlightGlowPresetComboBox == null || ConfigManager.CurrentConfig == null) return;
@@ -2934,15 +3028,21 @@ namespace WinPieGestures
                 bool useImageMode = coreType == "Image" || isCustomRasterImage || (hasConfigCustomImage && coreType != "Custom" && coreType != "Exit");
                 string? imagePath = isCustomRasterImage ? coreCustomItem!.FilePath : (hasConfigCustomImage ? ConfigManager.CurrentConfig.CoreCustomImagePath : null);
 
+                double coreScale = ConfigManager.CurrentConfig.CoreIconScale > 0 ? ConfigManager.CurrentConfig.CoreIconScale : 1.0;
+                double offsetX = ConfigManager.CurrentConfig.CoreImageOffsetX;
+                double offsetY = ConfigManager.CurrentConfig.CoreImageOffsetY;
+                var coreTransform = (offsetX != 0 || offsetY != 0) ? new TranslateTransform(offsetX, offsetY) : null;
+
                 if (useImageMode && !string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
                 {
-                    double imgSize = coreR * 1.85;
+                    double imgSize = coreR * 1.85 * coreScale;
                     var coreImgEllipse = new System.Windows.Shapes.Ellipse
                     {
                         Width = imgSize,
                         Height = imgSize,
                         HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                         VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                        RenderTransform = coreTransform,
                         IsHitTestVisible = false,
                         Visibility = (ConfigManager.CurrentConfig.ShowCoreIcon && ConfigManager.CurrentConfig.UiStyle != "CatPaw") ? Visibility.Visible : Visibility.Collapsed
                     };
@@ -2978,8 +3078,9 @@ namespace WinPieGestures
                             ConfigManager.CurrentConfig.CoreCustomIconKey,
                             ConfigManager.CurrentConfig.CoreCustomIconSvg),
                         Fill = _previewTextBrush,
-                        Width = exitSize,
-                        Height = exitSize,
+                        Width = exitSize * coreScale,
+                        Height = exitSize * coreScale,
+                        RenderTransform = coreTransform,
                         Stretch = Stretch.Uniform,
                         HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                         VerticalAlignment = System.Windows.VerticalAlignment.Center,

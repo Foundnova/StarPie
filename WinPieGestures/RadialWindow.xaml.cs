@@ -166,6 +166,11 @@ namespace WinPieGestures
 
             CoreTitle.Visibility = Visibility.Collapsed;
             CoreSubtitle.Visibility = Visibility.Collapsed;
+            double coreScale = ConfigManager.CurrentConfig.CoreIconScale > 0 ? ConfigManager.CurrentConfig.CoreIconScale : 1.0;
+            double offsetX = ConfigManager.CurrentConfig.CoreImageOffsetX;
+            double offsetY = ConfigManager.CurrentConfig.CoreImageOffsetY;
+            var coreTransform = (offsetX != 0 || offsetY != 0) ? new TranslateTransform(offsetX, offsetY) : null;
+
             if (showCoreIcon && !isCatPaw)
             {
                 bool isCustomIcon = coreType == "Custom";
@@ -193,9 +198,10 @@ namespace WinPieGestures
                         bmp.EndInit();
                         bmp.Freeze();
 
-                        double imgSize = coreRadius * 1.85;
+                        double imgSize = coreRadius * 1.85 * coreScale;
                         CoreCustomImageEllipse.Width = imgSize;
                         CoreCustomImageEllipse.Height = imgSize;
+                        CoreCustomImageEllipse.RenderTransform = coreTransform;
 
                         var brush = new ImageBrush(bmp)
                         {
@@ -227,6 +233,9 @@ namespace WinPieGestures
                     {
                         CoreExitIcon.Data = coreGeom;
                     }
+                    CoreExitIcon.Width = coreRadius * 0.42 * coreScale;
+                    CoreExitIcon.Height = coreRadius * 0.42 * coreScale;
+                    CoreExitIcon.RenderTransform = coreTransform;
                     CoreExitIcon.Visibility = Visibility.Visible;
                 }
             }
