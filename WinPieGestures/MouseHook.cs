@@ -1,3 +1,4 @@
+using System.IO;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -18,10 +19,33 @@ namespace WinPieGestures
         }
     }
 
+    
+    public class RawMouseEventArgs : EventArgs
+    {
+        public int Message { get; }
+        public string MouseButton { get; }
+        public uint MouseData { get; }
+        public bool IsButtonDown { get; }
+        public Point Position { get; }
+        public bool Handled { get; set; }
+
+        public RawMouseEventArgs(int message, string mouseButton, uint mouseData, bool isButtonDown, double x, double y)
+        {
+            Message = message;
+            MouseButton = mouseButton;
+            MouseData = mouseData;
+            IsButtonDown = isButtonDown;
+            Position = new Point(x, y);
+            Handled = false;
+        }
+    }
+
     public class MouseHook
     {
         private const int WH_MOUSE_LL = 14;
         private const int WM_MOUSEMOVE = 0x0200;
+        private const int WM_LBUTTONDOWN = 0x0201;
+        private const int WM_LBUTTONUP = 0x0202;
         private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_RBUTTONUP = 0x0205;
         private const int WM_MBUTTONDOWN = 0x0207;
@@ -83,6 +107,7 @@ namespace WinPieGestures
         public event EventHandler<MouseEventArgs>? OnTriggerButtonUp;
         public event EventHandler<MouseEventArgs>? OnMouseMove;
         public event EventHandler<MouseEventArgs>? OnRawMouseEvent;
+        public event EventHandler<RawMouseEventArgs>? OnRawMouseButtonEvent;
 
         // Legacy compatibility events
         public event EventHandler<MouseEventArgs>? OnRightButtonDown
@@ -221,32 +246,45 @@ namespace WinPieGestures
                 var rawArgs = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
                 OnRawMouseEvent?.Invoke(this, rawArgs);
 
-                string trigger = ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-                bool isTargetDown = false;
-                bool isTargetUp = false;
+                string btn = "";
+                bool isDown = false;
+                bool isUp = false;
 
-                if (trigger == "MiddleButton")
+                if (message == WM_MBUTTONDOWN || message == WM_MBUTTONUP)
                 {
-                    isTargetDown = (message == WM_MBUTTONDOWN);
-                    isTargetUp = (message == WM_MBUTTONUP);
+                    btn = "MiddleButton";
+                    isDown = (message == WM_MBUTTONDOWN);
+                    isUp = (message == WM_MBUTTONUP);
                 }
-                else if (trigger == "XButton1")
+                else if (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP)
+                {
+                    btn = "RightButton";
+                    isDown = (message == WM_RBUTTONDOWN);
+                    isUp = (message == WM_RBUTTONUP);
+                }
+                else if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP)
                 {
                     uint xBtn = (hookStruct.mouseData >> 16) & 0xFFFF;
-                    isTargetDown = (message == WM_XBUTTONDOWN && xBtn == 1);
-                    isTargetUp = (message == WM_XBUTTONUP && xBtn == 1);
+                    btn = (xBtn == 2 ? "XButton2" : "XButton1");
+                    isDown = (message == WM_XBUTTONDOWN);
+                    isUp = (message == WM_XBUTTONUP);
                 }
-                else if (trigger == "XButton2")
+                else if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP)
                 {
-                    uint xBtn = (hookStruct.mouseData >> 16) & 0xFFFF;
-                    isTargetDown = (message == WM_XBUTTONDOWN && xBtn == 2);
-                    isTargetUp = (message == WM_XBUTTONUP && xBtn == 2);
+                    btn = "LeftButton";
+                    isDown = (message == WM_LBUTTONDOWN);
+                    isUp = (message == WM_LBUTTONUP);
                 }
-                else // Default RightButton
+
+                if (!string.IsNullOrEmpty(btn))
                 {
-                    isTargetDown = (message == WM_RBUTTONDOWN);
-                    isTargetUp = (message == WM_RBUTTONUP);
+                    var rawButtonArgs = new RawMouseEventArgs(message, btn, hookStruct.mouseData, isDown, hookStruct.pt.x, hookStruct.pt.y);
+                    OnRawMouseButtonEvent?.Invoke(this, rawButtonArgs);
                 }
+
+                string trigger = ConfigManager.CurrentConfig?.Trigger?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+                bool isTargetDown = isDown && (btn == trigger);
+                bool isTargetUp = isUp && (btn == trigger);
 
                 if (isTargetDown)
                 {

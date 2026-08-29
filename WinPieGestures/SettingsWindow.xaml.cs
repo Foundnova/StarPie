@@ -992,9 +992,15 @@ namespace WinPieGestures
         {
             if (App.MainMouseHook != null)
             {
-                App.MainMouseHook.OnRawMouseEvent += (s, e) =>
+                App.MainMouseHook.OnRawMouseButtonEvent += (s, e) =>
                 {
-                    // Update sensor display on mouse movement / button actions
+                    if (e.IsButtonDown)
+                    {
+                        this.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            ProcessRawMouseButton(e.MouseButton, e.MouseData);
+                        }));
+                    }
                 };
             }
 
@@ -1135,14 +1141,14 @@ namespace WinPieGestures
 
             string btnName = mouseButton switch
             {
-                "MiddleButton" => "鼠标中键 (Middle Button)",
-                "XButton1" => "鼠标侧键 1 (后退 / XButton1)",
-                "XButton2" => "鼠标侧键 2 (前进 / XButton2)",
-                "LeftButton" => "鼠标左键 (Left Button)",
-                _ => "鼠标右键 (Right Button)"
+                "MiddleButton" => "🖱️ 鼠标中键 / 滚轮按压 (Middle Button)",
+                "XButton1" => "🖱️ 鼠标侧键 1 / 后退键 (XButton 1 / Back)",
+                "XButton2" => "🖱️ 鼠标侧键 2 / 前进键 (XButton 2 / Forward)",
+                "LeftButton" => "🖱️ 鼠标左键 (Left Button)",
+                _ => "🖱️ 鼠标右键 (Right Button)"
             };
 
-            var mods = Keyboard.Modifiers;
+            var mods = KeyboardHook.GetCurrentModifiers();
             string modText = "";
             if ((mods & ModifierKeys.Control) != 0) modText += "Ctrl + ";
             if ((mods & ModifierKeys.Shift) != 0) modText += "Shift + ";
