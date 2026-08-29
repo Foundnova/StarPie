@@ -324,7 +324,7 @@ namespace WinPieGestures
 
                 if (!isEscaped)
                 {
-                    double angle = Math.Atan2(dx, -dy) * (180.0 / Math.PI);
+                    double angle = Math.Atan2(dy, dx) * (180.0 / Math.PI);
                     if (angle < 0) angle += 360.0;
 
                     int sectorCount = _activeProfile?.SectorCount ?? 8;
