@@ -112,8 +112,16 @@ namespace WinPieGestures
                 MainSettingsWindow = new SettingsWindow();
                 this.MainWindow = MainSettingsWindow;
 
-                bool startMinimized = cmdLine.Contains("--minimized", StringComparison.OrdinalIgnoreCase) ||
-                                      cmdLine.Contains("--autostart", StringComparison.OrdinalIgnoreCase);
+                string[] cmdArgs = Environment.GetCommandLineArgs();
+                bool startMinimized = cmdArgs.Any(a => 
+                    string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "/minimized", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "/autostart", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase));
 
                 if (!startMinimized)
                 {

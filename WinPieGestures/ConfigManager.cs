@@ -183,6 +183,7 @@ namespace WinPieGestures
 
                 // Initialize internationalization language
                 I18n.SetLanguage(CurrentConfig.Language);
+                EnsureAutoStartRegistryUpToDate();
             }
             catch (Exception ex)
             {
@@ -355,7 +356,7 @@ namespace WinPieGestures
                 if (enable)
                 {
                     string exePath = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StarPie.exe");
-                    key.SetValue("StarPie", $"\"{exePath}\"");
+                    key.SetValue("StarPie", $"\"{exePath}\" --autostart --minimized");
                     // Clean up legacy key if present
                     try { key.DeleteValue("WinPieGestures", false); } catch { }
                 }
@@ -369,6 +370,28 @@ namespace WinPieGestures
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to set autostart: {ex.Message}");
             }
+        }
+
+        public static void EnsureAutoStartRegistryUpToDate()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+                if (key == null) return;
+
+                var existingVal = key.GetValue("StarPie") as string ?? key.GetValue("WinPieGestures") as string;
+                if (!string.IsNullOrEmpty(existingVal))
+                {
+                    string exePath = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StarPie.exe");
+                    string desiredVal = $"\"{exePath}\" --autostart --minimized";
+                    if (existingVal != desiredVal)
+                    {
+                        key.SetValue("StarPie", desiredVal);
+                        try { key.DeleteValue("WinPieGestures", false); } catch { }
+                    }
+                }
+            }
+            catch { }
         }
     }
 }
