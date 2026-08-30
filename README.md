@@ -37,7 +37,21 @@
 > - **低资源占用**：基于原生 C# WPF 构建，无浏览器内核打包，后台常驻内存约 **3 ～ 5 MB**；
 > - **低延迟响应**：基于 Win32 `WH_MOUSE_LL` 底层事件流，响应迅速，不影响鼠标正常右键点击；
 > - **绿色便携**：提供独立单文件版（内置 .NET 运行时，解压即用），配置保存于本地 `config.json`；
-> - **单实例保护**：全局命名互斥体防止重复多开，自动激活已有窗口。
+
+<details open>
+<summary><b>🎬 演示视频 / Video Demo </b></summary>
+<br/>
+
+<div align="center">
+  <a href="[https://www.bilibili.com/video/你的BV号](https://www.bilibili.com/video/BV1XjtA6KEGL)" target="_blank">
+    <img src="./attachments/video_cover.png" width="700" alt="StarPie 演示视频" />
+  </a>
+  <p>
+    <a href="https://www.bilibili.com/video/BV1XjtA6KEGL"><b>📺 点击前往 Bilibili 观看原声讲解与实机演示</b></a>
+  </p>
+</div>
+
+</details>
 
 ---
 
