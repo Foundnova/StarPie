@@ -209,6 +209,7 @@ namespace WinPieGestures
                 SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
                 ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
                 if (EnableMultiTierCheckBox != null) EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
+                SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
 
                 // Center Core Pattern, Image & Visibility
                 ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
@@ -473,6 +474,10 @@ namespace WinPieGestures
             if (CoreImagePerformanceTipText != null) CoreImagePerformanceTipText.Text = I18n.T("CoreImagePerformanceTip");
             if (EnableMultiTierCheckBox != null) EnableMultiTierCheckBox.Content = I18n.T("EnableMultiTier");
             if (EnableMultiTierDescText != null) EnableMultiTierDescText.Text = I18n.T("EnableMultiTierDesc");
+            if (SubmenuStyleTitleText != null) SubmenuStyleTitleText.Text = I18n.T("SubmenuStyleTitle");
+            if (SubmenuStyleDescText != null) SubmenuStyleDescText.Text = I18n.T("SubmenuStyleDesc");
+            if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
+            if (SubmenuStyleFanItem != null) SubmenuStyleFanItem.Content = I18n.T("SubmenuStyleFan");
 
             // Tab 2: Gestures & Actions
             if (GesturesPageHeader != null) GesturesPageHeader.Text = I18n.T("GesturesHeader");
@@ -2399,6 +2404,20 @@ namespace WinPieGestures
             if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
             {
                 RenderLiveWheelPreview();
+            }
+        }
+
+        private void SubmenuStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+            if (SubmenuStyleComboBox.SelectedItem is ComboBoxItem item && item.Tag is string style)
+            {
+                ConfigManager.CurrentConfig.SubmenuStyle = style;
+                ConfigManager.SaveConfig();
+                if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+                {
+                    RenderLiveWheelPreview();
+                }
             }
         }
 
