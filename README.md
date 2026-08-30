@@ -44,7 +44,7 @@
 
 <div align="center">
   <a href="[https://www.bilibili.com/video/你的BV号](https://www.bilibili.com/video/BV1XjtA6KEGL)" target="_blank">
-    <img src="./attachments/video_cover.png" width="700" alt="StarPie 演示视频" />
+    <img src="./attachments/video_cover.jpg" width="700" alt="StarPie 演示视频" />
   </a>
   <p>
     <a href="https://www.bilibili.com/video/BV1XjtA6KEGL"><b>📺 点击前往 Bilibili 观看原声讲解与实机演示</b></a>
