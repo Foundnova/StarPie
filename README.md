@@ -43,7 +43,7 @@
 <br/>
 
 <div align="center">
-  <a href="[https://www.bilibili.com/video/你的BV号](https://www.bilibili.com/video/BV1XjtA6KEGL)" target="_blank">
+  <a href="[https://www.bilibili.com/video/BV1XjtA6KEGL](https://www.bilibili.com/video/BV1XjtA6KEGL)" target="_blank">
     <img src="./attachments/video_cover.jpg" width="700" alt="StarPie 演示视频" />
   </a>
   <p>
