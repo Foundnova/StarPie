@@ -455,7 +455,8 @@ public static class ActionExecutor
 			switch (shell)
 			{
 			case "powershell":
-				Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -Command \"" + command + "\"")
+				// Visible: keep the window open (-NoExit). Hidden: run to completion.
+				Process.Start(new ProcessStartInfo("powershell.exe", (hidden ? "-NoProfile -Command \"" : "-NoProfile -NoExit -Command \"") + command + "\"")
 				{
 					UseShellExecute = false,
 					CreateNoWindow = hidden
@@ -469,7 +470,8 @@ public static class ActionExecutor
 				});
 				break;
 			default:
-				Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + command + "\"")
+				// Visible: keep the window open (/k). Hidden: /c so no lingering process.
+				Process.Start(new ProcessStartInfo("cmd.exe", (hidden ? "/c \"" : "/k \"") + command + "\"")
 				{
 					UseShellExecute = false,
 					CreateNoWindow = hidden
