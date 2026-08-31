@@ -16,6 +16,18 @@ public class MouseHook
 		public int y;
 	}
 
+	[StructLayout(LayoutKind.Sequential)]
+	private struct MSG
+	{
+		public nint hwnd;
+		public uint message;
+		public nuint wParam;
+		public nint lParam;
+		public uint time;
+		public POINT pt;
+		public uint lPrivate;
+	}
+
 	private struct MSLLHOOKSTRUCT
 	{
 		public POINT pt;
@@ -51,6 +63,10 @@ public class MouseHook
 
 	private const int WM_XBUTTONUP = 524;
 
+	private const uint WM_QUIT = 18u;
+
+	private const uint PM_NOREMOVE = 0u;
+
 	private const uint MOUSEEVENTF_RIGHTDOWN = 8u;
 
 	private const uint MOUSEEVENTF_RIGHTUP = 16u;
@@ -71,9 +87,23 @@ public class MouseHook
 
 	private nint _hookId = IntPtr.Zero;
 
-	private bool _ignoreNextButtonDown;
+	private int _ignoreNextButtonDown;
 
-	private bool _ignoreNextButtonUp;
+	private int _ignoreNextButtonUp;
+
+	private readonly object _lifecycleSync = new object();
+
+	private Thread? _hookThread;
+
+	private uint _hookThreadId;
+
+	private ManualResetEventSlim? _hookReady;
+
+	private Exception? _hookStartException;
+
+	private volatile bool _stopRequested;
+
+	private int _isPaused;
 
 	private System.Threading.Timer? _healthCheckTimer;
 
@@ -81,7 +111,17 @@ public class MouseHook
 
 	private int _hookEventsCountSinceLastCheck;
 
-	public bool IsPaused { get; set; }
+	public bool IsPaused
+	{
+		get
+		{
+			return Volatile.Read(ref _isPaused) != 0;
+		}
+		set
+		{
+			Volatile.Write(ref _isPaused, value ? 1 : 0);
+		}
+	}
 
 	public event EventHandler<MouseEventArgs>? OnTriggerButtonDown;
 
@@ -130,6 +170,27 @@ public class MouseHook
 	[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 	private static extern nint GetModuleHandle(string lpModuleName);
 
+	[DllImport("kernel32.dll")]
+	private static extern uint GetCurrentThreadId();
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool PeekMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern int GetMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+	[DllImport("user32.dll")]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool TranslateMessage(ref MSG lpMsg);
+
+	[DllImport("user32.dll")]
+	private static extern nint DispatchMessage(ref MSG lpMsg);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool PostThreadMessage(uint idThread, uint msg, nuint wParam, nint lParam);
+
 	[DllImport("user32.dll")]
 	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
 
@@ -144,30 +205,154 @@ public class MouseHook
 
 	public void Start()
 	{
-		if (_hookId == IntPtr.Zero)
+		ManualResetEventSlim ready;
+		lock (_lifecycleSync)
 		{
-			_hookId = SetHook(_proc);
-			if (_hookId == IntPtr.Zero)
+			if (_hookThread != null && _hookThread.IsAlive)
 			{
-				throw new Exception("Failed to set low-level mouse hook.");
+				return;
 			}
+			_stopRequested = false;
+			_hookStartException = null;
+			ready = new ManualResetEventSlim(initialState: false);
+			_hookReady = ready;
+			_hookThread = new Thread(HookThreadMain)
+			{
+				IsBackground = true,
+				Name = "StarPie.MouseHook",
+				Priority = ThreadPriority.AboveNormal
+			};
+			_hookThread.Start();
+		}
+
+		try
+		{
+			if (!ready.Wait(TimeSpan.FromSeconds(5)))
+			{
+				throw new TimeoutException("Timed out while starting the low-level mouse hook.");
+			}
+			Exception? startException;
+			lock (_lifecycleSync)
+			{
+				startException = _hookStartException;
+			}
+			if (startException != null)
+			{
+				throw new Exception("Failed to set low-level mouse hook.", startException);
+			}
+
 			_hookEventsCountSinceLastCheck = 0;
 			GetCursorPos(out _lastSystemCursorPos);
-			_healthCheckTimer = new System.Threading.Timer(CheckHookHealth, null, 3000, 3000);
+			lock (_lifecycleSync)
+			{
+				_healthCheckTimer ??= new System.Threading.Timer(CheckHookHealth, null, 3000, 3000);
+			}
+		}
+		catch
+		{
+			Stop();
+			throw;
 		}
 	}
 
 	public void Stop()
 	{
-		if (_healthCheckTimer != null)
+		System.Threading.Timer? healthCheckTimer;
+		Thread? hookThread;
+		uint hookThreadId;
+		lock (_lifecycleSync)
 		{
-			_healthCheckTimer.Dispose();
+			_stopRequested = true;
+			healthCheckTimer = _healthCheckTimer;
 			_healthCheckTimer = null;
+			hookThread = _hookThread;
+			hookThreadId = _hookThreadId;
 		}
-		if (_hookId != IntPtr.Zero)
+		healthCheckTimer?.Dispose();
+
+		if (hookThreadId != 0)
 		{
-			UnhookWindowsHookEx(_hookId);
-			_hookId = IntPtr.Zero;
+			PostThreadMessage(hookThreadId, WM_QUIT, 0u, IntPtr.Zero);
+		}
+
+		if (hookThread != null && hookThread.ManagedThreadId != Environment.CurrentManagedThreadId)
+		{
+			hookThread.Join(TimeSpan.FromSeconds(2));
+		}
+
+		lock (_lifecycleSync)
+		{
+			if (_hookThread == hookThread && (hookThread == null || !hookThread.IsAlive))
+			{
+				_hookThread = null;
+				_hookThreadId = 0;
+				_hookReady?.Dispose();
+				_hookReady = null;
+				_hookId = IntPtr.Zero;
+			}
+		}
+	}
+
+	private void HookThreadMain()
+	{
+		nint hookId = IntPtr.Zero;
+		uint threadId = GetCurrentThreadId();
+		lock (_lifecycleSync)
+		{
+			_hookThreadId = threadId;
+		}
+
+		try
+		{
+			// Force creation of this thread's message queue before Start() can
+			// post WM_QUIT during shutdown.
+			PeekMessage(out MSG _, IntPtr.Zero, 0u, 0u, PM_NOREMOVE);
+			hookId = SetHook(_proc);
+			if (hookId == IntPtr.Zero)
+			{
+				throw new InvalidOperationException("SetWindowsHookEx returned a null hook handle.");
+			}
+			lock (_lifecycleSync)
+			{
+				_hookId = hookId;
+			}
+			_hookReady?.Set();
+
+			MSG message;
+			while (!_stopRequested)
+			{
+				int result = GetMessage(out message, IntPtr.Zero, 0u, 0u);
+				if (result <= 0)
+				{
+					break;
+				}
+				TranslateMessage(ref message);
+				DispatchMessage(ref message);
+			}
+		}
+		catch (Exception ex)
+		{
+			lock (_lifecycleSync)
+			{
+				_hookStartException = ex;
+			}
+			_hookReady?.Set();
+		}
+		finally
+		{
+			if (hookId != IntPtr.Zero)
+			{
+				UnhookWindowsHookEx(hookId);
+			}
+			lock (_lifecycleSync)
+			{
+				if (_hookId == hookId)
+				{
+					_hookId = IntPtr.Zero;
+				}
+				_hookThreadId = 0;
+			}
+			_hookReady?.Set();
 		}
 	}
 
@@ -287,9 +472,8 @@ public class MouseHook
 			bool flag3 = flag2 && text == text2;
 			if (num2)
 			{
-				if (_ignoreNextButtonDown)
+				if (Interlocked.Exchange(ref _ignoreNextButtonDown, 0) != 0)
 				{
-					_ignoreNextButtonDown = false;
 					return CallNextHookEx(_hookId, nCode, wParam, lParam);
 				}
 				MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
@@ -301,9 +485,8 @@ public class MouseHook
 			}
 			else if (flag3)
 			{
-				if (_ignoreNextButtonUp)
+				if (Interlocked.Exchange(ref _ignoreNextButtonUp, 0) != 0)
 				{
-					_ignoreNextButtonUp = false;
 					return CallNextHookEx(_hookId, nCode, wParam, lParam);
 				}
 				MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
@@ -320,8 +503,8 @@ public class MouseHook
 	public void ReplayTriggerClick(string? triggerButton = null)
 	{
 		string text = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-		_ignoreNextButtonDown = true;
-		_ignoreNextButtonUp = true;
+		Interlocked.Exchange(ref _ignoreNextButtonDown, 1);
+		Interlocked.Exchange(ref _ignoreNextButtonUp, 1);
 		switch (text)
 		{
 		case "MiddleButton":

@@ -23,9 +23,9 @@ public class GestureController
 
 	private Point _startPoint;
 
-	private bool _isWaitingForThreshold;
+	private volatile bool _isWaitingForThreshold;
 
-	private bool _isGestureActive;
+	private volatile bool _isGestureActive;
 
 	private WheelProfile? _activeProfile;
 
@@ -36,6 +36,25 @@ public class GestureController
 	private bool _lastEscapedState;
 
 	private bool _lastShowSubTier;
+
+	// Mouse hooks can outpace WPF rendering. Keep one pending visual update and
+	// overwrite it with the newest state instead of queueing every intermediate
+	// sector transition on the UI dispatcher.
+	private readonly object _uiUpdateSync = new object();
+
+	private long _gestureVersion;
+
+	private bool _highlightUpdateScheduled;
+
+	private int _pendingSectorIndex = -1;
+
+	private int _pendingSubSectorIndex = -1;
+
+	private bool _pendingEscape;
+
+	private bool _pendingShowSubTier;
+
+	private long _pendingGestureVersion;
 
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
@@ -53,6 +72,159 @@ public class GestureController
 			_keyboardHook.OnKeyDown += KeyboardHook_OnKeyDown;
 			_keyboardHook.OnKeyUp += KeyboardHook_OnKeyUp;
 		}
+	}
+
+	private long BeginGestureTracking()
+	{
+		lock (_uiUpdateSync)
+		{
+			_gestureVersion++;
+			_highlightUpdateScheduled = false;
+			_pendingSectorIndex = -1;
+			_pendingSubSectorIndex = -1;
+			_pendingEscape = false;
+			_pendingShowSubTier = false;
+			_pendingGestureVersion = _gestureVersion;
+			_selectedSectorIndex = -1;
+			_selectedSubSectorIndex = -1;
+			_lastEscapedState = false;
+			_lastShowSubTier = false;
+			return _gestureVersion;
+		}
+	}
+
+	private void CancelGestureTracking()
+	{
+		lock (_uiUpdateSync)
+		{
+			_gestureVersion++;
+			_highlightUpdateScheduled = false;
+			_pendingGestureVersion = _gestureVersion;
+		}
+	}
+
+	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window) EndActiveGesture()
+	{
+		lock (_uiUpdateSync)
+		{
+			var result = (_selectedSectorIndex, _selectedSubSectorIndex, _activeProfile, _radialWindow);
+			_isGestureActive = false;
+			_isWaitingForThreshold = false;
+			_gestureVersion++;
+			_highlightUpdateScheduled = false;
+			_pendingGestureVersion = _gestureVersion;
+			return result;
+		}
+	}
+
+	private bool IsCurrentGesture(long version)
+	{
+		lock (_uiUpdateSync)
+		{
+			return version == _gestureVersion;
+		}
+	}
+
+	private long GetCurrentGestureVersion()
+	{
+		lock (_uiUpdateSync)
+		{
+			return _gestureVersion;
+		}
+	}
+
+	private void QueueHighlightUpdate(int sectorIndex, int subSectorIndex, bool isEscaped, bool showSubTier, long gestureVersion)
+	{
+		bool shouldSchedule;
+		lock (_uiUpdateSync)
+		{
+			if (!_isGestureActive || gestureVersion != _gestureVersion)
+			{
+				return;
+			}
+			if (sectorIndex == _selectedSectorIndex &&
+				subSectorIndex == _selectedSubSectorIndex &&
+				isEscaped == _lastEscapedState &&
+				showSubTier == _lastShowSubTier)
+			{
+				return;
+			}
+
+			_selectedSectorIndex = sectorIndex;
+			_selectedSubSectorIndex = subSectorIndex;
+			_lastEscapedState = isEscaped;
+			_lastShowSubTier = showSubTier;
+			_pendingSectorIndex = sectorIndex;
+			_pendingSubSectorIndex = subSectorIndex;
+			_pendingEscape = isEscaped;
+			_pendingShowSubTier = showSubTier;
+			_pendingGestureVersion = gestureVersion;
+			shouldSchedule = !_highlightUpdateScheduled;
+			_highlightUpdateScheduled = true;
+		}
+
+		if (!shouldSchedule)
+		{
+			return;
+		}
+
+		try
+		{
+			Application.Current.Dispatcher.BeginInvoke((Action)ApplyPendingHighlight, DispatcherPriority.Render);
+		}
+		catch
+		{
+			lock (_uiUpdateSync)
+			{
+				if (_pendingGestureVersion == gestureVersion)
+				{
+					_highlightUpdateScheduled = false;
+				}
+			}
+		}
+	}
+
+	private void ApplyPendingHighlight()
+	{
+		int targetSector;
+		int targetSubSector;
+		bool targetEscape;
+		bool targetShowSubTier;
+		long targetGestureVersion;
+		RadialWindow? radialWindow;
+
+		lock (_uiUpdateSync)
+		{
+			if (!_highlightUpdateScheduled)
+			{
+				return;
+			}
+			targetSector = _pendingSectorIndex;
+			targetSubSector = _pendingSubSectorIndex;
+			targetEscape = _pendingEscape;
+			targetShowSubTier = _pendingShowSubTier;
+			targetGestureVersion = _pendingGestureVersion;
+			if (!_isGestureActive || targetGestureVersion != _gestureVersion)
+			{
+				_highlightUpdateScheduled = false;
+				return;
+			}
+			radialWindow = _radialWindow;
+			// Keep the pending state until the activation callback creates the
+			// window. That callback calls this method again after Show().
+			if (radialWindow == null)
+			{
+				return;
+			}
+			_highlightUpdateScheduled = false;
+		}
+
+		if (!IsCurrentGesture(targetGestureVersion) || !ReferenceEquals(_radialWindow, radialWindow))
+		{
+			return;
+		}
+		radialWindow.SetOuterEscapeState(targetEscape);
+		radialWindow.HighlightSector(targetSector, targetSubSector, targetShowSubTier);
 	}
 
 	private bool CheckIsIsolated(out string processName)
@@ -96,9 +268,10 @@ public class GestureController
 			isProcessIsolated = isBlacklisted;
 		}
 
-		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && ((int)(Keyboard.GetKeyStates((Key)118) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)119) & KeyStates.Down) > 0);
-		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && ((int)(Keyboard.GetKeyStates((Key)116) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)117) & KeyStates.Down) > 0);
-		bool disableAlt = ConfigManager.CurrentConfig.DisableOnAlt && ((int)(Keyboard.GetKeyStates((Key)120) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)121) & KeyStates.Down) > 0);
+		ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
+		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && currentModifiers.HasFlag(ModifierKeys.Control);
+		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && currentModifiers.HasFlag(ModifierKeys.Shift);
+		bool disableAlt = ConfigManager.CurrentConfig.DisableOnAlt && currentModifiers.HasFlag(ModifierKeys.Alt);
 		bool isModifierSuppressed = disableCtrl | disableShift | disableAlt;
 
 		bool isFullScreenSuppressed = false;
@@ -146,17 +319,16 @@ public class GestureController
 		{
 			if (CheckIsIsolated(out string _))
 			{
+				CancelGestureTracking();
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				e.Handled = false;
 				return;
 			}
 			_startPoint = e.Position;
+			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
-			_selectedSectorIndex = -1;
-			_selectedSubSectorIndex = -1;
-			_lastEscapedState = false;
 			e.Handled = true;
 		}
 	}
@@ -170,6 +342,7 @@ public class GestureController
 		}
 		if (_isWaitingForThreshold)
 		{
+			CancelGestureTracking();
 			_isWaitingForThreshold = false;
 			string btn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
@@ -184,13 +357,14 @@ public class GestureController
 			{
 				return;
 			}
-			_isGestureActive = false;
-			int finalSector = _selectedSectorIndex;
-			int finalSubSector = _selectedSubSectorIndex;
-			WheelProfile finalProfile = _activeProfile;
+			var finalState = EndActiveGesture();
+			int finalSector = finalState.Sector;
+			int finalSubSector = finalState.SubSector;
+			WheelProfile? finalProfile = finalState.Profile;
+			RadialWindow? endedWindow = finalState.Window;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
-				HideRadialUI();
+				CloseGestureWindow(endedWindow);
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -245,6 +419,7 @@ public class GestureController
 			}
 			if (CheckIsIsolated(out string _))
 			{
+				CancelGestureTracking();
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				e.Handled = false;
@@ -252,11 +427,9 @@ public class GestureController
 			}
 			GetCursorPos(out var lpPoint);
 			_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
+			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
-			_selectedSectorIndex = -1;
-			_selectedSubSectorIndex = -1;
-			_lastEscapedState = false;
 			e.Handled = true;
 		}
 	}
@@ -295,6 +468,7 @@ public class GestureController
 		}
 		if (_isWaitingForThreshold)
 		{
+			CancelGestureTracking();
 			_isWaitingForThreshold = false;
 			uint vk = ((triggerConfig.VkCode != 0) ? triggerConfig.VkCode : e.VkCode);
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
@@ -309,13 +483,14 @@ public class GestureController
 			{
 				return;
 			}
-			_isGestureActive = false;
-			int finalSector = _selectedSectorIndex;
-			int finalSubSector = _selectedSubSectorIndex;
-			WheelProfile finalProfile = _activeProfile;
+			var finalState = EndActiveGesture();
+			int finalSector = finalState.Sector;
+			int finalSubSector = finalState.SubSector;
+			WheelProfile? finalProfile = finalState.Profile;
+			RadialWindow? endedWindow = finalState.Window;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
-				HideRadialUI();
+				CloseGestureWindow(endedWindow);
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -369,12 +544,18 @@ public class GestureController
 				Point center = _startPoint;
 				WheelProfile profile = _activeProfile;
 				Point initialPos = e.Position;
+				long gestureVersion = GetCurrentGestureVersion();
+				// Publish the threshold-crossing position before the UI callback is
+				// queued. Later move events replace it with the newest state.
+				ProcessMove(initialPos);
 				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 				{
-					//IL_0007: Unknown result type (might be due to invalid IL or missing references)
-					//IL_001e: Unknown result type (might be due to invalid IL or missing references)
+					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					{
+						return;
+					}
 					ShowRadialUI(center, profile);
-					ProcessMove(initialPos);
+					ApplyPendingHighlight();
 				}, (DispatcherPriority)7, Array.Empty<object>());
 			}
 		}
@@ -472,45 +653,60 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 				}
 			}
 		}
-		if (num4 == _selectedSectorIndex && num5 == _selectedSubSectorIndex && flag == _lastEscapedState && flag2 == _lastShowSubTier)
-		{
-			return;
-		}
-		_selectedSectorIndex = num4;
-		_selectedSubSectorIndex = num5;
-		_lastEscapedState = flag;
-		_lastShowSubTier = flag2;
-		int targetSector = num4;
-		int targetSubSector = num5;
-		bool targetEscape = flag;
-		bool targetShowSub = flag2;
-		((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-		{
-			if (_radialWindow != null)
-			{
-				_radialWindow.SetOuterEscapeState(targetEscape);
-				_radialWindow.HighlightSector(targetSector, targetSubSector, targetShowSub);
-			}
-		}, (DispatcherPriority)5, Array.Empty<object>());
+		QueueHighlightUpdate(num4, num5, flag, flag2, GetCurrentGestureVersion());
 	}
 
 	private void ShowRadialUI(Point center, WheelProfile profile)
 	{
 		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		if (_radialWindow != null)
+		lock (_uiUpdateSync)
 		{
-			_radialWindow.Close();
+			if (_radialWindow != null)
+			{
+				_radialWindow.Close();
+			}
+			_radialWindow = new RadialWindow(center, profile);
+			_radialWindow.Show();
 		}
-		_radialWindow = new RadialWindow(center, profile);
-		_radialWindow.Show();
 	}
 
 	private void HideRadialUI()
 	{
-		if (_radialWindow != null)
+		lock (_uiUpdateSync)
 		{
-			_radialWindow.Close();
-			_radialWindow = null;
+			if (_radialWindow != null)
+			{
+				_radialWindow.Close();
+				_radialWindow = null;
+			}
+		}
+	}
+
+	private void CloseGestureWindow(RadialWindow? gestureWindow)
+	{
+		if (gestureWindow == null)
+		{
+			return;
+		}
+
+		lock (_uiUpdateSync)
+		{
+			if (ReferenceEquals(_radialWindow, gestureWindow))
+			{
+				gestureWindow.Close();
+				_radialWindow = null;
+				return;
+			}
+		}
+
+		// A newer gesture may already own the active window. Close only the
+		// completed gesture's stale window and leave the newer one untouched.
+		try
+		{
+			gestureWindow.Close();
+		}
+		catch
+		{
 		}
 	}
 

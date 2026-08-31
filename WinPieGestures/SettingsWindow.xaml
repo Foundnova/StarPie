@@ -1443,75 +1443,110 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Name="SectorActionListTitleText" Text="扇区动作映射列表" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Name="SectorActionListDescText" Text="为每个方位指定触发动作与图标。支持热键组合（如 Ctrl+C）、启动本地程序与系统级操作。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,14" />
+                  <TextBlock Name="SectorActionListDescText" Text="为每个方位指定触发动作与图标。支持热键组合（如 Ctrl+C）、启动本地程序与系统级操作。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,2" />
+                  <TextBlock Name="SectorActionListReorderHintText" Text="点击右侧功能卡的 ▲ / ▼ 箭头，将功能移动到相邻的轮盘位置槽。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,14" />
                   <ItemsControl Name="SlotsItemsControl">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
-                          <Grid>
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="84" />
-                              <ColumnDefinition Width="74" />
-                              <ColumnDefinition Width="120" />
-                              <ColumnDefinition Width="102" />
-                              <ColumnDefinition Width="*" />
-                              <ColumnDefinition Width="68" />
-                              <ColumnDefinition Width="Auto" />
-                              <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" FontSize="11.5" Text="{Binding DirectionLabel}" />
-                            <Button Grid.Column="1" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="4,0" Margin="0,0,6,0" ToolTip="点击选取矢量图标" Click="PickIcon_Click">
-                              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Path Width="14" Height="14" Stretch="Uniform" Fill="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" Data="{Binding VectorIconData}" Visibility="{Binding HasVectorIcon, Converter={StaticResource BoolToVis}}" />
-                                <TextBlock FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="46" Text="{Binding IconDisplayText}" />
-                              </StackPanel>
-                            </Button>
-                            <TextBox Grid.Column="2" Margin="0,0,6,0" Height="30" FontSize="12" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Grid.Column="3" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" Style="{StaticResource FlatComboBoxStyle}" Height="30" Margin="0,0,6,0" FontSize="11.5" ItemsSource="{Binding ActionTypes}" SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Grid Column="4" Margin="0,0,6,0">
-                              <Grid Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}">
+                        <Grid Tag="SlotActionRow" Margin="0,0,0,8" Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="92" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+
+                          <Border Grid.Column="0" Margin="0,0,10,0" Padding="5" VerticalAlignment="Stretch" CornerRadius="8" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" ToolTip="{Binding DirectionLabel}" AutomationProperties.Name="{Binding DirectionLabel}">
+                            <local:WheelPositionIndicator
+                              PositionIndex="{Binding PositionIndex}"
+                              SectorCount="{Binding SectorCount}"
+                              Width="64"
+                              Height="64"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              IsHitTestVisible="False"
+                              AccentBrush="{DynamicResource AccentPrimaryBrush}"
+                              AccentTextBrush="{DynamicResource AccentTextBrush}"
+                              SectorBrush="{DynamicResource InputBackgroundBrush}"
+                              BorderBrush="{DynamicResource CardBorderBrush}"
+                              MutedBrush="{DynamicResource TextMutedBrush}"
+                              CenterBrush="{DynamicResource CardBackgroundBrush}" />
+                          </Border>
+
+                          <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                            <Grid>
                               <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="86" />
+                                <ColumnDefinition Width="132" MinWidth="132" />
+                                <ColumnDefinition Width="136" MinWidth="136" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="68" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="58" />
                               </Grid.ColumnDefinitions>
-                              <local:HotkeyRecorderBox Height="30" FontSize="12" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                              <Button Grid.Column="1" Content="⚙️ 拼装" Margin="4,0,0,0" Height="30" Padding="6,0" Cursor="Hand" ToolTip="打开快捷热键拼装组合器（支持 Alt+Tab、Win+Tab、Shift+Alt、多位连续数值等）" Click="HotkeyBuilderButton_Click" Style="{StaticResource ModernButtonStyle}" />
+
+                              <Button Grid.Column="0" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="6,0" Margin="0,0,8,0" Click="PickIcon_Click" ToolTip="点击选取矢量图标">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                  <Path Width="14" Height="14" Stretch="Uniform" Fill="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" Data="{Binding VectorIconData}" Visibility="{Binding HasVectorIcon, Converter={StaticResource BoolToVis}}" />
+                                  <TextBlock Text="{Binding IconDisplayText}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="52" />
+                                </StackPanel>
+                              </Button>
+
+                              <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" Height="30" FontSize="12" VerticalContentAlignment="Center" />
+
+                              <ComboBox Grid.Column="2" ItemsSource="{Binding ActionTypes}" SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" Style="{StaticResource FlatComboBoxStyle}" Height="30" Margin="0,0,8,0" FontSize="11.5" Padding="8,0" HorizontalContentAlignment="Left" ToolTip="{Binding Type}" />
+
+                              <Grid Grid.Column="3" Margin="0,0,8,0">
+                                <Grid Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <local:HotkeyRecorderBox Height="30" FontSize="12" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                  <Button Grid.Column="1" Content="⚙️ 拼装" Margin="4,0,0,0" Height="30" Padding="6,0" Cursor="Hand" ToolTip="打开快捷热键拼装组合器（支持 Alt+Tab、Win+Tab、Shift+Alt、多位连续数值等）" Click="HotkeyBuilderButton_Click" Style="{StaticResource ModernButtonStyle}" />
+                                </Grid>
+                                <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBox IsReadOnly="True" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的应用程序路径" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                  <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Height="30" ToolTip="选择应用程序或快捷方式..." Click="Browse_Click">
+                                    <TextBlock Text="📁" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                  </Button>
+                                </Grid>
+                                <Grid Visibility="{Binding IsFolderType, Converter={StaticResource BoolToVis}}">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBox Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的本地文件夹路径" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                  <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Height="30" ToolTip="选择本地文件夹..." Click="BrowseFolder_Click">
+                                    <TextBlock Text="📂" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                  </Button>
+                                </Grid>
+                                <ComboBox SelectedValuePath="Key" DisplayMemberPath="Value" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11.5" SelectedValue="{Binding SelectedSystemPreset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Source={x:Static local:SlotViewModel.SystemPresets}}" Visibility="{Binding IsSystemType, Converter={StaticResource BoolToVis}}" />
+                                <Grid Visibility="{Binding IsCommandType, Converter={StaticResource BoolToVis}}">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBox Grid.Column="0" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="要运行的命令，如 ping -n 3 127.0.0.1" />
+                                  <ComboBox Grid.Column="1" Width="118" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" />
+                                </Grid>
+                              </Grid>
+
+                              <TextBox Grid.Column="4" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />
+                              <Button Grid.Column="5" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="0,0,6,0" ToolTip="配置该扇区的二级级联子动作菜单" Content="{Binding SubActionButtonText}" Click="ManageSubActions_Click" />
+
+                              <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                                <Button Width="28" Height="30" Padding="0" Margin="0,0,4,0" Style="{StaticResource ModernButtonStyle}" Content="▲" IsEnabled="{Binding CanMoveUp}" ToolTip="{Binding MoveUpToolTip}" Click="MoveSlotUp_Click" AutomationProperties.Name="{Binding MoveUpToolTip}" />
+                                <Button Width="28" Height="30" Padding="0" Style="{StaticResource ModernButtonStyle}" Content="▼" IsEnabled="{Binding CanMoveDown}" ToolTip="{Binding MoveDownToolTip}" Click="MoveSlotDown_Click" AutomationProperties.Name="{Binding MoveDownToolTip}" />
+                              </StackPanel>
+
+                              <Button Grid.Column="7" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="10,0" Content="{Binding TestButtonText}" Click="Test_Click" />
                             </Grid>
-                              <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                  <ColumnDefinition Width="*" />
-                                  <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox IsReadOnly="True" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextSecondaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的应用程序路径" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Height="30" ToolTip="选择应用程序或快捷方式..." Click="Browse_Click">
-                                  <TextBlock Text="📁" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Button>
-                              </Grid>
-                              <Grid Visibility="{Binding IsFolderType, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                  <ColumnDefinition Width="*" />
-                                  <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="选择的本地文件夹路径" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                <Button Grid.Column="1" Width="34" Style="{StaticResource ModernButtonStyle}" Height="30" ToolTip="选择本地文件夹..." Click="BrowseFolder_Click">
-                                  <TextBlock Text="📂" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Button>
-                              </Grid>
-                              <ComboBox SelectedValuePath="Key" DisplayMemberPath="Value" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11.5" SelectedValue="{Binding SelectedSystemPreset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Source={x:Static local:SlotViewModel.SystemPresets}}" Visibility="{Binding IsSystemType, Converter={StaticResource BoolToVis}}" />
-                              <Grid Visibility="{Binding IsCommandType, Converter={StaticResource BoolToVis}}">
-                                <Grid.ColumnDefinitions>
-                                  <ColumnDefinition Width="*"/>
-                                  <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="要运行的命令，如 ping -n 3 127.0.0.1"/>
-                                <ComboBox Grid.Column="1" Width="118" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11"/>
-                              </Grid>
-                            </Grid>
-                            <TextBox Grid.Column="5" Margin="0,0,6,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />
-                            <Button Grid.Column="6" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="0,0,6,0" ToolTip="配置该扇区的二级级联子动作菜单" Content="{Binding SubActionButtonText}" Click="ManageSubActions_Click" />
-                            <Button Grid.Column="7" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="10,0" Content="{Binding TestButtonText}" Click="Test_Click" />
-                          </Grid>
-                        </Border>
+                          </Border>
+                        </Grid>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
