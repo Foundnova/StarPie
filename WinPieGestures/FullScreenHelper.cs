@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace WinPieGestures
 {
@@ -13,6 +14,9 @@ namespace WinPieGestures
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetDesktopWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -44,6 +48,23 @@ namespace WinPieGestures
 
         private const uint MONITOR_DEFAULTTONEAREST = 2;
 
+        private static bool IsDesktopShellWindow(IntPtr hWnd)
+        {
+            if (hWnd == GetShellWindow() || hWnd == GetDesktopWindow())
+            {
+                return true;
+            }
+
+            var className = new StringBuilder(256);
+            if (GetClassName(hWnd, className, className.Capacity) <= 0)
+            {
+                return false;
+            }
+
+            return string.Equals(className.ToString(), "Progman", StringComparison.Ordinal) ||
+                   string.Equals(className.ToString(), "WorkerW", StringComparison.Ordinal);
+        }
+
         /// <summary>
         /// Determines if the current active foreground window is in full-screen mode.
         /// </summary>
@@ -52,8 +73,9 @@ namespace WinPieGestures
             IntPtr hWnd = GetForegroundWindow();
             if (hWnd == IntPtr.Zero) return false;
 
-            // Exclude desktop background and shell manager
-            if (hWnd == GetShellWindow() || hWnd == GetDesktopWindow()) return false;
+            // Exclude the desktop and its WorkerW/Progman host windows. Win+D can make
+            // one of these hosts the foreground window, and their bounds cover the monitor.
+            if (IsDesktopShellWindow(hWnd)) return false;
 
             RECT windowRect;
             if (!GetWindowRect(hWnd, out windowRect)) return false;
