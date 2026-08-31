@@ -1,124 +1,108 @@
-using System;
-using System.Windows;
+﻿using System;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
-using Color = System.Windows.Media.Color;
-using Panel = System.Windows.Controls.Panel;
-using Point = System.Windows.Point;
 
-namespace WinPieGestures
+namespace WinPieGestures;
+
+public class ClassicRingRenderer : BaseStyleRenderer
 {
-    /// <summary>
-    /// Classic Ring Style: Vision Pro Spatial Ring HUD.
-    /// Features concentric spatial orbits, geometric compass ticks, and high-contrast sapphire pop-out.
-    /// </summary>
-    public class ClassicRingRenderer : BaseStyleRenderer
-    {
-        protected override void GetDefaultColors(string theme, out string sectorBgHex, out string sectorBorderHex, out string highlightBgHex, out string highlightBorderHex, out string textHex)
-        {
-            if (theme == "Light")
-            {
-                sectorBgHex = "#F5F8FAFC";
-                sectorBorderHex = "#3564748B";
-                highlightBgHex = "#FF2563EB";  // Vivid Royal Cobalt
-                highlightBorderHex = "#FF93C5FD";
-                textHex = "#FF0F172A";
-            }
-            else
-            {
-                sectorBgHex = "#F018181B";     // Deep obsidian zinc
-                sectorBorderHex = "#40FFFFFF"; // Fine crisp ring border
-                highlightBgHex = "#FF2563EB";  // Pure vivid Cobalt Blue
-                highlightBorderHex = "#FF93C5FD";
-                textHex = "#FFF8FAFC";
-            }
-        }
+	protected override void GetDefaultColors(string theme, out string sectorBgHex, out string sectorBorderHex, out string highlightBgHex, out string highlightBorderHex, out string textHex)
+	{
+		if (theme == "Light")
+		{
+			sectorBgHex = "#F5F8FAFC";
+			sectorBorderHex = "#3564748B";
+			highlightBgHex = "#FF2563EB";
+			highlightBorderHex = "#FF93C5FD";
+			textHex = "#FF0F172A";
+		}
+		else
+		{
+			sectorBgHex = "#F018181B";
+			sectorBorderHex = "#40FFFFFF";
+			highlightBgHex = "#FF2563EB";
+			highlightBorderHex = "#FF93C5FD";
+			textHex = "#FFF8FAFC";
+		}
+	}
 
-        protected override void PostInitialize()
-        {
-            BorderThickness = 1.0;
-            HighlightBorderThickness = 2.0;
-        }
+	protected override void PostInitialize()
+	{
+		base.BorderThickness = 1.0;
+		base.HighlightBorderThickness = 2.0;
+	}
 
-        public override void RenderDecorations(Canvas canvas, Grid coreGrid, double cx, double cy, double wheelRadius, double coreRadius, int insertIndex)
-        {
-            Color orbitColor = IsLightTheme ? Color.FromArgb(70, 100, 116, 139) : Color.FromArgb(45, 255, 255, 255);
-            Color tickColor = IsLightTheme ? Color.FromArgb(100, 71, 85, 105) : Color.FromArgb(70, 255, 255, 255);
+	public override void RenderDecorations(Canvas canvas, Grid coreGrid, double cx, double cy, double wheelRadius, double coreRadius, int insertIndex)
+	{
+		Color color = (base.IsLightTheme ? Color.FromArgb(70, 100, 116, 139) : Color.FromArgb(45, byte.MaxValue, byte.MaxValue, byte.MaxValue));
+		Color color2 = (base.IsLightTheme ? Color.FromArgb(100, 71, 85, 105) : Color.FromArgb(70, byte.MaxValue, byte.MaxValue, byte.MaxValue));
+		double num = wheelRadius + 8.0;
+		Ellipse element = new Ellipse
+		{
+			Width = num * 2.0,
+			Height = num * 2.0,
+			Stroke = new SolidColorBrush(color),
+			StrokeThickness = 1.0,
+			StrokeDashArray = new DoubleCollection { 3.0, 5.0 },
+			Tag = "Deco_SpatialOuterOrbit"
+		};
+		Canvas.SetLeft(element, cx - num);
+		Canvas.SetTop(element, cy - num);
+		Panel.SetZIndex(element, 0);
+		canvas.Children.Add(element);
+		double[] array = new double[4] { 0.0, 90.0, 180.0, 270.0 };
+		for (int i = 0; i < array.Length; i++)
+		{
+			double num2 = array[i] * Math.PI / 180.0;
+			double num3 = wheelRadius + 4.0;
+			double num4 = wheelRadius + 11.0;
+			Line element2 = new Line
+			{
+				X1 = cx + num3 * Math.Cos(num2),
+				Y1 = cy + num3 * Math.Sin(num2),
+				X2 = cx + num4 * Math.Cos(num2),
+				Y2 = cy + num4 * Math.Sin(num2),
+				Stroke = new SolidColorBrush(color2),
+				StrokeThickness = 1.2,
+				Tag = "Deco_CompassTick"
+			};
+			Panel.SetZIndex(element2, 0);
+			canvas.Children.Add(element2);
+		}
+		Ellipse element3 = new Ellipse
+		{
+			Width = coreRadius * 2.0 + 8.0,
+			Height = coreRadius * 2.0 + 8.0,
+			Stroke = new SolidColorBrush(Color.FromArgb(50, 59, 130, 246)),
+			StrokeThickness = 1.2,
+			Tag = "Deco_ClassicInnerRing"
+		};
+		Canvas.SetLeft(element3, cx - (coreRadius + 4.0));
+		Canvas.SetTop(element3, cy - (coreRadius + 4.0));
+		Panel.SetZIndex(element3, 0);
+		canvas.Children.Add(element3);
+	}
 
-            // 1. Concentric Spatial Outer Orbit (外层悬浮导引虚线轨道)
-            double outerOrbitRadius = wheelRadius + 8.0;
-            var outerOrbit = new Ellipse
-            {
-                Width = outerOrbitRadius * 2.0,
-                Height = outerOrbitRadius * 2.0,
-                Stroke = new SolidColorBrush(orbitColor),
-                StrokeThickness = 1.0,
-                StrokeDashArray = new DoubleCollection { 3, 5 },
-                Tag = "Deco_SpatialOuterOrbit"
-            };
-            Canvas.SetLeft(outerOrbit, cx - outerOrbitRadius);
-            Canvas.SetTop(outerOrbit, cy - outerOrbitRadius);
-            Panel.SetZIndex(outerOrbit, 0);
-            canvas.Children.Add(outerOrbit);
-
-            // 2. 4-Axis Compass / Spatial Radar Ticks (空间罗盘标尺)
-            double[] tickAngles = { 0, 90, 180, 270 };
-            foreach (double deg in tickAngles)
-            {
-                double rad = deg * Math.PI / 180.0;
-                double r1 = wheelRadius + 4.0;
-                double r2 = wheelRadius + 11.0;
-                var tickLine = new Line
-                {
-                    X1 = cx + r1 * Math.Cos(rad),
-                    Y1 = cy + r1 * Math.Sin(rad),
-                    X2 = cx + r2 * Math.Cos(rad),
-                    Y2 = cy + r2 * Math.Sin(rad),
-                    Stroke = new SolidColorBrush(tickColor),
-                    StrokeThickness = 1.2,
-                    Tag = "Deco_CompassTick"
-                };
-                Panel.SetZIndex(tickLine, 0);
-                canvas.Children.Add(tickLine);
-            }
-
-            // 3. Concentric Inner Energy Ring (内同心环)
-            var innerRing = new Ellipse
-            {
-                Width = coreRadius * 2.0 + 8.0,
-                Height = coreRadius * 2.0 + 8.0,
-                Stroke = new SolidColorBrush(Color.FromArgb(50, 59, 130, 246)),
-                StrokeThickness = 1.2,
-                Tag = "Deco_ClassicInnerRing"
-            };
-            Canvas.SetLeft(innerRing, cx - (coreRadius + 4.0));
-            Canvas.SetTop(innerRing, cy - (coreRadius + 4.0));
-            Panel.SetZIndex(innerRing, 0);
-            canvas.Children.Add(innerRing);
-        }
-
-        public override void ApplySectorHighlight(Path path, bool isHighlighted)
-        {
-            if (isHighlighted)
-            {
-                Color glowColor = GetEffectiveGlowColor();
-                double blurRadius = GetEffectiveGlowRadius(20.0);
-                double opacity = GetEffectiveGlowOpacity(0.75);
-
-                path.Effect = new DropShadowEffect
-                {
-                    Color = glowColor,
-                    BlurRadius = blurRadius,
-                    ShadowDepth = 2,
-                    Opacity = opacity
-                };
-            }
-            else
-            {
-                path.Effect = null;
-            }
-        }
-    }
+	public override void ApplySectorHighlight(Path path, bool isHighlighted)
+	{
+		if (isHighlighted)
+		{
+			Color effectiveGlowColor = GetEffectiveGlowColor();
+			double effectiveGlowRadius = GetEffectiveGlowRadius(20.0);
+			double effectiveGlowOpacity = GetEffectiveGlowOpacity(0.75);
+			path.Effect = new DropShadowEffect
+			{
+				Color = effectiveGlowColor,
+				BlurRadius = effectiveGlowRadius,
+				ShadowDepth = 2.0,
+				Opacity = effectiveGlowOpacity
+			};
+		}
+		else
+		{
+			path.Effect = null;
+		}
+	}
 }

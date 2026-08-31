@@ -1,361 +1,350 @@
-using System.IO;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
-using Point = System.Windows.Point;
+using System.Windows.Threading;
 
-namespace WinPieGestures
+namespace WinPieGestures;
+
+public class MouseHook
 {
-    public class MouseEventArgs : EventArgs
-    {
-        public Point Position { get; }
-        public bool Handled { get; set; }
+	private struct POINT
+	{
+		public int x;
 
-        public MouseEventArgs(double x, double y)
-        {
-            Position = new Point(x, y);
-            Handled = false;
-        }
-    }
+		public int y;
+	}
 
-    
-    public class RawMouseEventArgs : EventArgs
-    {
-        public int Message { get; }
-        public string MouseButton { get; }
-        public uint MouseData { get; }
-        public bool IsButtonDown { get; }
-        public Point Position { get; }
-        public bool Handled { get; set; }
+	private struct MSLLHOOKSTRUCT
+	{
+		public POINT pt;
 
-        public RawMouseEventArgs(int message, string mouseButton, uint mouseData, bool isButtonDown, double x, double y)
-        {
-            Message = message;
-            MouseButton = mouseButton;
-            MouseData = mouseData;
-            IsButtonDown = isButtonDown;
-            Position = new Point(x, y);
-            Handled = false;
-        }
-    }
+		public uint mouseData;
 
-    public class MouseHook
-    {
-        private const int WH_MOUSE_LL = 14;
-        private const int WM_MOUSEMOVE = 0x0200;
-        private const int WM_LBUTTONDOWN = 0x0201;
-        private const int WM_LBUTTONUP = 0x0202;
-        private const int WM_RBUTTONDOWN = 0x0204;
-        private const int WM_RBUTTONUP = 0x0205;
-        private const int WM_MBUTTONDOWN = 0x0207;
-        private const int WM_MBUTTONUP = 0x0208;
-        private const int WM_XBUTTONDOWN = 0x020B;
-        private const int WM_XBUTTONUP = 0x020C;
+		public uint flags;
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT
-        {
-            public int x;
-            public int y;
-        }
+		public uint time;
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct MSLLHOOKSTRUCT
-        {
-            public POINT pt;
-            public uint mouseData;
-            public uint flags;
-            public uint time;
-            public IntPtr dwExtraInfo;
-        }
+		public nint dwExtraInfo;
+	}
 
-        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+	private delegate nint LowLevelMouseProc(int nCode, nint wParam, nint lParam);
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+	private const int WH_MOUSE_LL = 14;
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+	private const int WM_MOUSEMOVE = 512;
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+	private const int WM_LBUTTONDOWN = 513;
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
+	private const int WM_LBUTTONUP = 514;
 
-        [DllImport("user32.dll")]
-        private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
+	private const int WM_RBUTTONDOWN = 516;
 
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
+	private const int WM_RBUTTONUP = 517;
 
-        private const uint MOUSEEVENTF_RIGHTDOWN = 0x0008;
-        private const uint MOUSEEVENTF_RIGHTUP = 0x0010;
-        private const uint MOUSEEVENTF_MIDDLEDOWN = 0x0020;
-        private const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
-        private const uint MOUSEEVENTF_XDOWN = 0x0080;
-        private const uint MOUSEEVENTF_XUP = 0x0100;
-        private const uint XBUTTON1 = 0x0001;
-        private const uint XBUTTON2 = 0x0002;
+	private const int WM_MBUTTONDOWN = 519;
 
-        public bool IsPaused { get; set; } = false;
+	private const int WM_MBUTTONUP = 520;
 
-        public event EventHandler<MouseEventArgs>? OnTriggerButtonDown;
-        public event EventHandler<MouseEventArgs>? OnTriggerButtonUp;
-        public event EventHandler<MouseEventArgs>? OnMouseMove;
-        public event EventHandler<MouseEventArgs>? OnRawMouseEvent;
-        public event EventHandler<RawMouseEventArgs>? OnRawMouseButtonEvent;
+	private const int WM_XBUTTONDOWN = 523;
 
-        // Legacy compatibility events
-        public event EventHandler<MouseEventArgs>? OnRightButtonDown
-        {
-            add => OnTriggerButtonDown += value;
-            remove => OnTriggerButtonDown -= value;
-        }
-        public event EventHandler<MouseEventArgs>? OnRightButtonUp
-        {
-            add => OnTriggerButtonUp += value;
-            remove => OnTriggerButtonUp -= value;
-        }
+	private const int WM_XBUTTONUP = 524;
 
-        private LowLevelMouseProc _proc;
-        private IntPtr _hookId = IntPtr.Zero;
+	private const uint MOUSEEVENTF_RIGHTDOWN = 8u;
 
-        // Flags to prevent recursive hook interception when we replay click events
-        private bool _ignoreNextButtonDown = false;
-        private bool _ignoreNextButtonUp = false;
+	private const uint MOUSEEVENTF_RIGHTUP = 16u;
 
-        // Hook stability and health check variables
-        private System.Threading.Timer? _healthCheckTimer;
-        private POINT _lastSystemCursorPos;
-        private int _hookEventsCountSinceLastCheck = 0;
+	private const uint MOUSEEVENTF_MIDDLEDOWN = 32u;
 
-        public MouseHook()
-        {
-            _proc = HookCallback;
-        }
+	private const uint MOUSEEVENTF_MIDDLEUP = 64u;
 
-        public void Start()
-        {
-            if (_hookId == IntPtr.Zero)
-            {
-                _hookId = SetHook(_proc);
-                if (_hookId == IntPtr.Zero)
-                {
-                    throw new Exception("Failed to set low-level mouse hook.");
-                }
+	private const uint MOUSEEVENTF_XDOWN = 128u;
 
-                // Initialize health check
-                _hookEventsCountSinceLastCheck = 0;
-                GetCursorPos(out _lastSystemCursorPos);
-                _healthCheckTimer = new System.Threading.Timer(CheckHookHealth, null, 3000, 3000);
-            }
-        }
+	private const uint MOUSEEVENTF_XUP = 256u;
 
-        public void Stop()
-        {
-            if (_healthCheckTimer != null)
-            {
-                _healthCheckTimer.Dispose();
-                _healthCheckTimer = null;
-            }
+	private const uint XBUTTON1 = 1u;
 
-            if (_hookId != IntPtr.Zero)
-            {
-                UnhookWindowsHookEx(_hookId);
-                _hookId = IntPtr.Zero;
-            }
-        }
+	private const uint XBUTTON2 = 2u;
 
-        private void CheckHookHealth(object? state)
-        {
-            if (_hookId == IntPtr.Zero) return;
+	private LowLevelMouseProc _proc;
 
-            POINT currentPos;
-            if (GetCursorPos(out currentPos))
-            {
-                bool mouseMoved = currentPos.x != _lastSystemCursorPos.x || currentPos.y != _lastSystemCursorPos.y;
-                _lastSystemCursorPos = currentPos;
+	private nint _hookId = IntPtr.Zero;
 
-                if (mouseMoved)
-                {
-                    // If system mouse moved, but we received 0 hook events, hook is likely dead!
-                    if (System.Threading.Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0) == 0)
-                    {
-                        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
-                        {
-                            Debug.WriteLine("Mouse hook health check failed. Re-registering hook...");
-                            try
-                            {
-                                Stop();
-                                Start();
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"Failed to re-register hook: {ex.Message}");
-                            }
-                        }));
-                    }
-                }
-                else
-                {
-                    // Reset count if mouse did not move to avoid false positive
-                    System.Threading.Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0);
-                }
-            }
-        }
+	private bool _ignoreNextButtonDown;
 
-        private IntPtr SetHook(LowLevelMouseProc proc)
-        {
-            using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule? curModule = curProcess.MainModule)
-            {
-                if (curModule == null) throw new InvalidOperationException("MainModule is null.");
-                return SetWindowsHookEx(WH_MOUSE_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
-            }
-        }
+	private bool _ignoreNextButtonUp;
 
-        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-        {
-            System.Threading.Interlocked.Increment(ref _hookEventsCountSinceLastCheck);
+	private System.Threading.Timer? _healthCheckTimer;
 
-            if (IsPaused)
-            {
-                return CallNextHookEx(_hookId, nCode, wParam, lParam);
-            }
+	private POINT _lastSystemCursorPos;
 
-            if (nCode >= 0)
-            {
-                int message = (int)wParam;
-                MSLLHOOKSTRUCT hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+	private int _hookEventsCountSinceLastCheck;
 
-                if (message == WM_MOUSEMOVE)
-                {
-                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                    OnMouseMove?.Invoke(this, args);
-                    if (args.Handled)
-                    {
-                        return (IntPtr)1; // Block event
-                    }
-                    return CallNextHookEx(_hookId, nCode, wParam, lParam);
-                }
+	public bool IsPaused { get; set; }
 
-                var rawArgs = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                OnRawMouseEvent?.Invoke(this, rawArgs);
+	public event EventHandler<MouseEventArgs>? OnTriggerButtonDown;
 
-                string btn = "";
-                bool isDown = false;
-                bool isUp = false;
+	public event EventHandler<MouseEventArgs>? OnTriggerButtonUp;
 
-                if (message == WM_MBUTTONDOWN || message == WM_MBUTTONUP)
-                {
-                    btn = "MiddleButton";
-                    isDown = (message == WM_MBUTTONDOWN);
-                    isUp = (message == WM_MBUTTONUP);
-                }
-                else if (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP)
-                {
-                    btn = "RightButton";
-                    isDown = (message == WM_RBUTTONDOWN);
-                    isUp = (message == WM_RBUTTONUP);
-                }
-                else if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP)
-                {
-                    uint xBtn = (hookStruct.mouseData >> 16) & 0xFFFF;
-                    btn = (xBtn == 2 ? "XButton2" : "XButton1");
-                    isDown = (message == WM_XBUTTONDOWN);
-                    isUp = (message == WM_XBUTTONUP);
-                }
-                else if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP)
-                {
-                    btn = "LeftButton";
-                    isDown = (message == WM_LBUTTONDOWN);
-                    isUp = (message == WM_LBUTTONUP);
-                }
+	public event EventHandler<MouseEventArgs>? OnMouseMove;
 
-                if (!string.IsNullOrEmpty(btn))
-                {
-                    var rawButtonArgs = new RawMouseEventArgs(message, btn, hookStruct.mouseData, isDown, hookStruct.pt.x, hookStruct.pt.y);
-                    OnRawMouseButtonEvent?.Invoke(this, rawButtonArgs);
-                }
+	public event EventHandler<MouseEventArgs>? OnRawMouseEvent;
 
-                string trigger = ConfigManager.CurrentConfig?.Trigger?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-                bool isTargetDown = isDown && (btn == trigger);
-                bool isTargetUp = isUp && (btn == trigger);
+	public event EventHandler<RawMouseEventArgs>? OnRawMouseButtonEvent;
 
-                if (isTargetDown)
-                {
-                    if (_ignoreNextButtonDown)
-                    {
-                        _ignoreNextButtonDown = false;
-                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
-                    }
+	public event EventHandler<MouseEventArgs>? OnRightButtonDown
+	{
+		add
+		{
+			OnTriggerButtonDown += value;
+		}
+		remove
+		{
+			OnTriggerButtonDown -= value;
+		}
+	}
 
-                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                    OnTriggerButtonDown?.Invoke(this, args);
-                    if (args.Handled)
-                    {
-                        return (IntPtr)1; // Block the event from propagating
-                    }
-                }
-                else if (isTargetUp)
-                {
-                    if (_ignoreNextButtonUp)
-                    {
-                        _ignoreNextButtonUp = false;
-                        return CallNextHookEx(_hookId, nCode, wParam, lParam);
-                    }
+	public event EventHandler<MouseEventArgs>? OnRightButtonUp
+	{
+		add
+		{
+			OnTriggerButtonUp += value;
+		}
+		remove
+		{
+			OnTriggerButtonUp -= value;
+		}
+	}
 
-                    var args = new MouseEventArgs(hookStruct.pt.x, hookStruct.pt.y);
-                    OnTriggerButtonUp?.Invoke(this, args);
-                    if (args.Handled)
-                    {
-                        return (IntPtr)1; // Block the event from propagating
-                    }
-                }
-            }
+	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+	private static extern nint SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, nint hMod, uint dwThreadId);
 
-            return CallNextHookEx(_hookId, nCode, wParam, lParam);
-        }
+	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool UnhookWindowsHookEx(nint hhk);
 
-        /// <summary>
-        /// Replays a mouse click for the designated trigger button at the current position.
-        /// Temporarily ignores our own hook to avoid infinite loop.
-        /// </summary>
-        public void ReplayTriggerClick(string? triggerButton = null)
-        {
-            string button = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-            _ignoreNextButtonDown = true;
-            _ignoreNextButtonUp = true;
+	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+	private static extern nint CallNextHookEx(nint hhk, int nCode, nint wParam, nint lParam);
 
-            if (button == "MiddleButton")
-            {
-                mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0);
-                mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0);
-            }
-            else if (button == "XButton1")
-            {
-                mouse_event(MOUSEEVENTF_XDOWN, 0, 0, XBUTTON1, 0);
-                mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON1, 0);
-            }
-            else if (button == "XButton2")
-            {
-                mouse_event(MOUSEEVENTF_XDOWN, 0, 0, XBUTTON2, 0);
-                mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON2, 0);
-            }
-            else // RightButton
-            {
-                mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-                mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
-            }
-        }
+	[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+	private static extern nint GetModuleHandle(string lpModuleName);
 
-        public void ReplayRightClick()
-        {
-            ReplayTriggerClick("RightButton");
-        }
-    }
+	[DllImport("user32.dll")]
+	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
+
+	[DllImport("user32.dll")]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool GetCursorPos(out POINT lpPoint);
+
+	public MouseHook()
+	{
+		_proc = HookCallback;
+	}
+
+	public void Start()
+	{
+		if (_hookId == IntPtr.Zero)
+		{
+			_hookId = SetHook(_proc);
+			if (_hookId == IntPtr.Zero)
+			{
+				throw new Exception("Failed to set low-level mouse hook.");
+			}
+			_hookEventsCountSinceLastCheck = 0;
+			GetCursorPos(out _lastSystemCursorPos);
+			_healthCheckTimer = new System.Threading.Timer(CheckHookHealth, null, 3000, 3000);
+		}
+	}
+
+	public void Stop()
+	{
+		if (_healthCheckTimer != null)
+		{
+			_healthCheckTimer.Dispose();
+			_healthCheckTimer = null;
+		}
+		if (_hookId != IntPtr.Zero)
+		{
+			UnhookWindowsHookEx(_hookId);
+			_hookId = IntPtr.Zero;
+		}
+	}
+
+	private void CheckHookHealth(object? state)
+	{
+		if (_hookId == IntPtr.Zero || !GetCursorPos(out var lpPoint))
+		{
+			return;
+		}
+		bool num = lpPoint.x != _lastSystemCursorPos.x || lpPoint.y != _lastSystemCursorPos.y;
+		_lastSystemCursorPos = lpPoint;
+		if (num)
+		{
+			if (Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0) != 0)
+			{
+				return;
+			}
+			Application current = Application.Current;
+			if (current == null)
+			{
+				return;
+			}
+			Dispatcher dispatcher = ((DispatcherObject)current).Dispatcher;
+			if (dispatcher == null)
+			{
+				return;
+			}
+			dispatcher.BeginInvoke((Delegate)(Action)delegate
+			{
+				try
+				{
+					Stop();
+					Start();
+				}
+				catch (Exception)
+				{
+				}
+			}, Array.Empty<object>());
+		}
+		else
+		{
+			Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0);
+		}
+	}
+
+	private nint SetHook(LowLevelMouseProc proc)
+	{
+		using Process process = Process.GetCurrentProcess();
+		using ProcessModule processModule = process.MainModule;
+		if (processModule == null)
+		{
+			throw new InvalidOperationException("MainModule is null.");
+		}
+		return SetWindowsHookEx(14, proc, GetModuleHandle(processModule.ModuleName), 0u);
+	}
+
+	private nint HookCallback(int nCode, nint wParam, nint lParam)
+	{
+		Interlocked.Increment(ref _hookEventsCountSinceLastCheck);
+		if (IsPaused)
+		{
+			return CallNextHookEx(_hookId, nCode, wParam, lParam);
+		}
+		if (nCode >= 0)
+		{
+			int num = (int)wParam;
+			MSLLHOOKSTRUCT mSLLHOOKSTRUCT = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+			if (num == 512)
+			{
+				MouseEventArgs e = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				OnMouseMove?.Invoke(this, e);
+				if (e.Handled)
+				{
+					return 1;
+				}
+				return CallNextHookEx(_hookId, nCode, wParam, lParam);
+			}
+			MouseEventArgs e2 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+			OnRawMouseEvent?.Invoke(this, e2);
+			string text = "";
+			bool flag = false;
+			bool flag2 = false;
+			switch (num)
+			{
+			case 519:
+			case 520:
+				text = "MiddleButton";
+				flag = num == 519;
+				flag2 = num == 520;
+				break;
+			case 516:
+			case 517:
+				text = "RightButton";
+				flag = num == 516;
+				flag2 = num == 517;
+				break;
+			case 523:
+			case 524:
+				text = ((((mSLLHOOKSTRUCT.mouseData >> 16) & 0xFFFF) == 2) ? "XButton2" : "XButton1");
+				flag = num == 523;
+				flag2 = num == 524;
+				break;
+			case 513:
+			case 514:
+				text = "LeftButton";
+				flag = num == 513;
+				flag2 = num == 514;
+				break;
+			}
+			if (!string.IsNullOrEmpty(text))
+			{
+				RawMouseEventArgs e3 = new RawMouseEventArgs(num, text, mSLLHOOKSTRUCT.mouseData, flag, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				OnRawMouseButtonEvent?.Invoke(this, e3);
+			}
+			string text2 = ConfigManager.CurrentConfig?.Trigger?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+			bool num2 = flag && text == text2;
+			bool flag3 = flag2 && text == text2;
+			if (num2)
+			{
+				if (_ignoreNextButtonDown)
+				{
+					_ignoreNextButtonDown = false;
+					return CallNextHookEx(_hookId, nCode, wParam, lParam);
+				}
+				MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				OnTriggerButtonDown?.Invoke(this, e4);
+				if (e4.Handled)
+				{
+					return 1;
+				}
+			}
+			else if (flag3)
+			{
+				if (_ignoreNextButtonUp)
+				{
+					_ignoreNextButtonUp = false;
+					return CallNextHookEx(_hookId, nCode, wParam, lParam);
+				}
+				MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				OnTriggerButtonUp?.Invoke(this, e5);
+				if (e5.Handled)
+				{
+					return 1;
+				}
+			}
+		}
+		return CallNextHookEx(_hookId, nCode, wParam, lParam);
+	}
+
+	public void ReplayTriggerClick(string? triggerButton = null)
+	{
+		string text = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+		_ignoreNextButtonDown = true;
+		_ignoreNextButtonUp = true;
+		switch (text)
+		{
+		case "MiddleButton":
+			mouse_event(32u, 0u, 0u, 0u, 0u);
+			mouse_event(64u, 0u, 0u, 0u, 0u);
+			break;
+		case "XButton1":
+			mouse_event(128u, 0u, 0u, 1u, 0u);
+			mouse_event(256u, 0u, 0u, 1u, 0u);
+			break;
+		case "XButton2":
+			mouse_event(128u, 0u, 0u, 2u, 0u);
+			mouse_event(256u, 0u, 0u, 2u, 0u);
+			break;
+		default:
+			mouse_event(8u, 0u, 0u, 0u, 0u);
+			mouse_event(16u, 0u, 0u, 0u, 0u);
+			break;
+		}
+	}
+
+	public void ReplayRightClick()
+	{
+		ReplayTriggerClick("RightButton");
+	}
 }

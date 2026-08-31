@@ -1,51 +1,42 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text;
 
-namespace WinPieGestures
+namespace WinPieGestures;
+
+public static class ActiveWindowHelper
 {
-    public static class ActiveWindowHelper
-    {
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
+	[DllImport("user32.dll")]
+	private static extern nint GetForegroundWindow();
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
-        /// <summary>
-        /// Gets the process name of the active foreground window.
-        /// Returns lowercase name with ".exe" extension (e.g., "chrome.exe").
-        /// Returns "unknown.exe" on failure.
-        /// </summary>
-        public static string GetActiveWindowProcessName()
-        {
-            try
-            {
-                IntPtr hWnd = GetForegroundWindow();
-                if (hWnd == IntPtr.Zero)
-                    return "unknown.exe";
-
-                uint processId;
-                GetWindowThreadProcessId(hWnd, out processId);
-
-                if (processId == 0)
-                    return "unknown.exe";
-
-                using (Process proc = Process.GetProcessById((int)processId))
-                {
-                    string processName = proc.ProcessName;
-                    if (string.IsNullOrEmpty(processName))
-                        return "unknown.exe";
-
-                    return processName.ToLower() + ".exe";
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to get active window process: {ex.Message}");
-                return "unknown.exe";
-            }
-        }
-    }
+	public static string GetActiveWindowProcessName()
+	{
+		try
+		{
+			nint foregroundWindow = GetForegroundWindow();
+			if (foregroundWindow == IntPtr.Zero)
+			{
+				return "unknown.exe";
+			}
+			GetWindowThreadProcessId(foregroundWindow, out var lpdwProcessId);
+			if (lpdwProcessId == 0)
+			{
+				return "unknown.exe";
+			}
+			using Process process = Process.GetProcessById((int)lpdwProcessId);
+			string processName = process.ProcessName;
+			if (string.IsNullOrEmpty(processName))
+			{
+				return "unknown.exe";
+			}
+			return processName.ToLower() + ".exe";
+		}
+		catch (Exception)
+		{
+			return "unknown.exe";
+		}
+	}
 }

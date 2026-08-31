@@ -1,76 +1,108 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
-namespace WinPieGestures
+namespace WinPieGestures;
+
+public static class FullScreenHelper
 {
-    public static class FullScreenHelper
-    {
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
+	private struct RECT
+	{
+		public int Left;
+		public int Top;
+		public int Right;
+		public int Bottom;
+	}
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetShellWindow();
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+	private struct MONITORINFO
+	{
+		public int cbSize;
+		public RECT rcMonitor;
+		public RECT rcWork;
+		public uint dwFlags;
+	}
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDesktopWindow();
+	private const uint MONITOR_DEFAULTTONEAREST = 2u;
 
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+	[DllImport("user32.dll")]
+	private static extern nint GetForegroundWindow();
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+	[DllImport("user32.dll")]
+	private static extern nint GetShellWindow();
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+	[DllImport("user32.dll")]
+	private static extern nint GetDesktopWindow();
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private struct MONITORINFO
-        {
-            public int cbSize;
-            public RECT rcMonitor;
-            public RECT rcWork;
-            public uint dwFlags;
-        }
+	[DllImport("user32.dll")]
+	private static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
 
-        private const uint MONITOR_DEFAULTTONEAREST = 2;
+	[DllImport("user32.dll", CharSet = CharSet.Auto)]
+	private static extern bool GetMonitorInfo(nint hMonitor, ref MONITORINFO lpmi);
 
-        /// <summary>
-        /// Determines if the current active foreground window is in full-screen mode.
-        /// </summary>
-        public static bool IsActiveWindowFullScreen()
-        {
-            IntPtr hWnd = GetForegroundWindow();
-            if (hWnd == IntPtr.Zero) return false;
+	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+	private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
-            // Exclude desktop background and shell manager
-            if (hWnd == GetShellWindow() || hWnd == GetDesktopWindow()) return false;
+	public static bool IsActiveWindowFullScreen()
+	{
+		nint foregroundWindow = GetForegroundWindow();
+		if (foregroundWindow == IntPtr.Zero)
+		{
+			return false;
+		}
+		if (foregroundWindow == GetShellWindow() || foregroundWindow == GetDesktopWindow())
+		{
+			return false;
+		}
 
-            RECT windowRect;
-            if (!GetWindowRect(hWnd, out windowRect)) return false;
+		// Exclude desktop background and shell manager window classes (Progman, WorkerW, Shell_TrayWnd, etc.)
+		StringBuilder sbClass = new StringBuilder(256);
+		GetClassName(foregroundWindow, sbClass, 256);
+		string className = sbClass.ToString();
 
-            IntPtr hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-            if (hMonitor == IntPtr.Zero) return false;
+		if (string.Equals(className, "Progman", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "WorkerW", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "SHELLDLL_DefView", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "SysListView32", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "Shell_SecondaryTrayWnd", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "Windows.UI.Core.CoreWindow", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
 
-            MONITORINFO monitorInfo = new MONITORINFO();
-            monitorInfo.cbSize = Marshal.SizeOf(monitorInfo);
+		// Check if active foreground process is Windows Explorer shell
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		if (string.Equals(activeProc, "explorer.exe", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
 
-            if (!GetMonitorInfo(hMonitor, ref monitorInfo)) return false;
+		if (!GetWindowRect(foregroundWindow, out var lpRect))
+		{
+			return false;
+		}
+		nint hMonitor = MonitorFromWindow(foregroundWindow, 2u);
+		if (hMonitor == IntPtr.Zero)
+		{
+			return false;
+		}
+		MONITORINFO lpmi = default(MONITORINFO);
+		lpmi.cbSize = Marshal.SizeOf(lpmi);
+		if (!GetMonitorInfo(hMonitor, ref lpmi))
+		{
+			return false;
+		}
 
-            // Check if active window rect covers the entire monitor rect
-            return windowRect.Left <= monitorInfo.rcMonitor.Left &&
-                   windowRect.Top <= monitorInfo.rcMonitor.Top &&
-                   windowRect.Right >= monitorInfo.rcMonitor.Right &&
-                   windowRect.Bottom >= monitorInfo.rcMonitor.Bottom;
-        }
-    }
+		// Full-screen check: window rect covers the entire monitor
+		if (lpRect.Left <= lpmi.rcMonitor.Left && lpRect.Top <= lpmi.rcMonitor.Top && lpRect.Right >= lpmi.rcMonitor.Right && lpRect.Bottom >= lpmi.rcMonitor.Bottom)
+		{
+			return true;
+		}
+		return false;
+	}
 }

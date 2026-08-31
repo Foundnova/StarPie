@@ -5,10 +5,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
-using Color = System.Windows.Media.Color;
-using Panel = System.Windows.Controls.Panel;
-using HorizontalAlignment = System.Windows.HorizontalAlignment;
-using Point = System.Windows.Point;
 
 namespace WinPieGestures
 {
