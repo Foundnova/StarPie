@@ -168,18 +168,25 @@ public partial class SubActionEditorWindow : Window
 		Close();
 	}
 
-	private void SubHotkeyBuilder_Click(object sender, RoutedEventArgs e)
+		private void SubHotkeyBuilder_Click(object sender, RoutedEventArgs e)
 	{
-		if (sender is FrameworkElement { DataContext: SubSlotViewModel dataContext })
+		try
 		{
-			HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(dataContext.Parameter ?? "")
+			if (sender is FrameworkElement { DataContext: SubSlotViewModel dataContext })
 			{
-				Owner = this
-			};
-			if (dlg.ShowDialog() == true)
-			{
-				dataContext.Parameter = dlg.ResultHotkey;
+				HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(dataContext.Parameter ?? "")
+				{
+					Owner = this
+				};
+				if (dlg.ShowDialog() == true)
+				{
+					dataContext.Parameter = dlg.ResultHotkey;
+				}
 			}
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, "打开按键拼装器失败: " + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
 

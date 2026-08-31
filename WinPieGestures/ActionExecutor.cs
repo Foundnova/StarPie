@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -436,9 +436,10 @@ public static class ActionExecutor
 			Process.Start(processStartInfo);
 		}
 	}
+
 	private static bool IsStandardKeyToken(string token)
 	{
-		string t = token.Trim().ToLower();
+		string t = token.Trim().ToLowerInvariant();
 		return t == "ctrl" || t == "shift" || t == "alt" || t == "win" ||
 		       t == "tab" || t == "enter" || t == "esc" || t == "space" ||
 		       t == "backspace" || t == "delete" || t == "insert" ||
@@ -510,7 +511,7 @@ public static class ActionExecutor
 			System.Threading.Thread.Sleep(15);
 		}
 
-				List<INPUT> upInputs = new List<INPUT>();
+		List<INPUT> upInputs = new List<INPUT>();
 		for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
 		{
 			upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
@@ -527,45 +528,55 @@ public static class ActionExecutor
 		{
 			return;
 		}
-		string text = presetName.Trim().ToLower();
-		if (text == null)
+		string text = presetName.Trim().ToLowerInvariant();
+
+		switch (text)
 		{
-			return;
-		}
-		switch (text.Length)
-		{
-		case 11:
-			switch (text[0])
+		case "windowswitcher":
+		case "taskswitcher":
+		case "alttabsticky":
+			ExecuteHotkey("Ctrl+Alt+Tab");
+			break;
+		case "alttab":
+		case "switchwindow":
+			ExecuteHotkey("Alt+Tab");
+			break;
+		case "closewindow":
+			ExecuteHotkey("Alt+F4");
+			break;
+		case "minimize":
+			ExecuteHotkey("Win+Down");
+			break;
+		case "maximize":
+			ExecuteHotkey("Win+Up");
+			break;
+		case "snapleft":
+			ExecuteHotkey("Win+Left");
+			break;
+		case "snapright":
+			ExecuteHotkey("Win+Right");
+			break;
+		case "taskview":
+			ExecuteHotkey("Win+Tab");
+			break;
+		case "prevdesktop":
+			ExecuteHotkey("Win+Ctrl+Left");
+			break;
+		case "nextdesktop":
+			ExecuteHotkey("Win+Ctrl+Right");
+			break;
+		case "showdesktop":
+			ExecuteHotkey("Win+D");
+			break;
+		case "fullscreen":
+			ExecuteHotkey("F11");
+			break;
+		case "screenshot":
+			ExecuteHotkey("Win+Shift+S");
+			break;
+		case "taskmanager":
+			if (!TryToggleProcessWindow("taskmgr"))
 			{
-			case 'c':
-				if (text == "closewindow")
-				{
-					ExecuteHotkey("Alt+F4");
-				}
-				break;
-			case 'p':
-				if (text == "prevdesktop")
-				{
-					ExecuteHotkey("Win+Ctrl+Left");
-				}
-				break;
-			case 'n':
-				if (text == "nextdesktop")
-				{
-					ExecuteHotkey("Win+Ctrl+Right");
-				}
-				break;
-			case 's':
-				if (text == "showdesktop")
-				{
-					ExecuteHotkey("Win+D");
-				}
-				break;
-			case 't':
-				if (!(text == "taskmanager") || TryToggleProcessWindow("taskmgr"))
-				{
-					break;
-				}
 				try
 				{
 					Process.Start(new ProcessStartInfo
@@ -573,72 +584,30 @@ public static class ActionExecutor
 						FileName = "taskmgr.exe",
 						UseShellExecute = true
 					});
-					break;
 				}
 				catch
 				{
 					ExecuteHotkey("Ctrl+Shift+Esc");
-					break;
 				}
-			case 'h':
-				if (text == "hardrefresh")
-				{
-					ExecuteHotkey("Ctrl+F5");
-				}
-				break;
 			}
 			break;
-		case 8:
-			switch (text[2])
+		case "explorer":
+			try
 			{
-			case 'n':
-				if (text == "minimize")
+				Process.Start(new ProcessStartInfo
 				{
-					ExecuteHotkey("Win+Down");
-				}
-				break;
-			case 'x':
-				if (text == "maximize")
-				{
-					ExecuteHotkey("Win+Up");
-				}
-				break;
-			case 'a':
-				if (text == "snapleft")
-				{
-					ExecuteHotkey("Win+Left");
-				}
-				break;
-			case 's':
-				if (text == "taskview")
-				{
-					ExecuteHotkey("Win+Tab");
-				}
-				break;
-			case 'p':
-				if (!(text == "explorer"))
-				{
-					break;
-				}
-				try
-				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = "explorer.exe",
-						UseShellExecute = true
-					});
-					break;
-				}
-				catch
-				{
-					ExecuteHotkey("Win+E");
-					break;
-				}
-			case 't':
-				if (!(text == "settings") || TryToggleProcessWindow("SystemSettings"))
-				{
-					break;
-				}
+					FileName = "explorer.exe",
+					UseShellExecute = true
+				});
+			}
+			catch
+			{
+				ExecuteHotkey("Win+E");
+			}
+			break;
+		case "settings":
+			if (!TryToggleProcessWindow("SystemSettings"))
+			{
 				try
 				{
 					Process.Start(new ProcessStartInfo
@@ -646,120 +615,16 @@ public static class ActionExecutor
 						FileName = "ms-settings:",
 						UseShellExecute = true
 					});
-					break;
 				}
 				catch
 				{
 					ExecuteHotkey("Win+I");
-					break;
-				}
-			case 'l':
-				if (text == "volumeup")
-				{
-					SimulateSingleKey(175);
-				}
-				break;
-			case 'o':
-				if (text == "closetab")
-				{
-					ExecuteHotkey("Ctrl+W");
-				}
-				break;
-			case 'u':
-				if (!(text == "shutdown"))
-				{
-					break;
-				}
-				try
-				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = "shutdown.exe",
-						Arguments = "/s /t 0",
-						UseShellExecute = true
-					});
-					break;
-				}
-				catch
-				{
-					break;
 				}
 			}
 			break;
-		case 9:
-			switch (text[1])
+		case "calculator":
+			if (!TryToggleProcessWindow("calc") && !TryToggleProcessWindow("CalculatorApp") && !TryToggleProcessWindow("Calculator"))
 			{
-			case 'n':
-				if (text == "snapright")
-				{
-					ExecuteHotkey("Win+Right");
-				}
-				break;
-			case 'u':
-				if (text == "rundialog")
-				{
-					ExecuteHotkey("Win+R");
-				}
-				break;
-			case 'l':
-				if (text == "playpause")
-				{
-					SimulateSingleKey(179);
-				}
-				break;
-			case 'e':
-				if (!(text == "nexttrack"))
-				{
-					if (text == "reopentab")
-					{
-						ExecuteHotkey("Ctrl+Shift+T");
-					}
-				}
-				else
-				{
-					SimulateSingleKey(176);
-				}
-				break;
-			case 'r':
-				if (text == "prevtrack")
-				{
-					SimulateSingleKey(177);
-				}
-				break;
-			case 't':
-				if (text == "stopmedia")
-				{
-					SimulateSingleKey(178);
-				}
-				break;
-			case 'o':
-				if (text == "zoomreset")
-				{
-					ExecuteHotkey("Ctrl+0");
-				}
-				break;
-			}
-			break;
-		case 10:
-			switch (text[6])
-			{
-			case 'r':
-				if (text == "fullscreen")
-				{
-					ExecuteHotkey("F11");
-				}
-				break;
-			case 's':
-				if (text == "screenshot")
-				{
-					ExecuteHotkey("Win+Shift+S");
-				}
-				break;
-			case 'a':
-				if (!(text == "calculator") || TryToggleProcessWindow("calc") || TryToggleProcessWindow("CalculatorApp") || TryToggleProcessWindow("Calculator"))
-				{
-					break;
-				}
 				try
 				{
 					Process.Start(new ProcessStartInfo
@@ -767,103 +632,71 @@ public static class ActionExecutor
 						FileName = "calc.exe",
 						UseShellExecute = true
 					});
-					break;
 				}
 				catch
 				{
 					ExecuteHotkey("Win+R");
-					break;
-				}
-			case 'd':
-				if (text == "volumedown")
-				{
-					SimulateSingleKey(174);
-				}
-				break;
-			case 'm':
-				if (text == "volumemute")
-				{
-					SimulateSingleKey(173);
-				}
-				break;
-			}
-			break;
-		case 6:
-			switch (text[0])
-			{
-			case 'n':
-				if (text == "newtab")
-				{
-					ExecuteHotkey("Ctrl+T");
-				}
-				break;
-			case 'z':
-				if (text == "zoomin")
-				{
-					ExecuteHotkey("Ctrl+Plus");
-				}
-				break;
-			}
-			break;
-		case 7:
-			switch (text[2])
-			{
-			case 'f':
-				if (text == "refresh")
-				{
-					ExecuteHotkey("F5");
-				}
-				break;
-			case 'o':
-				if (text == "zoomout")
-				{
-					ExecuteHotkey("Ctrl+Minus");
-				}
-				break;
-			case 's':
-				if (!(text == "restart"))
-				{
-					break;
-				}
-				try
-				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = "shutdown.exe",
-						Arguments = "/r /t 0",
-						UseShellExecute = true
-					});
-					break;
-				}
-				catch
-				{
-					break;
 				}
 			}
 			break;
-		case 13:
-			if (text == "windowssearch")
-			{
-				ExecuteHotkey("Win+S");
-			}
+		case "rundialog":
+			ExecuteHotkey("Win+R");
 			break;
-		case 16:
-			if (text == "clipboardhistory")
-			{
-				ExecuteHotkey("Win+V");
-			}
+		case "windowssearch":
+			ExecuteHotkey("Win+S");
 			break;
-		case 4:
-			if (text == "lock")
-			{
-				LockWorkStation();
-			}
+		case "clipboardhistory":
+			ExecuteHotkey("Win+V");
 			break;
-		case 5:
-			if (!(text == "sleep"))
-			{
-				break;
-			}
+		case "lock":
+			LockWorkStation();
+			break;
+		case "volumeup":
+			SimulateSingleKey(175);
+			break;
+		case "volumedown":
+			SimulateSingleKey(174);
+			break;
+		case "volumemute":
+			SimulateSingleKey(173);
+			break;
+		case "playpause":
+			SimulateSingleKey(179);
+			break;
+		case "nexttrack":
+			SimulateSingleKey(176);
+			break;
+		case "prevtrack":
+			SimulateSingleKey(177);
+			break;
+		case "stopmedia":
+			SimulateSingleKey(178);
+			break;
+		case "newtab":
+			ExecuteHotkey("Ctrl+T");
+			break;
+		case "closetab":
+			ExecuteHotkey("Ctrl+W");
+			break;
+		case "reopentab":
+			ExecuteHotkey("Ctrl+Shift+T");
+			break;
+		case "refresh":
+			ExecuteHotkey("F5");
+			break;
+		case "hardrefresh":
+			ExecuteHotkey("Ctrl+F5");
+			break;
+		case "zoomin":
+			ExecuteHotkey("Ctrl+Plus");
+			break;
+		case "zoomout":
+			ExecuteHotkey("Ctrl+Minus");
+			break;
+		case "zoomreset":
+			ExecuteHotkey("Ctrl+0");
+			break;
+		case "sleep":
 			try
 			{
 				Process.Start(new ProcessStartInfo
@@ -872,15 +705,32 @@ public static class ActionExecutor
 					Arguments = "powrprof.dll,SetSuspendState 0,1,0",
 					UseShellExecute = true
 				});
-				break;
 			}
-			catch
+			catch { }
+			break;
+		case "restart":
+			try
 			{
-				break;
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "shutdown.exe",
+					Arguments = "/r /t 0",
+					UseShellExecute = true
+				});
 			}
-		case 12:
-		case 14:
-		case 15:
+			catch { }
+			break;
+		case "shutdown":
+			try
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "shutdown.exe",
+					Arguments = "/s /t 0",
+					UseShellExecute = true
+				});
+			}
+			catch { }
 			break;
 		}
 	}
@@ -894,6 +744,7 @@ public static class ActionExecutor
 		};
 		SendInput(2u, pInputs, Marshal.SizeOf(typeof(INPUT)));
 	}
+
 	public static void SendTextInput(string text)
 	{
 		if (string.IsNullOrEmpty(text)) return;

@@ -4,6 +4,37 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.5.5] - 2026-08-31 (快捷键拼装组合器交互修复 & 常用快捷键一键预设 & 导出配置包含全量自定义配色与主题)
+
+### ⌨️ 快捷键拼装构建器全面修复与常用操作一键预设 (Hotkey Builder Fixes & Presets)
+1. **修复「拼装」按钮点击报 NullReferenceException / 空引用报错的问题**：
+   - 根因分析：`HotkeyBuilderDialog.xaml` 中主按键下拉框（`MainKeyComboBox`）在 XAML 解析构建时触发 `SelectionChanged` 事件，此时下方的 `CustomInputTextBox` 与 `PreviewResultText` 尚未实例化完成，直接访问控件导致抛出 `Object reference not set to an instance of an object`；
+   - 彻底修复：将 `_isInternalUpdating` 更新锁在窗口初始化前置为 `true`，移除 XAML 中的行内选中触发，并在所有事件回调和初始化方法中加入严密的非空安全防护（Null-Guards）与异常保护，确保点击 `[ ⚙️ 拼装 ]` 100% 顺畅弹出并实时响应。
+2. **新增「常用快捷操作一键预设」芯片栏与「常驻窗口切换器」**：
+   - 在按键拼装构建器顶部新增常用预设快速点击区：
+     - `🪟 Ctrl + Alt + Tab` (常驻窗口切换器 - 打开窗口列表并常驻在屏幕上，可用鼠标自由点选，免去键盘物理长按)
+     - `🪟 Alt + Tab` (快速切至上一窗口)
+     - `🌟 Win + Tab` (打开系统任务视图)
+     - `⌨️ Shift + Alt` / `Ctrl + Shift` (快速切换输入法)
+     - `🎨 Alt + Delete` (PS填充前景色) / `Ctrl + Delete` (PS填充背景色)
+     - `🖥️ Win + D` (快速显示桌面)
+     - `📋 Ctrl + Shift + V` (纯文本粘贴)
+     - `🔍 Win + S` (系统搜索) / `🔒 Win + L` (快速锁屏)
+   - 点击任意芯片即可秒级将对应快捷键填充至当前动作，彻底免去繁琐组合与系统按键拦截烦恼。
+3. **新增智能「窗口切换器常驻/长按模式」提示与一键转换**：
+   - 当检测到用户配置了 `Alt + Tab` 时，拼装器会自动浮现智能提示卡片，并提供 `[ 一键转为常驻模式 ]` 按钮，自动将 `Alt+Tab` 升级为 Windows 原生常驻切换模式（`Ctrl+Alt+Tab`），彻底解决轮盘拖动释放后窗口切换器一闪而过的问题；
+   - 系统动作预设库中新增「常驻窗口切换器 (`WindowSwitcher` / `Ctrl+Alt+Tab`)」与「快速切至上一窗口 (`AltTab` / `Alt+Tab`)」，提供更丰富的系统预设选择。
+4. **优化录制框对 Tab 与修饰键的直接录制体验**：
+   - 禁用 `HotkeyRecorderBox` 控件在录制状态下的 WPF 默认焦点跳转导航（`KeyboardNavigationMode.None`），确保在录制框内直接按下 `Tab` 或 `Alt+Tab` / `Win+Tab` 时不会丢失焦点，可直接识别录入。
+
+### 🎨 配置导入/导出全量包含自定义配色方案与主题预设 (Full Custom Color Presets Backup & Restore)
+1. **导出配置文件完整包含自定义配色方案**：
+   - 导出 JSON 时自动包含全局所有 `CustomColorPresets`（包含各预设的扇区背景色、边框色、高亮背景色、高亮边框色、文字颜色）、一二级当前选中的配色预设 ID 以及所有微调色彩参数；
+2. **导入配置自动刷新配色面板与主题列表**：
+   - 导入后立即调用 `ReloadThemePresets()` 动态重构主题下拉菜单与二级主题下拉菜单，自动将导入文件中的自定义预设加载到选项中，并实时更新颜色拾取框、色彩微调预览与交互画布，使得别人导入后可以完美无损使用导出者制作的轮盘配色方案。
+
+---
+
 ## [v1.5.4] - 2026-08-31 (快捷键按键拼装构建器 & 独立录制控制 & 蜂窝扇多形态几何重构与左右判定Bug修复)
 
 ### ⌨️ 快捷键录入与执行引擎全量重构 (Hotkey Input & Execution Engine Overhaul)

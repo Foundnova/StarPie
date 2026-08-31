@@ -6052,19 +6052,26 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
+		private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
 	{
-		if (sender is Button btn && btn.DataContext is SlotViewModel slotVm)
+		try
 		{
-			HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(slotVm.Parameter ?? "")
+			if (sender is Button btn && btn.DataContext is SlotViewModel slotVm)
 			{
-				Owner = this
-			};
-			if (dlg.ShowDialog() == true)
-			{
-				slotVm.Parameter = dlg.ResultHotkey;
-				SyncUiToConfigAndSave();
+				HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(slotVm.Parameter ?? "")
+				{
+					Owner = this
+				};
+				if (dlg.ShowDialog() == true)
+				{
+					slotVm.Parameter = dlg.ResultHotkey;
+					SyncUiToConfigAndSave();
+				}
 			}
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, "打开按键拼装器失败: " + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
 

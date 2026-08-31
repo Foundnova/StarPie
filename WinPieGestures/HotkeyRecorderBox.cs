@@ -51,6 +51,9 @@ public class HotkeyRecorderBox : Control
 	{
 		FocusVisualStyle = null;
 		Cursor = Cursors.Hand;
+		KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.None);
+		KeyboardNavigation.SetDirectionalNavigation(this, KeyboardNavigationMode.None);
+		KeyboardNavigation.SetControlTabNavigation(this, KeyboardNavigationMode.None);
 	}
 
 	public override void OnApplyTemplate()

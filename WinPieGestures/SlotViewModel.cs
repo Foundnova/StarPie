@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -10,6 +10,22 @@ public class SlotViewModel : INotifyPropertyChanged
 {
 	public static readonly List<SystemPresetItem> SystemPresetList = new List<SystemPresetItem>
 	{
+		new SystemPresetItem
+		{
+			Key = "WindowSwitcher",
+			Category = "窗口管理",
+			DisplayName = "常驻窗口切换器 (Window Switcher / Ctrl+Alt+Tab)",
+			DefaultName = "窗口切换",
+			DefaultIconKey = "TaskView"
+		},
+		new SystemPresetItem
+		{
+			Key = "AltTab",
+			Category = "窗口管理",
+			DisplayName = "快速切至上一窗口 (Alt+Tab)",
+			DefaultName = "切换窗口",
+			DefaultIconKey = "TaskView"
+		},
 		new SystemPresetItem
 		{
 			Key = "CloseWindow",
