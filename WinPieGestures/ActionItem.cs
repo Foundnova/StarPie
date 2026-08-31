@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace WinPieGestures;
 
@@ -15,6 +15,9 @@ public class ActionItem
 	public string IconKey { get; set; } = "";
 
 	public string CustomIconSvg { get; set; } = "";
+
+	/// <summary>Terminal used to run a "Command" action: "cmd", "powershell", "wsl" or "direct".</summary>
+	public string CommandTerminal { get; set; } = "cmd";
 
 	public List<ActionItem> SubActions { get; set; } = new List<ActionItem>();
 

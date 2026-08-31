@@ -183,6 +183,9 @@ public static class ActionExecutor
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
 				break;
+			case "Command":
+				ExecuteCommand(action.Parameter, action.CommandTerminal);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
@@ -434,6 +437,52 @@ public static class ActionExecutor
 			{
 			}
 			Process.Start(processStartInfo);
+		}
+	}
+
+	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL / direct).</summary>
+	private static void ExecuteCommand(string command, string? terminal)
+	{
+		if (string.IsNullOrWhiteSpace(command))
+		{
+			return;
+		}
+		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
+		try
+		{
+			switch (term)
+			{
+			case "powershell":
+				Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -Command \"" + command + "\"")
+				{
+					UseShellExecute = false
+				});
+				break;
+			case "wsl":
+				Process.Start(new ProcessStartInfo("wsl.exe", "-- " + command)
+				{
+					UseShellExecute = false
+				});
+				break;
+			case "direct":
+			case "none":
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = command,
+					UseShellExecute = true
+				});
+				break;
+			default:
+				Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + command + "\"")
+				{
+					UseShellExecute = false
+				});
+				break;
+			}
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
 	}
 

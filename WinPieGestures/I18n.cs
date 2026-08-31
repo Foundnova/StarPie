@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -583,6 +583,41 @@ public static class I18n
 			[LanguageCode.ZhTw] = "系統控制",
 			[LanguageCode.En] = "System",
 			[LanguageCode.Ja] = "システム"
+		};
+		dictionary["ActionTypeCommandShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "▶️ 运行命令",
+			[LanguageCode.ZhTw] = "▶️ 執行命令",
+			[LanguageCode.En] = "▶️ Run Command",
+			[LanguageCode.Ja] = "▶️ コマンド実行"
+		};
+		dictionary["TerminalCmd"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "CMD (命令提示符)",
+			[LanguageCode.ZhTw] = "CMD (命令提示字元)",
+			[LanguageCode.En] = "CMD",
+			[LanguageCode.Ja] = "CMD"
+		};
+		dictionary["TerminalPowerShell"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "PowerShell",
+			[LanguageCode.ZhTw] = "PowerShell",
+			[LanguageCode.En] = "PowerShell",
+			[LanguageCode.Ja] = "PowerShell"
+		};
+		dictionary["TerminalWsl"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "WSL (Linux 子系统)",
+			[LanguageCode.ZhTw] = "WSL (Linux 子系統)",
+			[LanguageCode.En] = "WSL",
+			[LanguageCode.Ja] = "WSL"
+		};
+		dictionary["TerminalDirect"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "直接运行 (无终端)",
+			[LanguageCode.ZhTw] = "直接執行 (無終端)",
+			[LanguageCode.En] = "Direct (no terminal)",
+			[LanguageCode.Ja] = "直接実行 (端末なし)"
 		};
 		dictionary["ProfileCardTitle"] = new Dictionary<LanguageCode, string>
 		{
