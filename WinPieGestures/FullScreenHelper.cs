@@ -25,17 +25,8 @@ public static class FullScreenHelper
 
 	private const uint MONITOR_DEFAULTTONEAREST = 2u;
 
-<<<<<<< HEAD
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
-=======
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
->>>>>>> 3ff691fae314fa72f6cc0244386f8e08f9efbc00
 
 	[DllImport("user32.dll")]
 	private static extern nint GetShellWindow();
@@ -53,7 +44,6 @@ public static class FullScreenHelper
 	[DllImport("user32.dll", CharSet = CharSet.Auto)]
 	private static extern bool GetMonitorInfo(nint hMonitor, ref MONITORINFO lpmi);
 
-<<<<<<< HEAD
 	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
 	private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
@@ -68,36 +58,6 @@ public static class FullScreenHelper
 		{
 			return false;
 		}
-=======
-        private static bool IsDesktopShellWindow(IntPtr hWnd)
-        {
-            if (hWnd == GetShellWindow() || hWnd == GetDesktopWindow())
-            {
-                return true;
-            }
-
-            var className = new StringBuilder(256);
-            if (GetClassName(hWnd, className, className.Capacity) <= 0)
-            {
-                return false;
-            }
-
-            return string.Equals(className.ToString(), "Progman", StringComparison.Ordinal) ||
-                   string.Equals(className.ToString(), "WorkerW", StringComparison.Ordinal);
-        }
-
-        /// <summary>
-        /// Determines if the current active foreground window is in full-screen mode.
-        /// </summary>
-        public static bool IsActiveWindowFullScreen()
-        {
-            IntPtr hWnd = GetForegroundWindow();
-            if (hWnd == IntPtr.Zero) return false;
-
-            // Exclude the desktop and its WorkerW/Progman host windows. Win+D can make
-            // one of these hosts the foreground window, and their bounds cover the monitor.
-            if (IsDesktopShellWindow(hWnd)) return false;
->>>>>>> 3ff691fae314fa72f6cc0244386f8e08f9efbc00
 
 		StringBuilder sbClass = new StringBuilder(256);
 		GetClassName(foregroundWindow, sbClass, 256);

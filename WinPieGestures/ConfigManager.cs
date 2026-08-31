@@ -47,7 +47,6 @@ public static class ConfigManager
 		LoadConfig();
 	}
 
-<<<<<<< HEAD
 	public static void LoadConfig()
 	{
 		try
@@ -181,36 +180,6 @@ public static class ConfigManager
 			I18n.SetLanguage(CurrentConfig.Language);
 		}
 	}
-=======
-    public class AppConfig
-    {
-        public string Language { get; set; } = "Auto";
-        public string TriggerButton { get; set; } = "RightButton";
-        public TriggerConfig Trigger { get; set; } = new TriggerConfig(); // "RightButton", "MiddleButton", "XButton1", "XButton2" // "Auto", "zh-CN", "zh-TW", "en", "ja"
-        public double DragThreshold { get; set; } = 25.0;
-        public string AnimationSpeed { get; set; } = "Balanced"; // "Elegant" (130ms), "Balanced" (80ms), "Fast" (35ms)
-        public bool EnableOuterEscapeCancel { get; set; } = false;
-        public double OuterEscapeDistance { get; set; } = 186.0; // Distance in pixels to trigger radial menu
-        public string AppTheme { get; set; } = "System"; // "System", "Light", "Dark", "MidnightNavy", "RoyalViolet", "TitaniumGray"
-        public string Theme { get; set; } = "System"; // Radial Wheel Color Theme: "System", "Dark", "Light", "MatchaForest", "GlacialIce", "MorandiMuted", "Custom"
-        public string UiStyle { get; set; } = "ClassicRing"; // "ClassicRing", "CleanSectors", "Glassmorphism", "CatPaw"
-        
-        // Multi-Tier Sub-Wheel (多级轮盘与级联子菜单)
-        public bool EnableMultiTier { get; set; } = true; // Multi-Tier feature toggle
-        public double SubWheelRadiusRatio { get; set; } = 1.55; // Outer ring radius multiplier
-        public string SubmenuStyle { get; set; } = "Wheel"; // "Wheel" (outer sub-ring), "Fan" (honeycomb fan)
-        
-        public bool ShowText { get; set; } = true;
-        public double WheelRadius { get; set; } = 138.0;
-        public double InnerRadius { get; set; } = 52.0;
-        public double CoreRadius { get; set; } = 50.0;
-        public string Shape { get; set; } = "Original"; // "Original", "Circle", "RoundedRect", "FloatingCapsules", "HexagonHive"
-        public double SectorGap { get; set; } = 2.0; // Optical Gap between sectors: 0 ~ 12px
-        public double SectorCornerRadius { get; set; } = 4.0; // Smooth Corner/Fillet: 0 ~ 16px
-        public string IconLayoutMode { get; set; } = "IconAndText"; // "IconAndText", "IconOnly", "TextOnly"
-        public double SectorIconSize { get; set; } = 20.0; // 14.0 ~ 36.0 px
-        public double SectorFontSize { get; set; } = 10.5; // 8.0 ~ 18.0 px
->>>>>>> 3ff691fae314fa72f6cc0244386f8e08f9efbc00
 
 	public static void SaveConfig()
 	{
