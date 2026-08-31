@@ -82,6 +82,13 @@ public static class IconHelper
 		{
 			new VectorIconItem
 			{
+				Key = "Command",
+				Category = "快捷工具",
+				DisplayName = "运行命令 (Command)",
+				SvgData = "M4,3H20A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5A2,2 0 0,1 4,3M4,5V19H20V5H4M11,17L7,13L11,9L12.4,10.4L9.8,13L12.4,15.6L11,17M15,17H18V15H15V17Z"
+			},
+			new VectorIconItem
+			{
 				Key = "Copy",
 				Category = "编辑与剪贴板",
 				DisplayName = "复制 (Copy)",

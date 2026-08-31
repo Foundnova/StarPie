@@ -440,7 +440,7 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL / direct).</summary>
+	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
 	private static void ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
@@ -448,34 +448,31 @@ public static class ActionExecutor
 			return;
 		}
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
+		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
+		string shell = hidden ? term.Substring(0, term.Length - "_hidden".Length) : term;
 		try
 		{
-			switch (term)
+			switch (shell)
 			{
 			case "powershell":
 				Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -Command \"" + command + "\"")
 				{
-					UseShellExecute = false
+					UseShellExecute = false,
+					CreateNoWindow = hidden
 				});
 				break;
 			case "wsl":
 				Process.Start(new ProcessStartInfo("wsl.exe", "-- " + command)
 				{
-					UseShellExecute = false
-				});
-				break;
-			case "direct":
-			case "none":
-				Process.Start(new ProcessStartInfo
-				{
-					FileName = command,
-					UseShellExecute = true
+					UseShellExecute = false,
+					CreateNoWindow = hidden
 				});
 				break;
 			default:
 				Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + command + "\"")
 				{
-					UseShellExecute = false
+					UseShellExecute = false,
+					CreateNoWindow = hidden
 				});
 				break;
 			}

@@ -652,7 +652,9 @@ public class SlotViewModel : INotifyPropertyChanged
 		new ActionTypeItem { Tag = "cmd", DisplayText = I18n.T("TerminalCmd") },
 		new ActionTypeItem { Tag = "powershell", DisplayText = I18n.T("TerminalPowerShell") },
 		new ActionTypeItem { Tag = "wsl", DisplayText = I18n.T("TerminalWsl") },
-		new ActionTypeItem { Tag = "direct", DisplayText = I18n.T("TerminalDirect") }
+		new ActionTypeItem { Tag = "cmd_hidden", DisplayText = I18n.T("TerminalCmdHidden") },
+		new ActionTypeItem { Tag = "powershell_hidden", DisplayText = I18n.T("TerminalPowerShellHidden") },
+		new ActionTypeItem { Tag = "wsl_hidden", DisplayText = I18n.T("TerminalWslHidden") }
 	};
 
 	/// <summary>Localized terminal options for Command actions.</summary>
@@ -661,7 +663,9 @@ public class SlotViewModel : INotifyPropertyChanged
 		new ActionTypeOption { Tag = "cmd", DisplayText = I18n.T("TerminalCmd") },
 		new ActionTypeOption { Tag = "powershell", DisplayText = I18n.T("TerminalPowerShell") },
 		new ActionTypeOption { Tag = "wsl", DisplayText = I18n.T("TerminalWsl") },
-		new ActionTypeOption { Tag = "direct", DisplayText = I18n.T("TerminalDirect") }
+		new ActionTypeOption { Tag = "cmd_hidden", DisplayText = I18n.T("TerminalCmdHidden") },
+		new ActionTypeOption { Tag = "powershell_hidden", DisplayText = I18n.T("TerminalPowerShellHidden") },
+		new ActionTypeOption { Tag = "wsl_hidden", DisplayText = I18n.T("TerminalWslHidden") }
 	};
 
 	public bool IsCommandType => Type == "Command";
