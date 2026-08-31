@@ -253,6 +253,36 @@ public static class I18n
 			[LanguageCode.En] = "Wheel Font Family:",
 			[LanguageCode.Ja] = "ホイールのフォント:"
 		};
+		
+		dictionary["SubmenuStyleTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二级菜单样式 (Submenu Style)",
+			[LanguageCode.ZhTw] = "二級選單樣式 (Submenu Style)",
+			[LanguageCode.En] = "Submenu Style",
+			[LanguageCode.Ja] = "サブメニューのスタイル"
+		};
+		dictionary["SubmenuStyleDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。",
+			[LanguageCode.ZhTw] = "外圈子環：子動作沿選中扇區外側環形展開（數量不限）；蜂窩扇：子動作以選中項為中心呈扇形排列（最多三项）。",
+			[LanguageCode.En] = "Sub-Ring: Sub-actions expand in an outer concentric ring; Honeycomb Fan: Expands outward from the selected sector in a tight fan (up to 3 items).",
+			[LanguageCode.Ja] = "外周リング：選択したセクターの外側にリング状に展開；ハニカムファン：扇状にコンパクトに展開（最大3項目）。"
+		};
+		dictionary["SubmenuStyleWheel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 外圈子环 (Sub-Ring)",
+			[LanguageCode.ZhTw] = "🌐 外圈子環 (Sub-Ring)",
+			[LanguageCode.En] = "🌐 Outer Sub-Ring",
+			[LanguageCode.Ja] = "🌐 外周同心リング"
+		};
+		dictionary["SubmenuStyleFan"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🍯 蜂窝扇 (Honeycomb Fan)",
+			[LanguageCode.ZhTw] = "🍯 蜂窩扇 (Honeycomb Fan)",
+			[LanguageCode.En] = "🍯 Honeycomb Fan",
+			[LanguageCode.Ja] = "🍯 ハニカムファン"
+		};
+
 		dictionary["OuterEscapeTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "顺势外甩脱离取消 (Outer Escape Cancel)",

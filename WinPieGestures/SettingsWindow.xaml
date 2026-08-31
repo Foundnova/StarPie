@@ -474,7 +474,7 @@
         </StackPanel>
         <StackPanel Grid.Row="2" Margin="0,15,0,5">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.5.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.5.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -1113,14 +1113,6 @@
                       </Grid>
                     </StackPanel>
                     <StackPanel Name="Tier2DimensionsPanel" Visibility="Collapsed">
-
-                      <!-- Submenu Display Style (Wheel vs Fan) -->
-                      <TextBlock Text="二级菜单展现形式 (Submenu Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                      <ComboBox Name="SubmenuStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🌐 外圈同心子环 (Outer Sub-Ring / 级联外环)" Tag="Wheel" IsSelected="True" />
-                        <ComboBoxItem Content="🍯 扇形蜂窝矩阵 (Honeycomb Fan / 局部辐射扇)" Tag="Fan" />
-                      </ComboBox>
-
                       <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
                         <TextBlock Text="🌟 当前正在单独调节二级级联轮盘专属尺寸，与一级轮盘完全独立互不影响。" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
                       </Border>
@@ -1414,6 +1406,25 @@
                   <TextBlock Name="MultiTierCardTitleText" Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                   <CheckBox Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed" />
                   <TextBlock Name="EnableMultiTierDescText" Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。点击下方各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0" />
+
+                  <StackPanel Name="SubmenuStylePanel" Margin="0,12,0,0">
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                          <TextBlock Name="SubmenuStyleTitleText" Text="二级菜单样式 (Submenu Style)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Name="SubmenuStyleDescText" Text="外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
+                          <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)" IsSelected="True" />
+                          <ComboBoxItem Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇 (Honeycomb Fan)" />
+                        </ComboBox>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
                   <StackPanel Name="SubWheelTriggerDistancePanel" Margin="0,10,0,0">
                     <Grid Margin="0,0,0,4">
                       <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离 (Trigger Distance):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -1646,7 +1657,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.5.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Text="v1.5.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -1681,7 +1692,7 @@
                         <ColumnDefinition Width="90" />
                       </Grid.ColumnDefinitions>
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
-                        <TextBlock Text="v1.5.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Text="v1.5.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                       <StackPanel Grid.Column="1" Margin="8,0,0,0">
                         <TextBlock Text="系统字体库选择 &amp; 一二级独立主题 &amp; 拼音模糊检索 &amp; 管理员开机自启" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />

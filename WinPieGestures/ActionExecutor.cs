@@ -156,6 +156,10 @@ public static class ActionExecutor
 	[DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 	private static extern int GetWindowText(nint hWnd, StringBuilder lpString, int nMaxCount);
 
+	
+	[DllImport("user32.dll")]
+	private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
@@ -178,6 +182,10 @@ public static class ActionExecutor
 				break;
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
+				break;
+			case "Text":
+			case "String":
+				SendTextInput(action.Parameter);
 				break;
 			case "System":
 				ExecuteSystem(action.Parameter);
@@ -428,36 +436,67 @@ public static class ActionExecutor
 			Process.Start(processStartInfo);
 		}
 	}
+	private static bool IsStandardKeyToken(string token)
+	{
+		string t = token.Trim().ToLower();
+		return t == "ctrl" || t == "shift" || t == "alt" || t == "win" ||
+		       t == "tab" || t == "enter" || t == "esc" || t == "space" ||
+		       t == "backspace" || t == "delete" || t == "insert" ||
+		       (t.StartsWith("f") && int.TryParse(t.Substring(1), out _)) ||
+		       (t.StartsWith("num"));
+	}
 
 	private static void ExecuteHotkey(string hotkeyString)
 	{
-		if (string.IsNullOrEmpty(hotkeyString))
+		if (string.IsNullOrWhiteSpace(hotkeyString))
 		{
 			return;
 		}
+
+		if (!hotkeyString.Contains('+') && hotkeyString.Length > 1 && !IsStandardKeyToken(hotkeyString))
+		{
+			SendTextInput(hotkeyString);
+			return;
+		}
+
 		HotkeyDetails hotkeyDetails = ParseHotkey(hotkeyString);
 		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0)
 		{
+			SendTextInput(hotkeyString);
 			return;
 		}
-		List<INPUT> list = new List<INPUT>();
+
+		List<INPUT> downInputs = new List<INPUT>();
 		foreach (ushort modifier in hotkeyDetails.Modifiers)
 		{
-			list.Add(CreateKeyInput(modifier, down: true));
+			downInputs.Add(CreateKeyInput(modifier, down: true));
 		}
 		if (hotkeyDetails.MainKey != 0)
 		{
-			list.Add(CreateKeyInput(hotkeyDetails.MainKey, down: true));
+			downInputs.Add(CreateKeyInput(hotkeyDetails.MainKey, down: true));
 		}
+
+		List<INPUT> upInputs = new List<INPUT>();
 		if (hotkeyDetails.MainKey != 0)
 		{
-			list.Add(CreateKeyInput(hotkeyDetails.MainKey, down: false));
+			upInputs.Add(CreateKeyInput(hotkeyDetails.MainKey, down: false));
 		}
 		for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
 		{
-			list.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
+			upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
 		}
-		SendInput((uint)list.Count, list.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+
+		if (downInputs.Count > 0)
+		{
+			SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+		}
+
+		System.Threading.Thread.Sleep(15);
+
+		if (upInputs.Count > 0)
+		{
+			SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+		}
 	}
 
 	private static void ExecuteSystem(string presetName)
@@ -833,6 +872,35 @@ public static class ActionExecutor
 		};
 		SendInput(2u, pInputs, Marshal.SizeOf(typeof(INPUT)));
 	}
+	public static void SendTextInput(string text)
+	{
+		if (string.IsNullOrEmpty(text)) return;
+		List<INPUT> inputs = new List<INPUT>();
+		foreach (char c in text)
+		{
+			INPUT down = new INPUT { type = 1u };
+			down.U.ki = new KEYBDINPUT
+			{
+				wVk = 0,
+				wScan = (ushort)c,
+				dwFlags = 4u, // KEYEVENTF_UNICODE
+				time = 0u,
+				dwExtraInfo = IntPtr.Zero
+			};
+			INPUT up = new INPUT { type = 1u };
+			up.U.ki = new KEYBDINPUT
+			{
+				wVk = 0,
+				wScan = (ushort)c,
+				dwFlags = 4u | 2u, // KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+				time = 0u,
+				dwExtraInfo = IntPtr.Zero
+			};
+			inputs.Add(down);
+			inputs.Add(up);
+		}
+		SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+	}
 
 	private static INPUT CreateKeyInput(ushort vk, bool down)
 	{
@@ -840,15 +908,21 @@ public static class ActionExecutor
 		{
 			type = 1u
 		};
+		ushort scan = (ushort)MapVirtualKey((uint)vk, 0u);
 		result.U.ki = new KEYBDINPUT
 		{
 			wVk = vk,
-			wScan = 0,
+			wScan = scan,
 			dwFlags = ((!down) ? 2u : 0u),
 			time = 0u,
 			dwExtraInfo = IntPtr.Zero
 		};
-		if ((vk >= 33 && vk <= 47) || (vk >= 91 && vk <= 92) || (vk >= 173 && vk <= 179) || (vk >= 166 && vk <= 172))
+		if (vk == 33 || vk == 34 || vk == 35 || vk == 36 ||
+		    vk == 37 || vk == 38 || vk == 39 || vk == 40 ||
+		    vk == 45 || vk == 46 ||
+		    vk == 91 || vk == 92 ||
+		    vk == 111 ||
+		    (vk >= 166 && vk <= 179))
 		{
 			result.U.ki.dwFlags |= 1u;
 		}
@@ -916,6 +990,10 @@ public static class ActionExecutor
 			return 0;
 		}
 		string text = keyToken.ToLower().Trim();
+		if (text.StartsWith("d") && text.Length == 2 && char.IsDigit(text[1]))
+		{
+			return (ushort)text[1];
+		}
 		if (text.Length == 1)
 		{
 			char c = text[0];

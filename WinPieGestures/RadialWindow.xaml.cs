@@ -1396,29 +1396,35 @@ public partial class RadialWindow : Window
 
 	public const int FanSubmenuSlotCount = 3;
 
-	public static int GetFanSlotIndex(int subIndex, int totalCount)
+	public static (double du, double dv) GetFanSubOffset(int index)
 	{
-		if (totalCount <= 1) return 1;
-		if (totalCount == 2) return subIndex == 0 ? 0 : 2;
-		return Math.Clamp(subIndex, 0, 2);
+		double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
+		return index switch
+		{
+			0 => (1.0 + ringR * 0.5, ringR * 0.8660254038),   // upper wing
+			1 => (1.0 + ringR, 0.0),                           // tip / center
+			_ => (1.0 + ringR * 0.5, -ringR * 0.8660254038)   // lower wing
+		};
 	}
 
-	public static (double du, double dv) GetFanSubOffset(int slotIndex)
+	public static int GetFanSlotIndex(int subIndex, int totalCount)
 	{
-		return slotIndex switch
-		{
-			0 => (1.30, -0.45),
-			1 => (1.45, 0.00),
-			2 => (1.30, 0.45),
-			_ => (1.45, 0.00)
-		};
+		if (totalCount <= 1) return 1; // Center tip
+		if (totalCount == 2) return (subIndex == 0) ? 0 : 2; // Symmetric upper/lower wings
+		return Math.Clamp(subIndex, 0, 2); // 0 = upper, 1 = tip, 2 = lower
+	}
+
+	public static double GetFanExtentRadius(double outer, double inner)
+	{
+		double R = (outer + inner) / 2.0;
+		return GetFanSubOffset(1).du * R + (outer - inner) * 0.40;
 	}
 
 	public static Geometry CreateSubMenuGeometry(string shape, double cx, double cy, double radius, double angleRad, double wheelCx, double wheelCy)
 	{
 		string s = string.IsNullOrEmpty(shape) ? "Original" : shape;
 		
-		// 1. HexagonHive: 6-vertex regular hexagon rotated along radial angle
+		// 1. HexagonHive
 		if (s.Equals("HexagonHive", StringComparison.OrdinalIgnoreCase))
 		{
 			Point[] pts = new Point[6];
@@ -1437,7 +1443,7 @@ public partial class RadialWindow : Window
 			return hex;
 		}
 
-		// 2. Circle: Clean round circular card bubble
+		// 2. Circle
 		if (s.Equals("Circle", StringComparison.OrdinalIgnoreCase))
 		{
 			EllipseGeometry ellipse = new EllipseGeometry(new Point(cx, cy), radius, radius);
@@ -1445,7 +1451,7 @@ public partial class RadialWindow : Window
 			return ellipse;
 		}
 
-		// 3. RoundedCapsule / FloatingCapsules: Pill / Stadium shape oriented along radial direction
+		// 3. RoundedCapsule / FloatingCapsules
 		if (s.Equals("RoundedCapsule", StringComparison.OrdinalIgnoreCase) || s.Equals("FloatingCapsules", StringComparison.OrdinalIgnoreCase))
 		{
 			double w = 2.1 * radius, h = 1.5 * radius, r = h / 2.0;
@@ -1458,7 +1464,7 @@ public partial class RadialWindow : Window
 			return rect;
 		}
 
-		// 4. CleanSectors / RoundedRect: Modern smooth rounded rectangle
+		// 4. CleanSectors / RoundedRect
 		if (s.Equals("CleanSectors", StringComparison.OrdinalIgnoreCase) || s.Equals("RoundedRect", StringComparison.OrdinalIgnoreCase))
 		{
 			double w = 2.0 * radius, h = 1.6 * radius, r = radius * 0.35;
@@ -1471,7 +1477,7 @@ public partial class RadialWindow : Window
 			return rect;
 		}
 
-		// 5. Original / ClassicRing: Concentric curved arc wedge radiating outward
+		// 5. Original / ClassicRing
 		{
 			double midDeg = angleRad * (180.0 / Math.PI);
 			double halfSpan = 18.0;

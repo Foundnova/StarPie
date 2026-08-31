@@ -1,4 +1,4 @@
-global using Point = System.Windows.Point;
+﻿global using Point = System.Windows.Point;
 global using Size = System.Windows.Size;
 global using Rect = System.Windows.Rect;
 global using Color = System.Windows.Media.Color;

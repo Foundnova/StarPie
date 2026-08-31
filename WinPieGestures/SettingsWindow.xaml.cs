@@ -953,6 +953,12 @@ public partial class SettingsWindow : Window
 		{
 			EnableMultiTierCheckBox.Content = I18n.T("EnableMultiTier");
 		}
+		
+		if (SubmenuStyleTitleText != null) SubmenuStyleTitleText.Text = I18n.T("SubmenuStyleTitle");
+		if (SubmenuStyleDescText != null) SubmenuStyleDescText.Text = I18n.T("SubmenuStyleDesc");
+		if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
+		if (SubmenuStyleFanItem != null) SubmenuStyleFanItem.Content = I18n.T("SubmenuStyleFan");
+
 		if (EnableMultiTierDescText != null)
 		{
 			EnableMultiTierDescText.Text = I18n.T("EnableMultiTierDesc");
