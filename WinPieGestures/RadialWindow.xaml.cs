@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -1426,20 +1426,64 @@ public partial class RadialWindow : Window
 		double itemAngleRad = Math.Atan2(cy - wheelCy, cx - wheelCx);
 		double itemAngleDeg = itemAngleRad * (180.0 / Math.PI);
 
-		// 1. HexagonHive: 6-vertex regular hexagon
+		// 1. HexagonHive: 6-vertex regular hexagon with smooth rounded corners
 		if (s.Equals("HexagonHive", StringComparison.OrdinalIgnoreCase))
 		{
-			Point[] pts = new Point[6];
+			double maxFillet = (Math.Sqrt(3.0) / 2.0) * radius * 0.95;
+			double rawCr = (cornerRadius >= 0.0)
+				? cornerRadius
+				: ((ConfigManager.CurrentConfig?.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
+			double effectiveCr = Math.Max(0.0, Math.Min(rawCr, maxFillet));
+
+			Point[] vertices = new Point[6];
 			for (int i = 0; i < 6; i++)
 			{
 				double ang = itemAngleRad + (double)i * (Math.PI / 3.0);
-				pts[i] = new Point(cx + Math.Cos(ang) * radius, cy + Math.Sin(ang) * radius);
+				vertices[i] = new Point(cx + Math.Cos(ang) * radius, cy + Math.Sin(ang) * radius);
 			}
+
 			StreamGeometry hex = new StreamGeometry();
 			using (StreamGeometryContext ctx = hex.Open())
 			{
-				ctx.BeginFigure(pts[0], isFilled: true, isClosed: true);
-				for (int i = 1; i < 6; i++) ctx.LineTo(pts[i], isStroked: true, isSmoothJoin: false);
+				if (effectiveCr < 0.5)
+				{
+					ctx.BeginFigure(vertices[0], isFilled: true, isClosed: true);
+					for (int i = 1; i < 6; i++)
+					{
+						ctx.LineTo(vertices[i], isStroked: true, isSmoothJoin: false);
+					}
+				}
+				else
+				{
+					double tangentDist = effectiveCr / Math.Sqrt(3.0);
+					Point[] pEntry = new Point[6];
+					Point[] pExit = new Point[6];
+
+					for (int k = 0; k < 6; k++)
+					{
+						Point prev = vertices[(k + 5) % 6];
+						Point curr = vertices[k];
+						Point next = vertices[(k + 1) % 6];
+
+						Vector vIn = curr - prev;
+						vIn.Normalize();
+						pEntry[k] = curr - vIn * tangentDist;
+
+						Vector vOut = next - curr;
+						vOut.Normalize();
+						pExit[k] = curr + vOut * tangentDist;
+					}
+
+					ctx.BeginFigure(pEntry[0], isFilled: true, isClosed: true);
+					Size arcSize = new Size(effectiveCr, effectiveCr);
+
+					for (int i = 0; i < 6; i++)
+					{
+						ctx.ArcTo(pExit[i], arcSize, 0.0, isLargeArc: false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+						int nextIdx = (i + 1) % 6;
+						ctx.LineTo(pEntry[nextIdx], isStroked: true, isSmoothJoin: false);
+					}
+				}
 			}
 			hex.Freeze();
 			return hex;

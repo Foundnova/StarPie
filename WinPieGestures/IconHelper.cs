@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -466,10 +466,8 @@ public static class IconHelper
 		}
 		case "HexagonHive":
 		{
-			double radius = Math.Max(8.0, Math.Min(num8 / 2.0, num9 / Math.Sqrt(3.0)) * 0.94);
-			Geometry geometry = CreateHexagonGeometry(num4, num5, radius, cornerRadius);
-			geometry.Transform = new RotateTransform(num, num4, num5);
-			return geometry;
+			double radius = Math.Max(10.0, Math.Min(num8 / 2.0, num9 / Math.Sqrt(3.0)) * 0.95);
+			return CreateHexagonGeometry(num4, num5, radius, cornerRadius, num);
 		}
 		case "RoundedCapsule":
 		case "FloatingCapsules":
@@ -479,10 +477,12 @@ public static class IconHelper
 			double num13 = Math.Max(16.0, num8 * 0.96);
 			double num14 = Math.Max(16.0, Math.Min(num13 * 0.82, num9 * 0.88));
 			double num15 = ((cornerRadius > 0.0) ? Math.Min(num14 / 2.0, cornerRadius + 2.0) : Math.Min(num14 / 2.0, 10.0));
-			return new RectangleGeometry(new Rect(num4 - num13 / 2.0, num5 - num14 / 2.0, num13, num14), num15, num15)
+			RectangleGeometry rect = new RectangleGeometry(new Rect(num4 - num13 / 2.0, num5 - num14 / 2.0, num13, num14), num15, num15)
 			{
 				Transform = new RotateTransform(num, num4, num5)
 			};
+			rect.Freeze();
+			return rect;
 		}
 		default:
 		{
@@ -502,138 +502,64 @@ public static class IconHelper
 		}
 	}
 
-	public static Geometry CreateHexagonGeometry(double cx, double cy, double radius, double cornerRadius = 0.0)
+	public static Geometry CreateHexagonGeometry(double cx, double cy, double radius, double cornerRadius = 0.0, double rotationDegrees = 0.0)
 	{
-		//IL_02e0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02d0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0112: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0117: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00aa: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0159: Unknown result type (might be due to invalid IL or missing references)
-		//IL_015e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0164: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0169: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0173: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0178: Unknown result type (might be due to invalid IL or missing references)
-		//IL_017a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_017c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0181: Unknown result type (might be due to invalid IL or missing references)
-		//IL_018e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0190: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0194: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0199: Unknown result type (might be due to invalid IL or missing references)
-		//IL_019e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01a3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01aa: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01b7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01b9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01bd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01e3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0216: Unknown result type (might be due to invalid IL or missing references)
-		//IL_021b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0245: Unknown result type (might be due to invalid IL or missing references)
-		double val = Math.Sqrt(3.0) / 2.0 * radius * 0.95;
-		double num = Math.Max(0.0, Math.Min(cornerRadius, val));
-		if (num < 0.5)
+		double maxFillet = Math.Sqrt(3.0) / 2.0 * radius * 0.95;
+		double effectiveCr = Math.Max(0.0, Math.Min(cornerRadius, maxFillet));
+		double rotRad = rotationDegrees * (Math.PI / 180.0);
+
+		Point[] vertices = new Point[6];
+		for (int i = 0; i < 6; i++)
 		{
-			PathFigure pathFigure = new PathFigure
-			{
-				IsClosed = true,
-				IsFilled = true
-			};
-			Point val2 = default(Point);
-			for (int i = 0; i < 6; i++)
-			{
-				double num2 = (double)i * 60.0 * (Math.PI / 180.0);
-				val2 = new Point(cx + radius * Math.Cos(num2), cy + radius * Math.Sin(num2));
-				if (i == 0)
-				{
-					pathFigure.StartPoint = val2;
-				}
-				else
-				{
-					pathFigure.Segments.Add(new LineSegment(val2, isStroked: true));
-				}
-			}
-			return new PathGeometry
-			{
-				Figures = { pathFigure }
-			};
+			double ang = rotRad + (double)i * (Math.PI / 3.0);
+			vertices[i] = new Point(cx + radius * Math.Cos(ang), cy + radius * Math.Sin(ang));
 		}
-		try
+
+		StreamGeometry hex = new StreamGeometry();
+		using (StreamGeometryContext ctx = hex.Open())
 		{
-			Point[] array = (Point[])(object)new Point[6];
-			for (int j = 0; j < 6; j++)
+			if (effectiveCr < 0.5)
 			{
-				double num3 = (double)j * 60.0 * (Math.PI / 180.0);
-				array[j] = new Point(cx + radius * Math.Cos(num3), cy + radius * Math.Sin(num3));
-			}
-			double num4 = num / Math.Sqrt(3.0);
-			Point[] array2 = (Point[])(object)new Point[6];
-			Point[] array3 = (Point[])(object)new Point[6];
-			for (int k = 0; k < 6; k++)
-			{
-				Point val3 = array[(k + 5) % 6];
-				Point val4 = array[k];
-				Point val5 = array[(k + 1) % 6];
-				Vector val6 = val4 - val3;
-				val6.Normalize();
-				array2[k] = val4 - val6 * num4;
-				Vector val7 = val5 - val4;
-				val7.Normalize();
-				array3[k] = val4 + val7 * num4;
-			}
-			PathFigure pathFigure2 = new PathFigure
-			{
-				StartPoint = array2[0],
-				IsClosed = true,
-				IsFilled = true
-			};
-			Size size = default(Size);
-			size = new Size(num, num);
-			for (int l = 0; l < 6; l++)
-			{
-				pathFigure2.Segments.Add(new ArcSegment(array3[l], size, 0.0, isLargeArc: false, SweepDirection.Clockwise, isStroked: true));
-				if (l < 5)
+				ctx.BeginFigure(vertices[0], isFilled: true, isClosed: true);
+				for (int i = 1; i < 6; i++)
 				{
-					pathFigure2.Segments.Add(new LineSegment(array2[l + 1], isStroked: true));
+					ctx.LineTo(vertices[i], isStroked: true, isSmoothJoin: false);
 				}
 			}
-			return new PathGeometry
+			else
 			{
-				Figures = { pathFigure2 }
-			};
+				double tangentDist = effectiveCr / Math.Sqrt(3.0);
+				Point[] pEntry = new Point[6];
+				Point[] pExit = new Point[6];
+
+				for (int k = 0; k < 6; k++)
+				{
+					Point prev = vertices[(k + 5) % 6];
+					Point curr = vertices[k];
+					Point next = vertices[(k + 1) % 6];
+
+					Vector vIn = curr - prev;
+					vIn.Normalize();
+					pEntry[k] = curr - vIn * tangentDist;
+
+					Vector vOut = next - curr;
+					vOut.Normalize();
+					pExit[k] = curr + vOut * tangentDist;
+				}
+
+				ctx.BeginFigure(pEntry[0], isFilled: true, isClosed: true);
+				Size arcSize = new Size(effectiveCr, effectiveCr);
+
+				for (int i = 0; i < 6; i++)
+				{
+					ctx.ArcTo(pExit[i], arcSize, 0.0, isLargeArc: false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: true);
+					int nextIdx = (i + 1) % 6;
+					ctx.LineTo(pEntry[nextIdx], isStroked: true, isSmoothJoin: false);
+				}
+			}
 		}
-		catch
-		{
-			PathFigure pathFigure3 = new PathFigure
-			{
-				IsClosed = true,
-				IsFilled = true
-			};
-			Point val8 = default(Point);
-			for (int m = 0; m < 6; m++)
-			{
-				double num5 = (double)m * 60.0 * (Math.PI / 180.0);
-				val8 = new Point(cx + radius * Math.Cos(num5), cy + radius * Math.Sin(num5));
-				if (m == 0)
-				{
-					pathFigure3.StartPoint = val8;
-				}
-				else
-				{
-					pathFigure3.Segments.Add(new LineSegment(val8, isStroked: true));
-				}
-			}
-			return new PathGeometry
-			{
-				Figures = { pathFigure3 }
-			};
-		}
+		hex.Freeze();
+		return hex;
 	}
 
 	public static Geometry CreateRoundedAnnularSectorGeometry(double cx, double cy, double startAngle, double endAngle, double innerRadius, double outerRadius, double cornerRadius)

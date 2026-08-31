@@ -27,6 +27,11 @@
 4. **优化录制框对 Tab 与修饰键的直接录制体验**：
    - 禁用 `HotkeyRecorderBox` 控件在录制状态下的 WPF 默认焦点跳转导航（`KeyboardNavigationMode.None`），确保在录制框内直接按下 `Tab` 或 `Alt+Tab` / `Win+Tab` 时不会丢失焦点，可直接识别录入。
 
+### 🎨 蜂窝扇六边形形态平滑圆角支持与渲染引擎优化 (Honeycomb Fan Hexagon Fillet Support)
+1. **修复「蜂窝扇」在「蜂巢六边形 (HexagonHive)」形态下圆角尺寸调节无效果的问题**：
+   - 根因分析：二级菜单蜂窝扇渲染器（`RadialWindow.CreateSubMenuGeometry`）在生成 HexagonHive 六边形几何图形时，未接入 `SubWheelCornerRadius` / `cornerRadius` 倒角参数，直接由 6 个锐角顶点通过 `LineTo` 硬折线封闭，导致无论用户在控制台中如何滑动「二级扇区边缘平滑倒角」滑块，蜂窝六边形形态均保持 0 圆角不变；
+   - 彻底修复：在 `CreateSubMenuGeometry` 中引入极坐标旋转六边形切向圆角算法（基于 $\frac{r_{\text{corner}}}{\sqrt{3}}$ 切线偏移与 `ArcTo` 贝塞尔圆弧过渡），并加入边界安全截断；无论是实时交互画布预览还是悬浮轮盘弹出，调节「二级扇区边缘平滑倒角」滑块时均可实时呈现从锐利六边形到极致平滑胶囊蜂巢的丝滑倒角形态。
+
 ### 🎨 配置导入/导出全量包含自定义配色方案与主题预设 (Full Custom Color Presets Backup & Restore)
 1. **导出配置文件完整包含自定义配色方案**：
    - 导出 JSON 时自动包含全局所有 `CustomColorPresets`（包含各预设的扇区背景色、边框色、高亮背景色、高亮边框色、文字颜色）、一二级当前选中的配色预设 ID 以及所有微调色彩参数；
