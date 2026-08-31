@@ -670,8 +670,6 @@ public class SlotViewModel : INotifyPropertyChanged
 
 	public bool IsCommandType => Type == "Command";
 
-	public string CommandLine => Parameter;
-
 	public string TestButtonText => I18n.T("BtnTest");
 
 	public event PropertyChangedEventHandler? PropertyChanged;

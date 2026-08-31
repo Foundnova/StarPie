@@ -450,19 +450,22 @@ public static class ActionExecutor
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
 		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
 		string shell = hidden ? term.Substring(0, term.Length - "_hidden".Length) : term;
+		// Escape embedded quotes for the cmd/PowerShell wrappers ("" is the escape inside Windows quoting)
+		string quoted = command.Replace("\"", "\"\"");
 		try
 		{
 			switch (shell)
 			{
 			case "powershell":
 				// Visible: keep the window open (-NoExit). Hidden: run to completion.
-				Process.Start(new ProcessStartInfo("powershell.exe", (hidden ? "-NoProfile -Command \"" : "-NoProfile -NoExit -Command \"") + command + "\"")
+				Process.Start(new ProcessStartInfo("powershell.exe", (hidden ? "-NoProfile -Command \"" : "-NoProfile -NoExit -Command \"") + quoted + "\"")
 				{
 					UseShellExecute = false,
 					CreateNoWindow = hidden
 				});
 				break;
 			case "wsl":
+				// WSL receives the raw command after "--"; no extra quoting needed
 				Process.Start(new ProcessStartInfo("wsl.exe", "-- " + command)
 				{
 					UseShellExecute = false,
@@ -471,7 +474,7 @@ public static class ActionExecutor
 				break;
 			default:
 				// Visible: keep the window open (/k). Hidden: /c so no lingering process.
-				Process.Start(new ProcessStartInfo("cmd.exe", (hidden ? "/c \"" : "/k \"") + command + "\"")
+				Process.Start(new ProcessStartInfo("cmd.exe", (hidden ? "/c \"" : "/k \"") + quoted + "\"")
 				{
 					UseShellExecute = false,
 					CreateNoWindow = hidden
