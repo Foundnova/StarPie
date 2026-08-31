@@ -53,7 +53,14 @@
                   <TextBox Grid.Column="2" Margin="0,0,6,0" Height="30" FontSize="11.5" VerticalContentAlignment="Center" ToolTip="子动作显示名称" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                   <ComboBox Grid.Column="3" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" Style="{StaticResource FlatComboBoxStyle}" Height="30" Margin="0,0,6,0" FontSize="11" ItemsSource="{Binding ActionTypes}" SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                   <Grid Column="4" Margin="0,0,6,0">
-                    <local:HotkeyRecorderBox Height="30" FontSize="11" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}" />
+                    <Grid Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <local:HotkeyRecorderBox Height="30" FontSize="11" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                      <Button Grid.Column="1" Content="⚙️ 拼装" Height="30" Padding="4,0" Margin="2,0,0,0" ToolTip="打开按键拼装组合器" Click="SubHotkeyBuilder_Click" Style="{StaticResource ModernButtonStyle}" />
+                    </Grid>
                     <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

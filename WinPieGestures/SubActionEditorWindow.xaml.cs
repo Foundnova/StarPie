@@ -167,4 +167,20 @@ public partial class SubActionEditorWindow : Window
 		base.DialogResult = false;
 		Close();
 	}
+
+	private void SubHotkeyBuilder_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is FrameworkElement { DataContext: SubSlotViewModel dataContext })
+		{
+			HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(dataContext.Parameter ?? "")
+			{
+				Owner = this
+			};
+			if (dlg.ShowDialog() == true)
+			{
+				dataContext.Parameter = dlg.ResultHotkey;
+			}
+		}
+	}
+
 }

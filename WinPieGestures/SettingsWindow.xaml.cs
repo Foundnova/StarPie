@@ -5535,8 +5535,7 @@ public partial class SettingsWindow : Window
 				Canvas.SetLeft(grid2, num26 - num33 / 2.0);
 				Canvas.SetTop(grid2, num27 - num34 / 2.0);
 				System.Windows.Controls.Panel.SetZIndex(grid2, 10);
-				LiveWheelPreviewCanvas.Children.Add(grid2);
-				if (!enableMultiTier || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
+				LiveWheelPreviewCanvas.Children.Add(grid2);if (!enableMultiTier || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
 				{
 					continue;
 				}
@@ -5545,9 +5544,12 @@ public partial class SettingsWindow : Window
 				{
 					continue;
 				}
+				bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+				bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
 				int count = actionItem.SubActions.Count;
+				int activeCount = isFan ? Math.Min(3, count) : count;
 				double num35 = num20 / (double)count;
-				for (int num36 = 0; num36 < count; num36++)
+				for (int num36 = 0; num36 < activeCount; num36++)
 				{
 					double num37 = num23 + (double)num36 * num35;
 					double num38 = num37 + num35;
@@ -5555,7 +5557,30 @@ public partial class SettingsWindow : Window
 					double num40 = (num12 + num13) / 2.0;
 					double num41 = num + Math.Cos(num39) * num40;
 					double num42 = num2 + Math.Sin(num39) * num40;
-					Geometry data2 = IconHelper.CreateAdvancedSectorGeometry(num, num2, num37, num38, num12, num13, shape, num11, cornerRadius2);
+
+					Geometry data2;
+					if (isFan)
+					{
+						int slot = RadialWindow.GetFanSlotIndex(num36, activeCount);
+						var (du, dv) = RadialWindow.GetFanSubOffset(slot);
+						double itemR_sub = (num8 - num9) * 0.40;
+						if (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0 && ConfigManager.CurrentConfig.WheelRadius > 0.0)
+						{
+							double ratio = ConfigManager.CurrentConfig.SubWheelOuterRadius / (ConfigManager.CurrentConfig.WheelRadius * 1.55);
+							itemR_sub *= Math.Max(0.5, Math.Min(2.5, ratio));
+						}
+						double R_sub = (num9 + num8) / 2.0 + num11;
+						double ux = Math.Cos(num24), uy = Math.Sin(num24);
+						double vx = -Math.Sin(num24), vy = Math.Cos(num24);
+						num41 = num + ux * (du * R_sub) + vx * (dv * R_sub);
+						num42 = num2 + uy * (du * R_sub) + vy * (dv * R_sub);
+						data2 = RadialWindow.CreateSubMenuGeometry(shape, num41, num42, itemR_sub, num24, num, num2, cornerRadius2);
+					}
+					else
+					{
+						data2 = IconHelper.CreateAdvancedSectorGeometry(num, num2, num37, num38, num12, num13, shape, num11, cornerRadius2);
+					}
+
 					TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
 					System.Windows.Shapes.Path path2 = new System.Windows.Shapes.Path
 					{
@@ -5565,7 +5590,7 @@ public partial class SettingsWindow : Window
 						StrokeThickness = (_previewStyleRenderer?.BorderThickness ?? 1.2),
 						RenderTransform = translateTransform2,
 						Tag = $"sub_{num21}_{num36}",
-						Opacity = 0.88
+						Opacity = (isFan ? (isTier2Mode ? 0.95 : 0.0) : 0.88)
 					};
 					System.Windows.Controls.Panel.SetZIndex(path2, 15);
 					LiveWheelPreviewCanvas.Children.Add(path2);
@@ -5573,12 +5598,12 @@ public partial class SettingsWindow : Window
 					_previewSubTransforms.Add(translateTransform2);
 					_previewSubParentIndices.Add(num21);
 					_previewSubIndices.Add(num36);
-					_previewSubAngles.Add(num39);
+					_previewSubAngles.Add(isFan ? num24 : num39);
 					ActionItem actionItem2 = actionItem.SubActions[num36];
 					StackPanel stackPanel2 = new StackPanel
 					{
-						Orientation = System.Windows.Controls.Orientation.Vertical,
-						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+						Orientation = Orientation.Vertical,
+						HorizontalAlignment = HorizontalAlignment.Center,
 						VerticalAlignment = VerticalAlignment.Center,
 						IsHitTestVisible = false,
 						RenderTransform = translateTransform2
@@ -5612,7 +5637,7 @@ public partial class SettingsWindow : Window
 								Width = num43,
 								Height = num43,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+								HorizontalAlignment = HorizontalAlignment.Center
 							};
 							stackPanel2.Children.Add(element6);
 						}
@@ -5625,13 +5650,13 @@ public partial class SettingsWindow : Window
 						BitmapSource icon2 = IconHelper.GetIcon(actionItem2.Parameter);
 						if (icon2 != null)
 						{
-							System.Windows.Controls.Image element7 = new System.Windows.Controls.Image
+							Image element7 = new Image
 							{
 								Source = icon2,
 								Width = num43,
 								Height = num43,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+								HorizontalAlignment = HorizontalAlignment.Center
 							};
 							stackPanel2.Children.Add(element7);
 						}
@@ -5643,10 +5668,10 @@ public partial class SettingsWindow : Window
 						{
 							Text = actionItem2.Name,
 							FontSize = Math.Max(5.0, num44 * 0.75 * num7),
-							FontFamily = new System.Windows.Media.FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"),
+							FontFamily = new FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"),
 							Foreground = _previewSubTextBrush,
 							FontWeight = FontWeights.Normal,
-							HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+							HorizontalAlignment = HorizontalAlignment.Center,
 							TextAlignment = TextAlignment.Center,
 							TextTrimming = TextTrimming.CharacterEllipsis,
 							MaxWidth = 64.0 * num7
@@ -5660,7 +5685,8 @@ public partial class SettingsWindow : Window
 						Width = num45,
 						Height = num46,
 						IsHitTestVisible = false,
-						RenderTransform = translateTransform2
+						RenderTransform = translateTransform2,
+						Opacity = (isFan ? (isTier2Mode ? 1.0 : 0.0) : 1.0)
 					};
 					grid3.Children.Add(stackPanel2);
 					Canvas.SetLeft(grid3, num41 - num45 / 2.0);
@@ -5699,13 +5725,8 @@ public partial class SettingsWindow : Window
 			return Stretch.None;
 		}
 		return Stretch.UniformToFill;
-	}
-
-	private void LiveWheelPreviewCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+	}private void LiveWheelPreviewCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 	{
-		//IL_001d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0022: Unknown result type (might be due to invalid IL or missing references)
-		//IL_032b: Unknown result type (might be due to invalid IL or missing references)
 		if (_previewSectorPaths.Count == 0 || ConfigManager.CurrentConfig == null)
 		{
 			return;
@@ -5732,41 +5753,43 @@ public partial class SettingsWindow : Window
 			double num14 = Math.Max(num13 + 10.0, num7 * num8);
 			int num15 = -2;
 			int num16 = -1;
+			bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+			bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
+
 			if (num3 <= num11)
 			{
 				num15 = -1;
 			}
-			else if (num3 >= num10 * 0.75 && num3 < num13)
+			else if (num3 >= num10 * 0.75)
 			{
 				double num17 = (Math.Atan2(num2, num) * (180.0 / Math.PI) + 360.0) % 360.0;
 				double num18 = 360.0 / (double)_previewSectorPaths.Count;
-				num15 = (int)Math.Round(num17 / num18) % _previewSectorPaths.Count;
-			}
-			else if (enableMultiTier && num3 >= num13 && num3 <= num14 + 25.0 * num8)
-			{
-				double num19 = (Math.Atan2(num2, num) * (180.0 / Math.PI) + 360.0) % 360.0;
-				double num20 = 360.0 / (double)_previewSectorPaths.Count;
-				int num21 = (int)Math.Round(num19 / num20) % _previewSectorPaths.Count;
-				num15 = num21;
-				for (int num22 = 0; num22 < _previewSubSectorPaths.Count; num22++)
+				num15 = (int)Math.Floor((num17 + num18 / 2.0) / num18) % _previewSectorPaths.Count;
+
+				if (enableMultiTier && num15 >= 0)
 				{
-					if (_previewSubParentIndices[num22] == num21)
+					for (int num22 = 0; num22 < _previewSubSectorPaths.Count; num22++)
 					{
-						System.Windows.Shapes.Path path = _previewSubSectorPaths[num22];
-						if (path.Data != null && path.Data.FillContains(position))
+						if (_previewSubParentIndices[num22] == num15)
 						{
-							num16 = num22;
-							break;
+							System.Windows.Shapes.Path path = _previewSubSectorPaths[num22];
+							if (path.Data != null && path.Data.FillContains(position))
+							{
+								num16 = num22;
+								break;
+							}
 						}
 					}
 				}
 			}
+
 			if (num15 == _lastHoveredSector && num16 == _lastHoveredSubIndex)
 			{
 				return;
 			}
 			_lastHoveredSector = num15;
 			_lastHoveredSubIndex = num16;
+
 			for (int num23 = 0; num23 < _previewSectorPaths.Count; num23++)
 			{
 				System.Windows.Shapes.Path path2 = _previewSectorPaths[num23];
@@ -5791,6 +5814,7 @@ public partial class SettingsWindow : Window
 					translateTransform.Y = 0.0;
 				}
 			}
+
 			for (int num25 = 0; num25 < _previewSubSectorPaths.Count; num25++)
 			{
 				System.Windows.Shapes.Path path3 = _previewSubSectorPaths[num25];
@@ -5798,146 +5822,100 @@ public partial class SettingsWindow : Window
 				int num26 = _previewSubParentIndices[num25];
 				double num27 = _previewSubAngles[num25];
 				Grid grid = ((num25 < _previewSubContainers.Count) ? _previewSubContainers[num25] : null);
+
 				if (num25 == num16)
 				{
 					path3.Fill = _previewSubHighlightBrush ?? _previewHighlightBrush;
 					path3.Stroke = _previewSubHighlightBorderBrush ?? _previewHighlightBorderBrush;
 					path3.StrokeThickness = _previewStyleRenderer?.HighlightBorderThickness ?? 2.0;
 					path3.Opacity = 1.0;
+					if (grid != null) grid.Opacity = 1.0;
 					System.Windows.Controls.Panel.SetZIndex(path3, 20);
 					translateTransform2.X = Math.Cos(num27) * 4.0;
 					translateTransform2.Y = Math.Sin(num27) * 4.0;
 					ApplySubSectorGlow(path3, isHighlighted: true);
-					if (grid == null)
+					if (grid != null)
 					{
-						continue;
-					}
-					System.Windows.Controls.Panel.SetZIndex(grid, 30);
-					if (grid.Children.Count <= 0 || !(grid.Children[0] is StackPanel stackPanel))
-					{
-						continue;
-					}
-					foreach (object child in stackPanel.Children)
-					{
-						if (child is System.Windows.Shapes.Path path4)
+						System.Windows.Controls.Panel.SetZIndex(grid, 30);
+						if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel)
 						{
-							path4.Fill = System.Windows.Media.Brushes.White;
-						}
-						else if (child is TextBlock textBlock)
-						{
-							textBlock.Foreground = System.Windows.Media.Brushes.White;
-							textBlock.FontWeight = FontWeights.SemiBold;
+							foreach (object child in stackPanel.Children)
+							{
+								if (child is System.Windows.Shapes.Path path4)
+								{
+									path4.Fill = Brushes.White;
+								}
+								else if (child is TextBlock textBlock)
+								{
+									textBlock.Foreground = Brushes.White;
+									textBlock.FontWeight = FontWeights.SemiBold;
+								}
+							}
 						}
 					}
 					continue;
 				}
+
 				if (num26 == num15)
 				{
 					path3.Fill = _previewSubDefaultBrush ?? _previewDefaultBrush;
 					path3.Stroke = _previewSubHighlightBorderBrush ?? _previewHighlightBorderBrush;
 					path3.StrokeThickness = _previewStyleRenderer?.BorderThickness ?? 1.5;
 					path3.Opacity = 1.0;
+					if (grid != null) grid.Opacity = 1.0;
 					System.Windows.Controls.Panel.SetZIndex(path3, 15);
 					translateTransform2.X = 0.0;
 					translateTransform2.Y = 0.0;
 					ApplySubSectorGlow(path3, isHighlighted: false);
-					if (grid == null)
+					if (grid != null)
 					{
-						continue;
-					}
-					System.Windows.Controls.Panel.SetZIndex(grid, 30);
-					if (grid.Children.Count <= 0 || !(grid.Children[0] is StackPanel stackPanel2))
-					{
-						continue;
-					}
-					foreach (object child2 in stackPanel2.Children)
-					{
-						if (child2 is System.Windows.Shapes.Path path5)
+						System.Windows.Controls.Panel.SetZIndex(grid, 30);
+						if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel2)
 						{
-							path5.Fill = _previewSubTextBrush ?? _previewTextBrush;
-						}
-						else if (child2 is TextBlock textBlock2)
-						{
-							textBlock2.Foreground = _previewSubTextBrush ?? _previewTextBrush;
-							textBlock2.FontWeight = FontWeights.Normal;
+							foreach (object child2 in stackPanel2.Children)
+							{
+								if (child2 is System.Windows.Shapes.Path path5)
+								{
+									path5.Fill = _previewSubTextBrush ?? _previewTextBrush;
+								}
+								else if (child2 is TextBlock textBlock2)
+								{
+									textBlock2.Foreground = _previewSubTextBrush ?? _previewTextBrush;
+									textBlock2.FontWeight = FontWeights.Normal;
+								}
+							}
 						}
 					}
 					continue;
 				}
+
 				path3.Fill = _previewSubDefaultBrush ?? _previewDefaultBrush;
 				path3.Stroke = _previewSubBorderBrush ?? _previewBorderBrush;
 				path3.StrokeThickness = _previewStyleRenderer?.BorderThickness ?? 1.2;
-				path3.Opacity = 0.85;
+				path3.Opacity = (isFan ? (isTier2Mode ? 0.95 : 0.0) : 0.85);
+				if (grid != null) grid.Opacity = (isFan ? (isTier2Mode ? 1.0 : 0.0) : 0.85);
 				System.Windows.Controls.Panel.SetZIndex(path3, 15);
 				translateTransform2.X = 0.0;
 				translateTransform2.Y = 0.0;
 				ApplySubSectorGlow(path3, isHighlighted: false);
-				if (grid == null)
+				if (grid != null)
 				{
-					continue;
-				}
-				System.Windows.Controls.Panel.SetZIndex(grid, 30);
-				if (grid.Children.Count <= 0 || !(grid.Children[0] is StackPanel stackPanel3))
-				{
-					continue;
-				}
-				foreach (object child3 in stackPanel3.Children)
-				{
-					if (child3 is System.Windows.Shapes.Path path6)
+					System.Windows.Controls.Panel.SetZIndex(grid, 30);
+					if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel3)
 					{
-						path6.Fill = _previewSubTextBrush ?? _previewTextBrush;
-					}
-					else if (child3 is TextBlock textBlock3)
-					{
-						textBlock3.Foreground = _previewSubTextBrush ?? _previewTextBrush;
-						textBlock3.FontWeight = FontWeights.Normal;
-					}
-				}
-			}
-			if (_previewCoreCircle == null)
-			{
-				return;
-			}
-			if (num15 == -1)
-			{
-				_previewCoreCircle.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 63, 94));
-				if (_previewExitIcon != null)
-				{
-					_previewExitIcon.Fill = System.Windows.Media.Brushes.White;
-					_previewStyleRenderer?.ApplyExitHighlight(_previewExitIcon, isHighlighted: true);
-				}
-				if (_previewCoreScale != null)
-				{
-					DoubleAnimation animation = new DoubleAnimation(1.1, TimeSpan.FromMilliseconds(120.0))
-					{
-						EasingFunction = new QuadraticEase
+						foreach (object child3 in stackPanel3.Children)
 						{
-							EasingMode = EasingMode.EaseOut
+							if (child3 is System.Windows.Shapes.Path path6)
+							{
+								path6.Fill = _previewSubTextBrush ?? _previewTextBrush;
+							}
+							else if (child3 is TextBlock textBlock3)
+							{
+								textBlock3.Foreground = _previewSubTextBrush ?? _previewTextBrush;
+								textBlock3.FontWeight = FontWeights.Normal;
+							}
 						}
-					};
-					_previewCoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
-					_previewCoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-				}
-			}
-			else
-			{
-				_previewCoreCircle.Fill = _previewCoreBgBrush;
-				if (_previewExitIcon != null)
-				{
-					_previewExitIcon.Fill = _previewTextBrush;
-					_previewStyleRenderer?.ApplyExitHighlight(_previewExitIcon, isHighlighted: false);
-				}
-				if (_previewCoreScale != null)
-				{
-					DoubleAnimation animation2 = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(120.0))
-					{
-						EasingFunction = new QuadraticEase
-						{
-							EasingMode = EasingMode.EaseOut
-						}
-					};
-					_previewCoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, animation2);
-					_previewCoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, animation2);
+					}
 				}
 			}
 		}
@@ -6071,6 +6049,22 @@ public partial class SettingsWindow : Window
 				RenderLiveWheelPreview();
 			}
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is Button btn && btn.DataContext is SlotViewModel slotVm)
+		{
+			HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(slotVm.Parameter ?? "")
+			{
+				Owner = this
+			};
+			if (dlg.ShowDialog() == true)
+			{
+				slotVm.Parameter = dlg.ResultHotkey;
+				SyncUiToConfigAndSave();
+			}
 		}
 	}
 

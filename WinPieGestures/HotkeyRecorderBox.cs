@@ -18,6 +18,7 @@ public class HotkeyRecorderBox : Control
 	private Button? _clearButton;
 	private Border? _mainBorder;
 	private Key _currentPressedKey = Key.None;
+	private readonly HashSet<string> _sessionModifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 	public string HotkeyText
 	{
@@ -41,7 +42,7 @@ public class HotkeyRecorderBox : Control
 	{
 		HotkeyTextProperty = DependencyProperty.Register("HotkeyText", typeof(string), typeof(HotkeyRecorderBox), new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnHotkeyTextChanged));
 		IsRecordingProperty = DependencyProperty.Register("IsRecording", typeof(bool), typeof(HotkeyRecorderBox), new PropertyMetadata(false, OnIsRecordingChanged));
-		PlaceholderProperty = DependencyProperty.Register("Placeholder", typeof(string), typeof(HotkeyRecorderBox), new PropertyMetadata("点击录制快捷键/输入文本..."));
+		PlaceholderProperty = DependencyProperty.Register("Placeholder", typeof(string), typeof(HotkeyRecorderBox), new PropertyMetadata("点击录制/按Esc取消..."));
 		DefaultStyleKeyProperty.OverrideMetadata(typeof(HotkeyRecorderBox), new FrameworkPropertyMetadata(typeof(HotkeyRecorderBox)));
 		FocusableProperty.OverrideMetadata(typeof(HotkeyRecorderBox), new FrameworkPropertyMetadata(true));
 	}
@@ -64,6 +65,7 @@ public class HotkeyRecorderBox : Control
 			_clearButton.Click += delegate(object s, RoutedEventArgs e)
 			{
 				HotkeyText = string.Empty;
+				_sessionModifiers.Clear();
 				IsRecording = false;
 				e.Handled = true;
 			};
@@ -76,9 +78,19 @@ public class HotkeyRecorderBox : Control
 		base.OnMouseDown(e);
 		if (e.ChangedButton == MouseButton.Left)
 		{
-			Focus();
-			IsRecording = true;
-			_currentPressedKey = Key.None;
+			if (!IsRecording)
+			{
+				Focus();
+				_sessionModifiers.Clear();
+				IsRecording = true;
+				_currentPressedKey = Key.None;
+			}
+			else
+			{
+				CommitModifierIfAny();
+				IsRecording = false;
+				Keyboard.ClearFocus();
+			}
 			e.Handled = true;
 		}
 	}
@@ -86,6 +98,7 @@ public class HotkeyRecorderBox : Control
 	protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
 	{
 		base.OnGotKeyboardFocus(e);
+		_sessionModifiers.Clear();
 		IsRecording = true;
 		_currentPressedKey = Key.None;
 		UpdateVisualDisplay();
@@ -116,6 +129,7 @@ public class HotkeyRecorderBox : Control
 
 		if (val == Key.Escape)
 		{
+			_sessionModifiers.Clear();
 			IsRecording = false;
 			Keyboard.ClearFocus();
 			UpdateVisualDisplay();
@@ -131,6 +145,11 @@ public class HotkeyRecorderBox : Control
 			return;
 		}
 
+		if (val == Key.LeftCtrl || val == Key.RightCtrl) _sessionModifiers.Add("Ctrl");
+		else if (val == Key.LeftShift || val == Key.RightShift) _sessionModifiers.Add("Shift");
+		else if (val == Key.LeftAlt || val == Key.RightAlt) _sessionModifiers.Add("Alt");
+		else if (val == Key.LWin || val == Key.RWin) _sessionModifiers.Add("Win");
+
 		if (IsModifierKey(val))
 		{
 			_currentPressedKey = Key.None;
@@ -143,6 +162,7 @@ public class HotkeyRecorderBox : Control
 		if (!string.IsNullOrEmpty(text))
 		{
 			HotkeyText = text;
+			_sessionModifiers.Clear();
 			IsRecording = false;
 			Keyboard.ClearFocus();
 			UpdateVisualDisplay();
@@ -158,10 +178,13 @@ public class HotkeyRecorderBox : Control
 
 			if (IsModifierKey(val) && _currentPressedKey == Key.None)
 			{
-				string modCombo = GetCurrentModifierString();
-				if (!string.IsNullOrEmpty(modCombo) && !modCombo.EndsWith(" + "))
+				bool anyModDown = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) ||
+				                  Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) ||
+				                  Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt) ||
+				                  Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin);
+				if (!anyModDown && _sessionModifiers.Count > 0)
 				{
-					HotkeyText = modCombo;
+					CommitModifierIfAny();
 					IsRecording = false;
 					Keyboard.ClearFocus();
 					UpdateVisualDisplay();
@@ -175,11 +198,17 @@ public class HotkeyRecorderBox : Control
 
 	private void CommitModifierIfAny()
 	{
-		string modCombo = GetCurrentModifierString();
-		if (!string.IsNullOrEmpty(modCombo))
+		List<string> list = new List<string>();
+		if (_sessionModifiers.Contains("Ctrl") || Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)) list.Add("Ctrl");
+		if (_sessionModifiers.Contains("Shift") || Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift)) list.Add("Shift");
+		if (_sessionModifiers.Contains("Alt") || Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt)) list.Add("Alt");
+		if (_sessionModifiers.Contains("Win") || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin)) list.Add("Win");
+
+		if (list.Count > 0)
 		{
-			HotkeyText = modCombo;
+			HotkeyText = string.Join(" + ", list);
 		}
+		_sessionModifiers.Clear();
 	}
 
 	private static bool IsModifierKey(Key key)
@@ -190,32 +219,15 @@ public class HotkeyRecorderBox : Control
 		       key == Key.LWin || key == Key.RWin;
 	}
 
-	private string GetCurrentModifierString()
-	{
-		List<string> list = new List<string>();
-		if (((int)Keyboard.Modifiers & 2) != 0 || Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
-		{
-			list.Add("Ctrl");
-		}
-		if (((int)Keyboard.Modifiers & 4) != 0 || Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
-		{
-			list.Add("Shift");
-		}
-		if (((int)Keyboard.Modifiers & 1) != 0 || Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
-		{
-			list.Add("Alt");
-		}
-		if (((int)Keyboard.Modifiers & 8) != 0 || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
-		{
-			list.Add("Win");
-		}
-		return string.Join(" + ", list);
-	}
-
 	private void UpdateModifierOnlyDisplay()
 	{
 		if (!IsRecording) return;
-		string modStr = GetCurrentModifierString();
+		List<string> list = new List<string>();
+		if (_sessionModifiers.Contains("Ctrl") || Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl)) list.Add("Ctrl");
+		if (_sessionModifiers.Contains("Shift") || Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift)) list.Add("Shift");
+		if (_sessionModifiers.Contains("Alt") || Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt)) list.Add("Alt");
+		if (_sessionModifiers.Contains("Win") || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin)) list.Add("Win");
+		string modStr = string.Join(" + ", list);
 		if (_displayTextBlock != null)
 		{
 			if (!string.IsNullOrEmpty(modStr))
@@ -234,19 +246,19 @@ public class HotkeyRecorderBox : Control
 	private string BuildHotkeyString(Key mainKey)
 	{
 		List<string> list = new List<string>();
-		if (((int)Keyboard.Modifiers & 2) != 0 || Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+		if (_sessionModifiers.Contains("Ctrl") || ((int)Keyboard.Modifiers & 2) != 0 || Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
 		{
 			list.Add("Ctrl");
 		}
-		if (((int)Keyboard.Modifiers & 4) != 0 || Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
+		if (_sessionModifiers.Contains("Shift") || ((int)Keyboard.Modifiers & 4) != 0 || Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
 		{
 			list.Add("Shift");
 		}
-		if (((int)Keyboard.Modifiers & 1) != 0 || Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
+		if (_sessionModifiers.Contains("Alt") || ((int)Keyboard.Modifiers & 1) != 0 || Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
 		{
 			list.Add("Alt");
 		}
-		if (((int)Keyboard.Modifiers & 8) != 0 || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
+		if (_sessionModifiers.Contains("Win") || ((int)Keyboard.Modifiers & 8) != 0 || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
 		{
 			list.Add("Win");
 		}
@@ -315,7 +327,7 @@ public class HotkeyRecorderBox : Control
 
 		if (IsRecording)
 		{
-			_displayTextBlock.Text = "🔴 录制中... 按 Esc 取消";
+			_displayTextBlock.Text = "🔴 录制中... 点击或按Esc完成";
 			_displayTextBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E11D48"));
 			if (_mainBorder != null)
 			{

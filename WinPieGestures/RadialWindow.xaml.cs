@@ -1420,17 +1420,19 @@ public partial class RadialWindow : Window
 		return GetFanSubOffset(1).du * R + (outer - inner) * 0.40;
 	}
 
-	public static Geometry CreateSubMenuGeometry(string shape, double cx, double cy, double radius, double angleRad, double wheelCx, double wheelCy)
+	public static Geometry CreateSubMenuGeometry(string shape, double cx, double cy, double radius, double parentAngleRad, double wheelCx, double wheelCy, double cornerRadius = -1)
 	{
 		string s = string.IsNullOrEmpty(shape) ? "Original" : shape;
-		
-		// 1. HexagonHive
+		double itemAngleRad = Math.Atan2(cy - wheelCy, cx - wheelCx);
+		double itemAngleDeg = itemAngleRad * (180.0 / Math.PI);
+
+		// 1. HexagonHive: 6-vertex regular hexagon
 		if (s.Equals("HexagonHive", StringComparison.OrdinalIgnoreCase))
 		{
 			Point[] pts = new Point[6];
 			for (int i = 0; i < 6; i++)
 			{
-				double ang = angleRad + (double)i * (Math.PI / 3.0);
+				double ang = itemAngleRad + (double)i * (Math.PI / 3.0);
 				pts[i] = new Point(cx + Math.Cos(ang) * radius, cy + Math.Sin(ang) * radius);
 			}
 			StreamGeometry hex = new StreamGeometry();
@@ -1443,7 +1445,7 @@ public partial class RadialWindow : Window
 			return hex;
 		}
 
-		// 2. Circle
+		// 2. Circle: Clean round circular card bubble
 		if (s.Equals("Circle", StringComparison.OrdinalIgnoreCase))
 		{
 			EllipseGeometry ellipse = new EllipseGeometry(new Point(cx, cy), radius, radius);
@@ -1451,60 +1453,48 @@ public partial class RadialWindow : Window
 			return ellipse;
 		}
 
-		// 3. RoundedCapsule / FloatingCapsules
-		if (s.Equals("RoundedCapsule", StringComparison.OrdinalIgnoreCase) || s.Equals("FloatingCapsules", StringComparison.OrdinalIgnoreCase))
+		// 3. RoundedCapsule / FloatingCapsules / Capsule: Stadium / Pill shape
+		if (s.Equals("RoundedCapsule", StringComparison.OrdinalIgnoreCase) ||
+		    s.Equals("FloatingCapsules", StringComparison.OrdinalIgnoreCase) ||
+		    s.Equals("Capsule", StringComparison.OrdinalIgnoreCase))
 		{
-			double w = 2.1 * radius, h = 1.5 * radius, r = h / 2.0;
+			double w = 1.9 * radius, h = 1.35 * radius;
+			double r = (cornerRadius >= 0.0) ? Math.Min(h / 2.0, cornerRadius) : (h / 2.0);
 			RectangleGeometry rect = new RectangleGeometry(new Rect(-w / 2.0, -h / 2.0, w, h), r, r);
 			TransformGroup tf = new TransformGroup();
-			tf.Children.Add(new RotateTransform(angleRad * (180.0 / Math.PI)));
+			tf.Children.Add(new RotateTransform(itemAngleDeg));
 			tf.Children.Add(new TranslateTransform(cx, cy));
 			rect.Transform = tf;
 			rect.Freeze();
 			return rect;
 		}
 
-		// 4. CleanSectors / RoundedRect
-		if (s.Equals("CleanSectors", StringComparison.OrdinalIgnoreCase) || s.Equals("RoundedRect", StringComparison.OrdinalIgnoreCase))
+		// 4. CleanSectors / RoundedRect: Modern smooth rounded rectangle
+		if (s.Equals("CleanSectors", StringComparison.OrdinalIgnoreCase) ||
+		    s.Equals("RoundedRect", StringComparison.OrdinalIgnoreCase))
 		{
-			double w = 2.0 * radius, h = 1.6 * radius, r = radius * 0.35;
+			double w = 1.85 * radius, h = 1.4 * radius;
+			double r = (cornerRadius >= 0.0) ? cornerRadius : (radius * 0.35);
 			RectangleGeometry rect = new RectangleGeometry(new Rect(-w / 2.0, -h / 2.0, w, h), r, r);
 			TransformGroup tf = new TransformGroup();
-			tf.Children.Add(new RotateTransform(angleRad * (180.0 / Math.PI)));
+			tf.Children.Add(new RotateTransform(itemAngleDeg));
 			tf.Children.Add(new TranslateTransform(cx, cy));
 			rect.Transform = tf;
 			rect.Freeze();
 			return rect;
 		}
 
-		// 5. Original / ClassicRing
+		// 5. Original / ClassicRing: Smooth radiating curved arc petal
 		{
-			double midDeg = angleRad * (180.0 / Math.PI);
-			double halfSpan = 18.0;
-			double startDeg = midDeg - halfSpan;
-			double endDeg = midDeg + halfSpan;
-			double startRad = startDeg * (Math.PI / 180.0);
-			double endRad = endDeg * (Math.PI / 180.0);
-			
+			double halfSpan = 14.0;
+			double startDeg = itemAngleDeg - halfSpan;
+			double endDeg = itemAngleDeg + halfSpan;
 			double distFromCenter = Math.Sqrt((cx - wheelCx) * (cx - wheelCx) + (cy - wheelCy) * (cy - wheelCy));
-			double rIn = Math.Max(10.0, distFromCenter - radius);
-			double rOut = distFromCenter + radius;
+			double rIn = Math.Max(10.0, distFromCenter - radius * 0.88);
+			double rOut = distFromCenter + radius * 0.88;
+			double cr = (cornerRadius >= 0.0) ? cornerRadius : 6.0;
 
-			Point p1 = new Point(wheelCx + Math.Cos(startRad) * rIn, wheelCy + Math.Sin(startRad) * rIn);
-			Point p2 = new Point(wheelCx + Math.Cos(endRad) * rIn, wheelCy + Math.Sin(endRad) * rIn);
-			Point p3 = new Point(wheelCx + Math.Cos(endRad) * rOut, wheelCy + Math.Sin(endRad) * rOut);
-			Point p4 = new Point(wheelCx + Math.Cos(startRad) * rOut, wheelCy + Math.Sin(startRad) * rOut);
-
-			StreamGeometry geo = new StreamGeometry();
-			using (StreamGeometryContext ctx = geo.Open())
-			{
-				ctx.BeginFigure(p1, isFilled: true, isClosed: true);
-				ctx.ArcTo(p2, new Size(rIn, rIn), 0.0, isLargeArc: false, SweepDirection.Clockwise, isStroked: true, isSmoothJoin: false);
-				ctx.LineTo(p3, isStroked: true, isSmoothJoin: false);
-				ctx.ArcTo(p4, new Size(rOut, rOut), 0.0, isLargeArc: false, SweepDirection.Counterclockwise, isStroked: true, isSmoothJoin: false);
-			}
-			geo.Freeze();
-			return geo;
+			return IconHelper.CreateAdvancedSectorGeometry(wheelCx, wheelCy, startDeg, endDeg, rIn, rOut, "Original", 0.0, cr);
 		}
 	}
 
@@ -1533,8 +1523,19 @@ public partial class RadialWindow : Window
 		double ux = Math.Cos(midRad), uy = Math.Sin(midRad);
 		double vx = -Math.Sin(midRad), vy = Math.Cos(midRad);
 
-		double R = (_innerRadius + _outerRadius) / 2.0;
+		double userSubRadius = ConfigManager.CurrentConfig.SubWheelOuterRadius;
+		double userSubGap = ConfigManager.CurrentConfig.SubWheelInnerGap;
+		double userCornerRadius = ConfigManager.CurrentConfig.SubWheelCornerRadius;
+
 		double itemR = (_outerRadius - _innerRadius) * 0.40;
+		if (userSubRadius > 0.0 && _outerRadius > 0.0)
+		{
+			double ratio = userSubRadius / (_outerRadius * 1.55);
+			itemR *= Math.Max(0.5, Math.Min(2.5, ratio));
+		}
+
+		double gapOffset = (userSubGap >= 0.0) ? userSubGap : 4.0;
+		double R = (_innerRadius + _outerRadius) / 2.0 + gapOffset;
 
 		double num7 = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : ((layoutMode == "IconOnly") ? 22.0 : 17.0));
 		double fontSize = ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : Math.Max(8.5, ConfigManager.CurrentConfig.SectorFontSize - 1.0));
@@ -1552,7 +1553,7 @@ public partial class RadialWindow : Window
 			double px = cx + ux * (du * R) + vx * (dv * R);
 			double py = cy + uy * (du * R) + vy * (dv * R);
 
-			Geometry data = CreateSubMenuGeometry(shape, px, py, itemR, midRad, cx, cy);
+			Geometry data = CreateSubMenuGeometry(shape, px, py, itemR, midRad, cx, cy, userCornerRadius);
 
 			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, px, py);
 			TranslateTransform translateTransform = new TranslateTransform(0.0, 0.0);

@@ -58,41 +58,59 @@ public class GestureController
 	private bool CheckIsIsolated(out string processName)
 	{
 		processName = ActiveWindowHelper.GetActiveWindowProcessName();
-		bool flag = false;
-		string b = processName.Trim().ToLowerInvariant();
-		if (string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
+		string cleanProcess = (processName ?? "").Trim().ToLowerInvariant();
+
+		bool isWhitelisted = false;
+		if (ConfigManager.CurrentConfig.WhitelistedProcesses != null)
 		{
-			bool flag2 = false;
-			if (ConfigManager.CurrentConfig.WhitelistedProcesses != null)
+			foreach (string whitelistedProcess in ConfigManager.CurrentConfig.WhitelistedProcesses)
 			{
-				foreach (string whitelistedProcess in ConfigManager.CurrentConfig.WhitelistedProcesses)
+				if (string.Equals(whitelistedProcess.Trim(), cleanProcess, StringComparison.OrdinalIgnoreCase))
 				{
-					if (string.Equals(whitelistedProcess.Trim(), b, StringComparison.OrdinalIgnoreCase))
-					{
-						flag2 = true;
-						break;
-					}
-				}
-			}
-			flag = !flag2;
-		}
-		else if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
-		{
-			foreach (string blacklistedProcess in ConfigManager.CurrentConfig.BlacklistedProcesses)
-			{
-				if (string.Equals(blacklistedProcess.Trim(), b, StringComparison.OrdinalIgnoreCase))
-				{
-					flag = true;
+					isWhitelisted = true;
 					break;
 				}
 			}
 		}
-		bool num = ConfigManager.CurrentConfig.DisableOnCtrl && ((int)(Keyboard.GetKeyStates((Key)118) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)119) & KeyStates.Down) > 0);
-		bool flag3 = ConfigManager.CurrentConfig.DisableOnShift && ((int)(Keyboard.GetKeyStates((Key)116) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)117) & KeyStates.Down) > 0);
-		bool flag4 = ConfigManager.CurrentConfig.DisableOnAlt && ((int)(Keyboard.GetKeyStates((Key)120) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)121) & KeyStates.Down) > 0);
-		bool flag5 = num | flag3 | flag4;
-		bool flag6 = ConfigManager.CurrentConfig.DisableOnFullScreen && FullScreenHelper.IsActiveWindowFullScreen();
-		return flag | flag5 | flag6;
+
+		bool isBlacklisted = false;
+		if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
+		{
+			foreach (string blacklistedProcess in ConfigManager.CurrentConfig.BlacklistedProcesses)
+			{
+				if (string.Equals(blacklistedProcess.Trim(), cleanProcess, StringComparison.OrdinalIgnoreCase))
+				{
+					isBlacklisted = true;
+					break;
+				}
+			}
+		}
+
+		bool isProcessIsolated = false;
+		if (string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
+		{
+			isProcessIsolated = !isWhitelisted;
+		}
+		else
+		{
+			isProcessIsolated = isBlacklisted;
+		}
+
+		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && ((int)(Keyboard.GetKeyStates((Key)118) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)119) & KeyStates.Down) > 0);
+		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && ((int)(Keyboard.GetKeyStates((Key)116) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)117) & KeyStates.Down) > 0);
+		bool disableAlt = ConfigManager.CurrentConfig.DisableOnAlt && ((int)(Keyboard.GetKeyStates((Key)120) & KeyStates.Down) > 0 || (int)(Keyboard.GetKeyStates((Key)121) & KeyStates.Down) > 0);
+		bool isModifierSuppressed = disableCtrl | disableShift | disableAlt;
+
+		bool isFullScreenSuppressed = false;
+		if (ConfigManager.CurrentConfig.DisableOnFullScreen)
+		{
+			if (!isWhitelisted && FullScreenHelper.IsActiveWindowFullScreen())
+			{
+				isFullScreenSuppressed = true;
+			}
+		}
+
+		return isProcessIsolated || isModifierSuppressed || isFullScreenSuppressed;
 	}
 
 	private bool IsModifierKey(uint vkCode)
@@ -416,27 +434,38 @@ public class GestureController
 					ActionItem actionItem = _activeProfile.Actions[num4];
 					if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
 					{
-						if (num3 >= num7)
+if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 						{
-							flag2 = true;
+							if (num3 >= num7)
+							{
+								flag2 = true;
+								num5 = HitTestFanSubs(currentPoint, _startPoint, num4, actionItem.SubActions.Count);
+							}
 						}
-						double num14 = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0);
-						double num15 = wheelRadius + num14 + 2.0;
-						if (num3 >= num15)
+						else
 						{
-							int count = actionItem.SubActions.Count;
-							double num16 = (double)num4 * num13 - num13 / 2.0;
-							double num17;
-							for (num17 = num11 - num16; num17 < 0.0; num17 += 360.0)
+							if (num3 >= num7)
 							{
+								flag2 = true;
 							}
-							while (num17 >= 360.0)
+							double num14 = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0);
+							double num15 = wheelRadius + num14 + 2.0;
+							if (num3 >= num15)
 							{
-								num17 -= 360.0;
-							}
-							if (num17 <= num13)
-							{
-								num5 = Math.Clamp((int)(num17 / (num13 / (double)count)), 0, count - 1);
+								int count = actionItem.SubActions.Count;
+								double num16 = (double)num4 * num13 - num13 / 2.0;
+								double num17;
+								for (num17 = num11 - num16; num17 < 0.0; num17 += 360.0)
+								{
+								}
+								while (num17 >= 360.0)
+								{
+									num17 -= 360.0;
+								}
+								if (num17 <= num13)
+								{
+									num5 = Math.Clamp((int)(num17 / (num13 / (double)count)), 0, count - 1);
+								}
 							}
 						}
 					}
@@ -491,24 +520,35 @@ public class GestureController
 		
 		double dx = currentPoint.X - centerPoint.X;
 		double dy = currentPoint.Y - centerPoint.Y;
+		double dist = Math.Sqrt(dx * dx + dy * dy);
 		
+		double outer = ConfigManager.CurrentConfig.WheelRadius;
+		double inner = ConfigManager.CurrentConfig.InnerRadius;
+		
+		if (dist < inner + (outer - inner) * 0.40)
+		{
+			return -1;
+		}
+
 		int n = _activeProfile?.SectorCount ?? 8;
 		double sectorSize = 360.0 / n;
 		double midRad = parentIndex * sectorSize * (Math.PI / 180.0);
 		
+		int activeCount = Math.Min(RadialWindow.FanSubmenuSlotCount, subCount);
+		if (activeCount == 1)
+		{
+			return 0;
+		}
+
+		double mouseAngle = Math.Atan2(dy, dx);
+		
+		int bestSub = 0;
+		double bestAngleDiff = double.MaxValue;
+		
 		double ux = Math.Cos(midRad), uy = Math.Sin(midRad);
 		double vx = -Math.Sin(midRad), vy = Math.Cos(midRad);
-		
-		double outer = ConfigManager.CurrentConfig.WheelRadius;
-		double inner = ConfigManager.CurrentConfig.InnerRadius;
 		double R = (inner + outer) / 2.0;
-		double itemR = (outer - inner) * 0.40;
-		
-		int bestSub = -1;
-		double bestDistSq = double.MaxValue;
-		double hitThresholdSq = (itemR * 1.45) * (itemR * 1.45);
-		
-		int activeCount = Math.Min(RadialWindow.FanSubmenuSlotCount, subCount);
+
 		for (int j = 0; j < activeCount; j++)
 		{
 			int slot = RadialWindow.GetFanSlotIndex(j, activeCount);
@@ -517,17 +557,24 @@ public class GestureController
 			double px = ux * (du * R) + vx * (dv * R);
 			double py = uy * (du * R) + vy * (dv * R);
 			
-			double ddx = dx - px;
-			double ddy = dy - py;
-			double distSq = ddx * ddx + ddy * ddy;
+			double itemAngle = Math.Atan2(py, px);
+			double diff = Math.Abs(NormalizeAngleRad(mouseAngle - itemAngle));
 			
-			if (distSq <= hitThresholdSq && distSq < bestDistSq)
+			if (diff < bestAngleDiff)
 			{
-				bestDistSq = distSq;
+				bestAngleDiff = diff;
 				bestSub = j;
 			}
 		}
+		
 		return bestSub;
+	}
+
+	private static double NormalizeAngleRad(double angle)
+	{
+		while (angle > Math.PI) angle -= 2.0 * Math.PI;
+		while (angle < -Math.PI) angle += 2.0 * Math.PI;
+		return angle;
 	}
 
 }

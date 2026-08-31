@@ -4,39 +4,35 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.5.4] - 2026-08-31 (快捷键录入与执行引擎全量重构 & 全局文字高对比度修复 & 二级菜单展示形式移至手势与动作 & PR#6 蜂窝扇数学拟合优化)
+## [v1.5.4] - 2026-08-31 (快捷键按键拼装构建器 & 独立录制控制 & 蜂窝扇多形态几何重构与左右判定Bug修复)
 
 ### ⌨️ 快捷键录入与执行引擎全量重构 (Hotkey Input & Execution Engine Overhaul)
-1. **解决 Alt+Delete、Shift+Alt、Ctrl+Shift 等特殊/纯修饰键无法录入的问题**：
-   - 彻底修复 `HotkeyRecorderBox.cs` 中硬编码的 `val == 2 || val == 32` 清除逻辑，解除对 `Delete` / `Backspace` 键的拦截，使 Photoshop 填充等经典快捷键（`Alt+Delete`、`Ctrl+Backspace`）能够正常录入；
-   - 支持纯修饰键组合（如切换输入法的 `Shift+Alt`、`Ctrl+Shift`、`Win+Alt`），在按下并释放修饰键时即可自动精准识别并完成录入；
-   - 增加独立的一键清除按钮（`PART_ClearButton`），无需借用按键即可快速清空快捷键，同时支持 `Esc` 键取消录制与 `Enter` 键确认保存。
-2. **支持连续多字符/数值文本输入 (Multi-digit & Text Action)**：
-   - 新增 `SendTextInput` 驱动，采用 Win32 原生 `KEYEVENTF_UNICODE` 字符流注入技术，支持直接录入并触发固定多位数值（如 `"100"`、`"0.5"`、`"1920"`）或字符串文本，突破以往只能录入单字符数字的局限；
-   - 在动作执行引擎 `ActionExecutor.cs` 中无缝支持 `Text` 与 `String` 动作类型。
+1. **新增独立的「快捷键与组合构建器 (`HotkeyBuilderDialog`)」**：
+   - 在控制台（`SettingsWindow`）主映射列表以及二级子动作编辑器（`SubActionEditorWindow`）中，为快捷热键行新增 **`[ ⚙️ 拼装 ]`** 独立构建按钮；
+   - **四项修饰键独立勾选**：提供 `[ ] Ctrl`、`[ ] Shift`、`[ ] Alt`、`[ ] Win` 勾选框；
+   - **全量主按键分类下拉选择器**：涵盖 `Tab`（窗口/焦点切换）、`Esc`、`Enter`、`Space`、`Backspace`、`Delete`、`Insert`、`Home/End/PageUp/PageDown`、`↑↓←→` 方向键、`F1~F24`、`A~Z`、`0~9`、小键盘等全部标准按键；
+   - **轻松设置系统级拦截热键与纯修饰键**：用户无需按下键盘即可直接勾选拼装出 `Alt + Tab`、`Win + Tab`、`Shift + Alt`、`Ctrl + Shift`、`Ctrl + Alt + Delete`，彻底避开操作系统拦截与窗口切走问题。
+2. **独立录制控制与多位数值/文本直输**：
+   - 录制框支持独立点击开启录制（`🔴 录制中...`），再次点击或按回车即可完成录制，按 `Esc` 取消，配备一键清除按钮（`✕`）；
+   - 在构建器与录制框中均支持直接输入多位连续数值（如 `"100"`、`"0.5"`、`"1920"`）或文本字符串，底层采用 `KEYEVENTF_UNICODE` 字符流驱动无缝注入。
 3. **彻底修复 Shift+F4 误触发 Shift+S / Ctrl+F5 误触发 Ctrl+T 等硬件扫描码 Bug**：
-   - 根因分析：在 Windows Win32 消息体系中，`VK_F4` 的虚拟键码为 `115`（`0x73`，恰好对应 ASCII 字符 `'s'`），`VK_F5` 的虚拟键码为 `116`（`0x74`，恰好对应 ASCII 字符 `'t'`）。以往向 Windows 发送键盘事件时 `wScan = 0`，导致 DirectInput、Adobe 系列及游戏将虚拟键码误转为 ASCII 字符码；
-   - 架构修复：引入 Win32 `MapVirtualKey(vk, MAPVK_VK_TO_VSC)` 硬件扫描码实时转换，并在 `CreateKeyInput` 中正确补充硬件级 `wScan` 与 `KEYEVENTF_EXTENDEDKEY` 扩展键标志（涵盖 `Delete`、`Insert`、`PageUp/Down`、`Home/End`、方向键、`Win` 键、小键盘除号等），彻底根治各类生产力应用中的快捷键误触发。
+   - 引入 Win32 `MapVirtualKey(vk, MAPVK_VK_TO_VSC)` 硬件扫描码实时转换，并在 `CreateKeyInput` 中正确补充硬件级 `wScan` 与 `KEYEVENTF_EXTENDEDKEY` 扩展键标志（涵盖 `Delete`、`Insert`、`PageUp/Down`、`Home/End`、方向键、`Win` 键、小键盘除号等），彻底根治各类生产力应用中的快捷键误触发。
 4. **解决 Illustrator 中 Ctrl+G / Ctrl+Shift+G 触发导致页面滚动的 Bug**：
    - 在 `ActionExecutor` 模拟按键下发链路中注入 15ms 的微时延保持（Hold Duration），确保修饰键（`Ctrl` / `Shift`）在宿主程序中被完整且稳定地置于按下态后再释放，避免被宿主软件误当作无修饰的单键（如 `G` 渐变/滚动工具）引发页面滚动。
-5. **解耦切换窗口快捷键录入 (Alt+Tab / Win+Tab)**：
-   - 优化录制焦点与按键拦截机制，录制中完全消费键盘事件，避免焦点被系统切走；配合独立录制与按键解析器，实现对 `Alt+Tab`、`Win+Tab` 等系统级切换快捷键的稳定配置与触发。
 
-### 🎨 全局深色模式文字对比度增强 (Dark Theme Text Contrast Fixes)
-1. **开关与复选框文字高对比度呈现 (Images 1 & 2 修复)**：
-   - 修复 `SettingsWindow.xaml` 中 `ToggleSwitchStyle`（开关控件）的内容呈现器未绑定前景色画刷的问题，在 `<ContentPresenter>` 上显式绑定 `TextElement.Foreground="{DynamicResource TextPrimaryBrush}"`，并将基础样式前景色设置为 `TextPrimaryBrush`；
-   - 彻底解决「外观与形态」中 `在轮盘扇区中显示动作名称文字`、`启用中心图案/图标显示` 以及「手势与动作」中 `启用多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)` 在极夜曜黑与钛金深灰深色主题下文字与暗色背景混淆不清的缺陷，文字呈现纯白高清对比度（#F8FAFC / #F4F4F5）。
+### 🍯 蜂窝扇几何重构与区域命中判定修复 (Honeycomb Fan Geometry & Hit-Test Fixes)
+1. **经典紧凑扇区（Original）与悬浮圆角胶囊（Capsule）深度适配**：
+   - 彻底修复 `ClassicRing` / `Original` 弧形扇叶计算时错误继承父级扇区中心角的缺陷。重构为依据各子按键在极坐标中的独立偏角 $\theta_j = \text{atan2}(p_{y}-c_y, p_{x}-c_x)$ 动态生成优雅的花瓣形圆角弧度，自然环抱展开；
+   - 重构 `RoundedCapsule`（圆角胶囊）的旋转矩阵，按各按键法线方向对齐，彻底消除放射性穿插重叠。
+2. **彻底修复「鼠标光标在左侧，激活动画效果却在右侧」的判定 Bug**：
+   - 根因分析：在实时画布 `LiveWheelPreviewCanvas_MouseMove` 与 `RenderLiveWheelPreview` 中，子菜单在蜂窝扇模式下未根据父级扇区状态进行可见性隔离，且悬停角判定存在量化偏移，导致左侧悬停时拾取了右侧残留的子菜单几何；
+   - 架构修复：实时画布在 `Fan` 模式下仅在鼠标划向对应父级扇区时才展开并命中对应的蜂窝扇，其余方位完全隔离隐藏（`Opacity = 0`），实现 100% 像素级精准对应。
 
-### 🔀 二级菜单展现形式切换移至「手势与动作」卡片 (Relocate Submenu Style)
-1. **界面功能层级合理归纳 (Images 3 & 4 修复)**：
-   - 将「二级菜单样式 (Submenu Style)」选择下拉框从 Tab 1（外观与形态）的二级轮盘尺寸面板中移除，规范归入 Tab 2（手势与动作）的 **「多级轮盘与级联子菜单」** 配置卡片中，紧邻多级轮盘总开关；
-   - 提供中/繁/英/日 4 种多语言文案支持，清晰注解「🌐 外圈子环」与「🍯 蜂窝扇」的应用场景与特性差异。
+### 🎨 全局深色模式文字高对比度优化
+- 修复 `ToggleSwitchStyle`（开关控件）内容呈现器未绑定前景色画刷的问题，在 `<ContentPresenter>` 上显式绑定 `TextElement.Foreground="{DynamicResource TextPrimaryBrush}"`，确保在极夜曜黑与钛金深灰深色主题下文字清晰锐利（纯白 #F8FAFC / #F4F4F5）。
 
-### 🍯 PR #6 蜂窝扇矩阵效果与多几何形状深度适配 (Honeycomb Fan Polish)
-1. **基于 PR #6 的正三角密铺与弦距矩阵算法**：
-   - 严格对齐 PR #6 几何数学模型，采用弦长距离 $R_{\text{chord}} = \sqrt{2-\sqrt{2}} \approx 0.76536686$ 与三角密铺偏移 ($du = 1 + R, 1 + R/2$; $dv = \pm R \frac{\sqrt{3}}{2}$)；
-   - 针对 5 种轮盘切削形态（蜂巢六边形、独立圆形、悬浮胶囊、圆角矩形、经典圆弧）自动生成对应几何外形；
-   - 统一渲染 Z-Index 与高亮对比度，确保鼠标悬停高亮时图标与文本清晰锐利，提供极致的丝滑操作手感。
+### 🔀 二级菜单展现形式切换移至「手势与动作」卡片
+- 将「二级菜单样式 (Submenu Style)」选择下拉框从 Tab 1（外观与形态）的二级轮盘尺寸面板中移除，规范归入 Tab 2（手势与动作）的 **「多级轮盘与级联子菜单」** 配置卡片中，紧邻多级轮盘总开关。
 
 ---
 

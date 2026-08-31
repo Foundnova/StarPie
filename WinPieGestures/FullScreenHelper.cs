@@ -59,7 +59,6 @@ public static class FullScreenHelper
 			return false;
 		}
 
-		// Exclude desktop background and shell manager window classes (Progman, WorkerW, Shell_TrayWnd, etc.)
 		StringBuilder sbClass = new StringBuilder(256);
 		GetClassName(foregroundWindow, sbClass, 256);
 		string className = sbClass.ToString();
@@ -75,7 +74,6 @@ public static class FullScreenHelper
 			return false;
 		}
 
-		// Check if active foreground process is Windows Explorer shell
 		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
 		if (string.Equals(activeProc, "explorer.exe", StringComparison.OrdinalIgnoreCase))
 		{
@@ -98,7 +96,6 @@ public static class FullScreenHelper
 			return false;
 		}
 
-		// Full-screen check: window rect covers the entire monitor
 		if (lpRect.Left <= lpmi.rcMonitor.Left && lpRect.Top <= lpmi.rcMonitor.Top && lpRect.Right >= lpmi.rcMonitor.Right && lpRect.Bottom >= lpmi.rcMonitor.Bottom)
 		{
 			return true;

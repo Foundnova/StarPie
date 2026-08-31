@@ -261,6 +261,8 @@
       <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource FlatComboBoxStyle}" />
       <Style x:Key="ToggleSwitchStyle" TargetType="{x:Type CheckBox}">
         <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="Template">
           <Setter.Value>
             <ControlTemplate TargetType="{x:Type CheckBox}">
@@ -273,7 +275,7 @@
                     </UIElement.Effect>
                   </Ellipse>
                 </Grid>
-                <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextPrimaryBrush}" />
               </StackPanel>
               <ControlTemplate.Triggers>
                 <Trigger Property="ToggleButton.IsChecked" Value="True">
@@ -1467,7 +1469,14 @@
                             <TextBox Grid.Column="2" Margin="0,0,6,0" Height="30" FontSize="12" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <ComboBox Grid.Column="3" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" Style="{StaticResource FlatComboBoxStyle}" Height="30" Margin="0,0,6,0" FontSize="11.5" ItemsSource="{Binding ActionTypes}" SelectedValue="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             <Grid Column="4" Margin="0,0,6,0">
-                              <local:HotkeyRecorderBox Height="30" FontSize="12" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}" />
+                              <Grid Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <local:HotkeyRecorderBox Height="30" FontSize="12" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                              <Button Grid.Column="1" Content="⚙️ 拼装" Margin="4,0,0,0" Height="30" Padding="6,0" Cursor="Hand" ToolTip="打开快捷热键拼装组合器（支持 Alt+Tab、Win+Tab、Shift+Alt、多位连续数值等）" Click="HotkeyBuilderButton_Click" Style="{StaticResource ModernButtonStyle}" />
+                            </Grid>
                               <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
                                 <Grid.ColumnDefinitions>
                                   <ColumnDefinition Width="*" />

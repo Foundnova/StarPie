@@ -466,33 +466,55 @@ public static class ActionExecutor
 			return;
 		}
 
+		// 1. If pure modifier combo (e.g. Shift + Alt, Ctrl + Shift)
+		if (hotkeyDetails.MainKey == 0 && hotkeyDetails.Modifiers.Count > 0)
+		{
+			List<INPUT> modDowns = new List<INPUT>();
+			foreach (ushort mod in hotkeyDetails.Modifiers)
+			{
+				modDowns.Add(CreateKeyInput(mod, down: true));
+			}
+			SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			System.Threading.Thread.Sleep(20);
+			List<INPUT> modUps = new List<INPUT>();
+			for (int i = hotkeyDetails.Modifiers.Count - 1; i >= 0; i--)
+			{
+				modUps.Add(CreateKeyInput(hotkeyDetails.Modifiers[i], down: false));
+			}
+			SendInput((uint)modUps.Count, modUps.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			return;
+		}
+
+		// 2. Standard Modifier + Main Key combo
 		List<INPUT> downInputs = new List<INPUT>();
 		foreach (ushort modifier in hotkeyDetails.Modifiers)
 		{
 			downInputs.Add(CreateKeyInput(modifier, down: true));
 		}
-		if (hotkeyDetails.MainKey != 0)
+		if (downInputs.Count > 0)
 		{
-			downInputs.Add(CreateKeyInput(hotkeyDetails.MainKey, down: true));
+			SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			System.Threading.Thread.Sleep(15);
 		}
 
-		List<INPUT> upInputs = new List<INPUT>();
 		if (hotkeyDetails.MainKey != 0)
 		{
-			upInputs.Add(CreateKeyInput(hotkeyDetails.MainKey, down: false));
+			INPUT[] keySeq = new INPUT[2]
+			{
+				CreateKeyInput(hotkeyDetails.MainKey, down: true),
+				CreateKeyInput(hotkeyDetails.MainKey, down: false)
+			};
+			SendInput(1u, new INPUT[] { keySeq[0] }, Marshal.SizeOf(typeof(INPUT)));
+			System.Threading.Thread.Sleep(20);
+			SendInput(1u, new INPUT[] { keySeq[1] }, Marshal.SizeOf(typeof(INPUT)));
+			System.Threading.Thread.Sleep(15);
 		}
+
+				List<INPUT> upInputs = new List<INPUT>();
 		for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
 		{
 			upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
 		}
-
-		if (downInputs.Count > 0)
-		{
-			SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-		}
-
-		System.Threading.Thread.Sleep(15);
-
 		if (upInputs.Count > 0)
 		{
 			SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
