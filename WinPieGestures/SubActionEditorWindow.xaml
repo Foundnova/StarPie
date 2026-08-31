@@ -15,6 +15,16 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
+        <!-- Local FlatComboBoxStyle: the window-scoped one in SettingsWindow is not visible here,
+             and a missing StaticResource would throw at runtime when sub-slot rows instantiate. -->
+        <Style x:Key="FlatComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="Padding" Value="6,2"/>
+        </Style>
+
         <Style x:Key="ModernButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource ButtonDefaultBgBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource ButtonDefaultBorderBrush}"/>

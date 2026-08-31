@@ -301,6 +301,34 @@ namespace WinPieGestures
                 [LanguageCode.En] = "Process Isolation & Activation Mode",
                 [LanguageCode.Ja] = "プロセス分離と有効化モード"
             },
+            ["SubmenuStyleTitle"] = new()
+            {
+                [LanguageCode.ZhCn] = "二级菜单样式 (Submenu Style)",
+                [LanguageCode.ZhTw] = "二級選單樣式 (Submenu Style)",
+                [LanguageCode.En] = "Submenu Style",
+                [LanguageCode.Ja] = "サブメニュースタイル (Submenu Style)"
+            },
+            ["SubmenuStyleDesc"] = new()
+            {
+                [LanguageCode.ZhCn] = "外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。",
+                [LanguageCode.ZhTw] = "外圈子環：子動作沿選中扇區外側環形展開（數量不限）；蜂窩扇：子動作以選中項為中心呈扇形排列（最多三項）。",
+                [LanguageCode.En] = "Sub-Ring: sub actions expand as an outer ring along the selected sector (any count). Honeycomb Fan: sub actions fan out centered on the selected item (up to three).",
+                [LanguageCode.Ja] = "サブリング：選択セクターの外側にリング状に展開（数は任意）。ハニカムファン：選択項目を中心に扇形に展開（最大3つ）。"
+            },
+            ["SubmenuStyleWheel"] = new()
+            {
+                [LanguageCode.ZhCn] = "🌐 外圈子环 (Sub-Ring)",
+                [LanguageCode.ZhTw] = "🌐 外圈子環 (Sub-Ring)",
+                [LanguageCode.En] = "🌐 Sub-Ring",
+                [LanguageCode.Ja] = "🌐 サブリング (Sub-Ring)"
+            },
+            ["SubmenuStyleFan"] = new()
+            {
+                [LanguageCode.ZhCn] = "🍯 蜂窝扇 (Honeycomb Fan)",
+                [LanguageCode.ZhTw] = "🍯 蜂窩扇 (Honeycomb Fan)",
+                [LanguageCode.En] = "🍯 Honeycomb Fan",
+                [LanguageCode.Ja] = "🍯 ハニカムファン (Honeycomb Fan)"
+            },
             ["IsolationBlacklistRadio"] = new()
             {
                 [LanguageCode.ZhCn] = "🚫 排除黑名单模式 (默认：全局生效，仅在黑名单程序中放行右键)",

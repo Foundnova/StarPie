@@ -69,6 +69,7 @@ namespace WinPieGestures
         // Multi-Tier Sub-Wheel (多级轮盘与级联子菜单)
         public bool EnableMultiTier { get; set; } = true; // Multi-Tier feature toggle
         public double SubWheelRadiusRatio { get; set; } = 1.55; // Outer ring radius multiplier
+        public string SubmenuStyle { get; set; } = "Wheel"; // "Wheel" (outer sub-ring), "Fan" (honeycomb fan)
         
         public bool ShowText { get; set; } = true;
         public double WheelRadius { get; set; } = 138.0;

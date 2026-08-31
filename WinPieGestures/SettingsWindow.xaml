@@ -612,7 +612,7 @@
                 <!-- Version Footer -->
                 <StackPanel Grid.Row="2" Margin="0,15,0,5">
                     <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-                        <TextBlock x:Name="SidebarVersionText" Text="v1.4.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
+                        <TextBlock x:Name="SidebarVersionText" Text="v1.5.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}"/>
                     </Border>
                     <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"/>
                 </StackPanel>
@@ -1407,6 +1407,25 @@
                                     <TextBlock x:Name="MultiTierCardTitleText" Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                                     <CheckBox x:Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed"/>
                                     <TextBlock x:Name="EnableMultiTierDescText" Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。点击下方各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0"/>
+
+                                    <StackPanel x:Name="SubmenuStylePanel" Margin="0,12,0,0">
+                                        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="200"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                                    <TextBlock x:Name="SubmenuStyleTitleText" Text="二级菜单样式 (Submenu Style)" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock x:Name="SubmenuStyleDescText" Text="外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <ComboBox x:Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="32" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
+                                                    <ComboBoxItem x:Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)"/>
+                                                    <ComboBoxItem x:Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇 (Honeycomb Fan)"/>
+                                                </ComboBox>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 
@@ -1672,7 +1691,7 @@
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                             <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="v1.4.5" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
+                                                <TextBlock Text="v1.5.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/>

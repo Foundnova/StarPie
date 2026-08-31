@@ -101,7 +101,11 @@ namespace WinPieGestures
             double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
             bool multiTier = ConfigManager.CurrentConfig.EnableMultiTier;
             double subRatio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1 ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
-            double maxRadius = multiTier ? (wheelRadius * subRatio + 25.0) : wheelRadius;
+            double ringMax = wheelRadius * subRatio + 25.0;
+            double fanMax = multiTier && string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase)
+                ? GetFanExtentRadius(wheelRadius, ConfigManager.CurrentConfig.InnerRadius) + 25.0
+                : 0.0;
+            double maxRadius = multiTier ? Math.Max(ringMax, fanMax) : wheelRadius;
 
             // Adjust window size dynamically based on max outer radius
             double winSize = maxRadius * 2.0 + 40.0; // Margin for shadow
@@ -686,6 +690,198 @@ namespace WinPieGestures
             this.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
+        // ================== SubmenuStyle "Fan" (honeycomb fan — optional alternate style) ==================
+
+        /// <summary>Fan style shows at most this many sub slots.</summary>
+        public const int FanSubmenuSlotCount = 3;
+
+        /// <summary>Fan offsets (in layout-radius units) in a radial/tangential frame: tip + upper/lower.</summary>
+        public static (double du, double dv) GetFanSubOffset(int index)
+        {
+            double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // |selected-item to neighbor| in layout-radius units
+            switch (index)
+            {
+                case 0: return (1.0 + ringR * 0.5, ringR * 0.8660254038);   // upper
+                case 1: return (1.0 + ringR, 0.0);                           // tip
+                default: return (1.0 + ringR * 0.5, -ringR * 0.8660254038); // lower
+            }
+        }
+
+        /// <summary>Max radial extent of the fan (window sizing).</summary>
+        public static double GetFanExtentRadius(double outer, double inner)
+        {
+            double R = (outer + inner) / 2.0;
+            return GetFanSubOffset(1).du * R + (outer - inner) * 0.40;
+        }
+
+        private static Geometry CreateSubMenuGeometry(string shape, double cx, double cy, double radius, double angleRad)
+        {
+            string s = string.IsNullOrEmpty(shape) ? "Circle" : shape;
+            if (s.Equals("Circle", StringComparison.OrdinalIgnoreCase))
+            {
+                return new EllipseGeometry(new Point(cx, cy), radius, radius);
+            }
+            if (s.Equals("HexagonHive", StringComparison.OrdinalIgnoreCase))
+            {
+                var pts = new Point[6];
+                for (int i = 0; i < 6; i++)
+                {
+                    double ang = angleRad + i * (Math.PI / 3.0);
+                    pts[i] = new Point(cx + Math.Cos(ang) * radius, cy + Math.Sin(ang) * radius);
+                }
+                var hex = new StreamGeometry();
+                using (var ctx = hex.Open())
+                {
+                    ctx.BeginFigure(pts[0], isFilled: true, isClosed: true);
+                    for (int i = 1; i < 6; i++) ctx.LineTo(pts[i], isStroked: true, isSmoothJoin: false);
+                }
+                hex.Freeze();
+                return hex;
+            }
+            // Capsule / rounded-rect family: rounded rect rotated along the radial direction
+            double w = 2.0 * radius, h = 1.6 * radius, rr = h / 2.0;
+            var rect = new RectangleGeometry(new Rect(-w / 2.0, -h / 2.0, w, h), rr, rr);
+            var tf = new TransformGroup();
+            tf.Children.Add(new RotateTransform(angleRad * (180.0 / Math.PI)));
+            tf.Children.Add(new TranslateTransform(cx, cy));
+            rect.Transform = tf;
+            return rect;
+        }
+
+        private void RenderFanSubtier(int parentIndex)
+        {
+            ClearSubTier();
+
+            if (!ConfigManager.CurrentConfig.EnableMultiTier) return;
+            if (parentIndex < 0 || parentIndex >= _profile.Actions.Count) return;
+
+            var parentAction = _profile.Actions[parentIndex];
+            if (parentAction == null || parentAction.SubActions == null || parentAction.SubActions.Count == 0) return;
+
+            int n = _profile.SectorCount;
+            double sectorSize = 360.0 / n;
+            double cx = WheelCanvas.Width / 2.0;
+            double cy = WheelCanvas.Height / 2.0;
+
+            string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
+            string layoutMode = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
+            bool showText = ConfigManager.CurrentConfig.ShowText && layoutMode != "IconOnly";
+
+            double outer = ConfigManager.CurrentConfig.WheelRadius;
+            double inner = ConfigManager.CurrentConfig.InnerRadius;
+            double R = (inner + outer) / 2.0;
+            double itemR = (outer - inner) * 0.40;
+            double midRad = parentIndex * sectorSize * (Math.PI / 180.0);
+            double ux = Math.Cos(midRad), uy = Math.Sin(midRad);
+            double vx = -Math.Sin(midRad), vy = Math.Cos(midRad);
+
+            var subActions = parentAction.SubActions;
+            int subCount = Math.Min(FanSubmenuSlotCount, subActions.Count);
+            _activeSubTierParentSector = parentIndex;
+
+            for (int j = 0; j < subCount; j++)
+            {
+                var (du, dv) = GetFanSubOffset(j);
+                double px = cx + ux * (du * R) + vx * (dv * R);
+                double py = cy + uy * (du * R) + vy * (dv * R);
+
+                Geometry geom = CreateSubMenuGeometry(shape, px, py, itemR, midRad);
+
+                var subPath = new Path
+                {
+                    Data = geom,
+                    Fill = _defaultSectorBrush,
+                    Stroke = _sectorBorderBrush,
+                    StrokeThickness = _borderThickness,
+                    Tag = $"sub_{parentIndex}_{j}",
+                    Opacity = 0.0
+                };
+                System.Windows.Controls.Panel.SetZIndex(subPath, 15);
+                WheelCanvas.Children.Add(subPath);
+                _subSectorPaths.Add(subPath);
+
+                double containerW = 66.0, containerH = 50.0;
+                var container = new Grid { Width = containerW, Height = containerH, Opacity = 0.0 };
+                var stackPanel = new StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Vertical,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                container.Children.Add(stackPanel);
+
+                var subAction = subActions[j];
+                string actionText = subAction?.Name ?? "";
+                string actionType = subAction?.Type ?? "Hotkey";
+                string parameter = subAction?.Parameter ?? "";
+                string iconKey = subAction?.IconKey ?? "";
+                string customSvg = subAction?.CustomIconSvg ?? "";
+
+                FrameworkElement? iconElem = null;
+                double iconSize = 18.0;
+                if (layoutMode != "TextOnly")
+                {
+                    if (!string.IsNullOrEmpty(customSvg))
+                    {
+                        try
+                        {
+                            iconElem = new Path { Data = Geometry.Parse(customSvg), Fill = _textColorBrush, Stretch = Stretch.Uniform, Width = iconSize, Height = iconSize, Margin = new Thickness(0, 0, 0, showText ? 2 : 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+                        }
+                        catch { }
+                    }
+                    if (iconElem == null && !string.IsNullOrEmpty(iconKey))
+                    {
+                        string? svg = IconHelper.GetSvgPathByKey(iconKey);
+                        if (!string.IsNullOrEmpty(svg))
+                        {
+                            iconElem = new Path { Data = Geometry.Parse(svg), Fill = _textColorBrush, Stretch = Stretch.Uniform, Width = iconSize, Height = iconSize, Margin = new Thickness(0, 0, 0, showText ? 2 : 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+                        }
+                    }
+                    if (iconElem == null)
+                    {
+                        string? autoSvg = GetVectorIconPath(actionType, parameter);
+                        if (!string.IsNullOrEmpty(autoSvg))
+                        {
+                            iconElem = new Path { Data = Geometry.Parse(autoSvg), Fill = _textColorBrush, Stretch = Stretch.Uniform, Width = iconSize, Height = iconSize, Margin = new Thickness(0, 0, 0, showText ? 2 : 0), HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+                        }
+                    }
+                    if (iconElem != null) stackPanel.Children.Add(iconElem);
+                }
+
+                if (showText && !string.IsNullOrEmpty(actionText))
+                {
+                    var tb = new TextBlock
+                    {
+                        Text = actionText,
+                        Foreground = _textColorBrush,
+                        FontSize = 9.5,
+                        FontWeight = FontWeights.Medium,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = containerW - 4.0,
+                        MaxHeight = 24,
+                        Margin = new Thickness(0, 1, 0, 0),
+                        Effect = (System.Windows.Media.Effects.Effect)Resources["TextShadow"]
+                    };
+                    stackPanel.Children.Add(tb);
+                }
+
+                Canvas.SetLeft(container, px - container.Width / 2.0);
+                Canvas.SetTop(container, py - container.Height / 2.0);
+                System.Windows.Controls.Panel.SetZIndex(container, 16);
+                WheelCanvas.Children.Add(container);
+                _subContentContainers.Add(container);
+
+                var fadeInAnim = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(110)))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+                subPath.BeginAnimation(UIElement.OpacityProperty, fadeInAnim);
+                container.BeginAnimation(UIElement.OpacityProperty, fadeInAnim);
+            }
+        }
+
         private void ClearSubTier()
         {
             foreach (var p in _subSectorPaths)
@@ -707,6 +903,14 @@ namespace WinPieGestures
             ClearSubTier();
 
             if (!ConfigManager.CurrentConfig.EnableMultiTier) return;
+
+            // Alternate style: honeycomb fan around the selected item
+            if (string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase))
+            {
+                RenderFanSubtier(parentIndex);
+                return;
+            }
+
             if (parentIndex < 0 || parentIndex >= _profile.Actions.Count) return;
 
             var parentAction = _profile.Actions[parentIndex];
