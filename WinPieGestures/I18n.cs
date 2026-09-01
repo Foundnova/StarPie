@@ -1802,6 +1802,34 @@ public static class I18n
 			[LanguageCode.En] = "Restore Factory Defaults",
 			[LanguageCode.Ja] = "初期設定にリセット"
 		};
+		dictionary["LogsTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "系统运行日志与诊断 (Runtime Logs)",
+			[LanguageCode.ZhTw] = "系統運行日誌與診斷 (Runtime Logs)",
+			[LanguageCode.En] = "System Runtime Logs & Diagnostics",
+			[LanguageCode.Ja] = "システム動作ログと診断 (Runtime Logs)"
+		};
+		dictionary["LogsDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "自动记录系统生命周期、手势分发、按键模拟与故障异常信息（保留最近7天），方便故障排查与问题反馈。",
+			[LanguageCode.ZhTw] = "自動記錄系統生命週期、手勢分發、按鍵模擬與故障異常資訊（保留最近7天），方便故障排查與問題回饋。",
+			[LanguageCode.En] = "Automatically records system lifecycle, gesture events, key simulations, and exceptions (retains 7 days) for diagnostics.",
+			[LanguageCode.Ja] = "システムのライフサイクル、ジェスチャイベント、キーシミュレーション、例外を自動記録します（過去7日間保持）。"
+		};
+		dictionary["BtnOpenLogFolder"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "\ud83d\udcc2 打开日志目录",
+			[LanguageCode.ZhTw] = "\ud83d\udcc2 開啟日誌目錄",
+			[LanguageCode.En] = "\ud83d\udcc2 Open Log Folder",
+			[LanguageCode.Ja] = "\ud83d\udcc2 ログフォルダーを開く"
+		};
+		dictionary["BtnViewTodayLog"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "\ud83d\udcc4 查看今日运行日志",
+			[LanguageCode.ZhTw] = "\ud83d\udcc4 檢視今日運行日誌",
+			[LanguageCode.En] = "\ud83d\udcc4 View Today's Log",
+			[LanguageCode.Ja] = "\ud83d\udcc4 今日のログを表示"
+		};
 		dictionary["AboutHeader"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "关于 StarPie & 版本记录",

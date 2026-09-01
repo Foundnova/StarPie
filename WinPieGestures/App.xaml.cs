@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Diagnostics;
 using System.IO;
@@ -85,15 +85,19 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
+		AppLogger.LogInfo($"=== StarPie v1.5.8 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try
 		{
 			ConfigManager.LoadConfig();
+			AppLogger.LogInfo("ConfigManager.LoadConfig completed");
 			MainMouseHook = new MouseHook();
 			MainMouseHook.Start();
+			AppLogger.LogInfo("MainMouseHook started");
 			MainKeyboardHook = new KeyboardHook();
 			MainKeyboardHook.Start();
+			AppLogger.LogInfo("MainKeyboardHook started");
 			MainGestureController = new GestureController(MainMouseHook, MainKeyboardHook);
 			MainSettingsWindow = new SettingsWindow();
 			base.MainWindow = MainSettingsWindow;
@@ -105,6 +109,7 @@ public partial class App : Application
 		}
 		catch (Exception ex)
 		{
+			AppLogger.LogError("StarPie initialization failed", ex);
 			MessageBox.Show("初始化 StarPie 失败:\n" + ex.Message, "启动错误", MessageBoxButton.OK, MessageBoxImage.Hand);
 			Shutdown();
 		}
@@ -134,6 +139,7 @@ public partial class App : Application
 	{
 		try
 		{
+			AppLogger.LogError("WPF Dispatcher Unhandled Exception", e.Exception);
 			e.Handled = true;
 		}
 		catch
@@ -145,7 +151,14 @@ public partial class App : Application
 	{
 		try
 		{
-			_ = e.ExceptionObject is Exception;
+			if (e.ExceptionObject is Exception ex)
+			{
+				AppLogger.LogError("AppDomain Unhandled Exception", ex);
+			}
+			else
+			{
+				AppLogger.LogError($"AppDomain Unhandled Exception Object: {e.ExceptionObject}");
+			}
 		}
 		catch
 		{
@@ -159,6 +172,7 @@ public partial class App : Application
 			base.OnExit(e);
 			return;
 		}
+		AppLogger.LogInfo("=== StarPie Exiting ===");
 		try
 		{
 			_waitHandleRegistration?.Unregister(null);
@@ -184,6 +198,7 @@ public partial class App : Application
 		catch
 		{
 		}
+		AppLogger.Shutdown();
 		base.OnExit(e);
 	}
 }
