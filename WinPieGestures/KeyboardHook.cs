@@ -74,7 +74,7 @@ public class KeyboardHook : IDisposable
 	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nuint dwExtraInfo);
 
 	[DllImport("user32.dll")]
-	private static extern short GetKeyState(int nVirtKey);
+	private static extern short GetAsyncKeyState(int nVirtKey);
 
 	public KeyboardHook()
 	{
@@ -142,19 +142,19 @@ public class KeyboardHook : IDisposable
 		//IL_005c: Unknown result type (might be due to invalid IL or missing references)
 		//IL_005d: Unknown result type (might be due to invalid IL or missing references)
 		ModifierKeys val = (ModifierKeys)0;
-		if ((GetKeyState(17) & 0x8000) != 0)
+		if ((GetAsyncKeyState(17) & 0x8000) != 0)
 		{
 			val = (ModifierKeys)((int)val | 2);
 		}
-		if ((GetKeyState(16) & 0x8000) != 0)
+		if ((GetAsyncKeyState(16) & 0x8000) != 0)
 		{
 			val = (ModifierKeys)((int)val | 4);
 		}
-		if ((GetKeyState(18) & 0x8000) != 0)
+		if ((GetAsyncKeyState(18) & 0x8000) != 0)
 		{
 			val = (ModifierKeys)((int)val | 1);
 		}
-		if ((GetKeyState(91) & 0x8000) != 0 || (GetKeyState(92) & 0x8000) != 0)
+		if ((GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0)
 		{
 			val = (ModifierKeys)((int)val | 8);
 		}
