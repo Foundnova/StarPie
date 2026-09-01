@@ -476,7 +476,7 @@
         </StackPanel>
         <StackPanel Grid.Row="2" Margin="0,15,0,5">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.5.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.5.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -1709,7 +1709,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.5.6" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Text="v1.5.7" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -1722,11 +1722,11 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.5.6 运行命令/终端选择 &amp; 蜂巢平滑倒角 &amp; 快捷键构建器修复 &amp; 配色方案全量备份" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🖥️ 【运行命令与终端选择】：支持一二级轮盘执行自定义系统命令，支持 CMD/PowerShell/WSL 及静默无终端模式；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🎨 【蜂巢六边形平滑圆角】：重构蜂巢矩阵切削算法，支持 0px 锐角到 20px 胶囊六边形无级平滑圆角调节；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• ⌨️ 【按键拼装组合与常驻切换】：新增一键常用操作预设芯片、窗口切换器常驻模式转换、扫描码扩展映射；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 💾 【配置全量导入/导出】：导出配置完整包含全局自定义配色方案、主题微调预设，实现一键无损迁移。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.5.7 轮盘动作上下排序 &amp; 扇区方位微缩指示器 &amp; 独立钩子线程与流畅度优化 &amp; 体验大升级" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🧭 【轮盘动作上下移动排序】：扇区配置列表支持一键 ▲ / ▼ 上下移动排序，即时同步调整空间极坐标槽位与实时画布；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎯 【扇区方位微缩指示器】：每个动作卡片左侧配备微缩轮盘指示器，精准高亮当前空间朝向，调序方位一目了然；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【独立低级钩子线程与流畅度优化】：鼠标钩子采用专属后台线程与自愈检测，手势移动高频调度合并，彻底杜绝掉帧；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🌟 【二级外径解耦 &amp; 配置即时导入 &amp; 自启双通道】：二级整体外径独立伸缩，JSON配置全量0重启导入，开机自启双通道高可靠。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -1735,6 +1735,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.5.7" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="轮盘动作排序 &amp; 方位指示器 &amp; 独立钩子线程 &amp; 手势拖拽流畅度优化" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="新增动作列表 ▲/▼ 排序；新增扇区方位微缩指示器；独立低级钩子后台线程与高频更新调度；二级外径与配置即时导入全面融合。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-01" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>

@@ -759,6 +759,13 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		OnPropertyChanged(nameof(IsLaunchType));
 		OnPropertyChanged(nameof(IsFolderType));
 		OnPropertyChanged(nameof(IsSystemType));
+		OnPropertyChanged(nameof(IsCommandType));
+		OnPropertyChanged(nameof(CommandTerminal));
+		OnPropertyChanged(nameof(Terminals));
+		OnPropertyChanged(nameof(TestButtonText));
+		OnPropertyChanged(nameof(PositionSlotLabel));
+		OnPropertyChanged(nameof(MoveUpToolTip));
+		OnPropertyChanged(nameof(MoveDownToolTip));
 		OnPropertyChanged(nameof(SubActionCount));
 		OnPropertyChanged(nameof(SubActionButtonText));
 	}

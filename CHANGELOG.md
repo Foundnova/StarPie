@@ -4,6 +4,27 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.5.7] - 2026-09-01 (轮盘动作上下排序 & 扇区方位微缩指示器 & 独立低级钩子线程与流畅度优化 - PR #26)
+
+### 🧭 轮盘动作上下排序与方位微缩指示器 (Action Ordering & Radial Position Indicator - PR #26)
+1. **扇区动作映射列表支持一键上下移动排序 (`MoveSlotUp` / `MoveSlotDown`)**：
+   - 动作配置列表中新增 `▲` / `▼` 快捷调序按钮；
+   - 移动动作时，极坐标槽位、对应动作配置以及实时交互画布预览毫秒级无缝联动交换，无需重新手动配置；
+   - 到达首项或末项时按钮智能置灰（`CanMoveUp` / `CanMoveDown`），防止越界。
+2. **扇区方位微缩指示器 (`WheelPositionIndicator`)**：
+   - 动作列表每行左侧全新引入高质感矢量微缩指示器，实时以亮色扇区与方向箭头直观标识当前动作对应的空间极坐标方位；
+   - 自适应当前轮盘扇区数量（4 / 8 / 12 扇区）并跟随当前主题与高亮色自动变换。
+
+### ⚡ 独立低级钩子后台线程与手势高频调度优化 (Dedicated Hook Thread & Gesture Dispatcher Coalescing)
+1. **低级鼠标全局钩子独立线程生命周期 (`MouseHook` Thread Isolation)**：
+   - 全局鼠标底层钩子（`WH_MOUSE_LL`）从主 UI 线程迁移至独立的专属后台高优先级线程（`StarPie.MouseHook`），并配备完整的 Windows 消息泵与自愈健康检查定时器（`HealthCheckTimer`），彻底杜绝主 UI 耗时或阻塞导致鼠标指针掉帧与钩子被系统卸载的问题。
+2. **高频手势移动更新合并调度 (Gesture Dispatcher Coalescing)**：
+   - `GestureController` 中增加基于版本锁（`_gestureVersion`）与高频去抖合并的 UI 调度机制，高回报率游戏鼠标（1000Hz / 4000Hz / 8000Hz）极速划动时自动折叠中间过渡帧，仅向 UI 派发最新扇区高亮状态，大幅降低 CPU 与 GPU 渲染负载。
+3. **二级子菜单缓存与性能优化 (`SubTierVisuals` Caching)**：
+   - 二级扇区与蜂窝扇子叶渲染对象支持按主扇区索引缓存复用，避免每次鼠标滑动产生大量 Freezable 对象。
+
+---
+
 ## [v1.5.6] - 2026-08-31 (运行自定义系统命令 & 二级轮盘独立外径渲染 & 配置文件即时全量导入 & 开机自启双通道保障 & 灵敏度与顺势外甩距离范围大扩展)
 
 ### 🖥️ 运行自定义系统命令与多终端支持 (Execute Command & Terminal Selector - PR #20)
