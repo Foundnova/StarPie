@@ -703,6 +703,34 @@ public static class I18n
 			[LanguageCode.En] = "Assign actions and icons for each sector. Supports hotkeys (e.g. Ctrl+C), app launching, folder opening, and system actions.",
 			[LanguageCode.Ja] = "各方向の動作とアイコンを設定します。ショートカット（Ctrl+C等）、アプリ起動、フォルダー、システム制御に対応。"
 		};
+		dictionary["SectorActionListReorderHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "点击右侧功能卡的 ▲ / ▼ 箭头，将功能移动到相邻的轮盘位置槽。",
+			[LanguageCode.ZhTw] = "點擊右側功能卡的 ▲ / ▼ 箭頭，將功能移動到相鄰的輪盤位置槽。",
+			[LanguageCode.En] = "Click the ▲ / ▼ arrows on the right to move an action to an adjacent wheel-position slot.",
+			[LanguageCode.Ja] = "右側の▲ / ▼ボタンをクリックして、アクションを隣のホイール位置へ移動します。"
+		};
+		dictionary["SectorPositionSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘位置槽",
+			[LanguageCode.ZhTw] = "輪盤位置槽",
+			[LanguageCode.En] = "Wheel position",
+			[LanguageCode.Ja] = "ホイール位置"
+		};
+		dictionary["SectorMoveUp"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "将此功能上移一个轮盘位置",
+			[LanguageCode.ZhTw] = "將此功能上移一個輪盤位置",
+			[LanguageCode.En] = "Move this action up one wheel position",
+			[LanguageCode.Ja] = "このアクションを1つ上のホイール位置へ移動"
+		};
+		dictionary["SectorMoveDown"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "将此功能下移一个轮盘位置",
+			[LanguageCode.ZhTw] = "將此功能下移一個輪盤位置",
+			[LanguageCode.En] = "Move this action down one wheel position",
+			[LanguageCode.Ja] = "このアクションを1つ下のホイール位置へ移動"
+		};
 		dictionary["IconPickerTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "选择动作矢量图标",

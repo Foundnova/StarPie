@@ -237,6 +237,10 @@ public partial class SettingsWindow : Window
 
 	private DispatcherTimer? _autoSaveDebounceTimer;
 
+	private bool _isChangingSectorCount;
+
+	private bool _previewRenderPending;
+
 	public SettingsWindow()
 	{
 		_isUpdatingUi = true;
@@ -1034,6 +1038,10 @@ public partial class SettingsWindow : Window
 		{
 			SectorActionListDescText.Text = I18n.T("SectorActionListDesc");
 		}
+		if (SectorActionListReorderHintText != null)
+		{
+			SectorActionListReorderHintText.Text = I18n.T("SectorActionListReorderHint");
+		}
 		if (AdvancedPageHeader != null)
 		{
 			AdvancedPageHeader.Text = I18n.T("AdvancedHeader");
@@ -1462,6 +1470,10 @@ public partial class SettingsWindow : Window
 	{
 		SyncUiToConfigAndSave();
 		MemoryOptimizer.TrimMemory();
+		if (_isClosingFromTray)
+		{
+			DisposeSlotViewModels();
+		}
 		if (!_isClosingFromTray)
 		{
 			e.Cancel = true;
@@ -1520,80 +1532,165 @@ public partial class SettingsWindow : Window
 	{
 		try
 		{
-			_slotViewModels.Clear();
-			if (_selectedProfile == null)
+			WheelProfile? profile = _selectedProfile;
+			if (profile == null)
 			{
-				_selectedProfile = (ProfilesListBox?.SelectedItem as WheelProfile) ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+				profile = ProfilesListBox?.SelectedItem as WheelProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+				_selectedProfile = profile;
 			}
-			if (_selectedProfile == null)
+
+			const int maxSectorCount = 12;
+			EnsureSlotViewModels(maxSectorCount);
+
+			if (profile == null)
 			{
+				for (int i = 0; i < _slotViewModels.Count; i++)
+				{
+					_slotViewModels[i].Update(i, 8, string.Empty, null, false);
+				}
 				return;
 			}
-			int num = _selectedProfile.SectorCount;
-			if (num != 4 && num != 8 && num != 12)
+
+			int count = NormalizeSectorCount(profile.SectorCount);
+			if (profile.SectorCount != count)
 			{
-				num = 8;
+				profile.SectorCount = count;
 			}
-			string[] array = num switch
+
+			string[] directions = count switch
 			{
-				4 => Directions4, 
-				12 => Directions12, 
-				_ => Directions8, 
+				4 => Directions4,
+				12 => Directions12,
+				_ => Directions8
 			};
-			if (_selectedProfile.Actions == null)
+
+			profile.Actions ??= new List<ActionItem>();
+			while (profile.Actions.Count < count)
 			{
-				_selectedProfile.Actions = new List<ActionItem>();
-			}
-			while (_selectedProfile.Actions.Count < num)
-			{
-				int count = _selectedProfile.Actions.Count;
-				if (num == 12 && count < DefaultPresets12.Length)
+				int index = profile.Actions.Count;
+				if (count == 12 && index < DefaultPresets12.Length)
 				{
-					ActionItem actionItem = DefaultPresets12[count];
-					_selectedProfile.Actions.Add(new ActionItem
+					ActionItem preset = DefaultPresets12[index];
+					profile.Actions.Add(new ActionItem
 					{
-						Type = actionItem.Type,
-						Name = actionItem.Name,
-						Parameter = actionItem.Parameter,
-						IconKey = actionItem.IconKey
+						Type = preset.Type,
+						Name = preset.Name,
+						Parameter = preset.Parameter,
+						IconKey = preset.IconKey
 					});
 				}
-				else if (num == 4 && count < DefaultPresets4.Length)
+				else if (count == 4 && index < DefaultPresets4.Length)
 				{
-					ActionItem actionItem2 = DefaultPresets4[count];
-					_selectedProfile.Actions.Add(new ActionItem
+					ActionItem preset = DefaultPresets4[index];
+					profile.Actions.Add(new ActionItem
 					{
-						Type = actionItem2.Type,
-						Name = actionItem2.Name,
-						Parameter = actionItem2.Parameter,
-						IconKey = actionItem2.IconKey
+						Type = preset.Type,
+						Name = preset.Name,
+						Parameter = preset.Parameter,
+						IconKey = preset.IconKey
 					});
 				}
 				else
 				{
-					_selectedProfile.Actions.Add(new ActionItem
+					profile.Actions.Add(new ActionItem
 					{
 						Type = "Hotkey",
-						Name = $"快捷动作 {count + 1}",
+						Name = $"快捷动作 {index + 1}",
 						Parameter = ""
 					});
 				}
 			}
-			for (int i = 0; i < num; i++)
+
+			for (int i = 0; i < _slotViewModels.Count; i++)
 			{
-				ActionItem action = _selectedProfile.Actions[i];
-				SlotViewModel item = new SlotViewModel(array[i], action);
-				_slotViewModels.Add(item);
+				ActionItem? action = i < profile.Actions.Count ? profile.Actions[i] : null;
+				bool isVisible = i < count;
+				string direction = isVisible ? directions[i] : string.Empty;
+				_slotViewModels[i].Update(i, count, direction, action, isVisible);
 			}
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			Debug.WriteLine($"[RefreshSlots Error]: {ex}");
+		}
+	}
+
+	private void DisposeSlotViewModels()
+	{
+		foreach (SlotViewModel slot in _slotViewModels)
+		{
+			slot.Dispose();
+		}
+	}
+
+	private static int NormalizeSectorCount(int sectorCount)
+	{
+		return sectorCount is 4 or 8 or 12 ? sectorCount : 8;
+	}
+
+	private void EnsureSlotViewModels(int count)
+	{
+		while (_slotViewModels.Count < count)
+		{
+			int positionIndex = _slotViewModels.Count;
+			_slotViewModels.Add(new SlotViewModel(
+				positionIndex,
+				8,
+				string.Empty,
+				new ActionItem
+				{
+					Type = "Hotkey",
+					Name = $"快捷动作 {positionIndex + 1}",
+					Parameter = ""
+				}));
+		}
+	}
+
+	private void MoveSlotUp_Click(object sender, RoutedEventArgs e)
+	{
+		MoveSlot(sender, -1);
+		e.Handled = true;
+	}
+
+	private void MoveSlotDown_Click(object sender, RoutedEventArgs e)
+	{
+		MoveSlot(sender, 1);
+		e.Handled = true;
+	}
+
+	private void MoveSlot(object sender, int offset)
+	{
+		if (sender is not FrameworkElement element ||
+			element.DataContext is not SlotViewModel slot ||
+			_selectedProfile?.Actions == null)
+		{
+			return;
+		}
+
+		int sourceIndex = _slotViewModels.IndexOf(slot);
+		int activeCount = NormalizeSectorCount(_selectedProfile.SectorCount);
+		int targetIndex = sourceIndex + offset;
+		if (sourceIndex < 0 || sourceIndex >= activeCount ||
+			targetIndex < 0 || targetIndex >= activeCount ||
+			targetIndex >= _selectedProfile.Actions.Count)
+		{
+			return;
+		}
+
+		(_selectedProfile.Actions[sourceIndex], _selectedProfile.Actions[targetIndex]) =
+			(_selectedProfile.Actions[targetIndex], _selectedProfile.Actions[sourceIndex]);
+
+		RefreshSlots();
+		SyncUiToConfigAndSave(true);
+		if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+		{
+			ScheduleLiveWheelPreviewRender();
 		}
 	}
 
 	private void SectorCountRadio_Checked(object sender, RoutedEventArgs e)
 	{
-		if (_isUpdatingUi)
+		if (_isUpdatingUi || _isChangingSectorCount)
 		{
 			return;
 		}
@@ -1606,35 +1703,70 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		int sectorCount = 8;
-		System.Windows.Controls.RadioButton sectorCount4Radio = SectorCount4Radio;
-		if (sectorCount4Radio != null && sectorCount4Radio.IsChecked == true)
+		if (SectorCount4Radio?.IsChecked == true)
 		{
 			sectorCount = 4;
 		}
-		else
+		else if (SectorCount8Radio?.IsChecked == true)
 		{
-			System.Windows.Controls.RadioButton sectorCount8Radio = SectorCount8Radio;
-			if (sectorCount8Radio != null && sectorCount8Radio.IsChecked == true)
+			sectorCount = 8;
+		}
+		else if (SectorCount12Radio?.IsChecked == true)
+		{
+			sectorCount = 12;
+		}
+
+		if (_selectedProfile.SectorCount == sectorCount)
+		{
+			return;
+		}
+
+		_isChangingSectorCount = true;
+		try
+		{
+			_isUpdatingUi = true;
+			try
 			{
-				sectorCount = 8;
+				_selectedProfile.SectorCount = sectorCount;
+				RefreshSlots();
 			}
-			else
+			finally
 			{
-				System.Windows.Controls.RadioButton sectorCount12Radio = SectorCount12Radio;
-				if (sectorCount12Radio != null && sectorCount12Radio.IsChecked == true)
+				_isUpdatingUi = false;
+			}
+
+			if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+			{
+				ScheduleLiveWheelPreviewRender();
+			}
+			SyncUiToConfigAndSave();
+		}
+		finally
+		{
+			_isChangingSectorCount = false;
+		}
+	}
+
+	private void ScheduleLiveWheelPreviewRender()
+	{
+		if (_previewRenderPending || LiveWheelPreviewCanvas == null ||
+			AppearanceSettingsGrid?.Visibility != Visibility.Visible)
+		{
+			return;
+		}
+
+		_previewRenderPending = true;
+		Dispatcher.BeginInvoke(
+			new Action(() =>
+			{
+				_previewRenderPending = false;
+				if (!IsLoaded || AppearanceSettingsGrid?.Visibility != Visibility.Visible)
 				{
-					sectorCount = 12;
+					return;
 				}
-			}
-		}
-		_selectedProfile.SectorCount = sectorCount;
-		RefreshSlots();
-		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
-		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
-		{
-			RenderLiveWheelPreview();
-		}
-		SyncUiToConfigAndSave();
+				RenderLiveWheelPreview();
+			}),
+			DispatcherPriority.Render);
 	}
 
 	private void AddProfileButton_Click(object sender, RoutedEventArgs e)

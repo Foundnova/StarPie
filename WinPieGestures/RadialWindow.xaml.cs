@@ -18,6 +18,33 @@ namespace WinPieGestures;
 
 public partial class RadialWindow : Window
 {
+	private sealed class SubTierVisuals
+	{
+		public List<System.Windows.Shapes.Path> Paths { get; }
+
+		public List<Grid> Containers { get; }
+
+		public List<TranslateTransform> PathTransforms { get; }
+
+		public List<TranslateTransform> ContainerTransforms { get; }
+
+		public List<double> Angles { get; }
+
+		public SubTierVisuals(
+			List<System.Windows.Shapes.Path> paths,
+			List<Grid> containers,
+			List<TranslateTransform> pathTransforms,
+			List<TranslateTransform> containerTransforms,
+			List<double> angles)
+		{
+			Paths = paths;
+			Containers = containers;
+			PathTransforms = pathTransforms;
+			ContainerTransforms = containerTransforms;
+			Angles = angles;
+		}
+	}
+
 	private int _currentHighlightedSector;
 
 	private int _currentHighlightedSubSector;
@@ -47,6 +74,8 @@ public partial class RadialWindow : Window
 	private readonly List<TranslateTransform> _subContainerTransforms;
 
 	private readonly List<double> _subSectorAngles;
+
+	private readonly Dictionary<int, SubTierVisuals> _subTierCache = new Dictionary<int, SubTierVisuals>();
 
 	private IRadialStyleRenderer _styleRenderer;
 
@@ -763,6 +792,7 @@ public partial class RadialWindow : Window
 			_isOuterEscaped = isEscaped;
 			DoubleAnimation animation = new DoubleAnimation
 			{
+				From = Opacity,
 				To = (isEscaped ? 0.38 : 1.0),
 				Duration = TimeSpan.FromMilliseconds(120.0),
 				EasingFunction = new QuadraticEase
@@ -776,13 +806,35 @@ public partial class RadialWindow : Window
 
 	private void ClearSubTier()
 	{
-		foreach (System.Windows.Shapes.Path subSectorPath in _subSectorPaths)
+		for (int i = 0; i < _subSectorPaths.Count; i++)
 		{
-			WheelCanvas.Children.Remove(subSectorPath);
+			System.Windows.Shapes.Path subSectorPath = _subSectorPaths[i];
+			subSectorPath.BeginAnimation(UIElement.OpacityProperty, null);
+			subSectorPath.Opacity = 0.0;
+			subSectorPath.Visibility = Visibility.Collapsed;
+			if (i < _subSectorTransforms.Count)
+			{
+				TranslateTransform transform = _subSectorTransforms[i];
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.X = 0.0;
+				transform.Y = 0.0;
+			}
 		}
-		foreach (Grid subContentContainer in _subContentContainers)
+		for (int i = 0; i < _subContentContainers.Count; i++)
 		{
-			WheelCanvas.Children.Remove(subContentContainer);
+			Grid subContentContainer = _subContentContainers[i];
+			subContentContainer.BeginAnimation(UIElement.OpacityProperty, null);
+			subContentContainer.Opacity = 0.0;
+			subContentContainer.Visibility = Visibility.Collapsed;
+			if (i < _subContainerTransforms.Count)
+			{
+				TranslateTransform transform = _subContainerTransforms[i];
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.X = 0.0;
+				transform.Y = 0.0;
+			}
 		}
 		_subSectorPaths.Clear();
 		_subContentContainers.Clear();
@@ -791,6 +843,50 @@ public partial class RadialWindow : Window
 		_subSectorAngles.Clear();
 		_activeSubTierParentSector = -1;
 		_currentHighlightedSubSector = -1;
+	}
+
+	private void ActivateCachedSubTier(int parentIndex, SubTierVisuals visuals)
+	{
+		_activeSubTierParentSector = parentIndex;
+		_subSectorPaths.AddRange(visuals.Paths);
+		_subContentContainers.AddRange(visuals.Containers);
+		_subSectorTransforms.AddRange(visuals.PathTransforms);
+		_subContainerTransforms.AddRange(visuals.ContainerTransforms);
+		_subSectorAngles.AddRange(visuals.Angles);
+
+		Duration duration = new Duration(TimeSpan.FromMilliseconds(110.0));
+		DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, duration)
+		{
+			EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+		};
+		for (int i = 0; i < _subSectorPaths.Count; i++)
+		{
+			System.Windows.Shapes.Path path = _subSectorPaths[i];
+			path.Visibility = Visibility.Visible;
+			path.Opacity = 0.0;
+			path.BeginAnimation(UIElement.OpacityProperty, fadeIn.Clone());
+			if (i < _subSectorTransforms.Count)
+			{
+				_subSectorTransforms[i].BeginAnimation(TranslateTransform.XProperty, null);
+				_subSectorTransforms[i].BeginAnimation(TranslateTransform.YProperty, null);
+				_subSectorTransforms[i].X = 0.0;
+				_subSectorTransforms[i].Y = 0.0;
+			}
+		}
+		for (int i = 0; i < _subContentContainers.Count; i++)
+		{
+			Grid container = _subContentContainers[i];
+			container.Visibility = Visibility.Visible;
+			container.Opacity = 0.0;
+			container.BeginAnimation(UIElement.OpacityProperty, fadeIn.Clone());
+			if (i < _subContainerTransforms.Count)
+			{
+				_subContainerTransforms[i].BeginAnimation(TranslateTransform.XProperty, null);
+				_subContainerTransforms[i].BeginAnimation(TranslateTransform.YProperty, null);
+				_subContainerTransforms[i].X = 0.0;
+				_subContainerTransforms[i].Y = 0.0;
+			}
+		}
 	}
 
 	private void ShowSubTier(int parentIndex)
@@ -804,6 +900,11 @@ public partial class RadialWindow : Window
 		ActionItem actionItem = _profile.Actions[parentIndex];
 		if (actionItem == null || actionItem.SubActions == null || actionItem.SubActions.Count == 0)
 		{
+			return;
+		}
+		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
+		{
+			ActivateCachedSubTier(parentIndex, cachedVisuals);
 			return;
 		}
 		int sectorCount = _profile.SectorCount;
@@ -1037,6 +1138,12 @@ public partial class RadialWindow : Window
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
 			grid.BeginAnimation(UIElement.OpacityProperty, animation2);
 		}
+		_subTierCache[parentIndex] = new SubTierVisuals(
+			new List<System.Windows.Shapes.Path>(_subSectorPaths),
+			new List<Grid>(_subContentContainers),
+			new List<TranslateTransform>(_subSectorTransforms),
+			new List<TranslateTransform>(_subContainerTransforms),
+			new List<double>(_subSectorAngles));
 	}
 
 	public void HighlightSector(int index)
@@ -1076,11 +1183,11 @@ public partial class RadialWindow : Window
 		if (CoreScale != null)
 		{
 			double toValue = ((mainIndex == -1) ? 1.1 : 1.0);
-			CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(toValue, duration2)
+			CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(CoreScale.ScaleX, toValue, duration2)
 			{
 				EasingFunction = easingFunction
 			});
-			CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(toValue, duration2)
+			CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(CoreScale.ScaleY, toValue, duration2)
 			{
 				EasingFunction = easingFunction
 			});
@@ -1113,22 +1220,22 @@ public partial class RadialWindow : Window
 			Panel.SetZIndex(path, 0);
 			if (translateTransform != null)
 			{
-				translateTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, duration)
+				translateTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform.X, 0.0, duration)
 				{
 					EasingFunction = easingFunction
 				});
-				translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, duration)
+				translateTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform.Y, 0.0, duration)
 				{
 					EasingFunction = easingFunction
 				});
 			}
 			if (translateTransform2 != null)
 			{
-				translateTransform2.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, duration)
+				translateTransform2.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform2.X, 0.0, duration)
 				{
 					EasingFunction = easingFunction
 				});
-				translateTransform2.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, duration)
+				translateTransform2.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform2.Y, 0.0, duration)
 				{
 					EasingFunction = easingFunction
 				});
@@ -1164,22 +1271,22 @@ public partial class RadialWindow : Window
 			double toValue3 = Math.Sin(num4) * 5.5;
 			if (translateTransform3 != null)
 			{
-				translateTransform3.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(toValue2, duration)
+				translateTransform3.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform3.X, toValue2, duration)
 				{
 					EasingFunction = easingFunction
 				});
-				translateTransform3.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(toValue3, duration)
+				translateTransform3.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform3.Y, toValue3, duration)
 				{
 					EasingFunction = easingFunction
 				});
 			}
 			if (translateTransform4 != null)
 			{
-				translateTransform4.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(toValue2, duration)
+				translateTransform4.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform4.X, toValue2, duration)
 				{
 					EasingFunction = easingFunction
 				});
-				translateTransform4.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(toValue3, duration)
+				translateTransform4.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform4.Y, toValue3, duration)
 				{
 					EasingFunction = easingFunction
 				});
@@ -1244,22 +1351,22 @@ public partial class RadialWindow : Window
 				double toValue5 = Math.Sin(num5) * 4.0;
 				if (translateTransform5 != null)
 				{
-					translateTransform5.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(toValue4, duration)
+					translateTransform5.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform5.X, toValue4, duration)
 					{
 						EasingFunction = easingFunction
 					});
-					translateTransform5.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(toValue5, duration)
+					translateTransform5.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform5.Y, toValue5, duration)
 					{
 						EasingFunction = easingFunction
 					});
 				}
 				if (translateTransform6 != null)
 				{
-					translateTransform6.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(toValue4, duration)
+					translateTransform6.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform6.X, toValue4, duration)
 					{
 						EasingFunction = easingFunction
 					});
-					translateTransform6.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(toValue5, duration)
+					translateTransform6.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform6.Y, toValue5, duration)
 					{
 						EasingFunction = easingFunction
 					});
@@ -1283,22 +1390,22 @@ public partial class RadialWindow : Window
 				}
 				if (translateTransform5 != null && (translateTransform5.X != 0.0 || translateTransform5.Y != 0.0))
 				{
-					translateTransform5.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, duration)
+					translateTransform5.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform5.X, 0.0, duration)
 					{
 						EasingFunction = easingFunction
 					});
-					translateTransform5.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, duration)
+					translateTransform5.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform5.Y, 0.0, duration)
 					{
 						EasingFunction = easingFunction
 					});
 				}
 				if (translateTransform6 != null && (translateTransform6.X != 0.0 || translateTransform6.Y != 0.0))
 				{
-					translateTransform6.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0.0, duration)
+					translateTransform6.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(translateTransform6.X, 0.0, duration)
 					{
 						EasingFunction = easingFunction
 					});
-					translateTransform6.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, duration)
+					translateTransform6.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(translateTransform6.Y, 0.0, duration)
 					{
 						EasingFunction = easingFunction
 					});
@@ -1560,6 +1667,11 @@ public partial class RadialWindow : Window
 		{
 			return;
 		}
+		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
+		{
+			ActivateCachedSubTier(parentIndex, cachedVisuals);
+			return;
+		}
 		int sectorCount = _profile.SectorCount;
 		double sectorSize = 360.0 / (double)sectorCount;
 		double width = base.Width;
@@ -1810,6 +1922,12 @@ public partial class RadialWindow : Window
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleXProperty, doubleAnimation2);
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, doubleAnimation2);
 		}
+		_subTierCache[parentIndex] = new SubTierVisuals(
+			new List<System.Windows.Shapes.Path>(_subSectorPaths),
+			new List<Grid>(_subContentContainers),
+			new List<TranslateTransform>(_subSectorTransforms),
+			new List<TranslateTransform>(_subContainerTransforms),
+			new List<double>(_subSectorAngles));
 	}
 
 }

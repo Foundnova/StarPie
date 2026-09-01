@@ -6,7 +6,7 @@ using System.Windows.Media;
 
 namespace WinPieGestures;
 
-public class SlotViewModel : INotifyPropertyChanged
+public class SlotViewModel : INotifyPropertyChanged, IDisposable
 {
 	public static readonly List<SystemPresetItem> SystemPresetList = new List<SystemPresetItem>
 	{
@@ -326,9 +326,19 @@ public class SlotViewModel : INotifyPropertyChanged
 
 	public static readonly Dictionary<string, string> SystemPresets = SystemPresetList.ToDictionary((SystemPresetItem x) => x.Key, (SystemPresetItem x) => x.FormattedDisplay);
 
-	public string DirectionLabel { get; }
+	public int PositionIndex { get; private set; }
 
-	public ActionItem Action { get; }
+	public int SectorCount { get; private set; }
+
+	public string DirectionLabel { get; private set; }
+
+	public ActionItem Action { get; private set; }
+
+	public bool IsVisible { get; private set; }
+
+	public bool CanMoveUp { get; private set; }
+
+	public bool CanMoveDown { get; private set; }
 
 	public string Name
 	{
@@ -672,6 +682,16 @@ public class SlotViewModel : INotifyPropertyChanged
 
 	public string TestButtonText => I18n.T("BtnTest");
 
+	public string PositionSlotLabel => I18n.T("SectorPositionSlot");
+
+	public string MoveUpToolTip => I18n.T("SectorMoveUp");
+
+	public string MoveDownToolTip => I18n.T("SectorMoveDown");
+
+	private readonly Action _languageChangedHandler;
+
+	private bool _isDisposed;
+
 	public event PropertyChangedEventHandler? PropertyChanged;
 
 	public void NotifySubActionsChanged()
@@ -680,8 +700,10 @@ public class SlotViewModel : INotifyPropertyChanged
 		OnPropertyChanged("SubActionButtonText");
 	}
 
-	public SlotViewModel(string directionLabel, ActionItem action)
+	public SlotViewModel(int positionIndex, int sectorCount, string directionLabel, ActionItem action)
 	{
+		PositionIndex = positionIndex;
+		SectorCount = sectorCount;
 		DirectionLabel = directionLabel;
 		Action = action ?? new ActionItem
 		{
@@ -689,14 +711,82 @@ public class SlotViewModel : INotifyPropertyChanged
 			Name = "快捷动作",
 			Parameter = ""
 		};
-		I18n.LanguageChanged += delegate
+		IsVisible = true;
+		CanMoveUp = positionIndex > 0;
+		CanMoveDown = positionIndex < sectorCount - 1;
+		_languageChangedHandler = HandleLanguageChanged;
+		I18n.LanguageChanged += _languageChangedHandler;
+	}
+
+	public SlotViewModel(string directionLabel, ActionItem action)
+		: this(0, 8, directionLabel, action)
+	{
+	}
+
+	public void Update(int positionIndex, int sectorCount, string directionLabel, ActionItem? action, bool isVisible)
+	{
+		PositionIndex = positionIndex;
+		SectorCount = sectorCount;
+		DirectionLabel = directionLabel ?? string.Empty;
+		Action = action ?? new ActionItem
 		{
-			OnPropertyChanged("ActionTypes");
-			OnPropertyChanged("Terminals");
-			OnPropertyChanged("TestButtonText");
-			OnPropertyChanged("IconDisplayText");
-			OnPropertyChanged("SubActionButtonText");
+			Type = "Hotkey",
+			Name = $"快捷动作 {positionIndex + 1}",
+			Parameter = ""
 		};
+		IsVisible = isVisible;
+		CanMoveUp = isVisible && positionIndex > 0;
+		CanMoveDown = isVisible && positionIndex < sectorCount - 1;
+
+		OnPropertyChanged(nameof(PositionIndex));
+		OnPropertyChanged(nameof(SectorCount));
+		OnPropertyChanged(nameof(DirectionLabel));
+		OnPropertyChanged(nameof(Action));
+		OnPropertyChanged(nameof(IsVisible));
+		OnPropertyChanged(nameof(CanMoveUp));
+		OnPropertyChanged(nameof(CanMoveDown));
+		OnPropertyChanged(nameof(Name));
+		OnPropertyChanged(nameof(Type));
+		OnPropertyChanged(nameof(Parameter));
+		OnPropertyChanged(nameof(Arguments));
+		OnPropertyChanged(nameof(IconKey));
+		OnPropertyChanged(nameof(CustomIconSvg));
+		OnPropertyChanged(nameof(IconDisplayText));
+		OnPropertyChanged(nameof(HasVectorIcon));
+		OnPropertyChanged(nameof(VectorIconData));
+		OnPropertyChanged(nameof(SelectedSystemPreset));
+		OnPropertyChanged(nameof(IsHotkeyType));
+		OnPropertyChanged(nameof(IsLaunchType));
+		OnPropertyChanged(nameof(IsFolderType));
+		OnPropertyChanged(nameof(IsSystemType));
+		OnPropertyChanged(nameof(SubActionCount));
+		OnPropertyChanged(nameof(SubActionButtonText));
+	}
+
+	private void HandleLanguageChanged()
+	{
+		if (_isDisposed)
+		{
+			return;
+		}
+		OnPropertyChanged(nameof(ActionTypes));
+		OnPropertyChanged(nameof(TestButtonText));
+		OnPropertyChanged(nameof(PositionSlotLabel));
+		OnPropertyChanged(nameof(MoveUpToolTip));
+		OnPropertyChanged(nameof(MoveDownToolTip));
+		OnPropertyChanged(nameof(IconDisplayText));
+		OnPropertyChanged(nameof(SubActionButtonText));
+	}
+
+	public void Dispose()
+	{
+		if (_isDisposed)
+		{
+			return;
+		}
+		_isDisposed = true;
+		I18n.LanguageChanged -= _languageChangedHandler;
+		PropertyChanged = null;
 	}
 
 	protected void OnPropertyChanged(string propertyName)
