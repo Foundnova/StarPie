@@ -1625,15 +1625,11 @@ public partial class RadialWindow : Window
 	public static (double du, double dv) GetFanSubOffset(int index)
 	{
 		double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
-		double orbitRadius = 1.0 + ringR;
-		double wingAngle = Math.Atan2(ringR * 0.8660254038, 1.0 + ringR * 0.5);
-		double wingDu = orbitRadius * Math.Cos(wingAngle);
-		double wingDv = orbitRadius * Math.Sin(wingAngle);
 		return index switch
 		{
-			0 => (wingDu, wingDv),       // upper wing on the common orbit
-			1 => (orbitRadius, 0.0),      // tip / center
-			_ => (wingDu, -wingDv)        // lower wing on the common orbit
+			0 => (1.0 + ringR * 0.5, ringR * 0.8660254038),   // upper wing
+			1 => (1.0 + ringR, 0.0),                           // tip / center
+			_ => (1.0 + ringR * 0.5, -ringR * 0.8660254038)   // lower wing
 		};
 	}
 
@@ -1758,13 +1754,9 @@ public partial class RadialWindow : Window
 			return rect;
 		}
 
-		// 5. Original / ClassicRing: Smooth radiating curved arc petal.
-		// The fan layout changes each item's slot position, but the compact
-		// sector itself remains concentric with the primary wheel.  Keep the
-		// fan arc narrower than the slot-to-slot angle so adjacent items do not
-		// overlap on the common orbit.
+		// 5. Original / ClassicRing: Smooth radiating curved arc petal
 		{
-			double halfSpan = 10.0;
+			double halfSpan = 14.0;
 			double startDeg = itemAngleDeg - halfSpan;
 			double endDeg = itemAngleDeg + halfSpan;
 			double distFromCenter = Math.Sqrt((cx - wheelCx) * (cx - wheelCx) + (cy - wheelCy) * (cy - wheelCy));
@@ -1820,7 +1812,6 @@ public partial class RadialWindow : Window
 		List<ActionItem> subActions = actionItem.SubActions;
 		int subCount = subActions.Count;
 		int activeCount = Math.Min(FanSubmenuSlotCount, subCount);
-		bool isCompactSector = string.Equals(shape, "Original", StringComparison.OrdinalIgnoreCase);
 		_activeSubTierParentSector = parentIndex;
 
 		for (int j = 0; j < activeCount; j++)
@@ -1833,11 +1824,7 @@ public partial class RadialWindow : Window
 
 			Geometry data = CreateSubMenuGeometry(shape, px, py, itemR, midRad, cx, cy, userCornerRadius);
 
-			ScaleTransform scaleTransform = new ScaleTransform(
-				0.75,
-				0.75,
-				isCompactSector ? cx : px,
-				isCompactSector ? cy : py);
+			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, px, py);
 			TranslateTransform translateTransform = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup = new TransformGroup();
 			transformGroup.Children.Add(scaleTransform);
