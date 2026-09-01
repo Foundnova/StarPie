@@ -927,6 +927,20 @@ public static class I18n
 			[LanguageCode.En] = "\ud83d\udccb About & Updates",
 			[LanguageCode.Ja] = "\ud83d\udccb 情報と更新"
 		};
+		dictionary["SidebarCollapse"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "折叠侧边栏",
+			[LanguageCode.ZhTw] = "摺疊側邊欄",
+			[LanguageCode.En] = "Collapse sidebar",
+			[LanguageCode.Ja] = "サイドバーを折りたたむ"
+		};
+		dictionary["SidebarExpand"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "展开侧边栏",
+			[LanguageCode.ZhTw] = "展開側邊欄",
+			[LanguageCode.En] = "Expand sidebar",
+			[LanguageCode.Ja] = "サイドバーを展開"
+		};
 		dictionary["BottomStatusNote"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "注: 所有修改均在内存中即时生效，点击【保存更改】持久化保存至硬盘。",
@@ -1353,6 +1367,20 @@ public static class I18n
 			[LanguageCode.ZhTw] = "僅顯示文字 (Text Only)",
 			[LanguageCode.En] = "Text Only",
 			[LanguageCode.Ja] = "文字のみ"
+		};
+		dictionary["ShowSectorActionText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "在轮盘扇区中显示动作名称文字",
+			[LanguageCode.ZhTw] = "在輪盤扇區中顯示動作名稱文字",
+			[LanguageCode.En] = "Show action names in wheel sectors",
+			[LanguageCode.Ja] = "ホイールの扇形にアクション名を表示"
+		};
+		dictionary["ShowSelectedActionText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "选中扇区时在中心显示动作名称",
+			[LanguageCode.ZhTw] = "選取扇區時在中心顯示動作名稱",
+			[LanguageCode.En] = "Show selected action name in the center",
+			[LanguageCode.Ja] = "選択中のアクション名を中央に表示"
 		};
 		dictionary["SectorIconSize"] = new Dictionary<LanguageCode, string>
 		{

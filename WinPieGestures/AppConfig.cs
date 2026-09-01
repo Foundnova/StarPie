@@ -71,6 +71,8 @@ public class AppConfig
 
 	public bool ShowText { get; set; } = true;
 
+	public bool ShowSelectedActionText { get; set; }
+
 	public double WheelRadius { get; set; } = 138.0;
 
 	public double InnerRadius { get; set; } = 52.0;
