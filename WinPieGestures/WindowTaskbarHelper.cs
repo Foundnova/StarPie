@@ -67,13 +67,6 @@ public static class WindowTaskbarHelper
 		public nint iString;
 	}
 
-	// ---- 模拟 Win+N（N=1..9, 0=10）----
-	[DllImport("user32.dll")]
-	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
-
-	private const byte VK_LWIN = 0x5B;
-	private const uint KEYEVENTF_KEYUP = 0x0002;
-
 	[DllImport("user32.dll")]
 	private static extern bool IsWindowVisible(nint hWnd);
 
@@ -437,24 +430,14 @@ public static class WindowTaskbarHelper
 	}
 
 	/// <summary>
-	/// 切换到任务栏第 n 个槽位：n=1..10 直接模拟 Win+N（与系统快捷键完全一致，固定项也生效）；
-	/// n=11..20 使用任务栏应用槽位顺序激活（回退 filtered 枚举）。
+	/// 切换到任务栏第 n 个应用槽位（1~20）。图标与激活共用同一槽位列表（GetTaskbarAppSlots），
+	/// 由构造保证显示与启动目标一致；运行槽位激活其窗口，固定未运行槽位无句柄 → 返回 false。
 	/// </summary>
 	public static bool ActivateTaskbarSlot(int n)
 	{
 		if (n <= 0)
 		{
 			return false;
-		}
-		if (n <= 10)
-		{
-			// Win+1..9, Win+0(=10)：原生快捷键（顺序稳定、含固定项；与"切换窗口1=Win+1"一致）
-			byte digit = (byte)((n == 10) ? '0' : ('0' + n));
-			keybd_event(VK_LWIN, 0, 0, IntPtr.Zero);
-			keybd_event(digit, 0, 0, IntPtr.Zero);
-			keybd_event(digit, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
-			keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
-			return true;
 		}
 		nint hWnd = GetNthTaskbarWindow(n);
 		if (hWnd == IntPtr.Zero)
