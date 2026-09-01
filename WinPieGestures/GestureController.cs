@@ -33,8 +33,13 @@ public class GestureController
 
 	private volatile bool _isGestureActive;
 
-	// 长按触发（可选）：按钮按下期间运行，拖动越过阈值或抬起时取消
-	private System.Windows.Threading.DispatcherTimer? _longPressTimer;
+	// 长按触发（可选）：钩子跑在独立后台线程，用 System.Threading.Timer（不依赖线程 Dispatcher），
+	// 代数(Generation)防止旧回调触发到新手势；激活经主线程 Dispatcher 执行。
+	private System.Threading.Timer? _longPressTimer;
+
+	private int _longPressGeneration;
+
+	private readonly object _longPressLock = new object();
 
 	private bool _mouseTriggerDown;
 
@@ -360,44 +365,78 @@ public class GestureController
 	{
 		CancelLongPressTimer();
 		double delay = ConfigManager.CurrentConfig.LongPressDelayMs > 0.0 ? ConfigManager.CurrentConfig.LongPressDelayMs : 450.0;
-		_longPressTimer = new System.Windows.Threading.DispatcherTimer
+		int generation;
+		lock (_longPressLock)
 		{
-			Interval = TimeSpan.FromMilliseconds(delay)
-		};
-		_longPressTimer.Tick += LongPressTimer_Tick;
-		_longPressTimer.Start();
+			generation = ++_longPressGeneration;
+			_longPressTimer = new System.Threading.Timer(delegate
+			{
+				LongPressTimerCallback(generation);
+			}, null, TimeSpan.FromMilliseconds(delay), System.Threading.Timeout.InfiniteTimeSpan);
+		}
 	}
 
 	private void CancelLongPressTimer()
 	{
-		if (_longPressTimer != null)
+		lock (_longPressLock)
 		{
-			_longPressTimer.Stop();
-			_longPressTimer.Tick -= LongPressTimer_Tick;
-			_longPressTimer = null;
+			_longPressGeneration++;
+			if (_longPressTimer != null)
+			{
+				_longPressTimer.Dispose();
+				_longPressTimer = null;
+			}
 		}
 	}
 
-	/// <summary>长按达阈值：在按下处呼出轮盘（光标仍在中心，移动后再选择）。</summary>
-	private void LongPressTimer_Tick(object? sender, EventArgs e)
+	/// <summary>长按达阈值：在按下处呼出轮盘（光标仍在中心，移动后再选择）。线程池回调 → 主线程 UI。</summary>
+	private void LongPressTimerCallback(int generation)
 	{
-		CancelLongPressTimer();
+		lock (_longPressLock)
+		{
+			if (generation != _longPressGeneration)
+			{
+				return; // 已被取消/替换的旧回调
+			}
+			_longPressTimer = null;
+		}
 		if (!_mouseTriggerDown || !_isWaitingForThreshold || _isGestureActive)
 		{
 			return;
 		}
-		_isWaitingForThreshold = false;
-		_isGestureActive = true;
-		string processName = ActiveWindowHelper.GetActiveWindowProcessName();
-		_activeProfile = ConfigManager.GetProfileForProcess(processName);
-		long gestureVersion = GetCurrentGestureVersion();
-		ProcessMove(_startPoint);
-		if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+		try
 		{
-			return;
+			_isWaitingForThreshold = false;
+			_isGestureActive = true;
+			string processName = ActiveWindowHelper.GetActiveWindowProcessName();
+			WheelProfile profile = ConfigManager.GetProfileForProcess(processName);
+			long gestureVersion = GetCurrentGestureVersion();
+			Point startPoint = _startPoint;
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+			{
+				try
+				{
+					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					{
+						return;
+					}
+					ShowRadialUI(startPoint, profile);
+					ApplyPendingHighlight();
+				}
+				catch
+				{
+					// 激活失败：恢复状态，保证拖拽等其它触发途径不受影响
+					_isWaitingForThreshold = true;
+					_isGestureActive = false;
+				}
+			}, (DispatcherPriority)6, Array.Empty<object>());
 		}
-		ShowRadialUI(_startPoint, _activeProfile);
-		ApplyPendingHighlight();
+		catch
+		{
+			// 预检/分派失败：恢复状态
+			_isWaitingForThreshold = true;
+			_isGestureActive = false;
+		}
 	}
 
 	private void Hook_OnTriggerButtonUp(object? sender, MouseEventArgs e)
