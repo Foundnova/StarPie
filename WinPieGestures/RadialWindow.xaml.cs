@@ -30,6 +30,10 @@ public partial class RadialWindow : Window
 	private const uint MONITOR_DEFAULTTONEAREST = 2;
 	private const uint SWP_NOACTIVATE = 0x0010;
 	private const uint SWP_NOZORDER = 0x0004;
+	private const int WM_DPICHANGED = 0x02E0;
+
+	private double _wheelCanvasSize = 360.0;
+	private double _canvasCenter = 180.0;
 
 	[DllImport("user32.dll")]
 	public static extern nint MonitorFromPoint(POINT pt, uint dwFlags);
@@ -64,8 +68,8 @@ public partial class RadialWindow : Window
 	}
 
 	/// <summary>
-	/// 以物理像素将窗口居中到 _centerPoint(鼠标钩子返回的物理坐标)所在的显示器上。
-	/// 在 PerMonitorV2 DPI 感知下,SetWindowPos 直接使用物理像素,可正确定位到副屏。
+	/// 以物理像素将窗口严格居中对齐到 _centerPoint(鼠标物理坐标)所在的显示器上。
+	/// 在 PerMonitorV2 混合 DPI 环境下，SetWindowPos 直接以物理像素精确定位，杜绝副屏跨屏漂移。
 	/// </summary>
 	private void PositionWindowOnTargetMonitor()
 	{
@@ -75,8 +79,8 @@ public partial class RadialWindow : Window
 			return;
 		}
 		var (scaleX, scaleY) = GetMonitorDpiScale(_centerPoint);
-		int physicalWidth = (int)Math.Round(base.Width * scaleX);
-		int physicalHeight = (int)Math.Round(base.Height * scaleY);
+		int physicalWidth = (int)Math.Round(_wheelCanvasSize * scaleX);
+		int physicalHeight = (int)Math.Round(_wheelCanvasSize * scaleY);
 		int physicalLeft = (int)Math.Round(_centerPoint.X - physicalWidth / 2.0);
 		int physicalTop = (int)Math.Round(_centerPoint.Y - physicalHeight / 2.0);
 		SetWindowPos(handle, IntPtr.Zero, physicalLeft, physicalTop, physicalWidth, physicalHeight, SWP_NOACTIVATE | SWP_NOZORDER);
@@ -85,7 +89,21 @@ public partial class RadialWindow : Window
 	protected override void OnSourceInitialized(EventArgs e)
 	{
 		base.OnSourceInitialized(e);
+		if (PresentationSource.FromVisual(this) is HwndSource source)
+		{
+			source.AddHook(WndProc);
+		}
 		PositionWindowOnTargetMonitor();
+	}
+
+	private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+	{
+		if (msg == WM_DPICHANGED)
+		{
+			PositionWindowOnTargetMonitor();
+			handled = true;
+		}
+		return IntPtr.Zero;
 	}
 
 	private sealed class SubTierVisuals
@@ -210,6 +228,34 @@ public partial class RadialWindow : Window
 		_centerPoint = centerPoint;
 		_profile = profile;
 		InitializeThemeAndStyle();
+
+		double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
+		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
+		bool enableMultiTier = ConfigManager.CurrentConfig.EnableMultiTier;
+		double num = ((ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55);
+		double subMaxR = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0)
+			? ConfigManager.CurrentConfig.SubWheelOuterRadius
+			: (wheelRadius * num);
+		double maxEffectiveR = enableMultiTier ? Math.Max(wheelRadius, subMaxR + 25.0) : wheelRadius;
+		_wheelCanvasSize = maxEffectiveR * 2.0 + 40.0;
+		_canvasCenter = _wheelCanvasSize / 2.0;
+
+		base.Width = _wheelCanvasSize;
+		base.Height = _wheelCanvasSize;
+		MainGrid.Width = _wheelCanvasSize;
+		MainGrid.Height = _wheelCanvasSize;
+		WheelCanvas.Width = _wheelCanvasSize;
+		WheelCanvas.Height = _wheelCanvasSize;
+
+		double length = _canvasCenter - coreRadius;
+		Canvas.SetLeft(CoreGrid, length);
+		Canvas.SetTop(CoreGrid, length);
+		CoreGrid.Width = coreRadius * 2.0;
+		CoreGrid.Height = coreRadius * 2.0;
+		Panel.SetZIndex(CoreGrid, 5);
+		OuterEllipse.Width = wheelRadius * 2.0 + 8.0;
+		OuterEllipse.Height = wheelRadius * 2.0 + 8.0;
+
 		CoreTextPanel.Visibility = Visibility.Collapsed;
 		base.Loaded += RadialWindow_Loaded;
 		CoreTitle.Text = ((profile.ProcessName == "Global") ? "全局动作" : profile.ProcessName);
@@ -304,34 +350,9 @@ public partial class RadialWindow : Window
 
 	private void RadialWindow_Loaded(object sender, RoutedEventArgs e)
 	{
-		//IL_01a6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ab: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01cf: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01d4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_017d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0182: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0194: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0199: Unknown result type (might be due to invalid IL or missing references)
 		double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
-		bool enableMultiTier = ConfigManager.CurrentConfig.EnableMultiTier;
-		double num = ((ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55);
-		double subMaxR = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0)
-			? ConfigManager.CurrentConfig.SubWheelOuterRadius
-			: (wheelRadius * num);
-		double maxEffectiveR = enableMultiTier ? Math.Max(wheelRadius, subMaxR + 25.0) : wheelRadius;
-		double num2 = (base.Height = (base.Width = maxEffectiveR * 2.0 + 40.0));
-		WheelCanvas.Width = num2;
-		WheelCanvas.Height = num2;
-		double length = num2 / 2.0 - coreRadius;
-		double length2 = num2 / 2.0 - coreRadius;
-		Canvas.SetLeft(CoreGrid, length);
-		Canvas.SetTop(CoreGrid, length2);
-		CoreGrid.Width = coreRadius * 2.0;
-		CoreGrid.Height = coreRadius * 2.0;
-		Panel.SetZIndex(CoreGrid, 5);
-		OuterEllipse.Width = wheelRadius * 2.0 + 8.0;
-		OuterEllipse.Height = wheelRadius * 2.0 + 8.0;
+
 		PositionWindowOnTargetMonitor();
 		CoreEllipse.Fill = _coreBgBrush;
 		CoreEllipse.Stroke = _coreBorderBrush;
@@ -473,9 +494,8 @@ public partial class RadialWindow : Window
 	private void RenderStyleDecorations()
 	{
 		_ = ConfigManager.CurrentConfig.UiStyle;
-		double width = base.Width;
-		double cx = width / 2.0;
-		double cy = width / 2.0;
+		double cx = _canvasCenter;
+		double cy = _canvasCenter;
 		double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		List<UIElement> list = new List<UIElement>();
@@ -522,9 +542,8 @@ public partial class RadialWindow : Window
 	{
 		int sectorCount = _profile.SectorCount;
 		double num = 360.0 / (double)sectorCount;
-		double width = base.Width;
-		double num2 = width / 2.0;
-		double num3 = width / 2.0;
+		double num2 = _canvasCenter;
+		double num3 = _canvasCenter;
 		string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
 		double gap = Math.Max(0.0, ConfigManager.CurrentConfig.SectorGap);
 		double cornerRadius = Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius);
@@ -818,8 +837,8 @@ public partial class RadialWindow : Window
 		//IL_0125: Unknown result type (might be due to invalid IL or missing references)
 		double num = startAngleDegrees * (Math.PI / 180.0);
 		double num2 = endAngleDegrees * (Math.PI / 180.0);
-		double num3 = base.Width / 2.0;
-		double num4 = base.Height / 2.0;
+		double num3 = _canvasCenter;
+		double num4 = _canvasCenter;
 		Point val = default(Point);
 		val = new Point(num3 + Math.Cos(num) * outerRadius, num4 + Math.Sin(num) * outerRadius);
 		Point point = default(Point);
@@ -966,9 +985,8 @@ public partial class RadialWindow : Window
 		}
 		int sectorCount = _profile.SectorCount;
 		double num = 360.0 / (double)sectorCount;
-		double width = base.Width;
-		double num2 = width / 2.0;
-		double num3 = width / 2.0;
+		double num2 = _canvasCenter;
+		double num3 = _canvasCenter;
 		string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
 		string text = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
 		bool flag = ConfigManager.CurrentConfig.ShowText && text != "IconOnly";
@@ -1731,9 +1749,8 @@ public partial class RadialWindow : Window
 		}
 		int sectorCount = _profile.SectorCount;
 		double sectorSize = 360.0 / (double)sectorCount;
-		double width = base.Width;
-		double cx = width / 2.0;
-		double cy = width / 2.0;
+		double cx = _canvasCenter;
+		double cy = _canvasCenter;
 		string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
 		string layoutMode = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
 		bool showText = ConfigManager.CurrentConfig.ShowText && layoutMode != "IconOnly";
