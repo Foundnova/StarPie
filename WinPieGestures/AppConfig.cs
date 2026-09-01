@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace WinPieGestures;
 
@@ -11,6 +11,12 @@ public class AppConfig
 	public TriggerConfig Trigger { get; set; } = new TriggerConfig();
 
 	public double DragThreshold { get; set; } = 25.0;
+
+	/// <summary>可选：长按触发按键（如右键）不动达到长按阈值后呼出轮盘，与拖动呼出共存。</summary>
+	public bool LongPressTrigger { get; set; }
+
+	/// <summary>长按响应时长（毫秒）。</summary>
+	public double LongPressDelayMs { get; set; } = 450.0;
 
 	public string AnimationSpeed { get; set; } = "Balanced";
 

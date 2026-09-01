@@ -990,6 +990,20 @@ public static class I18n
 			[LanguageCode.En] = "Supports one-click physical recording for all mouse buttons (Right, Middle, Side 1/2) and keyboard keys (CapsLock, ~, Space, Letters, F-keys) as well as combos (Alt+Drag, Ctrl+SideButton). Quick clicks naturally pass through native click events.",
 			[LanguageCode.Ja] = "すべてのマウスボタン（右、中央、サイド1/2）およびキーボード単キー（CapsLock、〜、スペース、ファンクションキー）やコンボ（Alt+ドラッグ、Ctrl+サイドキー）の物理録画に対応。短押しクリックは通常通り処理されます。"
 		};
+		dictionary["LongPressTriggerTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "长按触发按键呼出面板 (可选)",
+			[LanguageCode.ZhTw] = "長按觸發按鍵呼叫面板 (可選)",
+			[LanguageCode.En] = "Long-press trigger to open the menu (optional)",
+			[LanguageCode.Ja] = "長押しでメニューを開く (任意)"
+		};
+		dictionary["LongPressTriggerDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "按住触发键不动超过设定时长即呼出轮盘；未达时长松手仍为普通按键。与按住拖动呼出共存。",
+			[LanguageCode.ZhTw] = "按住觸發鍵不動超過設定時長即呼叫輪盤；未達時長鬆手仍為普通按鍵。與按住拖動呼叫共存。",
+			[LanguageCode.En] = "Hold the trigger key still for the configured duration to open the wheel. Releasing early still behaves as a normal key press. Coexists with the drag-to-open gesture.",
+			[LanguageCode.Ja] = "トリガーキーを一定時間押し続けるとホイールが開きます。時間前に離すと通常のキー操作になります。ドラッグで開く動作と共存できます。"
+		};
 		dictionary["BtnRecordTrigger"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "\ud83d\udd34 点击录制触发键 / 组合键",
