@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
@@ -243,7 +243,7 @@ public partial class SettingsWindow : Window
 		ConfigManager.LoadConfig();
 		InitializeComponent();
 		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.2");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.6");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -643,7 +643,7 @@ public partial class SettingsWindow : Window
 		if (_notifyIcon != null)
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.2"))
+			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.6"))
 			{
 				Enabled = false,
 				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
