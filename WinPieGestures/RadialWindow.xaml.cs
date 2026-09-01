@@ -217,7 +217,11 @@ public partial class RadialWindow : Window
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		bool enableMultiTier = ConfigManager.CurrentConfig.EnableMultiTier;
 		double num = ((ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55);
-		double num2 = (base.Height = (base.Width = (enableMultiTier ? (wheelRadius * num + 25.0) : wheelRadius) * 2.0 + 40.0));
+		double subMaxR = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0)
+			? ConfigManager.CurrentConfig.SubWheelOuterRadius
+			: (wheelRadius * num);
+		double maxEffectiveR = enableMultiTier ? Math.Max(wheelRadius, subMaxR + 25.0) : wheelRadius;
+		double num2 = (base.Height = (base.Width = maxEffectiveR * 2.0 + 40.0));
 		WheelCanvas.Width = num2;
 		WheelCanvas.Height = num2;
 		double length = num2 / 2.0 - coreRadius;
@@ -1573,15 +1577,10 @@ public partial class RadialWindow : Window
 		double userSubGap = ConfigManager.CurrentConfig.SubWheelInnerGap;
 		double userCornerRadius = ConfigManager.CurrentConfig.SubWheelCornerRadius;
 
-		double itemR = (_outerRadius - _innerRadius) * 0.40;
-		if (userSubRadius > 0.0 && _outerRadius > 0.0)
-		{
-			double ratio = userSubRadius / (_outerRadius * 1.55);
-			itemR *= Math.Max(0.5, Math.Min(2.5, ratio));
-		}
-
+		double ratio = (userSubRadius > 0.0 && _outerRadius > 0.0) ? (userSubRadius / (_outerRadius * 1.55)) : 1.0;
+		double itemR = (_outerRadius - _innerRadius) * 0.40 * Math.Max(0.5, Math.Min(2.5, ratio));
 		double gapOffset = (userSubGap >= 0.0) ? userSubGap : 4.0;
-		double R = (_innerRadius + _outerRadius) / 2.0 + gapOffset;
+		double R = ((_innerRadius + _outerRadius) / 2.0 * ratio) + gapOffset;
 
 		double num7 = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : ((layoutMode == "IconOnly") ? 22.0 : 17.0));
 		double fontSize = ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : Math.Max(8.5, ConfigManager.CurrentConfig.SectorFontSize - 1.0));

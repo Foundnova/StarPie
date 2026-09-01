@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Principal;
 using System.Text.Json;
 using Microsoft.Win32;
 
@@ -467,13 +468,23 @@ public static class ConfigManager
 		return false;
 	}
 
+	public static bool IsElevated()
+	{
+		try
+		{
+			using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+			WindowsPrincipal principal = new WindowsPrincipal(identity);
+			return principal.IsInRole(WindowsBuiltInRole.Administrator);
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	public static bool IsAutoStartEnabled()
 	{
-		if (!IsRegistryAutoStartEnabled())
-		{
-			return IsAdminTaskAutoStartEnabled();
-		}
-		return true;
+		return IsRegistryAutoStartEnabled() || IsAdminTaskAutoStartEnabled();
 	}
 
 	public static bool IsRegistryAutoStartEnabled()
@@ -519,17 +530,18 @@ public static class ConfigManager
 	{
 		try
 		{
-			string text = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StarPie.exe");
+			string exePath = Environment.ProcessPath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StarPie.exe");
 			if (enable)
 			{
+				// Always write registry auto-start as the foundational reliable guarantee
+				SetRegistryAutoStart(exePath);
+
 				if (asAdmin)
 				{
-					CreateOrUpdateAdminTask(text);
-					RemoveRegistryAutoStart();
+					CreateOrUpdateAdminTask(exePath);
 				}
 				else
 				{
-					SetRegistryAutoStart(text);
 					RemoveAdminTask();
 				}
 			}
@@ -541,6 +553,7 @@ public static class ConfigManager
 			if (CurrentConfig != null)
 			{
 				CurrentConfig.AutoStartAsAdmin = asAdmin;
+				SaveConfig();
 			}
 		}
 		catch (Exception)
@@ -604,17 +617,19 @@ public static class ConfigManager
 	{
 		try
 		{
-			string arguments = "/create /tn \"StarPie_AdminAutoStart\" /tr \"\\\"" + exePath + "\\\" --autostart --minimized\" /sc onlogon /rl highest /f";
-			using Process process = Process.Start(new ProcessStartInfo
+			string arguments = $"/create /tn \"StarPie_AdminAutoStart\" /tr \"\\\"{exePath}\\\" --autostart --minimized\" /sc onlogon /rl highest /f";
+			bool isElevated = IsElevated();
+			ProcessStartInfo psi = new ProcessStartInfo
 			{
 				FileName = "schtasks.exe",
 				Arguments = arguments,
-				UseShellExecute = false,
-				CreateNoWindow = true,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true
-			});
-			process?.WaitForExit(2500);
+				UseShellExecute = !isElevated,
+				Verb = isElevated ? "" : "runas",
+				CreateNoWindow = isElevated,
+				WindowStyle = ProcessWindowStyle.Hidden
+			};
+			using Process process = Process.Start(psi);
+			process?.WaitForExit(3000);
 		}
 		catch (Exception)
 		{
@@ -625,15 +640,17 @@ public static class ConfigManager
 	{
 		try
 		{
-			using Process process = Process.Start(new ProcessStartInfo
+			bool isElevated = IsElevated();
+			ProcessStartInfo psi = new ProcessStartInfo
 			{
 				FileName = "schtasks.exe",
 				Arguments = "/delete /tn \"StarPie_AdminAutoStart\" /f",
-				UseShellExecute = false,
-				CreateNoWindow = true,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true
-			});
+				UseShellExecute = !isElevated,
+				Verb = isElevated ? "" : "runas",
+				CreateNoWindow = isElevated,
+				WindowStyle = ProcessWindowStyle.Hidden
+			};
+			using Process process = Process.Start(psi);
 			process?.WaitForExit(2000);
 		}
 		catch

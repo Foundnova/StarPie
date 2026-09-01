@@ -547,7 +547,7 @@
                       <ColumnDefinition Width="*" />
                       <ColumnDefinition Width="60" />
                     </Grid.ColumnDefinitions>
-                    <Slider Name="ThresholdSlider" Minimum="10" Maximum="60" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
+                    <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
                     <TextBlock Name="ThresholdValueLabel" Grid.Column="1" Text="25" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
                 </StackPanel>
@@ -570,7 +570,7 @@
                       <ColumnDefinition Width="*" />
                       <ColumnDefinition Width="70" />
                     </Grid.ColumnDefinitions>
-                    <Slider Name="AnimSpeedSlider" Minimum="10" Maximum="300" Value="80" SmallChange="5" LargeChange="10" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="AnimSpeedSlider_ValueChanged" />
+                    <Slider Name="AnimSpeedSlider" Minimum="10" Maximum="500" Value="80" SmallChange="5" LargeChange="10" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="AnimSpeedSlider_ValueChanged" />
                     <TextBlock Name="AnimSpeedSliderLabel" Grid.Column="1" Text="80 ms" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
                 </StackPanel>
@@ -598,7 +598,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="70" />
                           </Grid.ColumnDefinitions>
-                          <Slider Name="OuterEscapeDistanceSlider" AutomationProperties.AutomationId="OuterEscapeDistanceSlider" Minimum="140" Maximum="320" Value="190" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OuterEscapeDistanceSlider_ValueChanged" />
+                          <Slider Name="OuterEscapeDistanceSlider" AutomationProperties.AutomationId="OuterEscapeDistanceSlider" Minimum="120" Maximum="650" Value="190" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OuterEscapeDistanceSlider_ValueChanged" />
                           <TextBlock Name="OuterEscapeDistanceLabel" Grid.Column="1" Text="190 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                       </StackPanel>
@@ -1092,7 +1092,7 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="WheelRadiusSlider" Minimum="90" Maximum="220" Value="138" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged" />
+                        <Slider Name="WheelRadiusSlider" Minimum="70" Maximum="280" Value="138" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged" />
                         <TextBlock Name="WheelRadiusLabel" Grid.Column="1" Text="138" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                       <TextBlock Text="扇区内半径 (Inner):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -1101,7 +1101,7 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="InnerRadiusSlider" Minimum="25" Maximum="140" Value="52" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged" />
+                        <Slider Name="InnerRadiusSlider" Minimum="20" Maximum="180" Value="52" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged" />
                         <TextBlock Name="InnerRadiusLabel" Grid.Column="1" Text="52" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                       <TextBlock Text="中心核心圆半径 (Core):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -1110,7 +1110,7 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="CoreRadiusSlider" Minimum="20" Maximum="120" Value="50" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged" />
+                        <Slider Name="CoreRadiusSlider" Minimum="15" Maximum="140" Value="50" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged" />
                         <TextBlock Name="CoreRadiusLabel" Grid.Column="1" Text="50" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                     </StackPanel>
@@ -1124,7 +1124,7 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="50" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelOuterRadiusSlider" Minimum="130" Maximum="320" Value="210" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
+                        <Slider Name="SubWheelOuterRadiusSlider" Minimum="120" Maximum="480" Value="210" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
                         <TextBlock Name="SubWheelOuterRadiusLabel" Grid.Column="1" Text="210 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                       <TextBlock Text="二级与一级轮盘间距 (Gap):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -1432,7 +1432,7 @@
                       <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离 (Trigger Distance):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <TextBlock Name="SubWheelTriggerDistanceValueText" Text="95 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                     </Grid>
-                    <Slider Name="SubWheelTriggerDistanceSlider" Minimum="50" Maximum="180" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
+                    <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
                     <TextBlock Name="SubWheelTriggerDistDesc" Text="调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                   </StackPanel>
                 </StackPanel>

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.CodeDom.Compiler;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -13,25 +14,17 @@ namespace WinPieGestures;
 public partial class App : Application
 {
 	private static Mutex? _singleInstanceMutex;
-
 	private static EventWaitHandle? _instanceWakeEvent;
-
 	private static RegisteredWaitHandle? _waitHandleRegistration;
-
 	private static bool _isDuplicateInstance;
 
 	private const string MutexName = "Global\\StarPie_SingleInstance_Mutex_9B8A7C";
-
 	private const string WakeEventName = "Global\\StarPie_Wakeup_Event_9B8A7C";
-
 	private const string AppId = "SoftBlack42.StarPie.App";
 
-	private GestureController? _gestureController;
-
+	public static GestureController? MainGestureController { get; private set; }
 	public static MouseHook? MainMouseHook { get; private set; }
-
 	public static KeyboardHook? MainKeyboardHook { get; private set; }
-
 	public static SettingsWindow? MainSettingsWindow { get; private set; }
 
 	[DllImport("shell32.dll", SetLastError = true)]
@@ -43,11 +36,9 @@ public partial class App : Application
 
 	protected override void OnStartup(StartupEventArgs e)
 	{
-		//IL_00db: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e5: Expected O, but got Unknown
 		try
 		{
-			SetCurrentProcessExplicitAppUserModelID("SoftBlack42.StarPie.App");
+			SetCurrentProcessExplicitAppUserModelID(AppId);
 		}
 		catch
 		{
@@ -58,7 +49,7 @@ public partial class App : Application
 			bool createdNew;
 			try
 			{
-				_singleInstanceMutex = new Mutex(initiallyOwned: true, "Global\\StarPie_SingleInstance_Mutex_9B8A7C", out createdNew);
+				_singleInstanceMutex = new Mutex(initiallyOwned: true, MutexName, out createdNew);
 			}
 			catch
 			{
@@ -68,7 +59,7 @@ public partial class App : Application
 			{
 				try
 				{
-					using EventWaitHandle eventWaitHandle = EventWaitHandle.OpenExisting("Global\\StarPie_Wakeup_Event_9B8A7C");
+					using EventWaitHandle eventWaitHandle = EventWaitHandle.OpenExisting(WakeEventName);
 					eventWaitHandle.Set();
 				}
 				catch
@@ -80,7 +71,7 @@ public partial class App : Application
 			}
 			try
 			{
-				_instanceWakeEvent = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, "Global\\StarPie_Wakeup_Event_9B8A7C");
+				_instanceWakeEvent = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, WakeEventName);
 				_waitHandleRegistration = ThreadPool.RegisterWaitForSingleObject(_instanceWakeEvent, delegate
 				{
 					((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
@@ -103,7 +94,7 @@ public partial class App : Application
 			MainMouseHook.Start();
 			MainKeyboardHook = new KeyboardHook();
 			MainKeyboardHook.Start();
-			_gestureController = new GestureController(MainMouseHook, MainKeyboardHook);
+			MainGestureController = new GestureController(MainMouseHook, MainKeyboardHook);
 			MainSettingsWindow = new SettingsWindow();
 			base.MainWindow = MainSettingsWindow;
 			if (!Environment.GetCommandLineArgs().Any((string a) => string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/minimized", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/autostart", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase)))

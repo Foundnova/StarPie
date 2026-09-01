@@ -250,311 +250,12 @@ public partial class SettingsWindow : Window
 		}
 		try
 		{
-			ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
-			UpdateTriggerBadgeDisplay();
-			HookRawInputForSensorAndRecorder();
-			ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
-			ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
-			if (EnableOuterEscapeCheckBox != null)
-			{
-				EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
-			}
-			if (OuterEscapeDistancePanel != null)
-			{
-				OuterEscapeDistancePanel.Visibility = ((!ConfigManager.CurrentConfig.EnableOuterEscapeCancel) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (OuterEscapeDistanceSlider != null)
-			{
-				OuterEscapeDistanceSlider.Value = ((ConfigManager.CurrentConfig.OuterEscapeDistance > 0.0) ? ConfigManager.CurrentConfig.OuterEscapeDistance : 190.0);
-			}
-			if (OuterEscapeDistanceLabel != null)
-			{
-				OuterEscapeDistanceLabel.Text = $"{OuterEscapeDistanceSlider?.Value ?? 190.0:0} px";
-			}
-			string text2 = ConfigManager.CurrentConfig.AnimationSpeed ?? "Balanced";
-			double value = ((ConfigManager.CurrentConfig.CustomAnimationDurationMs > 0.0) ? ConfigManager.CurrentConfig.CustomAnimationDurationMs : 80.0);
-			if (AnimSpeedSlider != null)
-			{
-				AnimSpeedSlider.Value = value;
-			}
-			if (AnimSpeedSliderLabel != null)
-			{
-				AnimSpeedSliderLabel.Text = $"{value:0} ms";
-			}
-			switch (text2)
-			{
-			case "Elegant":
-				if (AnimSpeedElegantRadio != null)
-				{
-					AnimSpeedElegantRadio.IsChecked = true;
-				}
-				break;
-			case "Fast":
-				if (AnimSpeedFastRadio != null)
-				{
-					AnimSpeedFastRadio.IsChecked = true;
-				}
-				break;
-			case "Custom":
-				if (AnimSpeedCustomRadio != null)
-				{
-					AnimSpeedCustomRadio.IsChecked = true;
-				}
-				break;
-			default:
-				if (AnimSpeedBalancedRadio != null)
-				{
-					AnimSpeedBalancedRadio.IsChecked = true;
-				}
-				break;
-			}
-			SetComboBoxSelectedValue(AppThemeComboBox, ConfigManager.CurrentConfig.AppTheme ?? "System");
 			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
-			ReloadThemePresets();
-			SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
-			SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
-			CustomSectorBgTextBox.Text = ConfigManager.CurrentConfig.CustomSectorBg;
-			CustomSectorBorderTextBox.Text = ConfigManager.CurrentConfig.CustomSectorBorder;
-			CustomHighlightBgTextBox.Text = ConfigManager.CurrentConfig.CustomHighlightBg;
-			CustomHighlightBorderTextBox.Text = ConfigManager.CurrentConfig.CustomHighlightBorder;
-			CustomTextTextBox.Text = ConfigManager.CurrentConfig.CustomText;
-			bool flag = (ConfigManager.CurrentConfig.Theme ?? "").StartsWith("CustomPreset_");
-			if (CustomColorsPanel != null)
-			{
-				CustomColorsPanel.Visibility = Visibility.Visible;
-			}
-			if (((ConfigManager.CurrentConfig.Theme == "Custom") | flag) && CustomColorExpander != null)
-			{
-				CustomColorExpander.IsExpanded = true;
-			}
-			if (RenameCustomColorPresetButton != null)
-			{
-				RenameCustomColorPresetButton.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (DeleteCustomColorPresetButton != null)
-			{
-				DeleteCustomColorPresetButton.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (DeletePresetInPanelButton != null)
-			{
-				DeletePresetInPanelButton.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (SavePresetChangesButton != null)
-			{
-				SavePresetChangesButton.Content = (flag ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton"));
-			}
-			SetComboBoxSelectedValue(HighlightGlowPresetComboBox, ConfigManager.CurrentConfig.HighlightGlowPreset ?? "Auto");
-			HighlightGlowColorTextBox.Text = ConfigManager.CurrentConfig.HighlightGlowColor ?? "";
-			HighlightGlowRadiusSlider.Value = ((ConfigManager.CurrentConfig.HighlightGlowRadius > 0.0) ? ConfigManager.CurrentConfig.HighlightGlowRadius : 24.0);
-			HighlightGlowRadiusLabel.Text = $"{HighlightGlowRadiusSlider.Value:0} px";
-			HighlightGlowOpacitySlider.Value = ((ConfigManager.CurrentConfig.HighlightGlowOpacity >= 0.0) ? ConfigManager.CurrentConfig.HighlightGlowOpacity : 0.85) * 100.0;
-			HighlightGlowOpacityLabel.Text = $"{HighlightGlowOpacitySlider.Value:0}%";
-			CustomHighlightGlowPanel.Visibility = ((!(ConfigManager.CurrentConfig.HighlightGlowPreset == "Custom") && string.IsNullOrEmpty(ConfigManager.CurrentConfig.HighlightGlowColor)) ? Visibility.Collapsed : Visibility.Visible);
-			SetComboBoxSelectedValue(SubHighlightGlowPresetComboBox, ConfigManager.CurrentConfig.SubWheelHighlightGlowPreset ?? "FollowPrimary");
-			if (SubHighlightGlowColorTextBox != null)
-			{
-				SubHighlightGlowColorTextBox.Text = ConfigManager.CurrentConfig.SubWheelHighlightGlowColor ?? "";
-			}
-			if (SubHighlightGlowRadiusSlider != null)
-			{
-				SubHighlightGlowRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelHighlightGlowRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelHighlightGlowRadius : 24.0);
-				if (SubHighlightGlowRadiusLabel != null)
-				{
-					SubHighlightGlowRadiusLabel.Text = $"{SubHighlightGlowRadiusSlider.Value:0} px";
-				}
-			}
-			if (SubHighlightGlowOpacitySlider != null)
-			{
-				SubHighlightGlowOpacitySlider.Value = ((ConfigManager.CurrentConfig.SubWheelHighlightGlowOpacity >= 0.0) ? ConfigManager.CurrentConfig.SubWheelHighlightGlowOpacity : 0.85) * 100.0;
-				if (SubHighlightGlowOpacityLabel != null)
-				{
-					SubHighlightGlowOpacityLabel.Text = $"{SubHighlightGlowOpacitySlider.Value:0}%";
-				}
-			}
-			if (SubCustomHighlightGlowPanel != null)
-			{
-				string text3 = ConfigManager.CurrentConfig.SubWheelHighlightGlowPreset ?? "FollowPrimary";
-				SubCustomHighlightGlowPanel.Visibility = ((!(text3 == "Custom") && string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelHighlightGlowColor)) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			WheelRadiusSlider.Value = ConfigManager.CurrentConfig.WheelRadius;
-			WheelRadiusLabel.Text = ConfigManager.CurrentConfig.WheelRadius.ToString("0");
-			InnerRadiusSlider.Value = ConfigManager.CurrentConfig.InnerRadius;
-			InnerRadiusLabel.Text = ConfigManager.CurrentConfig.InnerRadius.ToString("0");
-			CoreRadiusSlider.Value = ConfigManager.CurrentConfig.CoreRadius;
-			CoreRadiusLabel.Text = ConfigManager.CurrentConfig.CoreRadius.ToString("0");
-			SectorGapSlider.Value = ConfigManager.CurrentConfig.SectorGap;
-			SectorGapLabel.Text = $"{ConfigManager.CurrentConfig.SectorGap:0} px";
-			SectorCornerRadiusSlider.Value = ConfigManager.CurrentConfig.SectorCornerRadius;
-			SectorCornerRadiusLabel.Text = $"{ConfigManager.CurrentConfig.SectorCornerRadius:0} px";
-			SectorIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
-			SectorIconSizeLabel.Text = $"{SectorIconSizeSlider.Value:0} px";
-			SectorFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 10.5);
-			SectorFontSizeLabel.Text = $"{SectorFontSizeSlider.Value:0.0} px";
-			if (SubWheelOuterRadiusSlider != null)
-			{
-				SubWheelOuterRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : 210.0);
-				SubWheelOuterRadiusLabel.Text = $"{SubWheelOuterRadiusSlider.Value:0} px";
-			}
-			if (SubWheelInnerGapSlider != null)
-			{
-				SubWheelInnerGapSlider.Value = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0);
-				SubWheelInnerGapLabel.Text = $"{SubWheelInnerGapSlider.Value:0} px";
-			}
-			if (SubWheelCornerRadiusSlider != null)
-			{
-				SubWheelCornerRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
-				SubWheelCornerRadiusLabel.Text = $"{SubWheelCornerRadiusSlider.Value:0} px";
-			}
-			if (SubWheelIconSizeSlider != null)
-			{
-				SubWheelIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
-				SubWheelIconSizeLabel.Text = $"{SubWheelIconSizeSlider.Value:0} px";
-			}
-			if (SubWheelFontSizeSlider != null)
-			{
-				SubWheelFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 9.5);
-				SubWheelFontSizeLabel.Text = $"{SubWheelFontSizeSlider.Value:0.0} px";
-			}
-			if (SubWheelTriggerDistanceSlider != null)
-			{
-				SubWheelTriggerDistanceSlider.Value = ((ConfigManager.CurrentConfig.SubWheelTriggerDistance > 0.0) ? ConfigManager.CurrentConfig.SubWheelTriggerDistance : 95.0);
-				if (SubWheelTriggerDistanceValueText != null)
-				{
-					SubWheelTriggerDistanceValueText.Text = $"{SubWheelTriggerDistanceSlider.Value:0} px";
-				}
-			}
-			SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
-			SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
-			PopulateWheelFontFamilies();
-			SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
-			SetComboBoxSelectedValue(WheelFontFamilyComboBox, ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-			ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
-			if (EnableMultiTierCheckBox != null)
-			{
-				EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
-			}
-			if (SubWheelUiStyleComboBox != null)
-			{
-				SetComboBoxSelectedValue(SubWheelUiStyleComboBox, ConfigManager.CurrentConfig.SubWheelUiStyle ?? "FollowPrimary");
-			}
-			if (SubWheelThemeComboBox != null)
-			{
-				SetComboBoxSelectedValue(SubWheelThemeComboBox, ConfigManager.CurrentConfig.SubWheelTheme ?? "FollowPrimary");
-			}
-			if (SubCustomSectorBgTextBox != null)
-			{
-				SubCustomSectorBgTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomSectorBg ?? "";
-			}
-			if (SubCustomSectorBorderTextBox != null)
-			{
-				SubCustomSectorBorderTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomSectorBorder ?? "";
-			}
-			if (SubCustomHighlightBgTextBox != null)
-			{
-				SubCustomHighlightBgTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomHighlightBg ?? "";
-			}
-			if (SubCustomHighlightBorderTextBox != null)
-			{
-				SubCustomHighlightBorderTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder ?? "";
-			}
-			if (SubCustomTextTextBox != null)
-			{
-				SubCustomTextTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomText ?? "";
-			}
-			bool flag2 = (ConfigManager.CurrentConfig.SubWheelTheme ?? "").StartsWith("CustomPreset_");
-			if (((ConfigManager.CurrentConfig.SubWheelTheme == "Custom") | flag2) && SubCustomColorExpander != null)
-			{
-				SubCustomColorExpander.IsExpanded = true;
-			}
-			if (RenameSubCustomColorPresetButton != null)
-			{
-				RenameSubCustomColorPresetButton.Visibility = ((!flag2) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (DeleteSubCustomColorPresetButton != null)
-			{
-				DeleteSubCustomColorPresetButton.Visibility = ((!flag2) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (DeleteSubPresetInPanelButton != null)
-			{
-				DeleteSubPresetInPanelButton.Visibility = ((!flag2) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (SaveSubPresetChangesButton != null)
-			{
-				SaveSubPresetChangesButton.Content = (flag2 ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton"));
-			}
-			UpdateSubColorPreviews();
-			ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
-			SetComboBoxSelectedValue(CoreIconTypeComboBox, ConfigManager.CurrentConfig.CoreIconType ?? "Exit");
-			CoreImagePathTextBox.Text = ConfigManager.CurrentConfig.CoreCustomImagePath ?? "";
-			double num = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
-			if (CoreIconScaleSlider != null)
-			{
-				CoreIconScaleSlider.Value = num;
-			}
-			if (CoreIconScaleLabel != null)
-			{
-				CoreIconScaleLabel.Text = $"{Math.Round(num * 100.0)}%";
-			}
-			if (CoreImageOffsetXSlider != null)
-			{
-				CoreImageOffsetXSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetX;
-			}
-			if (CoreImageOffsetXLabel != null)
-			{
-				CoreImageOffsetXLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetX} px";
-			}
-			if (CoreImageOffsetYSlider != null)
-			{
-				CoreImageOffsetYSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetY;
-			}
-			if (CoreImageOffsetYLabel != null)
-			{
-				CoreImageOffsetYLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetY} px";
-			}
-			UpdateCoreIconPreviewUI();
-			DisableOnFullScreenCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnFullScreen;
-			CtrlModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnCtrl;
-			ShiftModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnShift;
-			AltModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnAlt;
-			bool flag3 = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
-			if (IsolationWhitelistRadio != null)
-			{
-				IsolationWhitelistRadio.IsChecked = flag3;
-			}
-			if (IsolationBlacklistRadio != null)
-			{
-				IsolationBlacklistRadio.IsChecked = !flag3;
-			}
-			RefreshProcessListUI();
-			AutoStartCheckBox.IsChecked = ConfigManager.IsAutoStartEnabled();
-			if (AutoStartAsAdminCheckBox != null)
-			{
-				AutoStartAsAdminCheckBox.IsChecked = ConfigManager.CurrentConfig.AutoStartAsAdmin || ConfigManager.IsAdminTaskAutoStartEnabled();
-			}
-			SetComboBoxSelectedValue(LanguageComboBox, ConfigManager.CurrentConfig.Language ?? "Auto");
-			ApplyLocalization();
-			UpdateColorPreviews();
+			LoadConfigToUi();
 			SlotsItemsControl.ItemsSource = _slotViewModels;
 			bool flag4 = IsRunningAsAdmin();
 			UacWarningCard.Visibility = (flag4 ? Visibility.Collapsed : Visibility.Visible);
-			_selectedProfile = ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-			if (_selectedProfile != null)
-			{
-				ProfilesListBox.SelectedItem = _selectedProfile;
-				if (SectorCount4Radio != null)
-				{
-					SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-				}
-				if (SectorCount8Radio != null)
-				{
-					SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-				}
-				if (SectorCount12Radio != null)
-				{
-					SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
-				}
-				RefreshSlots();
-			}
+			RefreshSlots();
 		}
 		finally
 		{
@@ -568,6 +269,320 @@ public partial class SettingsWindow : Window
 			}
 			MemoryOptimizer.TrimMemory();
 		};
+	}
+
+	private void LoadConfigToUi()
+	{
+		ProfilesListBox.ItemsSource = null;
+		ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
+		UpdateTriggerBadgeDisplay();
+		HookRawInputForSensorAndRecorder();
+
+		// Threshold & Outer Escape
+		ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
+		ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
+		if (EnableOuterEscapeCheckBox != null)
+		{
+			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
+		}
+		if (OuterEscapeDistancePanel != null)
+		{
+			OuterEscapeDistancePanel.Visibility = ((!ConfigManager.CurrentConfig.EnableOuterEscapeCancel) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (OuterEscapeDistanceSlider != null)
+		{
+			OuterEscapeDistanceSlider.Value = ((ConfigManager.CurrentConfig.OuterEscapeDistance > 0.0) ? ConfigManager.CurrentConfig.OuterEscapeDistance : 190.0);
+		}
+		if (OuterEscapeDistanceLabel != null)
+		{
+			OuterEscapeDistanceLabel.Text = $"{OuterEscapeDistanceSlider?.Value ?? 190.0:0} px";
+		}
+
+		// Animation Speed
+		string animSpeed = ConfigManager.CurrentConfig.AnimationSpeed ?? "Balanced";
+		double animVal = ((ConfigManager.CurrentConfig.CustomAnimationDurationMs > 0.0) ? ConfigManager.CurrentConfig.CustomAnimationDurationMs : 80.0);
+		if (AnimSpeedSlider != null)
+		{
+			AnimSpeedSlider.Value = animVal;
+		}
+		if (AnimSpeedSliderLabel != null)
+		{
+			AnimSpeedSliderLabel.Text = $"{animVal:0} ms";
+		}
+		switch (animSpeed)
+		{
+		case "Elegant":
+			if (AnimSpeedElegantRadio != null) AnimSpeedElegantRadio.IsChecked = true;
+			break;
+		case "Fast":
+			if (AnimSpeedFastRadio != null) AnimSpeedFastRadio.IsChecked = true;
+			break;
+		case "Custom":
+			if (AnimSpeedCustomRadio != null) AnimSpeedCustomRadio.IsChecked = true;
+			break;
+		default:
+			if (AnimSpeedBalancedRadio != null) AnimSpeedBalancedRadio.IsChecked = true;
+			break;
+		}
+
+		// App Theme & Presets
+		SetComboBoxSelectedValue(AppThemeComboBox, ConfigManager.CurrentConfig.AppTheme ?? "System");
+		ReloadThemePresets();
+		SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
+		SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
+
+		// Custom Colors
+		CustomSectorBgTextBox.Text = ConfigManager.CurrentConfig.CustomSectorBg;
+		CustomSectorBorderTextBox.Text = ConfigManager.CurrentConfig.CustomSectorBorder;
+		CustomHighlightBgTextBox.Text = ConfigManager.CurrentConfig.CustomHighlightBg;
+		CustomHighlightBorderTextBox.Text = ConfigManager.CurrentConfig.CustomHighlightBorder;
+		CustomTextTextBox.Text = ConfigManager.CurrentConfig.CustomText;
+		bool isCustomTheme = (ConfigManager.CurrentConfig.Theme ?? "").StartsWith("CustomPreset_");
+		if (CustomColorsPanel != null)
+		{
+			CustomColorsPanel.Visibility = Visibility.Visible;
+		}
+		if (((ConfigManager.CurrentConfig.Theme == "Custom") || isCustomTheme) && CustomColorExpander != null)
+		{
+			CustomColorExpander.IsExpanded = true;
+		}
+		if (RenameCustomColorPresetButton != null)
+		{
+			RenameCustomColorPresetButton.Visibility = ((!isCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (DeleteCustomColorPresetButton != null)
+		{
+			DeleteCustomColorPresetButton.Visibility = ((!isCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (DeletePresetInPanelButton != null)
+		{
+			DeletePresetInPanelButton.Visibility = ((!isCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (SavePresetChangesButton != null)
+		{
+			SavePresetChangesButton.Content = (isCustomTheme ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton"));
+		}
+
+		// Primary Glow
+		SetComboBoxSelectedValue(HighlightGlowPresetComboBox, ConfigManager.CurrentConfig.HighlightGlowPreset ?? "Auto");
+		HighlightGlowColorTextBox.Text = ConfigManager.CurrentConfig.HighlightGlowColor ?? "";
+		HighlightGlowRadiusSlider.Value = ((ConfigManager.CurrentConfig.HighlightGlowRadius > 0.0) ? ConfigManager.CurrentConfig.HighlightGlowRadius : 24.0);
+		HighlightGlowRadiusLabel.Text = $"{HighlightGlowRadiusSlider.Value:0} px";
+		HighlightGlowOpacitySlider.Value = ((ConfigManager.CurrentConfig.HighlightGlowOpacity >= 0.0) ? ConfigManager.CurrentConfig.HighlightGlowOpacity : 0.85) * 100.0;
+		HighlightGlowOpacityLabel.Text = $"{HighlightGlowOpacitySlider.Value:0}%";
+		CustomHighlightGlowPanel.Visibility = ((!(ConfigManager.CurrentConfig.HighlightGlowPreset == "Custom") && string.IsNullOrEmpty(ConfigManager.CurrentConfig.HighlightGlowColor)) ? Visibility.Collapsed : Visibility.Visible);
+
+		// Secondary Glow
+		SetComboBoxSelectedValue(SubHighlightGlowPresetComboBox, ConfigManager.CurrentConfig.SubWheelHighlightGlowPreset ?? "FollowPrimary");
+		if (SubHighlightGlowColorTextBox != null)
+		{
+			SubHighlightGlowColorTextBox.Text = ConfigManager.CurrentConfig.SubWheelHighlightGlowColor ?? "";
+		}
+		if (SubHighlightGlowRadiusSlider != null)
+		{
+			SubHighlightGlowRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelHighlightGlowRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelHighlightGlowRadius : 24.0);
+			if (SubHighlightGlowRadiusLabel != null)
+			{
+				SubHighlightGlowRadiusLabel.Text = $"{SubHighlightGlowRadiusSlider.Value:0} px";
+			}
+		}
+		if (SubHighlightGlowOpacitySlider != null)
+		{
+			SubHighlightGlowOpacitySlider.Value = ((ConfigManager.CurrentConfig.SubWheelHighlightGlowOpacity >= 0.0) ? ConfigManager.CurrentConfig.SubWheelHighlightGlowOpacity : 0.85) * 100.0;
+			if (SubHighlightGlowOpacityLabel != null)
+			{
+				SubHighlightGlowOpacityLabel.Text = $"{SubHighlightGlowOpacitySlider.Value:0}%";
+			}
+		}
+		if (SubCustomHighlightGlowPanel != null)
+		{
+			string subGlow = ConfigManager.CurrentConfig.SubWheelHighlightGlowPreset ?? "FollowPrimary";
+			SubCustomHighlightGlowPanel.Visibility = ((!(subGlow == "Custom") && string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelHighlightGlowColor)) ? Visibility.Collapsed : Visibility.Visible);
+		}
+
+		// Primary Geometry & Dimensions
+		WheelRadiusSlider.Value = ConfigManager.CurrentConfig.WheelRadius;
+		WheelRadiusLabel.Text = ConfigManager.CurrentConfig.WheelRadius.ToString("0");
+		InnerRadiusSlider.Value = ConfigManager.CurrentConfig.InnerRadius;
+		InnerRadiusLabel.Text = ConfigManager.CurrentConfig.InnerRadius.ToString("0");
+		CoreRadiusSlider.Value = ConfigManager.CurrentConfig.CoreRadius;
+		CoreRadiusLabel.Text = ConfigManager.CurrentConfig.CoreRadius.ToString("0");
+		SectorGapSlider.Value = ConfigManager.CurrentConfig.SectorGap;
+		SectorGapLabel.Text = $"{ConfigManager.CurrentConfig.SectorGap:0} px";
+		SectorCornerRadiusSlider.Value = ConfigManager.CurrentConfig.SectorCornerRadius;
+		SectorCornerRadiusLabel.Text = $"{ConfigManager.CurrentConfig.SectorCornerRadius:0} px";
+		SectorIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+		SectorIconSizeLabel.Text = $"{SectorIconSizeSlider.Value:0} px";
+		SectorFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 10.5);
+		SectorFontSizeLabel.Text = $"{SectorFontSizeSlider.Value:0.0} px";
+
+		// Sub-Wheel Dimensions
+		if (SubWheelOuterRadiusSlider != null)
+		{
+			SubWheelOuterRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : 210.0);
+			SubWheelOuterRadiusLabel.Text = $"{SubWheelOuterRadiusSlider.Value:0} px";
+		}
+		if (SubWheelInnerGapSlider != null)
+		{
+			SubWheelInnerGapSlider.Value = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0);
+			SubWheelInnerGapLabel.Text = $"{SubWheelInnerGapSlider.Value:0} px";
+		}
+		if (SubWheelCornerRadiusSlider != null)
+		{
+			SubWheelCornerRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
+			SubWheelCornerRadiusLabel.Text = $"{SubWheelCornerRadiusSlider.Value:0} px";
+		}
+		if (SubWheelIconSizeSlider != null)
+		{
+			SubWheelIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
+			SubWheelIconSizeLabel.Text = $"{SubWheelIconSizeSlider.Value:0} px";
+		}
+		if (SubWheelFontSizeSlider != null)
+		{
+			SubWheelFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 9.5);
+			SubWheelFontSizeLabel.Text = $"{SubWheelFontSizeSlider.Value:0.0} px";
+		}
+		if (SubWheelTriggerDistanceSlider != null)
+		{
+			SubWheelTriggerDistanceSlider.Value = ((ConfigManager.CurrentConfig.SubWheelTriggerDistance > 0.0) ? ConfigManager.CurrentConfig.SubWheelTriggerDistance : 95.0);
+			if (SubWheelTriggerDistanceValueText != null)
+			{
+				SubWheelTriggerDistanceValueText.Text = $"{SubWheelTriggerDistanceSlider.Value:0} px";
+			}
+		}
+
+		// Shapes & Layouts
+		SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
+		SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
+		PopulateWheelFontFamilies();
+		SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
+		SetComboBoxSelectedValue(WheelFontFamilyComboBox, ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+		ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
+		if (EnableMultiTierCheckBox != null)
+		{
+			EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
+		}
+
+		// Sub Wheel Themes & Colors
+		if (SubWheelUiStyleComboBox != null)
+		{
+			SetComboBoxSelectedValue(SubWheelUiStyleComboBox, ConfigManager.CurrentConfig.SubWheelUiStyle ?? "FollowPrimary");
+		}
+		if (SubWheelThemeComboBox != null)
+		{
+			SetComboBoxSelectedValue(SubWheelThemeComboBox, ConfigManager.CurrentConfig.SubWheelTheme ?? "FollowPrimary");
+		}
+		if (SubCustomSectorBgTextBox != null)
+		{
+			SubCustomSectorBgTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomSectorBg ?? "";
+		}
+		if (SubCustomSectorBorderTextBox != null)
+		{
+			SubCustomSectorBorderTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomSectorBorder ?? "";
+		}
+		if (SubCustomHighlightBgTextBox != null)
+		{
+			SubCustomHighlightBgTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomHighlightBg ?? "";
+		}
+		if (SubCustomHighlightBorderTextBox != null)
+		{
+			SubCustomHighlightBorderTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder ?? "";
+		}
+		if (SubCustomTextTextBox != null)
+		{
+			SubCustomTextTextBox.Text = ConfigManager.CurrentConfig.SubWheelCustomText ?? "";
+		}
+		bool isSubCustomTheme = (ConfigManager.CurrentConfig.SubWheelTheme ?? "").StartsWith("CustomPreset_");
+		if (((ConfigManager.CurrentConfig.SubWheelTheme == "Custom") || isSubCustomTheme) && SubCustomColorExpander != null)
+		{
+			SubCustomColorExpander.IsExpanded = true;
+		}
+		if (RenameSubCustomColorPresetButton != null)
+		{
+			RenameSubCustomColorPresetButton.Visibility = ((!isSubCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (DeleteSubCustomColorPresetButton != null)
+		{
+			DeleteSubCustomColorPresetButton.Visibility = ((!isSubCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (DeleteSubPresetInPanelButton != null)
+		{
+			DeleteSubPresetInPanelButton.Visibility = ((!isSubCustomTheme) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (SaveSubPresetChangesButton != null)
+		{
+			SaveSubPresetChangesButton.Content = (isSubCustomTheme ? I18n.T("SavePresetChangesButton") : I18n.T("SaveAsNewPresetButton"));
+		}
+		UpdateSubColorPreviews();
+
+		// Center Core Icon
+		ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
+		SetComboBoxSelectedValue(CoreIconTypeComboBox, ConfigManager.CurrentConfig.CoreIconType ?? "Exit");
+		CoreImagePathTextBox.Text = ConfigManager.CurrentConfig.CoreCustomImagePath ?? "";
+		double coreScale = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
+		if (CoreIconScaleSlider != null)
+		{
+			CoreIconScaleSlider.Value = coreScale;
+		}
+		if (CoreIconScaleLabel != null)
+		{
+			CoreIconScaleLabel.Text = $"{Math.Round(coreScale * 100.0)}%";
+		}
+		if (CoreImageOffsetXSlider != null)
+		{
+			CoreImageOffsetXSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetX;
+		}
+		if (CoreImageOffsetXLabel != null)
+		{
+			CoreImageOffsetXLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetX} px";
+		}
+		if (CoreImageOffsetYSlider != null)
+		{
+			CoreImageOffsetYSlider.Value = ConfigManager.CurrentConfig.CoreImageOffsetY;
+		}
+		if (CoreImageOffsetYLabel != null)
+		{
+			CoreImageOffsetYLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetY} px";
+		}
+		UpdateCoreIconPreviewUI();
+
+		// Scene Isolation
+		DisableOnFullScreenCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnFullScreen;
+		CtrlModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnCtrl;
+		ShiftModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnShift;
+		AltModifierCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnAlt;
+		bool isWhitelist = string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+		if (IsolationWhitelistRadio != null)
+		{
+			IsolationWhitelistRadio.IsChecked = isWhitelist;
+		}
+		if (IsolationBlacklistRadio != null)
+		{
+			IsolationBlacklistRadio.IsChecked = !isWhitelist;
+		}
+		RefreshProcessListUI();
+
+		// AutoStart
+		AutoStartCheckBox.IsChecked = ConfigManager.IsAutoStartEnabled();
+		if (AutoStartAsAdminCheckBox != null)
+		{
+			AutoStartAsAdminCheckBox.IsChecked = ConfigManager.CurrentConfig.AutoStartAsAdmin;
+		}
+
+		// Language & Previews
+		SetComboBoxSelectedValue(LanguageComboBox, ConfigManager.CurrentConfig.Language ?? "Auto");
+		ApplyLocalization();
+		UpdateColorPreviews();
+
+		// Profiles
+		_selectedProfile = ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+		if (_selectedProfile != null)
+		{
+			ProfilesListBox.SelectedItem = _selectedProfile;
+			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
+			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
+			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
+		}
 	}
 
 	[DllImport("user32.dll")]
@@ -4759,36 +4774,19 @@ public partial class SettingsWindow : Window
 		}
 		if (ConfigManager.ImportConfig(openFileDialog.FileName))
 		{
-			System.Windows.MessageBox.Show("配置导入成功！正在应用新设置...", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			_isUpdatingUi = true;
 			try
 			{
-				ProfilesListBox.ItemsSource = null;
-				ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
-				ProfilesListBox.SelectedIndex = 0;
-				UpdateTriggerBadgeDisplay();
-				HookRawInputForSensorAndRecorder();
-				ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
-				SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
-				SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
-				SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
-				SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
-				WheelRadiusSlider.Value = ConfigManager.CurrentConfig.WheelRadius;
-				InnerRadiusSlider.Value = ConfigManager.CurrentConfig.InnerRadius;
-				CoreRadiusSlider.Value = ConfigManager.CurrentConfig.CoreRadius;
-				SectorGapSlider.Value = ConfigManager.CurrentConfig.SectorGap;
-				SectorCornerRadiusSlider.Value = ConfigManager.CurrentConfig.SectorCornerRadius;
-				SectorIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
-				SectorIconSizeLabel.Text = $"{SectorIconSizeSlider.Value:0} px";
-				SectorFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 10.5);
-				SectorFontSizeLabel.Text = $"{SectorFontSizeSlider.Value:0.0} px";
-				ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
+				LoadConfigToUi();
+				AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
 			}
 			finally
 			{
 				_isUpdatingUi = false;
 			}
+			RefreshSlots();
 			RenderLiveWheelPreview();
+			System.Windows.MessageBox.Show("配置导入成功！已即时应用所有轮盘尺寸、主题与动作方案。", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 		}
 		else
 		{
@@ -5031,8 +5029,8 @@ public partial class SettingsWindow : Window
 			bool num4 = enableMultiTier && wheelProfile.Actions != null && wheelProfile.Actions.Any((ActionItem a) => a != null && a.SubActions != null && a.SubActions.Count > 0);
 			double num5 = Math.Max(80.0, ConfigManager.CurrentConfig.WheelRadius);
 			double num6 = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : (ConfigManager.CurrentConfig.WheelRadius * num3));
-			double val = (num4 ? (Math.Max(num5, num6) + 10.0) : num5);
-			double num7 = 135.0 / Math.Max(135.0, val);
+			double baseScaleRef = Math.Max(215.0, ConfigManager.CurrentConfig.WheelRadius * 1.55);
+			double num7 = 135.0 / baseScaleRef;
 			double num8 = Math.Max(30.0, ConfigManager.CurrentConfig.WheelRadius * num7);
 			double num9 = Math.Max(15.0, ConfigManager.CurrentConfig.InnerRadius * num7);
 			double num10 = Math.Max(10.0, ConfigManager.CurrentConfig.CoreRadius * num7);
@@ -5563,13 +5561,11 @@ public partial class SettingsWindow : Window
 					{
 						int slot = RadialWindow.GetFanSlotIndex(num36, activeCount);
 						var (du, dv) = RadialWindow.GetFanSubOffset(slot);
-						double itemR_sub = (num8 - num9) * 0.40;
-						if (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0 && ConfigManager.CurrentConfig.WheelRadius > 0.0)
-						{
-							double ratio = ConfigManager.CurrentConfig.SubWheelOuterRadius / (ConfigManager.CurrentConfig.WheelRadius * 1.55);
-							itemR_sub *= Math.Max(0.5, Math.Min(2.5, ratio));
-						}
-						double R_sub = (num9 + num8) / 2.0 + num11;
+						double ratio = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0 && ConfigManager.CurrentConfig.WheelRadius > 0.0)
+							? (ConfigManager.CurrentConfig.SubWheelOuterRadius / (ConfigManager.CurrentConfig.WheelRadius * 1.55))
+							: 1.0;
+						double itemR_sub = (num8 - num9) * 0.40 * Math.Max(0.5, Math.Min(2.5, ratio));
+						double R_sub = ((num9 + num8) / 2.0 * ratio) + num11;
 						double ux = Math.Cos(num24), uy = Math.Sin(num24);
 						double vx = -Math.Sin(num24), vy = Math.Cos(num24);
 						num41 = num + ux * (du * R_sub) + vx * (dv * R_sub);
