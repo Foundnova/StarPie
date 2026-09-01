@@ -31,6 +31,12 @@ namespace WinPieGestures;
 
 public partial class SettingsWindow : Window
 {
+	private const double SidebarExpandedWidth = 230.0;
+
+	private const double SidebarCollapsedWidth = 68.0;
+
+	private bool _isSidebarCollapsed;
+
 	private bool _isRecordingTrigger;
 
 	private System.Windows.Media.Brush? _originalBadgeBorderBrush;
@@ -273,6 +279,41 @@ public partial class SettingsWindow : Window
 			}
 			MemoryOptimizer.TrimMemory();
 		};
+	}
+
+	private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
+	{
+		_isSidebarCollapsed = !_isSidebarCollapsed;
+		ApplySidebarLayout();
+	}
+
+	private void ApplySidebarLayout()
+	{
+		if (SidebarColumn == null || SidebarBorder == null || SidebarBrandGrid == null || SidebarBrandTextPanel == null || SidebarFooterPanel == null || SidebarToggleIcon == null || SidebarToggleButton == null)
+		{
+			return;
+		}
+		bool isCollapsed = _isSidebarCollapsed;
+		SidebarColumn.Width = new GridLength(isCollapsed ? SidebarCollapsedWidth : SidebarExpandedWidth);
+		SidebarBorder.Padding = isCollapsed ? new Thickness(10, 20, 10, 15) : new Thickness(16, 20, 16, 15);
+		SidebarToggleButton.HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+		SidebarBrandGrid.HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+		SidebarBrandTextPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+		SidebarFooterPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+		SidebarToggleIcon.Data = Geometry.Parse(isCollapsed ? "M10,6 L16,12 L10,18" : "M14,6 L8,12 L14,18");
+		string toggleText = I18n.T(isCollapsed ? "SidebarExpand" : "SidebarCollapse");
+		SidebarToggleButton.ToolTip = toggleText;
+		System.Windows.Automation.AutomationProperties.SetName(SidebarToggleButton, toggleText);
+
+		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
+		StackPanel[] navigationContents = new StackPanel[5] { NavTab0Content, NavTab1Content, NavTab2Content, NavTab3Content, NavTab4Content };
+		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
+		for (int i = 0; i < navigationButtons.Length; i++)
+		{
+			navigationButtons[i].Padding = isCollapsed ? new Thickness(10) : new Thickness(14, 10, 14, 10);
+			navigationContents[i].HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+			navigationTexts[i].Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+		}
 	}
 
 	private void LoadConfigToUi()
@@ -741,6 +782,12 @@ public partial class SettingsWindow : Window
 		if (NavTab4Text != null)
 		{
 			NavTab4Text.Text = I18n.T("TabAbout");
+		}
+		if (SidebarToggleButton != null)
+		{
+			string toggleText = I18n.T(_isSidebarCollapsed ? "SidebarExpand" : "SidebarCollapse");
+			SidebarToggleButton.ToolTip = toggleText;
+			System.Windows.Automation.AutomationProperties.SetName(SidebarToggleButton, toggleText);
 		}
 		if (BottomNoteText != null)
 		{

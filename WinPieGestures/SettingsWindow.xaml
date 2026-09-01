@@ -414,18 +414,21 @@
   </FrameworkElement.Resources>
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="230" />
+      <ColumnDefinition Name="SidebarColumn" Width="230" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
-    <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="16,20,16,15">
+    <Border Name="SidebarBorder" Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="16,20,16,15">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Margin="0,5,0,24">
-          <Grid Margin="0,0,0,8">
+        <StackPanel Grid.Row="0" Margin="0,5,0,16">
+          <Button Name="SidebarToggleButton" Width="32" Height="30" HorizontalAlignment="Right" Padding="0" Style="{StaticResource ModernButtonStyle}" ToolTip="折叠侧边栏" AutomationProperties.Name="折叠侧边栏" Click="SidebarToggleButton_Click">
+            <Path Name="SidebarToggleIcon" Width="12" Height="12" Stretch="Uniform" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M14,6 L8,12 L14,18" />
+          </Button>
+          <Grid Name="SidebarBrandGrid" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
@@ -436,49 +439,49 @@
               </UIElement.Effect>
               <Image Source="logo.png" Width="38" Height="38" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-              <TextBlock Text="StarPie" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <StackPanel Name="SidebarBrandTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+              <TextBlock Name="SidebarBrandTitleText" Text="StarPie" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
               <TextBlock Name="SidebarSubtitleText" Text="现代鼠标轮盘笔势系统" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
             </StackPanel>
           </Grid>
         </StackPanel>
         <StackPanel Grid.Row="1">
-          <RadioButton Name="NavTab0" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="0" IsChecked="True" Checked="NavTab_Checked">
-            <StackPanel Orientation="Horizontal">
+          <RadioButton Name="NavTab0" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="0" IsChecked="True" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab0Text}">
+            <StackPanel Name="NavTab0Content" HorizontalAlignment="Left" Orientation="Horizontal">
               <Path Width="16" Height="16" Stretch="Uniform" Data="M12,2 A10,10 0 0 0 2,12A10,10 0 0 0 12,22A10,10 0 0 0 22,12A10,10 0 0 0 12,2M12,4 A8,8 0 0 1 20,12A8,8 0 0 1 12,20A8,8 0 0 1 4,12A8,8 0 0 1 12,4M12,6 A6,6 0 0 0 6,12A6,6 0 0 0 12,18A6,6 0 0 0 18,12A6,6 0 0 0 12,6M12,8 A4,4 0 0 1 16,12A4,4 0 0 1 12,16A4,4 0 0 1 8,12A4,4 0 0 1 12,8" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
               <TextBlock Name="NavTab0Text" Text="🎯 触发与场景" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
             </StackPanel>
           </RadioButton>
-          <RadioButton Name="NavTab1" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="1" Checked="NavTab_Checked">
-            <StackPanel Orientation="Horizontal">
+          <RadioButton Name="NavTab1" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="1" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab1Text}">
+            <StackPanel Name="NavTab1Content" HorizontalAlignment="Left" Orientation="Horizontal">
               <Path Width="16" Height="16" Stretch="Uniform" Data="M12,3 C7.03,3 3,7.03 3,12 C3,16.97 7.03,21 12,21 C12.83,21 13.5,20.33 13.5,19.5 C13.5,19.11 13.35,18.76 13.11,18.49 C12.88,18.23 12.73,17.88 12.73,17.5 A1.5,1.5 0 0 1 14.23,16L16,16 C18.76,16 21,13.76 21,11 C21,6.58 16.97,3 12,3 M6.5,12 A1.5,1.5 0 0 1 5,10.5A1.5,1.5 0 0 1 6.5,9A1.5,1.5 0 0 1 8,10.5A1.5,1.5 0 0 1 6.5,12M9.5,8 A1.5,1.5 0 0 1 8,6.5A1.5,1.5 0 0 1 9.5,5A1.5,1.5 0 0 1 11,6.5A1.5,1.5 0 0 1 9.5,8M14.5,8 A1.5,1.5 0 0 1 13,6.5A1.5,1.5 0 0 1 14.5,5A1.5,1.5 0 0 1 16,6.5A1.5,1.5 0 0 1 14.5,8M17.5,12 A1.5,1.5 0 0 1 16,10.5A1.5,1.5 0 0 1 17.5,9A1.5,1.5 0 0 1 19,10.5A1.5,1.5 0 0 1 17.5,12" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
               <TextBlock Name="NavTab1Text" Text="🎨 外观与形态" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
             </StackPanel>
           </RadioButton>
-          <RadioButton Name="NavTab2" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="2" Checked="NavTab_Checked">
-            <StackPanel Orientation="Horizontal">
+          <RadioButton Name="NavTab2" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="2" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab2Text}">
+            <StackPanel Name="NavTab2Content" HorizontalAlignment="Left" Orientation="Horizontal">
               <Path Width="16" Height="16" Stretch="Uniform" Data="M4,6 C4,4.9 4.9,4 6,4 L18,4 C19.1,4 20,4.9 20,6 L20,18 C20,19.1 19.1,20 18,20 L6,20 C4.9,20 4,19.1 4,18 L4,6 M6,8 L18,8 L18,6 L6,6 L6,8 M6,12 L18,12 L18,10 L6,10 L6,12 M6,16 L12,16 L12,14 L6,14 L6,16" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
               <TextBlock Name="NavTab2Text" Text="⚡ 手势与动作" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
             </StackPanel>
           </RadioButton>
-          <RadioButton Name="NavTab3" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="3" Checked="NavTab_Checked">
-            <StackPanel Orientation="Horizontal">
+          <RadioButton Name="NavTab3" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="3" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab3Text}">
+            <StackPanel Name="NavTab3Content" HorizontalAlignment="Left" Orientation="Horizontal">
               <Path Width="16" Height="16" Stretch="Uniform" Data="M12,15.5 A3.5,3.5 0 0 1 8.5,12A3.5,3.5 0 0 1 12,8.5A3.5,3.5 0 0 1 15.5,12A3.5,3.5 0 0 1 12,15.5M19.43,12.97 C19.47,12.65 19.5,12.33 19.5,12 C19.5,11.67 19.47,11.34 19.43,11 L21.54,9.37 C21.73,9.22 21.78,8.95 21.66,8.73 L19.66,5.27 C19.54,5.05 19.27,4.96 19.05,5.05 L16.56,6.05 C16.04,5.66 15.5,5.32 14.87,5.07 L14.5,2.42 C14.46,2.18 14.25,2 14,2 L10,2 C9.75,2 9.54,2.18 9.5,2.42 L9.13,5.07 C8.5,5.32 7.96,5.66 7.44,6.05 L4.95,5.05 C4.73,4.96 4.46,5.05 4.34,5.27 L2.34,8.73 C2.21,8.95 2.27,9.22 2.46,9.37 L4.57,11 C4.53,11.34 4.5,11.67 4.5,12 C4.5,12.33 4.53,12.65 4.57,12.97 L2.46,14.63 C2.27,14.78 2.21,15.05 2.34,15.27 L4.34,18.73 C4.46,18.95 4.73,19.03 4.95,18.95 L7.44,17.94 C7.96,18.34 8.5,18.68 9.13,18.93 L9.5,21.58 C9.54,21.82 9.75,22 10,22 L14,22 C14.25,22 14.46,21.82 14.5,21.58 L14.87,18.93 C15.5,18.67 16.04,18.34 16.56,17.94 L19.05,18.95 C19.27,19.03 19.54,18.95 19.66,18.73 L21.66,15.27 C21.78,15.05 21.73,14.78 21.54,14.63 L19.43,12.97" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
               <TextBlock Name="NavTab3Text" Text="⚙️ 高级与系统" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
             </StackPanel>
           </RadioButton>
-          <RadioButton Name="NavTab4" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="4" Checked="NavTab_Checked">
-            <StackPanel Orientation="Horizontal">
+          <RadioButton Name="NavTab4" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="4" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab4Text}">
+            <StackPanel Name="NavTab4Content" HorizontalAlignment="Left" Orientation="Horizontal">
               <Path Width="16" Height="16" Stretch="Uniform" Data="M11,9 L13,9 L13,7 L11,7 M12,20 C7.59,20 4,16.41 4,12 C4,7.59 7.59,4 12,4 C16.41,4 20,7.59 20,12 C20,16.41 16.41,20 12,20 M12,2 A10,10 0 0 0 2,12A10,10 0 0 0 12,22A10,10 0 0 0 22,12A10,10 0 0 0 12,2M11,17 L13,17 L13,11 L11,11 L11,17" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
               <TextBlock Name="NavTab4Text" Text="📋 关于与更新" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
             </StackPanel>
           </RadioButton>
         </StackPanel>
-        <StackPanel Grid.Row="2" Margin="0,15,0,5">
+        <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
             <TextBlock Name="SidebarVersionText" Text="v1.5.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
-          <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
+          <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
       </Grid>
     </Border>
