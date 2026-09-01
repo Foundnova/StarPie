@@ -76,12 +76,16 @@ public static class WindowTaskbarHelper
 	private static extern bool ShowWindow(nint hWnd, int nCmdShow);
 
 	private const int SW_RESTORE = 9;
+	private const int SW_MINIMIZE = 6;
 
 	[DllImport("user32.dll")]
 	private static extern bool BringWindowToTop(nint hWnd);
 
 	[DllImport("user32.dll")]
 	private static extern bool SetForegroundWindow(nint hWnd);
+
+	[DllImport("user32.dll")]
+	private static extern nint GetForegroundWindow();
 
 	[DllImport("kernel32.dll")]
 	private static extern uint GetCurrentThreadId();
@@ -168,7 +172,8 @@ public static class WindowTaskbarHelper
 				{
 					return true;
 				}
-				if (GetWindowRect(hWnd, out RECT rc))
+				// 最小化窗口的矩形是任务栏处占位矩形，不参与"离屏"判定（其任务栏按钮必然存在）
+				if (!IsIconic(hWnd) && GetWindowRect(hWnd, out RECT rc))
 				{
 					nint mon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
 					if (mon != IntPtr.Zero)
@@ -218,7 +223,7 @@ public static class WindowTaskbarHelper
 		return list[n - 1];
 	}
 
-	/// <summary>将窗口激活到前台（处理 Windows 前台锁：最小化先还原 + AttachThreadInput + BringWindowToTop + SetForegroundWindow）。</summary>
+	/// <summary>将窗口激活到前台：处理 Windows 前台锁（AttachThreadInput 到前台/目标线程 + BringWindowToTop + SetForegroundWindow，失败再最小化还原兜底强制前台）。</summary>
 	public static bool ActivateWindow(nint hWnd)
 	{
 		if (hWnd == IntPtr.Zero)
@@ -227,21 +232,45 @@ public static class WindowTaskbarHelper
 		}
 		try
 		{
+			nint hForeground = GetForegroundWindow();
+			uint foregroundThread = (hForeground != IntPtr.Zero) ? GetWindowThreadProcessId(hForeground, out _) : 0u;
+			uint targetThread = GetWindowThreadProcessId(hWnd, out _);
+			uint currentThread = GetCurrentThreadId();
+
+			bool attachedForeground = false;
+			bool attachedTarget = false;
+			if (foregroundThread != 0u && foregroundThread != currentThread && foregroundThread != targetThread)
+			{
+				attachedForeground = AttachThreadInput(foregroundThread, currentThread, true);
+			}
+			if (targetThread != currentThread)
+			{
+				attachedTarget = AttachThreadInput(currentThread, targetThread, true);
+			}
+
 			if (IsIconic(hWnd))
 			{
 				ShowWindow(hWnd, SW_RESTORE);
 			}
-			uint targetThread = GetWindowThreadProcessId(hWnd, out _);
-			uint currentThread = GetCurrentThreadId();
-			if (targetThread != currentThread)
-			{
-				AttachThreadInput(currentThread, targetThread, true);
-			}
 			BringWindowToTop(hWnd);
 			bool ok = SetForegroundWindow(hWnd);
-			if (targetThread != currentThread)
+
+			// 兜底：最小化再还原可强制获得前台（否则仅闪烁任务栏）
+			if (!ok)
+			{
+				ShowWindow(hWnd, SW_MINIMIZE);
+				ShowWindow(hWnd, SW_RESTORE);
+				BringWindowToTop(hWnd);
+				ok = SetForegroundWindow(hWnd);
+			}
+
+			if (attachedTarget)
 			{
 				AttachThreadInput(currentThread, targetThread, false);
+			}
+			if (attachedForeground)
+			{
+				AttachThreadInput(foregroundThread, currentThread, false);
 			}
 			return ok;
 		}
