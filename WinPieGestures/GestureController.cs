@@ -33,6 +33,11 @@ public class GestureController
 
 	private volatile bool _isGestureActive;
 
+	// 长按触发（可选）：按钮按下期间运行，拖动越过阈值或抬起时取消
+	private System.Windows.Threading.DispatcherTimer? _longPressTimer;
+
+	private bool _mouseTriggerDown;
+
 	private WheelProfile? _activeProfile;
 
 	private int _selectedSectorIndex = -1;
@@ -328,6 +333,8 @@ public class GestureController
 				CancelGestureTracking();
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
+				_mouseTriggerDown = false;
+				CancelLongPressTimer();
 				e.Handled = false;
 				return;
 			}
@@ -338,8 +345,59 @@ public class GestureController
 			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
+			_mouseTriggerDown = true;
+			// 可选：长按不动超过阈值即呼出轮盘（与拖动呼出共存）
+			if (ConfigManager.CurrentConfig.LongPressTrigger)
+			{
+				StartLongPressTimer();
+			}
 			e.Handled = true;
 		}
+	}
+
+	/// <summary>启动长按触发计时（按下时，仅鼠标触发）。</summary>
+	private void StartLongPressTimer()
+	{
+		CancelLongPressTimer();
+		double delay = ConfigManager.CurrentConfig.LongPressDelayMs > 0.0 ? ConfigManager.CurrentConfig.LongPressDelayMs : 450.0;
+		_longPressTimer = new System.Windows.Threading.DispatcherTimer
+		{
+			Interval = TimeSpan.FromMilliseconds(delay)
+		};
+		_longPressTimer.Tick += LongPressTimer_Tick;
+		_longPressTimer.Start();
+	}
+
+	private void CancelLongPressTimer()
+	{
+		if (_longPressTimer != null)
+		{
+			_longPressTimer.Stop();
+			_longPressTimer.Tick -= LongPressTimer_Tick;
+			_longPressTimer = null;
+		}
+	}
+
+	/// <summary>长按达阈值：在按下处呼出轮盘（光标仍在中心，移动后再选择）。</summary>
+	private void LongPressTimer_Tick(object? sender, EventArgs e)
+	{
+		CancelLongPressTimer();
+		if (!_mouseTriggerDown || !_isWaitingForThreshold || _isGestureActive)
+		{
+			return;
+		}
+		_isWaitingForThreshold = false;
+		_isGestureActive = true;
+		string processName = ActiveWindowHelper.GetActiveWindowProcessName();
+		_activeProfile = ConfigManager.GetProfileForProcess(processName);
+		long gestureVersion = GetCurrentGestureVersion();
+		ProcessMove(_startPoint);
+		if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+		{
+			return;
+		}
+		ShowRadialUI(_startPoint, _activeProfile);
+		ApplyPendingHighlight();
 	}
 
 	private void Hook_OnTriggerButtonUp(object? sender, MouseEventArgs e)
@@ -349,6 +407,8 @@ public class GestureController
 		{
 			return;
 		}
+		_mouseTriggerDown = false;
+		CancelLongPressTimer();
 		if (_isWaitingForThreshold)
 		{
 			CancelGestureTracking();
@@ -553,6 +613,7 @@ public class GestureController
 			{
 				_isWaitingForThreshold = false;
 				_isGestureActive = true;
+				CancelLongPressTimer(); // 拖动先于长按触发
 				string activeWindowProcessName = ActiveWindowHelper.GetActiveWindowProcessName();
 				_activeProfile = ConfigManager.GetProfileForProcess(activeWindowProcessName);
 				Point center = _startPoint;
