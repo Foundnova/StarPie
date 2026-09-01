@@ -4,6 +4,33 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.5.8] - 2026-09-01 (Win10 计算器唤起修复 & PrintScreen 独立截屏热键 & 启动 Explorer 修复 & 系统异步运行日志系统)
+
+### 🧮 系统功能「计算器」Win10 / Win11 双通道唤起兼容 (System Calculator Windows 10 Fix)
+1. **重构计算器系统动作唤起链路**：
+   - 彻底修复在 Windows 10 环境下因 UWP 后台挂起进程 (`CalculatorApp.exe`) 导致窗口查找死锁、无法拉起计算器界面的问题；
+   - 采用「系统 `calc.exe` 启动 + 协议通道 `ms-calculator:` 自动回退」双通道机制，确保在 Windows 10、Windows 11 及各类定制精简版系统中均能 100% 顺畅唤起计算器。
+
+### 📸 PrintScreen 独立截屏热键执行修复 (PrintScreen Standalone Key Simulation)
+1. **修复单独配置 `PrintScreen` 快捷键无法触发的缺陷**：
+   - 根因分析：先前热键分发逻辑中，当配置单键且字符串长度大于 1 时，因白名单缺失误将其当作字符串逐字发送（`SendTextInput("PrintScreen")`），导致没有下发物理按键扫描码；
+   - 彻底修复：优化热键解析路由，直接将 `PrintScreen` / `PrtScn` / `PrtSc` / `Snapshot` 映射为 Windows 虚拟键码 `VK_SNAPSHOT (44 / 0x2C)`，并在底层硬件模拟中打上 `KEYEVENTF_EXTENDEDKEY` 扩展键标志，完美触发系统全屏截屏或第三方截屏工具（如 Snipaste、PixPin、微信截图等）。
+
+### 📂 启动程序配置为 `explorer.exe` 修复 (Launch Explorer Process Fix)
+1. **排除资源管理器进程被误作为普通窗口最小化/恢复的 Bug**：
+   - 根因分析：`explorer.exe` 作为 Windows 桌面外壳始终在后台常驻，先前单例窗口切换器 `TryToggleProcessWindow` 将其误判为已有前台程序进行最小化/焦点切换，导致新资源管理器窗口无法弹出；
+   - 彻底修复：显式排除 `explorer` 及其派生工具，确保配置启动 `explorer.exe`（包括带参数打开特定目录或高亮选中文件）时，能直接拉起独立的新文件资源管理器窗口。
+
+### 📋 系统异步运行日志与一键诊断系统 (`AppLogger` & Diagnostics)
+1. **轻量高性能异步文件日志引擎**：
+   - 全新内置 `AppLogger`，将应用生命周期（启动/退出）、配置装载/备份、底层鼠标/键盘钩子自愈健康检查、扇区动作执行分发及未捕获全局异常自动记录至 `%LOCALAPPDATA%\StarPie\logs\starpie_YYYY-MM-DD.log`；
+   - 采用低优先级后台线程异步批量写入与 7 天滚动自动清理机制，零 GC 抖动与零 UI 卡顿。
+2. **设置界面一键查看与诊断支持**：
+   - 在「高级系统与运维备份」面板中新增「系统运行日志与诊断」卡片；
+   - 提供 `[ 📂 打开日志目录 ]` 与 `[ 📄 查看今日运行日志 ]` 快捷按钮，极大方便开发者与用户后续排查故障与反馈问题。
+
+---
+
 ## [v1.5.7] - 2026-09-01 (轮盘动作上下排序 & 扇区方位微缩指示器 & 独立低级钩子线程与流畅度优化 - PR #26)
 
 ### 🧭 轮盘动作上下排序与方位微缩指示器 (Action Ordering & Radial Position Indicator - PR #26)

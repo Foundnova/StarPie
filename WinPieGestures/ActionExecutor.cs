@@ -171,6 +171,7 @@ public static class ActionExecutor
 		}
 		try
 		{
+			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
 			switch (action.Type.Trim())
 			{
 			case "Launch":
@@ -197,6 +198,7 @@ public static class ActionExecutor
 		}
 		catch (Exception ex)
 		{
+			AppLogger.LogError($"Failed to execute action '{action.Name}' (Type: {action.Type}, Param: {action.Parameter})", ex);
 			MessageBox.Show("Failed to execute action '" + action.Name + "': " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
 	}
@@ -207,7 +209,11 @@ public static class ActionExecutor
 		{
 			return false;
 		}
-		string text = Path.GetFileNameWithoutExtension(processOrExePath).ToLower();
+		string text = Path.GetFileNameWithoutExtension(processOrExePath).ToLowerInvariant();
+		if (text == "explorer" || text == "cmd" || text == "powershell" || text == "wsl" || text == "calc" || text == "calculator" || text == "calculatorapp")
+		{
+			return false;
+		}
 		Process[] processesByName = Process.GetProcessesByName(text);
 		if ((processesByName == null || processesByName.Length == 0) && text.EndsWith("64"))
 		{
@@ -350,41 +356,40 @@ public static class ActionExecutor
 		{
 			return;
 		}
+		string text = Environment.ExpandEnvironmentVariables(folderPath.Trim().Trim('"'));
+		AppLogger.LogInfo($"Executing OpenFolder: '{text}'");
 		try
 		{
-			string text = Environment.ExpandEnvironmentVariables(folderPath.Trim().Trim('"'));
-			if (!TryToggleFolderWindow(text))
+			if (Directory.Exists(text))
 			{
-				if (Directory.Exists(text))
+				Process.Start(new ProcessStartInfo
 				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = "explorer.exe",
-						Arguments = "\"" + text + "\"",
-						UseShellExecute = true
-					});
-				}
-				else if (File.Exists(text))
+					FileName = "explorer.exe",
+					Arguments = "\"" + text + "\"",
+					UseShellExecute = true
+				});
+			}
+			else if (File.Exists(text))
+			{
+				Process.Start(new ProcessStartInfo
 				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = "explorer.exe",
-						Arguments = "/select,\"" + text + "\"",
-						UseShellExecute = true
-					});
-				}
-				else
+					FileName = "explorer.exe",
+					Arguments = "/select,\"" + text + "\"",
+					UseShellExecute = true
+				});
+			}
+			else
+			{
+				Process.Start(new ProcessStartInfo
 				{
-					Process.Start(new ProcessStartInfo
-					{
-						FileName = text,
-						UseShellExecute = true
-					});
-				}
+					FileName = text,
+					UseShellExecute = true
+				});
 			}
 		}
 		catch (Exception ex)
 		{
+			AppLogger.LogError($"Failed to open folder '{folderPath}'", ex);
 			MessageBox.Show("无法打开文件夹 '" + folderPath + "':\n" + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 		}
 	}
@@ -396,20 +401,32 @@ public static class ActionExecutor
 			return;
 		}
 		string text = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
+		AppLogger.LogInfo($"Executing Launch: Path='{text}', Args='{arguments}'");
 		if (text.StartsWith("shell:AppsFolder", StringComparison.OrdinalIgnoreCase) || (text.Contains("!") && !text.Contains(":\\") && !text.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
 		{
 			string arguments2 = (text.StartsWith("shell:AppsFolder", StringComparison.OrdinalIgnoreCase) ? text : ("shell:AppsFolder\\" + text));
-			Process.Start(new ProcessStartInfo
+			try
 			{
-				FileName = "explorer.exe",
-				Arguments = arguments2,
-				UseShellExecute = true
-			});
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "explorer.exe",
+					Arguments = arguments2,
+					UseShellExecute = true
+				});
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogError($"Failed to launch UWP app: {arguments2}", ex);
+				throw;
+			}
 		}
 		else
 		{
-			if (string.IsNullOrWhiteSpace(arguments) && TryToggleProcessWindow(text))
+			string exeName = Path.GetFileNameWithoutExtension(text).ToLowerInvariant();
+			bool isShellOrSpecial = exeName == "explorer" || exeName == "cmd" || exeName == "powershell" || exeName == "wsl" || exeName == "calc" || exeName == "calculator" || exeName == "calculatorapp";
+			if (!isShellOrSpecial && string.IsNullOrWhiteSpace(arguments) && TryToggleProcessWindow(text))
 			{
+				AppLogger.LogInfo($"Toggled active window for existing process '{text}'");
 				return;
 			}
 			ProcessStartInfo processStartInfo = new ProcessStartInfo
@@ -436,7 +453,15 @@ public static class ActionExecutor
 			catch
 			{
 			}
-			Process.Start(processStartInfo);
+			try
+			{
+				Process.Start(processStartInfo);
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogError($"Process.Start failed for '{text}' with args '{arguments}'", ex);
+				throw;
+			}
 		}
 	}
 
@@ -452,6 +477,7 @@ public static class ActionExecutor
 		string shell = hidden ? term.Substring(0, term.Length - "_hidden".Length) : term;
 		// Escape embedded quotes for the cmd/PowerShell wrappers ("" is the escape inside Windows quoting)
 		string quoted = command.Replace("\"", "\"\"");
+		AppLogger.LogInfo($"Executing Command: Shell='{shell}', Hidden={hidden}, Cmd='{command}'");
 		try
 		{
 			switch (shell)
@@ -484,18 +510,9 @@ public static class ActionExecutor
 		}
 		catch (Exception ex)
 		{
+			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
 			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
-	}
-
-	private static bool IsStandardKeyToken(string token)
-	{
-		string t = token.Trim().ToLowerInvariant();
-		return t == "ctrl" || t == "shift" || t == "alt" || t == "win" ||
-		       t == "tab" || t == "enter" || t == "esc" || t == "space" ||
-		       t == "backspace" || t == "delete" || t == "insert" ||
-		       (t.StartsWith("f") && int.TryParse(t.Substring(1), out _)) ||
-		       (t.StartsWith("num"));
 	}
 
 	private static void ExecuteHotkey(string hotkeyString)
@@ -505,18 +522,15 @@ public static class ActionExecutor
 			return;
 		}
 
-		if (!hotkeyString.Contains('+') && hotkeyString.Length > 1 && !IsStandardKeyToken(hotkeyString))
+		HotkeyDetails hotkeyDetails = ParseHotkey(hotkeyString);
+		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0)
 		{
+			AppLogger.LogInfo($"Executing Text Input: '{hotkeyString}'");
 			SendTextInput(hotkeyString);
 			return;
 		}
 
-		HotkeyDetails hotkeyDetails = ParseHotkey(hotkeyString);
-		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0)
-		{
-			SendTextInput(hotkeyString);
-			return;
-		}
+		AppLogger.LogInfo($"Executing Hotkey: '{hotkeyString}' (MainKey: {hotkeyDetails.MainKey}, Modifiers: [{string.Join(",", hotkeyDetails.Modifiers)}])");
 
 		// 1. If pure modifier combo (e.g. Shift + Alt, Ctrl + Shift)
 		if (hotkeyDetails.MainKey == 0 && hotkeyDetails.Modifiers.Count > 0)
@@ -674,18 +688,29 @@ public static class ActionExecutor
 			}
 			break;
 		case "calculator":
-			if (!TryToggleProcessWindow("calc") && !TryToggleProcessWindow("CalculatorApp") && !TryToggleProcessWindow("Calculator"))
+			AppLogger.LogInfo("Launching System Calculator");
+			try
 			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "calc.exe",
+					UseShellExecute = true
+				});
+			}
+			catch (Exception ex1)
+			{
+				AppLogger.LogWarn($"Direct calc.exe launch failed: {ex1.Message}. Attempting ms-calculator: URI...");
 				try
 				{
 					Process.Start(new ProcessStartInfo
 					{
-						FileName = "calc.exe",
+						FileName = "ms-calculator:",
 						UseShellExecute = true
 					});
 				}
-				catch
+				catch (Exception ex2)
 				{
+					AppLogger.LogError("Failed to launch calculator via ms-calculator: URI as well", ex2);
 					ExecuteHotkey("Win+R");
 				}
 			}
@@ -843,6 +868,7 @@ public static class ActionExecutor
 		};
 		if (vk == 33 || vk == 34 || vk == 35 || vk == 36 ||
 		    vk == 37 || vk == 38 || vk == 39 || vk == 40 ||
+		    vk == 44 ||
 		    vk == 45 || vk == 46 ||
 		    vk == 91 || vk == 92 ||
 		    vk == 111 ||
@@ -1034,8 +1060,13 @@ public static class ActionExecutor
 		case "spacebar":
 			return 32;
 		case "prtscn":
+		case "prtsc":
+		case "prntscrn":
 		case "snapshot":
 		case "printscreen":
+		case "print_screen":
+		case "print screen":
+		case "print":
 			return 44;
 		case "pause":
 			return 19;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -384,11 +384,14 @@ public class MouseHook
 			{
 				try
 				{
+					AppLogger.LogWarn("MouseHook detected stalled events while cursor moved. Restarting hook...");
 					Stop();
 					Start();
+					AppLogger.LogInfo("MouseHook restarted successfully.");
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
+					AppLogger.LogError("Failed to restart MouseHook during health check", ex);
 				}
 			}, Array.Empty<object>());
 		}
