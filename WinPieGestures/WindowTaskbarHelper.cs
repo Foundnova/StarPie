@@ -357,7 +357,8 @@ public static class WindowTaskbarHelper
 		return list[n - 1];
 	}
 
-	/// <summary>任务栏第 n 个应用槽位的图标：运行窗口取窗口图标；固定未运行取任务栏按钮图像；失败返回 null（默认程序图标兜底）。</summary>
+	/// <summary>任务栏第 n 个应用槽位的图标：优先任务栏按钮自身图标（工具栏图像列表，与任务栏显示/Win+N 目标一致）；
+	/// 取不到再由窗口/进程图标链兜底；仍无返回 null（默认程序图标）。</summary>
 	public static BitmapSource? GetNthWindowIcon(int n)
 	{
 		if (n <= 0)
@@ -372,11 +373,13 @@ public static class WindowTaskbarHelper
 				return null;
 			}
 			(int rawIndex, nint hwnd) = app.Value.slots[n - 1];
-			if (hwnd != IntPtr.Zero)
+			// 任务栏按钮自身的图标（shell 已计算，含固定应用与无图标 exe 的应用）
+			BitmapSource? buttonIcon = TryGetToolbarButtonIcon(app.Value.toolbar, rawIndex);
+			if (buttonIcon != null)
 			{
-				return GetWindowIcon(hwnd);
+				return buttonIcon;
 			}
-			return TryGetToolbarButtonIcon(app.Value.toolbar, rawIndex);
+			return hwnd != IntPtr.Zero ? GetWindowIcon(hwnd) : null;
 		}
 		nint fallback = GetNthTaskbarWindow(n);
 		return fallback != IntPtr.Zero ? GetWindowIcon(fallback) : null;
