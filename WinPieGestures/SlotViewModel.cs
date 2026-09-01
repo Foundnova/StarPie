@@ -381,12 +381,17 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 					Name = I18n.T("ActionTypeFolderShort");
 				}
 			}
+			if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作")))
+			{
+				Name = I18n.T("ActionTypeSwitchWindowShort");
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
+			OnPropertyChanged("IsSwitchWindowType");
 		}
 	}
 
@@ -622,6 +627,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "SwitchWindow",
+			DisplayText = I18n.T("ActionTypeSwitchWindowShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -648,6 +658,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Tag = "Command",
 			DisplayText = I18n.T("ActionTypeCommandShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "SwitchWindow",
+			DisplayText = I18n.T("ActionTypeSwitchWindowShort")
 		},
 		new ActionTypeItem
 		{
@@ -679,6 +694,31 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 	};
 
 	public bool IsCommandType => Type == "Command";
+
+	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
+	public string NthWindowIndex
+	{
+		get
+		{
+			return Action.Parameter ?? "";
+		}
+		set
+		{
+			string digits = string.IsNullOrEmpty(value) ? "" : new string(value.Where(char.IsDigit).ToArray());
+			if (int.TryParse(digits, out int n))
+			{
+				n = Math.Max(1, Math.Min(20, n));
+				digits = n.ToString();
+			}
+			if (Action.Parameter != digits)
+			{
+				Action.Parameter = digits;
+				OnPropertyChanged("NthWindowIndex");
+			}
+		}
+	}
 
 	public string TestButtonText => I18n.T("BtnTest");
 

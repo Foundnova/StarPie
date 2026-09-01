@@ -67,7 +67,33 @@ public partial class RadialWindow : Window
 	/// 以物理像素将窗口居中到 _centerPoint(鼠标钩子返回的物理坐标)所在的显示器上。
 	/// 在 PerMonitorV2 DPI 感知下,SetWindowPos 直接使用物理像素,可正确定位到副屏。
 	/// </summary>
-	private void PositionWindowOnTargetMonitor()
+	/// <summary>
+		/// SwitchWindow 动作：显示任务栏第 N 窗口的当前图标；获取失败返回 null（调用方回退默认程序图标）。
+		/// </summary>
+		private static FrameworkElement? BuildSwitchWindowIcon(string parameter, double size, bool showText)
+		{
+			if (!int.TryParse(parameter?.Trim(), out int n) || n <= 0)
+			{
+				return null;
+			}
+			BitmapSource? windowIcon = WindowTaskbarHelper.GetNthWindowIcon(n);
+			if (windowIcon == null)
+			{
+				return null;
+			}
+			return new Image
+			{
+				Source = windowIcon,
+				Width = size,
+				Height = size,
+				Stretch = Stretch.Uniform,
+				Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+				HorizontalAlignment = HorizontalAlignment.Center
+			};
+		}
+
+		/// <summary>以物理像素将窗口居中到 _centerPoint 所在显示器（PerMonitorV2 混合 DPI 副屏定位）。</summary>
+		private void PositionWindowOnTargetMonitor()
 	{
 		nint handle = new WindowInteropHelper(this).Handle;
 		if (handle == IntPtr.Zero)
@@ -703,6 +729,10 @@ public partial class RadialWindow : Window
 						};
 					}
 				}
+				if (frameworkElement2 == null && text3 == "SwitchWindow")
+				{
+					frameworkElement2 = BuildSwitchWindowIcon(text4, num11, flag);
+				}
 				if (frameworkElement2 == null)
 				{
 					string vectorIconPath = GetVectorIconPath(text3, text4);
@@ -783,6 +813,9 @@ public partial class RadialWindow : Window
 			return "M19,15H5V5H19M19,3H5C3.89,3 3,3.89 3,5V15C3,16.1 3.89,17 5,17H19C20.1,17 21,16.1 21,15V5C21,3.89 20.1,3 19,3M2,18H22V20H2V18Z";
 		case "Command":
 			return IconHelper.GetSvgPathByKey("Command");
+		case "SwitchWindow":
+			// 默认程序图标（窗口切换）：四格程序窗格
+			return "M4,4H11V11H4V4M13,4H20V11H13V4M4,13H11V20H4V13M13,13H20V20H13V13Z";
 		case "System":
 			if (!string.IsNullOrEmpty(parameter))
 			{
@@ -1122,23 +1155,27 @@ public partial class RadialWindow : Window
 						};
 					}
 				}
-				if (frameworkElement == null)
-				{
-					string vectorIconPath = GetVectorIconPath(text3, text4);
-					if (!string.IsNullOrEmpty(vectorIconPath))
+				if (frameworkElement == null && text3 == "SwitchWindow")
 					{
-						frameworkElement = new System.Windows.Shapes.Path
-						{
-							Data = Geometry.Parse(vectorIconPath),
-							Fill = _subTextColorBrush,
-							Stretch = Stretch.Uniform,
-							Width = num7,
-							Height = num7,
-							Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
-							HorizontalAlignment = HorizontalAlignment.Center
-						};
+						frameworkElement = BuildSwitchWindowIcon(text4, num7, flag);
 					}
-				}
+					if (frameworkElement == null)
+					{
+						string vectorIconPath = GetVectorIconPath(text3, text4);
+						if (!string.IsNullOrEmpty(vectorIconPath))
+						{
+							frameworkElement = new System.Windows.Shapes.Path
+							{
+								Data = Geometry.Parse(vectorIconPath),
+								Fill = _subTextColorBrush,
+								Stretch = Stretch.Uniform,
+								Width = num7,
+								Height = num7,
+								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+								HorizontalAlignment = HorizontalAlignment.Center
+							};
+						}
+					}
 				if (frameworkElement != null)
 				{
 					stackPanel.Children.Add(frameworkElement);
@@ -1901,6 +1938,10 @@ public partial class RadialWindow : Window
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
+				}
+				if (frameworkElement == null && text3 == "SwitchWindow")
+				{
+					frameworkElement = BuildSwitchWindowIcon(text4, num7, showText);
 				}
 				if (frameworkElement == null)
 				{

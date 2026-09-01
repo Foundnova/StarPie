@@ -186,6 +186,9 @@ public static class ActionExecutor
 			case "Command":
 				ExecuteCommand(action.Parameter, action.CommandTerminal);
 				break;
+			case "SwitchWindow":
+				ExecuteSwitchWindow(action.Parameter);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
@@ -485,6 +488,19 @@ public static class ActionExecutor
 		catch (Exception ex)
 		{
 			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
+		}
+	}
+
+	/// <summary>切换到任务栏第 N 个窗口（N≤0 或越界 → 无操作）。</summary>
+	private static void ExecuteSwitchWindow(string? parameter)
+	{
+		if (int.TryParse(parameter?.Trim(), out int n) && n > 0)
+		{
+			nint hWnd = WindowTaskbarHelper.GetNthTaskbarWindow(n);
+			if (hWnd != IntPtr.Zero)
+			{
+				WindowTaskbarHelper.ActivateWindow(hWnd);
+			}
 		}
 	}
 

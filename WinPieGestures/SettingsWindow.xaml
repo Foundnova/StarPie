@@ -1533,6 +1533,9 @@
                                   <TextBox Grid.Column="0" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Margin="0,0,4,0" FontSize="11" VerticalContentAlignment="Center" ToolTip="要运行的命令，如 ping -n 3 127.0.0.1" />
                                   <ComboBox Grid.Column="1" Width="118" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" />
                                 </Grid>
+                                <Grid Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}">
+                                  <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏第 N 个窗口的序号（1~20）；不显示在任务栏的窗口（如托盘驻留/隐藏程序）不参与计数" />
+                                </Grid>
                               </Grid>
 
                               <TextBox Grid.Column="4" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />

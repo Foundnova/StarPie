@@ -53,12 +53,17 @@ public class SubSlotViewModel : INotifyPropertyChanged
 					Name = "打开文件夹";
 				}
 			}
+			if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作")))
+			{
+				Name = "切换窗口";
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
+			OnPropertyChanged("IsSwitchWindowType");
 		}
 	}
 
@@ -247,6 +252,31 @@ public class SubSlotViewModel : INotifyPropertyChanged
 	public bool IsSystemType => Type == "System";
 
 	public bool IsCommandType => Type == "Command";
+
+	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
+	public string NthWindowIndex
+	{
+		get
+		{
+			return Action.Parameter ?? "";
+		}
+		set
+		{
+			string digits = string.IsNullOrEmpty(value) ? "" : new string(value.Where(char.IsDigit).ToArray());
+			if (int.TryParse(digits, out int n))
+			{
+				n = Math.Max(1, Math.Min(20, n));
+				digits = n.ToString();
+			}
+			if (Action.Parameter != digits)
+			{
+				Action.Parameter = digits;
+				OnPropertyChanged("NthWindowIndex");
+			}
+		}
+	}
 
 	/// <summary>Localized terminal options for Command actions.</summary>
 	public List<ActionTypeItem> Terminals => SlotViewModel.LocalizedTerminals;
