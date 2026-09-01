@@ -1754,9 +1754,9 @@ public partial class RadialWindow : Window
 			return rect;
 		}
 
-		// 5. Original / ClassicRing: Smooth radiating curved arc petal
+		// 5. Original / ClassicRing: Smooth radiating curved arc petal (compact sector, keep PR#34 tuning)
 		{
-			double halfSpan = 14.0;
+			double halfSpan = 10.0;
 			double startDeg = itemAngleDeg - halfSpan;
 			double endDeg = itemAngleDeg + halfSpan;
 			double distFromCenter = Math.Sqrt((cx - wheelCx) * (cx - wheelCx) + (cy - wheelCy) * (cy - wheelCy));
@@ -1812,6 +1812,7 @@ public partial class RadialWindow : Window
 		List<ActionItem> subActions = actionItem.SubActions;
 		int subCount = subActions.Count;
 		int activeCount = Math.Min(FanSubmenuSlotCount, subCount);
+		bool isCompactSector = string.Equals(shape, "Original", StringComparison.OrdinalIgnoreCase);
 		_activeSubTierParentSector = parentIndex;
 
 		for (int j = 0; j < activeCount; j++)
@@ -1824,7 +1825,8 @@ public partial class RadialWindow : Window
 
 			Geometry data = CreateSubMenuGeometry(shape, px, py, itemR, midRad, cx, cy, userCornerRadius);
 
-			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, px, py);
+			// 经典紧凑扇区以轮盘中心为缩放枢轴（PR#34 适配），其余形态按各项自身位置
+			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, isCompactSector ? cx : px, isCompactSector ? cy : py);
 			TranslateTransform translateTransform = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup = new TransformGroup();
 			transformGroup.Children.Add(scaleTransform);
