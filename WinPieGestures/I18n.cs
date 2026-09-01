@@ -1368,6 +1368,20 @@ public static class I18n
 			[LanguageCode.En] = "Text Only",
 			[LanguageCode.Ja] = "文字のみ"
 		};
+		dictionary["ShowSectorActionText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "在轮盘扇区中显示动作名称文字",
+			[LanguageCode.ZhTw] = "在輪盤扇區中顯示動作名稱文字",
+			[LanguageCode.En] = "Show action names in wheel sectors",
+			[LanguageCode.Ja] = "ホイールの扇形にアクション名を表示"
+		};
+		dictionary["ShowSelectedActionText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "选中扇区时在中心显示动作名称",
+			[LanguageCode.ZhTw] = "選取扇區時在中心顯示動作名稱",
+			[LanguageCode.En] = "Show selected action name in the center",
+			[LanguageCode.Ja] = "選択中のアクション名を中央に表示"
+		};
 		dictionary["SectorIconSize"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "图标大小 (Icon Size)",
