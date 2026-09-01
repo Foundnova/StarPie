@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -674,6 +674,26 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 
 	private void ShowRadialUI(Point center, WheelProfile profile)
 	{
+		// 后台 STA 预热任务栏槽位快照：大幅降低"切换窗口"图标加载/激活的首次开销（UIA 遍历较贵）
+		try
+		{
+			System.Threading.Thread warm = new System.Threading.Thread(delegate ()
+			{
+				try
+				{
+					WindowTaskbarHelper.Prefetch();
+				}
+				catch
+				{
+				}
+			});
+			warm.IsBackground = true;
+			warm.SetApartmentState(ApartmentState.STA);
+			warm.Start();
+		}
+		catch
+		{
+		}
 		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
 		lock (_uiUpdateSync)
 		{

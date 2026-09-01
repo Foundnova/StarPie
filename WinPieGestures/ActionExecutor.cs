@@ -187,6 +187,9 @@ public static class ActionExecutor
 			case "Command":
 				ExecuteCommand(action.Parameter, action.CommandTerminal);
 				break;
+			case "SwitchWindow":
+				ExecuteSwitchWindow(action.Parameter);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
@@ -513,6 +516,30 @@ public static class ActionExecutor
 			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
 			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
+	}
+
+/// <summary>切换到任务栏第 N 个槽位（N=1..10 等价 Win+N；参数缺失/非法默认第 1 个；越界无动作并记录诊断）。</summary>
+	private static void ExecuteSwitchWindow(string? parameter)
+	{
+		int n = 1;
+		if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)
+		{
+			n = parsed;
+		}
+		if (!WindowTaskbarHelper.ActivateTaskbarSlot(n))
+		{
+			System.Diagnostics.Debug.WriteLine($"[SwitchWindow] 任务栏第 {n} 个槽位不可用");
+		}
+	}
+
+	private static bool IsStandardKeyToken(string token)
+	{
+		string t = token.Trim().ToLowerInvariant();
+		return t == "ctrl" || t == "shift" || t == "alt" || t == "win" ||
+		       t == "tab" || t == "enter" || t == "esc" || t == "space" ||
+		       t == "backspace" || t == "delete" || t == "insert" ||
+		       (t.StartsWith("f") && int.TryParse(t.Substring(1), out _)) ||
+		       (t.StartsWith("num"));
 	}
 
 	private static void ExecuteHotkey(string hotkeyString)

@@ -591,6 +591,13 @@ public static class I18n
 			[LanguageCode.En] = "Run Command",
 			[LanguageCode.Ja] = "コマンド実行"
 		};
+		dictionary["ActionTypeSwitchWindowShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "切换窗口",
+			[LanguageCode.ZhTw] = "切換視窗",
+			[LanguageCode.En] = "Switch Window",
+			[LanguageCode.Ja] = "ウィンドウ切替"
+		};
 		dictionary["TerminalCmd"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "CMD",
