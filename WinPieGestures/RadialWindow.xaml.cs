@@ -1706,16 +1706,37 @@ public partial class RadialWindow : Window
 	public static (double du, double dv) GetFanSubOffset(int index)
 	{
 		double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
-		double orbitRadius = 1.0 + ringR;
-		double wingAngle = Math.Atan2(ringR * 0.8660254038, 1.0 + ringR * 0.5);
-		double wingDu = orbitRadius * Math.Cos(wingAngle);
-		double wingDv = orbitRadius * Math.Sin(wingAngle);
 		return index switch
 		{
-			0 => (wingDu, wingDv),       // upper wing on the common orbit
-			1 => (orbitRadius, 0.0),      // tip / center
-			_ => (wingDu, -wingDv)        // lower wing on the common orbit
+			0 => (1.0 + ringR * 0.5, ringR * 0.8660254038),   // upper wing
+			1 => (1.0 + ringR, 0.0),                           // tip / center
+			_ => (1.0 + ringR * 0.5, -ringR * 0.8660254038)   // lower wing
 		};
+	}
+
+	/// <summary>
+	/// 按形态取蜂窝扇槽位坐标：
+	/// 经典紧凑扇区（Original/ClassicRing）三个二级项落在同一圆环（共轨，PR#34 布局）；
+	/// 其余形态（Circle/Capsule/HexagonHive）保持原始等边蜂窝坐标。
+	/// 渲染与命中必须使用同一函数，保证"所见即所点"。
+	/// </summary>
+	public static (double du, double dv) GetFanSubOffsetForShape(string? shape, int index)
+	{
+		if (string.Equals(shape, "Original", StringComparison.OrdinalIgnoreCase))
+		{
+			double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
+			double orbitRadius = 1.0 + ringR;
+			double wingAngle = Math.Atan2(ringR * 0.8660254038, 1.0 + ringR * 0.5);
+			double wingDu = orbitRadius * Math.Cos(wingAngle);
+			double wingDv = orbitRadius * Math.Sin(wingAngle);
+			return index switch
+			{
+				0 => (wingDu, wingDv),      // upper wing on the common orbit
+				1 => (orbitRadius, 0.0),    // tip / center
+				_ => (wingDu, -wingDv)      // lower wing on the common orbit
+			};
+		}
+		return GetFanSubOffset(index);
 	}
 
 	public static int GetFanSlotIndex(int subIndex, int totalCount)
@@ -1839,11 +1860,7 @@ public partial class RadialWindow : Window
 			return rect;
 		}
 
-		// 5. Original / ClassicRing: Smooth radiating curved arc petal.
-		// The fan layout changes each item's slot position, but the compact
-		// sector itself remains concentric with the primary wheel.  Keep the
-		// fan arc narrower than the slot-to-slot angle so adjacent items do not
-		// overlap on the common orbit.
+// 5. Original / ClassicRing: Smooth radiating curved arc petal (compact sector, keep PR#34 tuning)
 		{
 			double halfSpan = 10.0;
 			double startDeg = itemAngleDeg - halfSpan;
@@ -1907,18 +1924,15 @@ public partial class RadialWindow : Window
 		for (int j = 0; j < activeCount; j++)
 		{
 			int slot = GetFanSlotIndex(j, activeCount);
-			var (du, dv) = GetFanSubOffset(slot);
+			var (du, dv) = GetFanSubOffsetForShape(shape, slot);
 
 			double px = cx + ux * (du * R) + vx * (dv * R);
 			double py = cy + uy * (du * R) + vy * (dv * R);
 
 			Geometry data = CreateSubMenuGeometry(shape, px, py, itemR, midRad, cx, cy, userCornerRadius);
 
-			ScaleTransform scaleTransform = new ScaleTransform(
-				0.75,
-				0.75,
-				isCompactSector ? cx : px,
-				isCompactSector ? cy : py);
+// 经典紧凑扇区以轮盘中心为缩放枢轴（PR#34 适配），其余形态按各项自身位置
+			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, isCompactSector ? cx : px, isCompactSector ? cy : py);
 			TranslateTransform translateTransform = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup = new TransformGroup();
 			transformGroup.Children.Add(scaleTransform);
