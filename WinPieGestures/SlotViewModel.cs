@@ -385,6 +385,10 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			{
 				Name = I18n.T("ActionTypeSwitchWindowShort");
 			}
+			if (value == "SwitchWindow" && string.IsNullOrWhiteSpace(Action.Parameter))
+			{
+				NthWindowIndex = "1";
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");

@@ -57,6 +57,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			{
 				Name = "切换窗口";
 			}
+			if (value == "SwitchWindow" && string.IsNullOrWhiteSpace(Action.Parameter))
+			{
+				NthWindowIndex = "1";
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");

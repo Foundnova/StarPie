@@ -68,13 +68,14 @@ public partial class RadialWindow : Window
 	/// 在 PerMonitorV2 DPI 感知下,SetWindowPos 直接使用物理像素,可正确定位到副屏。
 	/// </summary>
 	/// <summary>
-		/// SwitchWindow 动作：显示任务栏第 N 窗口的当前图标；获取失败返回 null（调用方回退默认程序图标）。
+		/// SwitchWindow 动作：显示任务栏第 N 窗口的当前图标（参数缺失/非法默认第 1 个）；获取失败返回 null（调用方回退默认程序图标）。
 		/// </summary>
 		private static FrameworkElement? BuildSwitchWindowIcon(string parameter, double size, bool showText)
 		{
-			if (!int.TryParse(parameter?.Trim(), out int n) || n <= 0)
+			int n = 1;
+			if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)
 			{
-				return null;
+				n = parsed;
 			}
 			BitmapSource? windowIcon = WindowTaskbarHelper.GetNthWindowIcon(n);
 			if (windowIcon == null)
