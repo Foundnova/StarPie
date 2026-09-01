@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -40,7 +40,8 @@ public partial class SubActionEditorWindow : Window
 						Parameter = existingSubAction.Parameter,
 						Arguments = existingSubAction.Arguments,
 						IconKey = existingSubAction.IconKey,
-						CustomIconSvg = existingSubAction.CustomIconSvg
+						CustomIconSvg = existingSubAction.CustomIconSvg,
+						CommandTerminal = existingSubAction.CommandTerminal
 					}
 				});
 			}

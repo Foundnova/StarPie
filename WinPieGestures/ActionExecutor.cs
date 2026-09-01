@@ -183,6 +183,9 @@ public static class ActionExecutor
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
 				break;
+			case "Command":
+				ExecuteCommand(action.Parameter, action.CommandTerminal);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
@@ -434,6 +437,54 @@ public static class ActionExecutor
 			{
 			}
 			Process.Start(processStartInfo);
+		}
+	}
+
+	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
+	private static void ExecuteCommand(string command, string? terminal)
+	{
+		if (string.IsNullOrWhiteSpace(command))
+		{
+			return;
+		}
+		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
+		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
+		string shell = hidden ? term.Substring(0, term.Length - "_hidden".Length) : term;
+		// Escape embedded quotes for the cmd/PowerShell wrappers ("" is the escape inside Windows quoting)
+		string quoted = command.Replace("\"", "\"\"");
+		try
+		{
+			switch (shell)
+			{
+			case "powershell":
+				// Visible: keep the window open (-NoExit). Hidden: run to completion.
+				Process.Start(new ProcessStartInfo("powershell.exe", (hidden ? "-NoProfile -Command \"" : "-NoProfile -NoExit -Command \"") + quoted + "\"")
+				{
+					UseShellExecute = false,
+					CreateNoWindow = hidden
+				});
+				break;
+			case "wsl":
+				// WSL receives the raw command after "--"; no extra quoting needed
+				Process.Start(new ProcessStartInfo("wsl.exe", "-- " + command)
+				{
+					UseShellExecute = false,
+					CreateNoWindow = hidden
+				});
+				break;
+			default:
+				// Visible: keep the window open (/k). Hidden: /c so no lingering process.
+				Process.Start(new ProcessStartInfo("cmd.exe", (hidden ? "/c \"" : "/k \"") + quoted + "\"")
+				{
+					UseShellExecute = false,
+					CreateNoWindow = hidden
+				});
+				break;
+			}
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
 	}
 

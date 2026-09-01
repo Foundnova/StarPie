@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -58,6 +58,7 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			OnPropertyChanged("IsLaunchType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
+			OnPropertyChanged("IsCommandType");
 		}
 	}
 
@@ -244,6 +245,27 @@ public class SubSlotViewModel : INotifyPropertyChanged
 	}
 
 	public bool IsSystemType => Type == "System";
+
+	public bool IsCommandType => Type == "Command";
+
+	/// <summary>Localized terminal options for Command actions.</summary>
+	public List<ActionTypeItem> Terminals => SlotViewModel.LocalizedTerminals;
+
+	public string CommandTerminal
+	{
+		get
+		{
+			return Action.CommandTerminal ?? "cmd";
+		}
+		set
+		{
+			if (Action.CommandTerminal != value && !string.IsNullOrEmpty(value))
+			{
+				Action.CommandTerminal = value;
+				OnPropertyChanged("CommandTerminal");
+			}
+		}
+	}
 
 	public List<ActionTypeItem> ActionTypes => SlotViewModel.LocalizedActionTypes;
 

@@ -691,6 +691,8 @@ public partial class RadialWindow : Window
 			return IconHelper.GetSvgPathByKey("Folder");
 		case "Hotkey":
 			return "M19,15H5V5H19M19,3H5C3.89,3 3,3.89 3,5V15C3,16.1 3.89,17 5,17H19C20.1,17 21,16.1 21,15V5C21,3.89 20.1,3 19,3M2,18H22V20H2V18Z";
+		case "Command":
+			return IconHelper.GetSvgPathByKey("Command");
 		case "System":
 			if (!string.IsNullOrEmpty(parameter))
 			{
