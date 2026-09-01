@@ -340,6 +340,22 @@ public partial class SettingsWindow : Window
 		// Threshold & Outer Escape
 		ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
 		ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
+		if (LongPressTriggerCheckBox != null)
+		{
+			LongPressTriggerCheckBox.IsChecked = ConfigManager.CurrentConfig.LongPressTrigger;
+		}
+		if (LongPressDelaySlider != null)
+		{
+			LongPressDelaySlider.Value = ConfigManager.CurrentConfig.LongPressDelayMs > 0.0 ? ConfigManager.CurrentConfig.LongPressDelayMs : 450.0;
+		}
+		if (LongPressDelayLabel != null)
+		{
+			LongPressDelayLabel.Text = $"{LongPressDelaySlider.Value:0} ms";
+		}
+		if (LongPressDelayPanel != null)
+		{
+			LongPressDelayPanel.Visibility = ConfigManager.CurrentConfig.LongPressTrigger ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -822,6 +838,14 @@ public partial class SettingsWindow : Window
 		if (TriggerPageHeader != null)
 		{
 			TriggerPageHeader.Text = I18n.T("TriggerHeader");
+		}
+		if (LongPressTriggerTitleText != null)
+		{
+			LongPressTriggerTitleText.Text = I18n.T("LongPressTriggerTitle");
+		}
+		if (LongPressTriggerDescText != null)
+		{
+			LongPressTriggerDescText.Text = I18n.T("LongPressTriggerDesc");
 		}
 		if (TriggerPageSubheader != null)
 		{
@@ -6420,6 +6444,35 @@ public partial class SettingsWindow : Window
 			}
 			SyncUiToConfigAndSave();
 		}
+	}
+
+	private void LongPressTriggerCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		bool enabled = LongPressTriggerCheckBox.IsChecked == true;
+		ConfigManager.CurrentConfig.LongPressTrigger = enabled;
+		if (LongPressDelayPanel != null)
+		{
+			LongPressDelayPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+		}
+		SyncUiToConfigAndSave();
+	}
+
+	private void LongPressDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.LongPressDelayMs = e.NewValue;
+		if (LongPressDelayLabel != null)
+		{
+			LongPressDelayLabel.Text = $"{e.NewValue:0} ms";
+		}
+		SyncUiToConfigAndSave();
 	}
 
 		private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
