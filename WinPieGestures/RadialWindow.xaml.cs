@@ -5,8 +5,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -18,6 +20,74 @@ namespace WinPieGestures;
 
 public partial class RadialWindow : Window
 {
+	[StructLayout(LayoutKind.Sequential)]
+	public struct POINT
+	{
+		public int x;
+		public int y;
+	}
+
+	private const uint MONITOR_DEFAULTTONEAREST = 2;
+	private const uint SWP_NOACTIVATE = 0x0010;
+	private const uint SWP_NOZORDER = 0x0004;
+
+	[DllImport("user32.dll")]
+	public static extern nint MonitorFromPoint(POINT pt, uint dwFlags);
+
+	[DllImport("SHCore.dll", SetLastError = true)]
+	public static extern int GetDpiForMonitor(nint hMonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	public static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+	/// <summary>
+	/// 获取指定物理像素坐标所在显示器的 DPI 缩放系数(多显示器混合 DPI 环境下逐屏获取)。
+	/// </summary>
+	public static (double scaleX, double scaleY) GetMonitorDpiScale(Point physicalPoint)
+	{
+		try
+		{
+			POINT pt = new POINT { x = (int)Math.Round(physicalPoint.X), y = (int)Math.Round(physicalPoint.Y) };
+			nint hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+			if (hMonitor != IntPtr.Zero)
+			{
+				if (GetDpiForMonitor(hMonitor, 0, out uint dpiX, out uint dpiY) == 0 && dpiX > 0 && dpiY > 0)
+				{
+					return (dpiX / 96.0, dpiY / 96.0);
+				}
+			}
+		}
+		catch
+		{
+		}
+		return (1.0, 1.0);
+	}
+
+	/// <summary>
+	/// 以物理像素将窗口居中到 _centerPoint(鼠标钩子返回的物理坐标)所在的显示器上。
+	/// 在 PerMonitorV2 DPI 感知下,SetWindowPos 直接使用物理像素,可正确定位到副屏。
+	/// </summary>
+	private void PositionWindowOnTargetMonitor()
+	{
+		nint handle = new WindowInteropHelper(this).Handle;
+		if (handle == IntPtr.Zero)
+		{
+			return;
+		}
+		var (scaleX, scaleY) = GetMonitorDpiScale(_centerPoint);
+		int physicalWidth = (int)Math.Round(base.Width * scaleX);
+		int physicalHeight = (int)Math.Round(base.Height * scaleY);
+		int physicalLeft = (int)Math.Round(_centerPoint.X - physicalWidth / 2.0);
+		int physicalTop = (int)Math.Round(_centerPoint.Y - physicalHeight / 2.0);
+		SetWindowPos(handle, IntPtr.Zero, physicalLeft, physicalTop, physicalWidth, physicalHeight, SWP_NOACTIVATE | SWP_NOZORDER);
+	}
+
+	protected override void OnSourceInitialized(EventArgs e)
+	{
+		base.OnSourceInitialized(e);
+		PositionWindowOnTargetMonitor();
+	}
+
 	private sealed class SubTierVisuals
 	{
 		public List<System.Windows.Shapes.Path> Paths { get; }
@@ -262,20 +332,7 @@ public partial class RadialWindow : Window
 		Panel.SetZIndex(CoreGrid, 5);
 		OuterEllipse.Width = wheelRadius * 2.0 + 8.0;
 		OuterEllipse.Height = wheelRadius * 2.0 + 8.0;
-		double num5 = 1.0;
-		double num6 = 1.0;
-		PresentationSource presentationSource = PresentationSource.FromVisual(this);
-		if (presentationSource?.CompositionTarget != null)
-		{
-			Matrix transformToDevice = presentationSource.CompositionTarget.TransformToDevice;
-			num5 = transformToDevice.M11;
-			transformToDevice = presentationSource.CompositionTarget.TransformToDevice;
-			num6 = transformToDevice.M22;
-		}
-		Point centerPoint = _centerPoint;
-		base.Left = centerPoint.X / num5 - base.Width / 2.0;
-		centerPoint = _centerPoint;
-		base.Top = centerPoint.Y / num6 - base.Height / 2.0;
+		PositionWindowOnTargetMonitor();
 		CoreEllipse.Fill = _coreBgBrush;
 		CoreEllipse.Stroke = _coreBorderBrush;
 		string text = ConfigManager.CurrentConfig.CoreBgImagePath ?? "";

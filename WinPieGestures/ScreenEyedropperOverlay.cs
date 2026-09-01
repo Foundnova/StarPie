@@ -39,6 +39,19 @@ public partial class ScreenEyedropperOverlay : Window
 	[DllImport("user32.dll")]
 	private static extern bool GetCursorPos(out POINT lpPoint);
 
+	[DllImport("user32.dll")]
+	private static extern int GetSystemMetrics(int nIndex);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+	private const int SM_XVIRTUALSCREEN = 76;
+	private const int SM_YVIRTUALSCREEN = 77;
+	private const int SM_CXVIRTUALSCREEN = 78;
+	private const int SM_CYVIRTUALSCREEN = 79;
+	private const uint SWP_NOACTIVATE = 0x0010;
+	private const uint SWP_NOZORDER = 0x0004;
+
 	public ScreenEyedropperOverlay()
 	{
 		base.WindowStyle = WindowStyle.None;
@@ -51,6 +64,19 @@ public partial class ScreenEyedropperOverlay : Window
 		base.Top = SystemParameters.VirtualScreenTop;
 		base.Width = SystemParameters.VirtualScreenWidth;
 		base.Height = SystemParameters.VirtualScreenHeight;
+		base.SourceInitialized += delegate
+		{
+			// 混合 DPI 多显示器下,SystemParameters 的 DIP 值与物理像素不一致,
+			// 用 Win32 物理像素强制铺满整个虚拟屏幕。
+			nint handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+			if (handle != IntPtr.Zero)
+			{
+				SetWindowPos(handle, IntPtr.Zero,
+					GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN),
+					GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN),
+					SWP_NOACTIVATE | SWP_NOZORDER);
+			}
+		};
 		_loupeCanvas = new Canvas
 		{
 			IsHitTestVisible = false
