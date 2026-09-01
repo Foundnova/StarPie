@@ -927,6 +927,20 @@ public static class I18n
 			[LanguageCode.En] = "\ud83d\udccb About & Updates",
 			[LanguageCode.Ja] = "\ud83d\udccb 情報と更新"
 		};
+		dictionary["SidebarCollapse"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "折叠侧边栏",
+			[LanguageCode.ZhTw] = "摺疊側邊欄",
+			[LanguageCode.En] = "Collapse sidebar",
+			[LanguageCode.Ja] = "サイドバーを折りたたむ"
+		};
+		dictionary["SidebarExpand"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "展开侧边栏",
+			[LanguageCode.ZhTw] = "展開側邊欄",
+			[LanguageCode.En] = "Expand sidebar",
+			[LanguageCode.Ja] = "サイドバーを展開"
+		};
 		dictionary["BottomStatusNote"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "注: 所有修改均在内存中即时生效，点击【保存更改】持久化保存至硬盘。",
