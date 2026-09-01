@@ -376,6 +376,7 @@ public class SlotViewModel : INotifyPropertyChanged
 			OnPropertyChanged("IsLaunchType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
+			OnPropertyChanged("IsCommandType");
 		}
 	}
 
@@ -391,6 +392,22 @@ public class SlotViewModel : INotifyPropertyChanged
 			{
 				Action.Parameter = value;
 				OnPropertyChanged("Parameter");
+			}
+		}
+	}
+
+	public string CommandTerminal
+	{
+		get
+		{
+			return Action.CommandTerminal ?? "cmd";
+		}
+		set
+		{
+			if (Action.CommandTerminal != value && !string.IsNullOrEmpty(value))
+			{
+				Action.CommandTerminal = value;
+				OnPropertyChanged("CommandTerminal");
 			}
 		}
 	}
@@ -590,6 +607,11 @@ public class SlotViewModel : INotifyPropertyChanged
 		},
 		new ActionTypeOption
 		{
+			Tag = "Command",
+			DisplayText = I18n.T("ActionTypeCommandShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -614,10 +636,39 @@ public class SlotViewModel : INotifyPropertyChanged
 		},
 		new ActionTypeItem
 		{
+			Tag = "Command",
+			DisplayText = I18n.T("ActionTypeCommandShort")
+		},
+		new ActionTypeItem
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
 	};
+
+	/// <summary>Localized terminal options (shared by the sub-action editor).</summary>
+	public static List<ActionTypeItem> LocalizedTerminals => new List<ActionTypeItem>
+	{
+		new ActionTypeItem { Tag = "cmd", DisplayText = I18n.T("TerminalCmd") },
+		new ActionTypeItem { Tag = "powershell", DisplayText = I18n.T("TerminalPowerShell") },
+		new ActionTypeItem { Tag = "wsl", DisplayText = I18n.T("TerminalWsl") },
+		new ActionTypeItem { Tag = "cmd_hidden", DisplayText = I18n.T("TerminalCmdHidden") },
+		new ActionTypeItem { Tag = "powershell_hidden", DisplayText = I18n.T("TerminalPowerShellHidden") },
+		new ActionTypeItem { Tag = "wsl_hidden", DisplayText = I18n.T("TerminalWslHidden") }
+	};
+
+	/// <summary>Localized terminal options for Command actions.</summary>
+	public List<ActionTypeOption> Terminals => new List<ActionTypeOption>
+	{
+		new ActionTypeOption { Tag = "cmd", DisplayText = I18n.T("TerminalCmd") },
+		new ActionTypeOption { Tag = "powershell", DisplayText = I18n.T("TerminalPowerShell") },
+		new ActionTypeOption { Tag = "wsl", DisplayText = I18n.T("TerminalWsl") },
+		new ActionTypeOption { Tag = "cmd_hidden", DisplayText = I18n.T("TerminalCmdHidden") },
+		new ActionTypeOption { Tag = "powershell_hidden", DisplayText = I18n.T("TerminalPowerShellHidden") },
+		new ActionTypeOption { Tag = "wsl_hidden", DisplayText = I18n.T("TerminalWslHidden") }
+	};
+
+	public bool IsCommandType => Type == "Command";
 
 	public string TestButtonText => I18n.T("BtnTest");
 
@@ -641,6 +692,7 @@ public class SlotViewModel : INotifyPropertyChanged
 		I18n.LanguageChanged += delegate
 		{
 			OnPropertyChanged("ActionTypes");
+			OnPropertyChanged("Terminals");
 			OnPropertyChanged("TestButtonText");
 			OnPropertyChanged("IconDisplayText");
 			OnPropertyChanged("SubActionButtonText");

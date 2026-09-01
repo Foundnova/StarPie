@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -583,6 +583,55 @@ public static class I18n
 			[LanguageCode.ZhTw] = "系統控制",
 			[LanguageCode.En] = "System",
 			[LanguageCode.Ja] = "システム"
+		};
+		dictionary["ActionTypeCommandShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "运行命令",
+			[LanguageCode.ZhTw] = "執行命令",
+			[LanguageCode.En] = "Run Command",
+			[LanguageCode.Ja] = "コマンド実行"
+		};
+		dictionary["TerminalCmd"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "CMD",
+			[LanguageCode.ZhTw] = "CMD",
+			[LanguageCode.En] = "CMD",
+			[LanguageCode.Ja] = "CMD"
+		};
+		dictionary["TerminalPowerShell"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "Powershell",
+			[LanguageCode.ZhTw] = "Powershell",
+			[LanguageCode.En] = "Powershell",
+			[LanguageCode.Ja] = "Powershell"
+		};
+		dictionary["TerminalWsl"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "WSL",
+			[LanguageCode.ZhTw] = "WSL",
+			[LanguageCode.En] = "WSL",
+			[LanguageCode.Ja] = "WSL"
+		};
+		dictionary["TerminalCmdHidden"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "CMD (无终端)",
+			[LanguageCode.ZhTw] = "CMD (無終端)",
+			[LanguageCode.En] = "CMD (no window)",
+			[LanguageCode.Ja] = "CMD (非表示)"
+		};
+		dictionary["TerminalPowerShellHidden"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "Powershell (无终端)",
+			[LanguageCode.ZhTw] = "Powershell (無終端)",
+			[LanguageCode.En] = "Powershell (no window)",
+			[LanguageCode.Ja] = "Powershell (非表示)"
+		};
+		dictionary["TerminalWslHidden"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "WSL (无终端)",
+			[LanguageCode.ZhTw] = "WSL (無終端)",
+			[LanguageCode.En] = "WSL (no window)",
+			[LanguageCode.Ja] = "WSL (非表示)"
 		};
 		dictionary["ProfileCardTitle"] = new Dictionary<LanguageCode, string>
 		{
