@@ -476,7 +476,7 @@
         </StackPanel>
         <StackPanel Grid.Row="2" Margin="0,15,0,5">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.5.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.5.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -1663,7 +1663,7 @@
                   <Button Name="TrimMemoryButton" Grid.Column="1" Content="立即压缩内存" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="14,0" VerticalAlignment="Center" ToolTip="立即清理未引用的工作集物理内存" Click="TrimMemoryButton_Click" />
                 </Grid>
               </Border>
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -1672,6 +1672,30 @@
                   <WrapPanel>
                     <Button Name="ExportConfigButton" Content="导出当前配置为 JSON..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,0" Click="ExportConfigButton_Click" />
                     <Button Name="ImportConfigButton" Content="从外部 JSON 文件导入..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Click="ImportConfigButton_Click" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📋" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Name="LogsTitleText" Text="系统运行日志与诊断 (Runtime Logs &amp; Diagnostics)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <TextBlock Name="LogsDescText" Text="自动记录系统事件、手势调度、按键模拟与异常排查信息（自动保留最近 7 天），便于快速定位与修复问题。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Grid>
+                  <WrapPanel Margin="0,12,0,0">
+                    <Button Name="OpenLogFolderButton" Content="📂 打开日志目录" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,0" Click="OpenLogFolderButton_Click" ToolTip="在资源管理器中打开日志文件夹" />
+                    <Button Name="ViewTodayLogButton" Content="📄 查看今日运行日志" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Click="ViewTodayLogButton_Click" ToolTip="在系统默认编辑器中打开当天的日志文件" />
                   </WrapPanel>
                 </StackPanel>
               </Border>
@@ -1709,7 +1733,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.5.7" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Text="v1.5.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -1722,11 +1746,11 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.5.7 轮盘动作上下排序 &amp; 扇区方位微缩指示器 &amp; 独立钩子线程与流畅度优化 &amp; 体验大升级" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🧭 【轮盘动作上下移动排序】：扇区配置列表支持一键 ▲ / ▼ 上下移动排序，即时同步调整空间极坐标槽位与实时画布；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🎯 【扇区方位微缩指示器】：每个动作卡片左侧配备微缩轮盘指示器，精准高亮当前空间朝向，调序方位一目了然；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• ⚡ 【独立低级钩子线程与流畅度优化】：鼠标钩子采用专属后台线程与自愈检测，手势移动高频调度合并，彻底杜绝掉帧；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🌟 【二级外径解耦 &amp; 配置即时导入 &amp; 自启双通道】：二级整体外径独立伸缩，JSON配置全量0重启导入，开机自启双通道高可靠。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.5.8 Win10 计算器呼出修复 &amp; PrintScreen 独立截屏热键 &amp; 启动资源管理器修复 &amp; 系统运行日志" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🧮 【Win10 计算器唤起修复】：重构系统计算器调用，适配 Win10/Win11 协议唤起（ms-calculator:），解决单例 UWP 无法打开问题；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📸 【PrintScreen 独立按键触发】：修复单个 PrintScreen 按键误转为文本输入的 Bug，支持 VK_SNAPSHOT 扩展扫描码直接模拟；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📂 【启动 explorer.exe 修复】：排除 explorer 进程窗口误拦截，支持启动资源管理器与打开自定义目录；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📋 【系统运行日志与诊断】：新增高性能异步运行日志系统（AppLogger），支持查看今日日志与打开日志目录，方便故障排查。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -1735,6 +1759,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.5.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="Win10 计算器修复 &amp; PrintScreen 截屏 &amp; 启动 Explorer 修复 &amp; 运行日志记录" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="修复 Win10 计算器呼出；支持单独 PrintScreen 截屏热键；修复启动 explorer.exe；新增系统异步运行日志与一键查看诊断。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-01" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>

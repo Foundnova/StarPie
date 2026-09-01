@@ -66,11 +66,13 @@ public static class ConfigManager
 					ReadCommentHandling = JsonCommentHandling.Skip
 				};
 				CurrentConfig = JsonSerializer.Deserialize<AppConfig>(json, options) ?? CreateDefaultConfig();
+				AppLogger.LogInfo($"Loaded configuration from '{ConfigPath}'");
 			}
 			else
 			{
 				CurrentConfig = CreateDefaultConfig();
 				SaveConfig();
+				AppLogger.LogInfo($"Created and saved default configuration at '{ConfigPath}'");
 			}
 			AppConfig currentConfig = CurrentConfig;
 			if (currentConfig.BlacklistedProcesses == null)
@@ -197,8 +199,9 @@ public static class ConfigManager
 			string contents = JsonSerializer.Serialize(CurrentConfig, options);
 			File.WriteAllText(ConfigPath, contents);
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			AppLogger.LogError("Failed to save config to file", ex);
 		}
 	}
 

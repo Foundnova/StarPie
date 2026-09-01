@@ -662,7 +662,7 @@ public partial class SettingsWindow : Window
 		if (_notifyIcon != null)
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.7"))
+			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.8"))
 			{
 				Enabled = false,
 				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -1097,6 +1097,22 @@ public partial class SettingsWindow : Window
 		if (ImportConfigButton != null)
 		{
 			ImportConfigButton.Content = I18n.T("BtnImportConfig");
+		}
+		if (LogsTitleText != null)
+		{
+			LogsTitleText.Text = I18n.T("LogsTitle");
+		}
+		if (LogsDescText != null)
+		{
+			LogsDescText.Text = I18n.T("LogsDesc");
+		}
+		if (OpenLogFolderButton != null)
+		{
+			OpenLogFolderButton.Content = I18n.T("BtnOpenLogFolder");
+		}
+		if (ViewTodayLogButton != null)
+		{
+			ViewTodayLogButton.Content = I18n.T("BtnViewTodayLog");
 		}
 		BuildTrayContextMenu();
 	}
@@ -4930,6 +4946,16 @@ public partial class SettingsWindow : Window
 	{
 		MemoryOptimizer.TrimMemory(force: true);
 		System.Windows.MessageBox.Show(this, "物理工作集内存已深度压缩！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+	}
+
+	private void OpenLogFolderButton_Click(object sender, RoutedEventArgs e)
+	{
+		AppLogger.OpenLogFolder();
+	}
+
+	private void ViewTodayLogButton_Click(object sender, RoutedEventArgs e)
+	{
+		AppLogger.OpenTodayLogFile();
 	}
 
 	private void OpenReleasesFolderButton_Click(object sender, RoutedEventArgs e)
