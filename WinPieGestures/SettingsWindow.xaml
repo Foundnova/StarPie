@@ -1534,7 +1534,7 @@
                                   <ComboBox Grid.Column="1" Width="118" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" />
                                 </Grid>
                                 <Grid Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}">
-                                  <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏第 N 个窗口的序号（1~20）；不显示在任务栏的窗口（如托盘驻留/隐藏程序）不参与计数" />
+                                  <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏槽位序号：1≈Win+1、2≈Win+2…（原生支持 1~10，11~20 按任务栏顺序）；托盘驻留/隐藏窗口不计入" />
                                 </Grid>
                               </Grid>
 

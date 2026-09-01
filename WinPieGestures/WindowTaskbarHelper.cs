@@ -22,6 +22,36 @@ public static class WindowTaskbarHelper
 
 	private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
+	// ---- 任务栏工具栏（Win+N 槽位顺序）----
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern nint FindWindow(string lpClassName, string? lpWindowName);
+
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern nint FindWindowEx(nint hwndParent, nint hwndChildAfter, string lpszClass, string? lpszWindow);
+
+	private const uint TB_BUTTONCOUNT = 0x0418;
+	private const uint TB_GETBUTTON = 0x0417;
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct TBBUTTON
+	{
+		public int iBitmap;
+		public int idCommand;
+		public byte fsState;
+		public byte fsStyle;
+		public byte bReserved0;
+		public byte bReserved1;
+		public nint dwData;
+		public nint iString;
+	}
+
+	// ---- 模拟 Win+N（N=1..9, 0=10）----
+	[DllImport("user32.dll")]
+	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
+
+	private const byte VK_LWIN = 0x5B;
+	private const uint KEYEVENTF_KEYUP = 0x0002;
+
 	[DllImport("user32.dll")]
 	private static extern bool IsWindowVisible(nint hWnd);
 
@@ -208,12 +238,75 @@ public static class WindowTaskbarHelper
 		return list;
 	}
 
-	/// <summary>任务栏第 n 个窗口（1 起）；越界返回 0。</summary>
+	/// <summary>
+	/// 任务栏按钮顺序（与 Win+N 的槽位完全一致，Win10 经典任务栏读取 "MSTaskSwWClass"/"MSTaskListWClass" 工具栏）。
+	/// 取不到（Win11 XAML 任务栏 / 失败）返回 null，由调用方回退到 filtered 枚举。
+	/// </summary>
+	public static List<nint>? GetTaskbarToolbarSlots()
+	{
+		try
+		{
+			nint taskbar = FindWindow("Shell_TrayWnd", null);
+			if (taskbar == IntPtr.Zero)
+			{
+				return null;
+			}
+			nint toolbar = FindWindowEx(taskbar, IntPtr.Zero, "MSTaskSwWClass", null);
+			if (toolbar == IntPtr.Zero)
+			{
+				toolbar = FindWindowEx(taskbar, IntPtr.Zero, "MSTaskListWClass", null);
+			}
+			if (toolbar == IntPtr.Zero)
+			{
+				return null;
+			}
+			int count = (int)SendMessage(toolbar, TB_BUTTONCOUNT, IntPtr.Zero, IntPtr.Zero);
+			if (count <= 0)
+			{
+				return null;
+			}
+			List<nint> slots = new List<nint>(count);
+			byte[] buf = new byte[Marshal.SizeOf<TBBUTTON>()];
+			GCHandle pin = GCHandle.Alloc(buf, GCHandleType.Pinned);
+			try
+			{
+				for (int i = 0; i < count; i++)
+				{
+					if (SendMessage(toolbar, TB_GETBUTTON, (nint)i, pin.AddrOfPinnedObject()).ToInt64() <= 0)
+					{
+						continue;
+					}
+					TBBUTTON btn = Marshal.PtrToStructure<TBBUTTON>(pin.AddrOfPinnedObject());
+					slots.Add((nint)btn.idCommand); // idCommand = 任务栏按钮对应窗口句柄（固定但未运行窗口为 0）
+				}
+			}
+			finally
+			{
+				pin.Free();
+			}
+			return slots;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>任务栏第 n 个槽位（Win+N 语义）：优先工具栏按钮顺序，回退 filtered 枚举。</summary>
 	public static nint GetNthTaskbarWindow(int n)
 	{
 		if (n <= 0)
 		{
 			return IntPtr.Zero;
+		}
+		List<nint>? slots = GetTaskbarToolbarSlots();
+		if (slots != null)
+		{
+			if (n > slots.Count)
+			{
+				return IntPtr.Zero;
+			}
+			return slots[n - 1];
 		}
 		List<nint> list = GetTaskbarWindows();
 		if (n > list.Count)
@@ -221,6 +314,34 @@ public static class WindowTaskbarHelper
 			return IntPtr.Zero;
 		}
 		return list[n - 1];
+	}
+
+	/// <summary>
+	/// 切换到任务栏第 n 个槽位：n=1..10 直接模拟 Win+N（与系统快捷键完全一致，固定项也生效）；
+	/// n=11..20 使用任务栏工具栏顺序激活（回退 filtered 枚举）。
+	/// </summary>
+	public static bool ActivateTaskbarSlot(int n)
+	{
+		if (n <= 0)
+		{
+			return false;
+		}
+		if (n <= 10)
+		{
+			// Win+1..9, Win+0(=10)：原生快捷键（顺序稳定、含固定项；与"切换窗口1=Win+1"一致）
+			byte digit = (byte)((n == 10) ? '0' : ('0' + n));
+			keybd_event(VK_LWIN, 0, 0, IntPtr.Zero);
+			keybd_event(digit, 0, 0, IntPtr.Zero);
+			keybd_event(digit, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+			keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+			return true;
+		}
+		nint hWnd = GetNthTaskbarWindow(n);
+		if (hWnd == IntPtr.Zero)
+		{
+			return false;
+		}
+		return ActivateWindow(hWnd);
 	}
 
 	/// <summary>将窗口激活到前台：处理 Windows 前台锁（AttachThreadInput 到前台/目标线程 + BringWindowToTop + SetForegroundWindow，失败再最小化还原兜底强制前台）。</summary>

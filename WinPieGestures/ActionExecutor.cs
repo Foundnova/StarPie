@@ -491,7 +491,7 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>切换到任务栏第 N 个窗口；参数缺失/非法时默认切换第 1 个；无窗口时不动作并记录诊断日志。</summary>
+	/// <summary>切换到任务栏第 N 个槽位（N=1..10 等价 Win+N；参数缺失/非法默认第 1 个；越界无动作并记录诊断）。</summary>
 	private static void ExecuteSwitchWindow(string? parameter)
 	{
 		int n = 1;
@@ -499,13 +499,10 @@ public static class ActionExecutor
 		{
 			n = parsed;
 		}
-		nint hWnd = WindowTaskbarHelper.GetNthTaskbarWindow(n);
-		if (hWnd == IntPtr.Zero)
+		if (!WindowTaskbarHelper.ActivateTaskbarSlot(n))
 		{
-			System.Diagnostics.Debug.WriteLine($"[SwitchWindow] 第 {n} 个窗口不存在（当前可切换窗口数 {WindowTaskbarHelper.GetTaskbarWindows().Count}）");
-			return;
+			System.Diagnostics.Debug.WriteLine($"[SwitchWindow] 任务栏第 {n} 个槽位不可用");
 		}
-		WindowTaskbarHelper.ActivateWindow(hWnd);
 	}
 
 	private static bool IsStandardKeyToken(string token)
