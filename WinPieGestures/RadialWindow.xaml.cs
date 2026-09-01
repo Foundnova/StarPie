@@ -230,6 +230,16 @@ public partial class RadialWindow : Window
 
 	private bool _isOuterEscaped;
 
+	private Visibility _defaultCoreExitIconVisibility = Visibility.Collapsed;
+
+	private Visibility _defaultCoreCustomImageVisibility = Visibility.Collapsed;
+
+	private double _defaultCoreExitIconOpacity = 1.0;
+
+	private double _defaultCoreCustomImageOpacity = 1.0;
+
+	private Effect? _defaultCoreCustomImageEffect;
+
 	public RadialWindow(Point centerPoint, WheelProfile profile)
 	{
 		//IL_00d0: Unknown result type (might be due to invalid IL or missing references)
@@ -489,6 +499,19 @@ public partial class RadialWindow : Window
 			CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
 			CoreExitIcon.Visibility = Visibility.Collapsed;
 		}
+		_defaultCoreExitIconVisibility = CoreExitIcon.Visibility;
+		_defaultCoreCustomImageVisibility = CoreCustomImageEllipse.Visibility;
+		_defaultCoreExitIconOpacity = CoreExitIcon.Opacity;
+		_defaultCoreCustomImageOpacity = CoreCustomImageEllipse.Opacity;
+		_defaultCoreCustomImageEffect = CoreCustomImageEllipse.Effect;
+		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Width = Math.Max(32.0, Math.Min(coreRadius * 1.75, 180.0));
+		CoreSelectionText.FontSize = Math.Max(8.0, Math.Min(16.0, coreRadius / 4.0));
+		CoreSelectionOverlay.Fill = CreateFrostedCoreBrush(_coreBgBrush);
+		CoreSelectionText.Foreground = _textColorBrush;
+		Panel.SetZIndex(CoreSelectionOverlay, 20);
+		Panel.SetZIndex(CoreSelectionTextPanel, 21);
 		RenderStyleDecorations();
 		RenderSectors();
 		Storyboard storyboard = new Storyboard();
@@ -1277,6 +1300,7 @@ public partial class RadialWindow : Window
 		_ = _currentHighlightedSubSector;
 		_ = _currentHighlightedSubSector;
 		_currentHighlightedSubSector = subIndex;
+		UpdateCoreSelectionDisplay(mainIndex, subIndex);
 		AppConfig currentConfig = ConfigManager.CurrentConfig;
 		double num = ((currentConfig == null || !(currentConfig.CustomAnimationDurationMs > 0.0)) ? ((double)(ConfigManager.CurrentConfig?.AnimationSpeed switch
 		{
@@ -1601,6 +1625,63 @@ public partial class RadialWindow : Window
 			ShadowDepth = 0.0,
 			Opacity = opacity
 		};
+	}
+
+	private void UpdateCoreSelectionDisplay(int mainIndex, int subIndex)
+	{
+		bool shouldShow = ConfigManager.CurrentConfig?.ShowSelectedActionText == true && mainIndex >= 0;
+		string selectedName = string.Empty;
+		if (shouldShow && mainIndex < _profile.Actions.Count)
+		{
+			ActionItem action = _profile.Actions[mainIndex];
+			if (subIndex >= 0 && action?.SubActions != null && subIndex < action.SubActions.Count)
+			{
+				selectedName = action.SubActions[subIndex]?.Name ?? string.Empty;
+			}
+			if (string.IsNullOrWhiteSpace(selectedName))
+			{
+				selectedName = action?.Name ?? string.Empty;
+			}
+		}
+
+		if (shouldShow && !string.IsNullOrWhiteSpace(selectedName))
+		{
+			CoreSelectionText.Text = selectedName;
+			CoreSelectionTextPanel.Visibility = Visibility.Visible;
+			CoreSelectionOverlay.Visibility = Visibility.Visible;
+			CoreExitIcon.Opacity = (CoreExitIcon.Visibility == Visibility.Visible) ? 0.18 : _defaultCoreExitIconOpacity;
+			CoreCustomImageEllipse.Opacity = _defaultCoreCustomImageOpacity;
+			CoreCustomImageEllipse.Effect = (CoreCustomImageEllipse.Visibility == Visibility.Visible)
+				? new BlurEffect { Radius = 5.5, RenderingBias = RenderingBias.Performance }
+				: _defaultCoreCustomImageEffect;
+			Panel.SetZIndex(CoreSelectionOverlay, 20);
+			Panel.SetZIndex(CoreSelectionTextPanel, 21);
+			return;
+		}
+
+		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		CoreExitIcon.Visibility = _defaultCoreExitIconVisibility;
+		CoreCustomImageEllipse.Visibility = _defaultCoreCustomImageVisibility;
+		CoreExitIcon.Opacity = _defaultCoreExitIconOpacity;
+		CoreCustomImageEllipse.Opacity = _defaultCoreCustomImageOpacity;
+		CoreCustomImageEllipse.Effect = _defaultCoreCustomImageEffect;
+	}
+
+	private static Brush CreateFrostedCoreBrush(Brush baseBrush)
+	{
+		Color baseColor = (baseBrush as SolidColorBrush)?.Color ?? Color.FromRgb(36, 44, 60);
+		double luminance = (0.2126 * baseColor.R) + (0.7152 * baseColor.G) + (0.0722 * baseColor.B);
+		if (luminance >= 165.0)
+		{
+			return new SolidColorBrush(Color.FromArgb(88, byte.MaxValue, byte.MaxValue, byte.MaxValue));
+		}
+
+		return new SolidColorBrush(Color.FromArgb(
+			112,
+			(byte)Math.Min(255, baseColor.R + 48),
+			(byte)Math.Min(255, baseColor.G + 56),
+			(byte)Math.Min(255, baseColor.B + 72)));
 	}
 
 	private static Stretch ParseStretch(string? str)

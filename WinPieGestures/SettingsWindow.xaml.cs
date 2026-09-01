@@ -105,6 +105,20 @@ public partial class SettingsWindow : Window
 
 	private System.Windows.Shapes.Path? _previewExitIcon;
 
+	private UIElement? _previewCoreIconElement;
+
+	private Visibility _previewCoreIconDefaultVisibility = Visibility.Collapsed;
+
+	private double _previewCoreIconDefaultOpacity = 1.0;
+
+	private Effect? _previewCoreIconDefaultEffect;
+
+	private bool _previewCoreUsesCustomImage;
+
+	private Ellipse? _previewCoreSelectionOverlay;
+
+	private TextBlock? _previewCoreSelectionText;
+
 	private int _lastHoveredSector = -2;
 
 	private int _lastHoveredSubIndex = -2;
@@ -503,6 +517,10 @@ public partial class SettingsWindow : Window
 		SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
 		SetComboBoxSelectedValue(WheelFontFamilyComboBox, ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 		ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
+		if (ShowSelectedActionTextCheckBox != null)
+		{
+			ShowSelectedActionTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowSelectedActionText;
+		}
 		if (EnableMultiTierCheckBox != null)
 		{
 			EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
@@ -975,6 +993,14 @@ public partial class SettingsWindow : Window
 		{
 			WheelFontFamilyTitleText.Text = I18n.T("WheelFontFamily");
 		}
+		if (ShowTextCheckBox != null)
+		{
+			ShowTextCheckBox.Content = I18n.T("ShowSectorActionText");
+		}
+		if (ShowSelectedActionTextCheckBox != null)
+		{
+			ShowSelectedActionTextCheckBox.Content = I18n.T("ShowSelectedActionText");
+		}
 		if (FindName("OlderMilestonesExpander") is Expander expander)
 		{
 			expander.Header = I18n.T("MilestonesOlderExpander");
@@ -1371,6 +1397,10 @@ public partial class SettingsWindow : Window
 			if (ShowTextCheckBox != null)
 			{
 				ConfigManager.CurrentConfig.ShowText = ShowTextCheckBox.IsChecked == true;
+			}
+			if (ShowSelectedActionTextCheckBox != null)
+			{
+				ConfigManager.CurrentConfig.ShowSelectedActionText = ShowSelectedActionTextCheckBox.IsChecked == true;
 			}
 			if (ShowCoreIconCheckBox != null)
 			{
@@ -3684,6 +3714,21 @@ public partial class SettingsWindow : Window
 		SyncUiToConfigAndSave();
 	}
 
+	private void ShowSelectedActionTextCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (ShowSelectedActionTextCheckBox == null || ConfigManager.CurrentConfig == null || _isUpdatingUi)
+		{
+			return;
+		}
+
+		ConfigManager.CurrentConfig.ShowSelectedActionText = ShowSelectedActionTextCheckBox.IsChecked == true;
+		if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		SyncUiToConfigAndSave();
+	}
+
 	private void SectorIconSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
 	{
 		if (SectorIconSizeSlider != null && SectorIconSizeLabel != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
@@ -5220,6 +5265,13 @@ public partial class SettingsWindow : Window
 			_previewSubParentIndices.Clear();
 			_previewSubIndices.Clear();
 			_previewSubAngles.Clear();
+			_previewCoreIconElement = null;
+			_previewCoreIconDefaultVisibility = Visibility.Collapsed;
+			_previewCoreIconDefaultOpacity = 1.0;
+			_previewCoreIconDefaultEffect = null;
+			_previewCoreUsesCustomImage = false;
+			_previewCoreSelectionOverlay = null;
+			_previewCoreSelectionText = null;
 			_lastHoveredSector = -2;
 			_lastHoveredSubIndex = -2;
 			double num = 300.0 / 2.0;
@@ -5496,6 +5548,11 @@ public partial class SettingsWindow : Window
 				catch
 				{
 				}
+				_previewCoreIconElement = ellipse;
+				_previewCoreIconDefaultVisibility = ellipse.Visibility;
+				_previewCoreIconDefaultOpacity = ellipse.Opacity;
+				_previewCoreIconDefaultEffect = ellipse.Effect;
+				_previewCoreUsesCustomImage = true;
 				grid.Children.Add(ellipse);
 			}
 			else
@@ -5514,8 +5571,48 @@ public partial class SettingsWindow : Window
 					IsHitTestVisible = false,
 					Visibility = ((!ConfigManager.CurrentConfig.ShowCoreIcon) ? Visibility.Collapsed : Visibility.Visible)
 				};
+				_previewCoreIconElement = _previewExitIcon;
+				_previewCoreIconDefaultVisibility = _previewExitIcon.Visibility;
+				_previewCoreIconDefaultOpacity = _previewExitIcon.Opacity;
+				_previewCoreIconDefaultEffect = _previewExitIcon.Effect;
+				_previewCoreUsesCustomImage = false;
 				grid.Children.Add(_previewExitIcon);
 			}
+			_previewCoreSelectionOverlay = new Ellipse
+			{
+				Width = num10 * 2.0,
+				Height = num10 * 2.0,
+				Fill = CreateFrostedCoreBrush(_previewCoreBgBrush),
+				Opacity = 0.92,
+				Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(130, 255, 255, 255)),
+				StrokeThickness = 1.1,
+				Visibility = Visibility.Collapsed,
+				IsHitTestVisible = false,
+				Effect = new BlurEffect { Radius = 7.0, RenderingBias = RenderingBias.Performance }
+			};
+			grid.Children.Add(_previewCoreSelectionOverlay);
+			_previewCoreSelectionText = new TextBlock
+			{
+				Width = Math.Max(24.0, Math.Min(num10 * 1.75, 150.0)),
+				Foreground = _previewTextBrush,
+				FontSize = Math.Max(8.0, Math.Min(16.0, num10 / 4.0)),
+				FontWeight = FontWeights.SemiBold,
+				HorizontalAlignment = HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center,
+				TextAlignment = TextAlignment.Center,
+				TextWrapping = TextWrapping.Wrap,
+				TextTrimming = TextTrimming.CharacterEllipsis,
+				MaxHeight = Math.Max(24.0, num10 * 1.15),
+				Visibility = Visibility.Collapsed,
+				IsHitTestVisible = false,
+				Effect = new DropShadowEffect
+				{
+					BlurRadius = 2.0,
+					ShadowDepth = 1.0,
+					Opacity = 0.4
+				}
+			};
+			grid.Children.Add(_previewCoreSelectionText);
 			_previewStyleRenderer.RenderDecorations(LiveWheelPreviewCanvas, grid, num, num2, num8, num10, 1);
 			int num19 = ((wheelProfile.SectorCount > 0) ? wheelProfile.SectorCount : 8);
 			double num20 = 360.0 / (double)num19;
@@ -5926,7 +6023,77 @@ public partial class SettingsWindow : Window
 			return Stretch.None;
 		}
 		return Stretch.UniformToFill;
-	}private void LiveWheelPreviewCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+	}
+
+	private static System.Windows.Media.Brush CreateFrostedCoreBrush(System.Windows.Media.Brush baseBrush)
+	{
+		System.Windows.Media.Color baseColor = (baseBrush as SolidColorBrush)?.Color ?? System.Windows.Media.Color.FromRgb(36, 44, 60);
+		double luminance = (0.2126 * baseColor.R) + (0.7152 * baseColor.G) + (0.0722 * baseColor.B);
+		if (luminance >= 165.0)
+		{
+			return new SolidColorBrush(System.Windows.Media.Color.FromArgb(88, byte.MaxValue, byte.MaxValue, byte.MaxValue));
+		}
+
+		return new SolidColorBrush(System.Windows.Media.Color.FromArgb(
+			112,
+			(byte)Math.Min(255, baseColor.R + 48),
+			(byte)Math.Min(255, baseColor.G + 56),
+			(byte)Math.Min(255, baseColor.B + 72)));
+	}
+
+	private void UpdatePreviewCoreSelection(int mainIndex, int subIndex, WheelProfile? wheelProfile)
+	{
+		bool shouldShow = ConfigManager.CurrentConfig?.ShowSelectedActionText == true && mainIndex >= 0 && wheelProfile != null;
+		string selectedName = string.Empty;
+		if (shouldShow && wheelProfile!.Actions != null && mainIndex < wheelProfile.Actions.Count)
+		{
+			ActionItem action = wheelProfile.Actions[mainIndex];
+			if (subIndex >= 0 && subIndex < _previewSubIndices.Count && subIndex < _previewSubParentIndices.Count && _previewSubParentIndices[subIndex] == mainIndex)
+			{
+				int localSubIndex = _previewSubIndices[subIndex];
+				if (action?.SubActions != null && localSubIndex >= 0 && localSubIndex < action.SubActions.Count)
+				{
+					selectedName = action.SubActions[localSubIndex]?.Name ?? string.Empty;
+				}
+			}
+			if (string.IsNullOrWhiteSpace(selectedName))
+			{
+				selectedName = action?.Name ?? string.Empty;
+			}
+		}
+
+		if (shouldShow && !string.IsNullOrWhiteSpace(selectedName) && _previewCoreSelectionOverlay != null && _previewCoreSelectionText != null)
+		{
+			_previewCoreSelectionText.Text = selectedName;
+			_previewCoreSelectionOverlay.Visibility = Visibility.Visible;
+			_previewCoreSelectionText.Visibility = Visibility.Visible;
+			if (_previewCoreIconElement != null)
+			{
+				_previewCoreIconElement.Opacity = _previewCoreUsesCustomImage ? _previewCoreIconDefaultOpacity : 0.18;
+				_previewCoreIconElement.Effect = _previewCoreUsesCustomImage
+					? new BlurEffect { Radius = 5.5, RenderingBias = RenderingBias.Performance }
+					: _previewCoreIconDefaultEffect;
+			}
+			return;
+		}
+
+		if (_previewCoreSelectionOverlay != null)
+		{
+			_previewCoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		}
+		if (_previewCoreSelectionText != null)
+		{
+			_previewCoreSelectionText.Visibility = Visibility.Collapsed;
+		}
+		if (_previewCoreIconElement != null)
+		{
+			_previewCoreIconElement.Visibility = _previewCoreIconDefaultVisibility;
+			_previewCoreIconElement.Opacity = _previewCoreIconDefaultOpacity;
+			_previewCoreIconElement.Effect = _previewCoreIconDefaultEffect;
+		}
+	}
+
+	private void LiveWheelPreviewCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 	{
 		if (_previewSectorPaths.Count == 0 || ConfigManager.CurrentConfig == null)
 		{
@@ -5990,6 +6157,7 @@ public partial class SettingsWindow : Window
 			}
 			_lastHoveredSector = num15;
 			_lastHoveredSubIndex = num16;
+			UpdatePreviewCoreSelection(num15, num16, wheelProfile);
 
 			for (int num23 = 0; num23 < _previewSectorPaths.Count; num23++)
 			{
@@ -6131,6 +6299,7 @@ public partial class SettingsWindow : Window
 		{
 			_lastHoveredSector = -2;
 			_lastHoveredSubIndex = -2;
+			UpdatePreviewCoreSelection(-1, -1, _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault());
 			for (int i = 0; i < _previewSectorPaths.Count; i++)
 			{
 				System.Windows.Shapes.Path path = _previewSectorPaths[i];

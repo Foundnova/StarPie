@@ -1214,7 +1214,10 @@
                       <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="11.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
-                    <CheckBox Name="ShowTextCheckBox" Content="在轮盘扇区中显示动作名称文字" Style="{StaticResource ToggleSwitchStyle}" Margin="0,8,0,0" Checked="ShowTextCheckBox_Changed" Unchecked="ShowTextCheckBox_Changed" />
+                    <WrapPanel Margin="0,8,0,0">
+                      <CheckBox Name="ShowTextCheckBox" Content="在轮盘扇区中显示动作名称文字" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,30,10" Checked="ShowTextCheckBox_Changed" Unchecked="ShowTextCheckBox_Changed" />
+                      <CheckBox Name="ShowSelectedActionTextCheckBox" Content="选中扇区时在中心显示动作名称" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowSelectedActionTextCheckBox_Changed" Unchecked="ShowSelectedActionTextCheckBox_Changed" />
+                    </WrapPanel>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
