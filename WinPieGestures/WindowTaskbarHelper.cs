@@ -31,6 +31,28 @@ public static class WindowTaskbarHelper
 
 	private const uint TB_BUTTONCOUNT = 0x0418;
 	private const uint TB_GETBUTTON = 0x0417;
+	private const uint TB_GETIMAGELIST = 0x0419;
+	private const uint TB_GETBUTTONINFO = 0x0441;
+	private const uint TBIF_IMAGE = 0x00000002;
+	private const uint ILD_TRANSPARENT = 0x00000001;
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct TBBUTTONINFO
+	{
+		public uint cbSize;
+		public uint dwMask;
+		public int idCommand;
+		public int iImage;
+		public byte fsState;
+		public byte fsStyle;
+		public ushort cx;
+		public nint lParam;
+		public nint pszText;
+		public int cchText;
+	}
+
+	[DllImport("comctl32.dll")]
+	private static extern nint ImageList_GetIcon(nint himl, int i, uint flags);
 
 	[StructLayout(LayoutKind.Sequential)]
 	private struct TBBUTTON
@@ -238,34 +260,49 @@ public static class WindowTaskbarHelper
 		return list;
 	}
 
-	/// <summary>
-	/// 任务栏按钮顺序（与 Win+N 的槽位完全一致，Win10 经典任务栏读取 "MSTaskSwWClass"/"MSTaskListWClass" 工具栏）。
-	/// 取不到（Win11 XAML 任务栏 / 失败）返回 null，由调用方回退到 filtered 枚举。
-	/// </summary>
-	public static List<nint>? GetTaskbarToolbarSlots()
+	/// <summary>找到任务栏应用按钮工具栏（Win10 经典任务栏）；Win11 XAML 任务栏返回 0。</summary>
+	private static nint FindTaskbarToolbar()
 	{
 		try
 		{
 			nint taskbar = FindWindow("Shell_TrayWnd", null);
 			if (taskbar == IntPtr.Zero)
 			{
-				return null;
+				return IntPtr.Zero;
 			}
 			nint toolbar = FindWindowEx(taskbar, IntPtr.Zero, "MSTaskSwWClass", null);
 			if (toolbar == IntPtr.Zero)
 			{
 				toolbar = FindWindowEx(taskbar, IntPtr.Zero, "MSTaskListWClass", null);
 			}
-			if (toolbar == IntPtr.Zero)
-			{
-				return null;
-			}
+			return toolbar;
+		}
+		catch
+		{
+			return IntPtr.Zero;
+		}
+	}
+
+	/// <summary>
+	/// 任务栏"应用槽位"（与 Win+N 计数一致）：按任务栏按钮顺序，只保留应用按钮——
+	/// 运行窗口（idCommand=窗口句柄）与固定应用（未运行，idCommand=0 但 dwData 有应用标识）；
+	/// 系统按钮（任务视图/搜索等 idCommand=0 且 dwData=0）被剔除。
+	/// </summary>
+	private static (nint toolbar, List<(int rawIndex, nint hwnd)> slots)? GetTaskbarAppSlots()
+	{
+		nint toolbar = FindTaskbarToolbar();
+		if (toolbar == IntPtr.Zero)
+		{
+			return null;
+		}
+		try
+		{
 			int count = (int)SendMessage(toolbar, TB_BUTTONCOUNT, IntPtr.Zero, IntPtr.Zero);
 			if (count <= 0)
 			{
 				return null;
 			}
-			List<nint> slots = new List<nint>(count);
+			List<(int, nint)> slots = new List<(int, nint)>(count);
 			byte[] buf = new byte[Marshal.SizeOf<TBBUTTON>()];
 			GCHandle pin = GCHandle.Alloc(buf, GCHandleType.Pinned);
 			try
@@ -277,14 +314,18 @@ public static class WindowTaskbarHelper
 						continue;
 					}
 					TBBUTTON btn = Marshal.PtrToStructure<TBBUTTON>(pin.AddrOfPinnedObject());
-					slots.Add((nint)btn.idCommand); // idCommand = 任务栏按钮对应窗口句柄（固定但未运行窗口为 0）
+					// 应用按钮：运行窗口 idCommand=窗口句柄；固定应用 dwData 携带应用标识。系统按钮两者皆 0。
+					if (btn.idCommand != 0 || btn.dwData != IntPtr.Zero)
+					{
+						slots.Add((i, (nint)btn.idCommand));
+					}
 				}
 			}
 			finally
 			{
 				pin.Free();
 			}
-			return slots;
+			return slots.Count > 0 ? (toolbar, slots) : null;
 		}
 		catch
 		{
@@ -292,21 +333,21 @@ public static class WindowTaskbarHelper
 		}
 	}
 
-	/// <summary>任务栏第 n 个槽位（Win+N 语义）：优先工具栏按钮顺序，回退 filtered 枚举。</summary>
+	/// <summary>任务栏第 n 个应用槽位的窗口句柄（与 Win+N 位置对齐；固定未运行返回 0）；工具栏不可用回退 filtered 枚举。</summary>
 	public static nint GetNthTaskbarWindow(int n)
 	{
 		if (n <= 0)
 		{
 			return IntPtr.Zero;
 		}
-		List<nint>? slots = GetTaskbarToolbarSlots();
-		if (slots != null)
+		var app = GetTaskbarAppSlots();
+		if (app != null)
 		{
-			if (n > slots.Count)
+			if (n > app.Value.slots.Count)
 			{
 				return IntPtr.Zero;
 			}
-			return slots[n - 1];
+			return app.Value.slots[n - 1].hwnd;
 		}
 		List<nint> list = GetTaskbarWindows();
 		if (n > list.Count)
@@ -316,9 +357,85 @@ public static class WindowTaskbarHelper
 		return list[n - 1];
 	}
 
+	/// <summary>任务栏第 n 个应用槽位的图标：运行窗口取窗口图标；固定未运行取任务栏按钮图像；失败返回 null（默认程序图标兜底）。</summary>
+	public static BitmapSource? GetNthWindowIcon(int n)
+	{
+		if (n <= 0)
+		{
+			return null;
+		}
+		var app = GetTaskbarAppSlots();
+		if (app != null)
+		{
+			if (n > app.Value.slots.Count)
+			{
+				return null;
+			}
+			(int rawIndex, nint hwnd) = app.Value.slots[n - 1];
+			if (hwnd != IntPtr.Zero)
+			{
+				return GetWindowIcon(hwnd);
+			}
+			return TryGetToolbarButtonIcon(app.Value.toolbar, rawIndex);
+		}
+		nint fallback = GetNthTaskbarWindow(n);
+		return fallback != IntPtr.Zero ? GetWindowIcon(fallback) : null;
+	}
+
+	/// <summary>读取任务栏按钮在工具栏图像列表里的图标（固定未运行应用也可取到）。</summary>
+	private static BitmapSource? TryGetToolbarButtonIcon(nint toolbar, int rawIndex)
+	{
+		try
+		{
+			nint imageList = SendMessage(toolbar, TB_GETIMAGELIST, IntPtr.Zero, IntPtr.Zero);
+			if (imageList == IntPtr.Zero)
+			{
+				return null;
+			}
+			byte[] buf2 = new byte[Marshal.SizeOf<TBBUTTONINFO>()];
+			GCHandle pin = GCHandle.Alloc(buf2, GCHandleType.Pinned);
+			try
+			{
+				if (SendMessage(toolbar, TB_GETBUTTONINFO, (nint)rawIndex, pin.AddrOfPinnedObject()).ToInt64() == 0)
+				{
+					return null;
+				}
+				TBBUTTONINFO info2 = Marshal.PtrToStructure<TBBUTTONINFO>(pin.AddrOfPinnedObject());
+				return GetImageListIcon(imageList, info2.iImage);
+			}
+			finally
+			{
+				pin.Free();
+			}
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static BitmapSource? GetImageListIcon(nint imageList, int index)
+	{
+		try
+		{
+			nint hIcon = ImageList_GetIcon(imageList, index, ILD_TRANSPARENT);
+			if (hIcon == IntPtr.Zero)
+			{
+				return null;
+			}
+			BitmapSource? bmp = ToBitmapSource(hIcon);
+			DestroyIcon(hIcon);
+			return bmp;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
 	/// <summary>
 	/// 切换到任务栏第 n 个槽位：n=1..10 直接模拟 Win+N（与系统快捷键完全一致，固定项也生效）；
-	/// n=11..20 使用任务栏工具栏顺序激活（回退 filtered 枚举）。
+	/// n=11..20 使用任务栏应用槽位顺序激活（回退 filtered 枚举）。
 	/// </summary>
 	public static bool ActivateTaskbarSlot(int n)
 	{
@@ -399,17 +516,6 @@ public static class WindowTaskbarHelper
 		{
 			return false;
 		}
-	}
-
-	/// <summary>任务栏第 n 个窗口的图标；失败返回 null（调用方回退默认程序图标）。</summary>
-	public static BitmapSource? GetNthWindowIcon(int n)
-	{
-		nint hWnd = GetNthTaskbarWindow(n);
-		if (hWnd == IntPtr.Zero)
-		{
-			return null;
-		}
-		return GetWindowIcon(hWnd);
 	}
 
 	/// <summary>
