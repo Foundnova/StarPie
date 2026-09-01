@@ -23,6 +23,12 @@ public class GestureController
 
 	private Point _startPoint;
 
+	// 手势起点所在显示器的 DPI 缩放系数,用于将物理像素位移归一化为 DIP,
+	// 保证多显示器混合 DPI 环境下滑动阈值与扇区命中判定一致。
+	private double _currentDpiScaleX = 1.0;
+
+	private double _currentDpiScaleY = 1.0;
+
 	private volatile bool _isWaitingForThreshold;
 
 	private volatile bool _isGestureActive;
@@ -326,6 +332,9 @@ public class GestureController
 				return;
 			}
 			_startPoint = e.Position;
+			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
+			_currentDpiScaleX = scaleX;
+			_currentDpiScaleY = scaleY;
 			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
@@ -427,6 +436,9 @@ public class GestureController
 			}
 			GetCursorPos(out var lpPoint);
 			_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
+			var (dpiX, dpiY) = RadialWindow.GetMonitorDpiScale(_startPoint);
+			_currentDpiScaleX = dpiX;
+			_currentDpiScaleY = dpiY;
 			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
@@ -530,9 +542,11 @@ public class GestureController
 		if (_isWaitingForThreshold)
 		{
 			Point position = e.Position;
-			double num = position.X - _startPoint.X;
+			double scaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
+			double scaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
+			double num = (position.X - _startPoint.X) / scaleX;
 			position = e.Position;
-			double num2 = position.Y - _startPoint.Y;
+			double num2 = (position.Y - _startPoint.Y) / scaleY;
 			double num3 = num * num + num2 * num2;
 			double dragThreshold = ConfigManager.CurrentConfig.DragThreshold;
 			if (num3 >= dragThreshold * dragThreshold)
@@ -567,8 +581,10 @@ public class GestureController
 
 	private void ProcessMove(Point currentPoint)
 	{
-		double num = currentPoint.X - _startPoint.X;
-		double num2 = currentPoint.Y - _startPoint.Y;
+		double moveScaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
+		double moveScaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
+		double num = (currentPoint.X - _startPoint.X) / moveScaleX;
+		double num2 = (currentPoint.Y - _startPoint.Y) / moveScaleY;
 		double num3 = Math.Sqrt(num * num + num2 * num2);
 		int num4 = -1;
 		int num5 = -1;
@@ -713,9 +729,11 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 	private int HitTestFanSubs(Point currentPoint, Point centerPoint, int parentIndex, int subCount)
 	{
 		if (parentIndex < 0 || subCount <= 0) return -1;
-		
-		double dx = currentPoint.X - centerPoint.X;
-		double dy = currentPoint.Y - centerPoint.Y;
+
+		double hitScaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
+		double hitScaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
+		double dx = (currentPoint.X - centerPoint.X) / hitScaleX;
+		double dy = (currentPoint.Y - centerPoint.Y) / hitScaleY;
 		double dist = Math.Sqrt(dx * dx + dy * dy);
 		
 		double outer = ConfigManager.CurrentConfig.WheelRadius;
