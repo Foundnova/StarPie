@@ -1706,15 +1706,11 @@ public partial class RadialWindow : Window
 	public static (double du, double dv) GetFanSubOffset(int index)
 	{
 		double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
-		double orbitRadius = 1.0 + ringR;
-		double wingAngle = Math.Atan2(ringR * 0.8660254038, 1.0 + ringR * 0.5);
-		double wingDu = orbitRadius * Math.Cos(wingAngle);
-		double wingDv = orbitRadius * Math.Sin(wingAngle);
 		return index switch
 		{
-			0 => (wingDu, wingDv),       // upper wing on the common orbit
-			1 => (orbitRadius, 0.0),      // tip / center
-			_ => (wingDu, -wingDv)        // lower wing on the common orbit
+			0 => (1.0 + ringR * 0.5, ringR * 0.8660254038),   // upper wing
+			1 => (1.0 + ringR, 0.0),                           // tip / center
+			_ => (1.0 + ringR * 0.5, -ringR * 0.8660254038)   // lower wing
 		};
 	}
 
