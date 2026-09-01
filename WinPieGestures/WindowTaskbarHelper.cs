@@ -143,6 +143,11 @@ public static class WindowTaskbarHelper
 	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
 	private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
+	[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern nint SendMessageTimeout(nint hWnd, uint msg, nint wParam, nint lParam, uint fuFlags, uint uTimeout, out nint lpdwResult);
+
+	private const uint SMTO_ABORTIFHUNG = 0x0002;
+
 	private const uint WM_GETICON = 0x007F;
 
 	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -414,12 +419,17 @@ public static class WindowTaskbarHelper
 	}
 
 	/// <summary>
-	/// 候选运行窗口按"任务栏可见顺序（从左到右）"排序——图标与激活共用此列表，保证一一对应且顺序稳定。
-	/// 顺序来源：① UIA 任务栏按钮标题（任何版本）；② 工具栏按钮序（Win10 回退）；③ 枚举（最后兜底，近似）。
+	/// 候选运行窗口按"任务栏可见顺序"排列——只保留能对应到任务栏按钮的窗口（鬼窗口丢弃），
+	/// 同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定，多开可分别激活且编号恒定）。
+	/// 顺序来源：① UIA 任务栏按钮标题（匹配标题或进程描述）；② 工具栏按钮序（Win10 回退）；③ 按句柄排序（兜底，稳定）。
 	/// </summary>
 	public static List<nint> GetTaskbarOrderedWindows()
 	{
 		List<nint> candidates = GetTaskbarWindows();
+		if (candidates.Count == 0)
+		{
+			return candidates;
+		}
 		List<string>? names = GetTaskbarButtonNames();
 		if (names != null && names.Count > 0)
 		{
@@ -427,32 +437,29 @@ public static class WindowTaskbarHelper
 			List<nint> ordered = new List<nint>(candidates.Count);
 			foreach (string name in names)
 			{
-				nint hit = IntPtr.Zero;
+				List<nint> matched = new List<nint>();
 				foreach (nint h in candidates)
 				{
 					if (used.Contains(h))
 					{
 						continue;
 					}
-					if (NameMatchesWindow(name, TitleOf(h)))
+					if (NameMatchesWindowOrProcess(name, h))
 					{
-						hit = h;
-						break;
+						matched.Add(h);
 					}
 				}
-				if (hit != IntPtr.Zero)
+				if (matched.Count > 0)
 				{
-					ordered.Add(hit);
-					used.Add(hit);
+					matched.Sort((a, b) => a.ToInt64().CompareTo(b.ToInt64())); // 组内稳定序（句柄≈创建先后）
+					foreach (nint h in matched)
+					{
+						ordered.Add(h);
+						used.Add(h);
+					}
 				}
 			}
-			foreach (nint h in candidates)
-			{
-				if (used.Add(h))
-				{
-					ordered.Add(h);
-				}
-			}
+			// 未匹配到任何按钮的候选 = 鬼窗口，丢弃：任务栏没有的按钮，菜单里就没有 N
 			return ordered;
 		}
 		var app = GetTaskbarAppSlots();
@@ -467,7 +474,7 @@ public static class WindowTaskbarHelper
 					bySlots.Add(s.hwnd);
 				}
 			}
-			foreach (nint h in candidates)
+			foreach (nint h in candidates.OrderBy(c => c.ToInt64()))
 			{
 				if (used2.Add(h))
 				{
@@ -476,7 +483,62 @@ public static class WindowTaskbarHelper
 			}
 			return bySlots;
 		}
-		return candidates;
+		// 兜底：按句柄排序，保证顺序稳定（不再用 z 序）
+		return candidates.OrderBy(c => c.ToInt64()).ToList();
+	}
+
+	/// <summary>窗口是否对应任务栏按钮名：标题匹配（精确/前缀），或所属程序的进程描述/文件名匹配（支持分组应用）。</summary>
+	private static bool NameMatchesWindowOrProcess(string name, nint hWnd)
+	{
+		if (NameMatchesWindow(name, TitleOf(hWnd)))
+		{
+			return true;
+		}
+		string? desc = ProcessDescriptionOf(hWnd);
+		if (string.IsNullOrEmpty(desc))
+		{
+			return false;
+		}
+		if (string.Equals(desc, name, StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		if (name.StartsWith(desc, StringComparison.OrdinalIgnoreCase) && desc.Length >= 3)
+		{
+			return true;
+		}
+		if (desc.StartsWith(name, StringComparison.OrdinalIgnoreCase) && name.Length >= 3)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>窗口所属进程的显示名（exe 的 FileDescription，取不到用文件名）；便于匹配任务栏的分组按钮名。</summary>
+	private static string? ProcessDescriptionOf(nint hWnd)
+	{
+		try
+		{
+			GetWindowThreadProcessId(hWnd, out uint pid);
+			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+			{
+				string? exe = proc?.MainModule?.FileName;
+				if (string.IsNullOrEmpty(exe))
+				{
+					return null;
+				}
+				System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
+				if (!string.IsNullOrEmpty(fvi.FileDescription))
+				{
+					return fvi.FileDescription;
+				}
+				return System.IO.Path.GetFileNameWithoutExtension(exe);
+			}
+		}
+		catch
+		{
+			return null;
+		}
 	}
 
 	/// <summary>任务栏第 n 个运行窗口（按任务栏可见顺序）；越界返回 0。</summary>
@@ -593,10 +655,16 @@ public static class WindowTaskbarHelper
 		}
 		try
 		{
-			nint hIcon = SendMessage(hWnd, WM_GETICON, (nint)1, IntPtr.Zero); // ICON_BIG
-			if (hIcon == IntPtr.Zero)
+			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——目标窗口假死时不阻塞轮盘渲染
+			nint hIcon = IntPtr.Zero;
+			nint result = IntPtr.Zero;
+			if (SendMessageTimeout(hWnd, WM_GETICON, (nint)1, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
 			{
-				hIcon = SendMessage(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero); // ICON_SMALL
+				hIcon = result;
+			}
+			if (hIcon == IntPtr.Zero && SendMessageTimeout(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
+			{
+				hIcon = result;
 			}
 			if (hIcon == IntPtr.Zero)
 			{
