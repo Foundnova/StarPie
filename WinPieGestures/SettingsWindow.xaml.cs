@@ -5765,7 +5765,7 @@ public partial class SettingsWindow : Window
 					if (isFan)
 					{
 						int slot = RadialWindow.GetFanSlotIndex(num36, activeCount);
-						var (du, dv) = RadialWindow.GetFanSubOffset(slot);
+						var (du, dv) = RadialWindow.GetFanSubOffsetForShape(ConfigManager.CurrentConfig.Shape, slot);
 						double ratio = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0 && ConfigManager.CurrentConfig.WheelRadius > 0.0)
 							? (ConfigManager.CurrentConfig.SubWheelOuterRadius / (ConfigManager.CurrentConfig.WheelRadius * 1.55))
 							: 1.0;

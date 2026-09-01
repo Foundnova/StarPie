@@ -786,7 +786,7 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		for (int j = 0; j < activeCount; j++)
 		{
 			int slot = RadialWindow.GetFanSlotIndex(j, activeCount);
-			var (du, dv) = RadialWindow.GetFanSubOffset(slot);
+			var (du, dv) = RadialWindow.GetFanSubOffsetForShape(ConfigManager.CurrentConfig.Shape, slot);
 			
 			double px = ux * (du * R) + vx * (dv * R);
 			double py = uy * (du * R) + vy * (dv * R);

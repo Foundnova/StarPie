@@ -1633,6 +1633,31 @@ public partial class RadialWindow : Window
 		};
 	}
 
+	/// <summary>
+	/// 按形态取蜂窝扇槽位坐标：
+	/// 经典紧凑扇区（Original/ClassicRing）三个二级项落在同一圆环（共轨，PR#34 布局）；
+	/// 其余形态（Circle/Capsule/HexagonHive）保持原始等边蜂窝坐标。
+	/// 渲染与命中必须使用同一函数，保证"所见即所点"。
+	/// </summary>
+	public static (double du, double dv) GetFanSubOffsetForShape(string? shape, int index)
+	{
+		if (string.Equals(shape, "Original", StringComparison.OrdinalIgnoreCase))
+		{
+			double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
+			double orbitRadius = 1.0 + ringR;
+			double wingAngle = Math.Atan2(ringR * 0.8660254038, 1.0 + ringR * 0.5);
+			double wingDu = orbitRadius * Math.Cos(wingAngle);
+			double wingDv = orbitRadius * Math.Sin(wingAngle);
+			return index switch
+			{
+				0 => (wingDu, wingDv),      // upper wing on the common orbit
+				1 => (orbitRadius, 0.0),    // tip / center
+				_ => (wingDu, -wingDv)      // lower wing on the common orbit
+			};
+		}
+		return GetFanSubOffset(index);
+	}
+
 	public static int GetFanSlotIndex(int subIndex, int totalCount)
 	{
 		if (totalCount <= 1) return 1; // Center tip
@@ -1818,7 +1843,7 @@ public partial class RadialWindow : Window
 		for (int j = 0; j < activeCount; j++)
 		{
 			int slot = GetFanSlotIndex(j, activeCount);
-			var (du, dv) = GetFanSubOffset(slot);
+			var (du, dv) = GetFanSubOffsetForShape(shape, slot);
 
 			double px = cx + ux * (du * R) + vx * (dv * R);
 			double py = cy + uy * (du * R) + vy * (dv * R);
