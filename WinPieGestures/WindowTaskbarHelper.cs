@@ -418,12 +418,25 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>
-	/// 候选运行窗口按"任务栏可见顺序"排列——只保留能对应到任务栏按钮的窗口（鬼窗口丢弃），
-	/// 同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定，多开可分别激活且编号恒定）。
-	/// 顺序来源：① UIA 任务栏按钮标题（匹配标题或进程描述）；② 工具栏按钮序（Win10 回退）；③ 按句柄排序（兜底，稳定）。
-	/// </summary>
+	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。</summary>
 	public static List<nint> GetTaskbarOrderedWindows()
+	{
+		lock (s_snapshotLock)
+		{
+			if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+			{
+				return s_snapshot;
+			}
+			s_procDescCache.Clear();
+			s_iconCache.Clear();
+			s_snapshot = ComputeOrderedWindows();
+			s_snapshotAt = DateTime.UtcNow;
+			return s_snapshot;
+		}
+	}
+
+	/// <summary>实际计算：只保留能对应到任务栏按钮的窗口（鬼窗口丢弃）；同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定）。</summary>
+	private static List<nint> ComputeOrderedWindows()
 	{
 		List<nint> candidates = GetTaskbarWindows();
 		if (candidates.Count == 0)
@@ -514,34 +527,63 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>窗口所属进程的显示名（exe 的 FileDescription，取不到用文件名）；便于匹配任务栏的分组按钮名。</summary>
+	/// <summary>窗口所属进程的显示名（exe 的 FileDescription，取不到用文件名），按进程缓存；便于匹配任务栏分组按钮名。</summary>
 	private static string? ProcessDescriptionOf(nint hWnd)
 	{
+		GetWindowThreadProcessId(hWnd, out uint pid);
+		lock (s_procDescCache)
+		{
+			if (s_procDescCache.TryGetValue(pid, out string? desc))
+			{
+				return desc;
+			}
+		}
+		string? computed = null;
 		try
 		{
-			GetWindowThreadProcessId(hWnd, out uint pid);
 			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
 			{
 				string? exe = proc?.MainModule?.FileName;
-				if (string.IsNullOrEmpty(exe))
+				if (!string.IsNullOrEmpty(exe))
 				{
-					return null;
+					System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
+					computed = !string.IsNullOrEmpty(fvi.FileDescription)
+						? fvi.FileDescription
+						: System.IO.Path.GetFileNameWithoutExtension(exe);
 				}
-				System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
-				if (!string.IsNullOrEmpty(fvi.FileDescription))
-				{
-					return fvi.FileDescription;
-				}
-				return System.IO.Path.GetFileNameWithoutExtension(exe);
 			}
 		}
 		catch
 		{
-			return null;
+			computed = null;
 		}
+		if (computed != null)
+		{
+			lock (s_procDescCache)
+			{
+				s_procDescCache[pid] = computed;
+			}
+		}
+		return computed;
 	}
 
-	/// <summary>任务栏第 n 个运行窗口（按任务栏可见顺序）；越界返回 0。</summary>
+	// ---- 手势级快照缓存（一次手势内：所有槽位图标 + 激活共用一次枚举/UIA/进程读取）----
+	private static readonly object s_snapshotLock = new object();
+	private static List<nint>? s_snapshot;
+	private static DateTime s_snapshotAt;
+	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
+	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
+	private const double SNAPSHOT_TTL_MS = 1500.0;
+
+	/// <summary>后台预热任务栏槽位快照（供下一次手势首帧直接命中缓存）。</summary>
+	public static void Prefetch()
+	{
+		GetTaskbarOrderedWindows();
+	}
+
+	/// <summary>
+	/// 任务栏第 n 个运行窗口（按任务栏可见顺序）；越界返回 0。快照缓存：同一次手势内所有取值共用一份。
+	/// </summary>
 	public static nint GetNthTaskbarWindow(int n)
 	{
 		if (n <= 0)
@@ -556,7 +598,7 @@ public static class WindowTaskbarHelper
 		return list[n - 1];
 	}
 
-	/// <summary>任务栏第 n 个运行窗口的图标（与激活同一顺序列表，天然一致）。</summary>
+	/// <summary>任务栏第 n 个运行窗口的图标（与激活同一顺序快照，天然一致；图标按窗口缓存）。</summary>
 	public static BitmapSource? GetNthWindowIcon(int n)
 	{
 		if (n <= 0)
@@ -653,6 +695,26 @@ public static class WindowTaskbarHelper
 		{
 			return null;
 		}
+		lock (s_iconCache)
+		{
+			if (s_iconCache.TryGetValue(hWnd, out BitmapSource? cached))
+			{
+				return cached;
+			}
+		}
+		BitmapSource? bmp = ComputeWindowIcon(hWnd);
+		if (bmp != null)
+		{
+			lock (s_iconCache)
+			{
+				s_iconCache[hWnd] = bmp;
+			}
+		}
+		return bmp;
+	}
+
+	private static BitmapSource? ComputeWindowIcon(nint hWnd)
+	{
 		try
 		{
 			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——目标窗口假死时不阻塞轮盘渲染
