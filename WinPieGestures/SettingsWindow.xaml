@@ -1577,7 +1577,7 @@
                   </Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="🌐" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
+                      <TextBlock Text="🌐" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                       <TextBlock Name="LanguageTitleText" Text="界面语言 (Display Language)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="LanguageDescText" Text="选择软件控制台与轮盘界面的显示语言，即时生效并持久保存。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -1615,7 +1615,7 @@
                       </Grid.ColumnDefinitions>
                       <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                          <TextBlock Text="🛡️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                          <TextBlock Text="🛡️" FontSize="13" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                           <TextBlock Name="AutoStartAsAdminTitleText" Text="以管理员身份开机自启 (推荐)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Name="AutoStartAsAdminDescText" Text="通过 Windows 任务计划程序实现最高权限静默自启，无需每次弹出 UAC 提示，可对所有高权限应用生效。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
@@ -1636,7 +1636,7 @@
                   </Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="🛡️" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
+                      <TextBlock Text="🛡️" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                       <TextBlock Name="ElevateTitleText" Text="以管理员权限运行 (UAC Elevation)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="ElevateDescText" Text="当前以普通用户权限运行。若需在任务管理器、注册表或管理员权限程序中响应轮盘手势，建议提升为管理员权限。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
@@ -1655,7 +1655,7 @@
                   </Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="🚀" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
+                      <TextBlock Text="🚀" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                       <TextBlock Name="MemoryOptTitleText" Text="极致轻量内存管理 (Memory Optimization)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="MemoryOptDescText" Text="已开启工作集压缩与动态内存优化，StarPie 常驻后台内存维持在 15~25MB。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -1837,7 +1837,7 @@
                       <TextBlock Grid.Column="2" Text="2026-08-23" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
                     </Grid>
                   </Border>
-                  <Expander Name="OlderMilestonesExpander" Header="📜 展开查看更早的历史版本演进 (Older Milestones)" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0" Margin="0,4,0,0">
+                  <Expander Name="OlderMilestonesExpander" Header="📜 展开查看更早的历史版本演进 (Older Milestones)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" Background="#00FFFFFF" BorderThickness="0" Margin="0,4,0,0">
                     <StackPanel Margin="0,8,0,0">
                       <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                         <Grid>
