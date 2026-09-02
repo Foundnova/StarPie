@@ -67,7 +67,54 @@ public class GestureTrailOverlay : Window
 	{
 		double sx = scaleX > 0.0 ? scaleX : 1.0;
 		double sy = scaleY > 0.0 ? scaleY : 1.0;
-		_line.Points.Add(new Point(screenX / sx - _originX, screenY / sy - _originY));
+		double px = screenX / sx - _originX;
+		double py = screenY / sy - _originY;
+		// 若落点靠近窗口边缘：窗口随轨迹动态扩张（向右下扩展尺寸，向左上平移原点），轨迹不再裁剪
+		const double margin = 80.0;
+		double shiftX = 0.0;
+		double shiftY = 0.0;
+		if (px < margin)
+		{
+			shiftX = margin - px;
+		}
+		if (py < margin)
+		{
+			shiftY = margin - py;
+		}
+		if (shiftX != 0.0 || shiftY != 0.0)
+		{
+			Left -= shiftX;
+			Top -= shiftY;
+			_originX += shiftX;
+			_originY += shiftY;
+			ShiftTrail(shiftX, shiftY);
+			px += shiftX;
+			py += shiftY;
+		}
+		if (px > Width - margin)
+		{
+			Width = px + margin;
+		}
+		if (py > Height - margin)
+		{
+			Height = py + margin;
+		}
+		_line.Points.Add(new Point(px, py));
+	}
+
+	private void ShiftTrail(double shiftX, double shiftY)
+	{
+		for (int i = 0; i < _line.Points.Count; i++)
+		{
+			Point pt = _line.Points[i];
+			pt.X += shiftX;
+			pt.Y += shiftY;
+			_line.Points[i] = pt;
+		}
+		double dotX = Canvas.GetLeft(_startDot);
+		double dotY = Canvas.GetTop(_startDot);
+		Canvas.SetLeft(_startDot, dotX + shiftX);
+		Canvas.SetTop(_startDot, dotY + shiftY);
 	}
 
 	public void ClearTrail()
