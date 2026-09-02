@@ -506,6 +506,15 @@ public class GestureController
 		_trailScaleY = tScaleY;
 		_trailLastX = pressPoint.X;
 		_trailLastY = pressPoint.Y;
+		// 按下即清空并隐藏浮层：杜绝上一次手势轨迹在触发瞬间闪现
+		DispatchUi(delegate
+		{
+			if (_trail != null)
+			{
+				_trail.ClearTrail();
+				_trail.Hide();
+			}
+		});
 		// 轨迹在越过阈值后才显示（见 ShowGestureTrail）
 	}
 
@@ -519,6 +528,8 @@ public class GestureController
 			{
 				_trail = new GestureTrailOverlay();
 			}
+			// 先清空旧内容，再显示，再画新起点（同一次调度内完成，杜绝旧轨迹残影）
+			_trail.ClearTrail();
 			_trail.ShowCoveringScreen(p0.X, p0.Y, sx, sy);
 			_trail.BeginAt(p0.X, p0.Y, sx, sy);
 		});
