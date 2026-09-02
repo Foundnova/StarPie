@@ -6459,7 +6459,7 @@ public partial class SettingsWindow : Window
 					{
 						_previewSubStyleRenderer?.ApplySectorHighlight(path2, isHighlighted: false);
 					}
-					System.Windows.Controls.Panel.SetZIndex(path2, isSelectedSub ? 35 : 15);
+					System.Windows.Controls.Panel.SetZIndex(path2, isSelectedSub ? 25 : 15);
 					LiveWheelPreviewCanvas.Children.Add(path2);
 					_previewSubSectorPaths.Add(path2);
 					_previewSubTransforms.Add(translateTransform2);
@@ -6583,7 +6583,7 @@ public partial class SettingsWindow : Window
 					grid3.Children.Add(stackPanel2);
 					Canvas.SetLeft(grid3, num41 - num45 / 2.0);
 					Canvas.SetTop(grid3, num42 - num46 / 2.0);
-					System.Windows.Controls.Panel.SetZIndex(grid3, 30);
+					System.Windows.Controls.Panel.SetZIndex(grid3, 50);
 					LiveWheelPreviewCanvas.Children.Add(grid3);
 					_previewSubContainers.Add(grid3);
 				}
@@ -6817,7 +6817,7 @@ public partial class SettingsWindow : Window
 					ApplySubSectorGlow(path3, isHighlighted: true);
 					if (grid != null)
 					{
-						System.Windows.Controls.Panel.SetZIndex(grid, 30);
+						System.Windows.Controls.Panel.SetZIndex(grid, 50);
 						if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel)
 						{
 							foreach (object child in stackPanel.Children)
@@ -6851,7 +6851,7 @@ public partial class SettingsWindow : Window
 					ApplySubSectorGlow(path3, isHighlighted: false);
 					if (grid != null)
 					{
-						System.Windows.Controls.Panel.SetZIndex(grid, 30);
+						System.Windows.Controls.Panel.SetZIndex(grid, 50);
 						if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel2)
 						{
 							foreach (object child2 in stackPanel2.Children)
@@ -6883,7 +6883,7 @@ public partial class SettingsWindow : Window
 				ApplySubSectorGlow(path3, isHighlighted: false);
 				if (grid != null)
 				{
-					System.Windows.Controls.Panel.SetZIndex(grid, 30);
+					System.Windows.Controls.Panel.SetZIndex(grid, 50);
 					if (grid.Children.Count > 0 && grid.Children[0] is StackPanel stackPanel3)
 					{
 						foreach (object child3 in stackPanel3.Children)
@@ -7030,7 +7030,7 @@ public partial class SettingsWindow : Window
 						ShadowDepth = 0.0,
 						Opacity = 0.95
 					};
-					System.Windows.Controls.Panel.SetZIndex(subPath, 35);
+					System.Windows.Controls.Panel.SetZIndex(subPath, 25);
 				}
 				else if (j != _lastHoveredSubIndex)
 				{
