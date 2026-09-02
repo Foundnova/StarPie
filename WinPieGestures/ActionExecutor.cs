@@ -458,7 +458,34 @@ public static class ActionExecutor
 			}
 			try
 			{
-				Process.Start(processStartInfo);
+				System.Diagnostics.Process started = System.Diagnostics.Process.Start(processStartInfo);
+				// 启动后自动把新窗口拉到前台（后台等待主窗口出现 → ActivateWindow，含前台解锁链）
+				if (started != null)
+				{
+					System.Diagnostics.Process proc = started;
+					System.Threading.Tasks.Task.Run(delegate
+					{
+						try
+						{
+							for (int i = 0; i < 40; i++)
+							{
+								if (proc.MainWindowHandle != IntPtr.Zero)
+								{
+									break;
+								}
+								System.Threading.Thread.Sleep(50);
+							}
+							if (proc.MainWindowHandle != IntPtr.Zero)
+							{
+								System.Threading.Thread.Sleep(150); // 等窗口内容就绪再激活
+								WindowTaskbarHelper.ActivateWindow(proc.MainWindowHandle);
+							}
+						}
+						catch
+						{
+						}
+					});
+				}
 			}
 			catch (Exception ex)
 			{
