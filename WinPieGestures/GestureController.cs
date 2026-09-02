@@ -465,19 +465,19 @@ public class GestureController
 		e.Handled = true; // 拦截原生抬起
 	}
 
-	/// <summary>方向码 → 图样字符（8 方向，屏幕坐标 y 向下）。</summary>
+	/// <summary>方向码 → 图样字符（8 方向，方位码与图样选项一致：U/D/L/R/UL/UR/DL/DR，屏幕坐标 y 向下）。</summary>
 	private static string GestureDirCode(int dir)
 	{
 		return dir switch
 		{
-			0 => "E",
-			1 => "SE",
-			2 => "D",
-			3 => "SW",
-			4 => "W",
-			5 => "NW",
-			6 => "U",
-			_ => "NE"
+			0 => "R",  // 右
+			1 => "DR", // 右下
+			2 => "D",  // 下
+			3 => "DL", // 左下
+			4 => "L",  // 左
+			5 => "UL", // 左上
+			6 => "U",  // 上
+			_ => "UR"  // 右上
 		};
 	}
 
