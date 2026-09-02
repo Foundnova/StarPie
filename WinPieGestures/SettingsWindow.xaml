@@ -144,6 +144,33 @@
           </Setter.Value>
         </Setter>
       </Style>
+      <Style x:Key="CanvasToolBtnStyle" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="btnBd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" SnapsToDevicePixels="True">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                  <Setter TargetName="btnBd" Property="Background" Value="{DynamicResource ItemHoverBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="btnBd" Property="Background" Value="{DynamicResource NavTabActiveBgBrush}" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
       <Style x:Key="PrimaryButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource ModernButtonStyle}">
         <Setter Property="Background" Value="{DynamicResource AccentPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
@@ -414,10 +441,10 @@
   </FrameworkElement.Resources>
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Name="SidebarColumn" Width="230" />
+      <ColumnDefinition Name="SidebarColumn" Width="68" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
-    <Border Name="SidebarBorder" Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="16,20,16,15">
+    <Border Name="SidebarBorder" Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,1,0" Padding="10,20,10,15">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -425,10 +452,10 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel Grid.Row="0" Margin="0,5,0,16">
-          <Button Name="SidebarToggleButton" Width="32" Height="30" HorizontalAlignment="Right" Padding="0" Style="{StaticResource ModernButtonStyle}" ToolTip="折叠侧边栏" AutomationProperties.Name="折叠侧边栏" Click="SidebarToggleButton_Click">
-            <Path Name="SidebarToggleIcon" Width="12" Height="12" Stretch="Uniform" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M14,6 L8,12 L14,18" />
+          <Button Name="SidebarToggleButton" Width="32" Height="30" HorizontalAlignment="Center" Padding="0" Style="{StaticResource ModernButtonStyle}" ToolTip="展开侧边栏" AutomationProperties.Name="展开侧边栏" Click="SidebarToggleButton_Click">
+            <Path Name="SidebarToggleIcon" Width="12" Height="12" Stretch="Uniform" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M10,6 L16,12 L10,18" />
           </Button>
-          <Grid Name="SidebarBrandGrid" Margin="0,8,0,0">
+          <Grid Name="SidebarBrandGrid" Margin="0,8,0,0" HorizontalAlignment="Center">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
@@ -439,47 +466,47 @@
               </UIElement.Effect>
               <Image Source="logo.png" Width="38" Height="38" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
-            <StackPanel Name="SidebarBrandTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+            <StackPanel Name="SidebarBrandTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed">
               <TextBlock Name="SidebarBrandTitleText" Text="StarPie" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
               <TextBlock Name="SidebarSubtitleText" Text="现代鼠标轮盘笔势系统" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
             </StackPanel>
           </Grid>
         </StackPanel>
-        <StackPanel Grid.Row="1">
+        <StackPanel Grid.Row="1" Margin="0,0,0,0">
           <RadioButton Name="NavTab0" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="0" IsChecked="True" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab0Text}">
-            <StackPanel Name="NavTab0Content" HorizontalAlignment="Left" Orientation="Horizontal">
-              <Path Width="16" Height="16" Stretch="Uniform" Data="M12,2 A10,10 0 0 0 2,12A10,10 0 0 0 12,22A10,10 0 0 0 22,12A10,10 0 0 0 12,2M12,4 A8,8 0 0 1 20,12A8,8 0 0 1 12,20A8,8 0 0 1 4,12A8,8 0 0 1 12,4M12,6 A6,6 0 0 0 6,12A6,6 0 0 0 12,18A6,6 0 0 0 18,12A6,6 0 0 0 12,6M12,8 A4,4 0 0 1 16,12A4,4 0 0 1 12,16A4,4 0 0 1 8,12A4,4 0 0 1 12,8" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
-              <TextBlock Name="NavTab0Text" Text="🎯 触发与场景" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8Z" />
+              <TextBlock Name="NavTab0Text" Text="触发与场景" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab1" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="1" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab1Text}">
-            <StackPanel Name="NavTab1Content" HorizontalAlignment="Left" Orientation="Horizontal">
-              <Path Width="16" Height="16" Stretch="Uniform" Data="M12,3 C7.03,3 3,7.03 3,12 C3,16.97 7.03,21 12,21 C12.83,21 13.5,20.33 13.5,19.5 C13.5,19.11 13.35,18.76 13.11,18.49 C12.88,18.23 12.73,17.88 12.73,17.5 A1.5,1.5 0 0 1 14.23,16L16,16 C18.76,16 21,13.76 21,11 C21,6.58 16.97,3 12,3 M6.5,12 A1.5,1.5 0 0 1 5,10.5A1.5,1.5 0 0 1 6.5,9A1.5,1.5 0 0 1 8,10.5A1.5,1.5 0 0 1 6.5,12M9.5,8 A1.5,1.5 0 0 1 8,6.5A1.5,1.5 0 0 1 9.5,5A1.5,1.5 0 0 1 11,6.5A1.5,1.5 0 0 1 9.5,8M14.5,8 A1.5,1.5 0 0 1 13,6.5A1.5,1.5 0 0 1 14.5,5A1.5,1.5 0 0 1 16,6.5A1.5,1.5 0 0 1 14.5,8M17.5,12 A1.5,1.5 0 0 1 16,10.5A1.5,1.5 0 0 1 17.5,9A1.5,1.5 0 0 1 19,10.5A1.5,1.5 0 0 1 17.5,12" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
-              <TextBlock Name="NavTab1Text" Text="🎨 外观与形态" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,3C7.03,3 3,7.03 3,12C3,16.97 7.03,21 12,21C12.83,21 13.5,20.33 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.49C12.88,18.23 12.73,17.88 12.73,17.5C12.73,16.67 13.4,16 14.23,16H16C18.76,16 21,13.76 21,11C21,6.58 16.97,3 12,3M6.5,12C5.67,12 5,11.33 5,10.5C5,9.67 5.67,9 6.5,9C7.33,9 8,9.67 8,10.5C8,11.33 7.33,12 6.5,12M9.5,8C8.67,8 8,7.33 8,6.5C8,5.67 8.67,5 9.5,5C10.33,5 11,5.67 11,6.5C11,7.33 10.33,8 9.5,8M14.5,8C13.67,8 13,7.33 13,6.5C13,5.67 13.67,5 14.5,5C15.33,5 16,5.67 16,6.5C16,7.33 15.33,8 14.5,8M17.5,12C16.67,12 16,11.33 16,10.5C16,9.67 16.67,9 17.5,9C18.33,9 19,9.67 19,10.5C19,11.33 18.33,12 17.5,12Z" />
+              <TextBlock Name="NavTab1Text" Text="外观与形态" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab2" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="2" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab2Text}">
-            <StackPanel Name="NavTab2Content" HorizontalAlignment="Left" Orientation="Horizontal">
-              <Path Width="16" Height="16" Stretch="Uniform" Data="M4,6 C4,4.9 4.9,4 6,4 L18,4 C19.1,4 20,4.9 20,6 L20,18 C20,19.1 19.1,20 18,20 L6,20 C4.9,20 4,19.1 4,18 L4,6 M6,8 L18,8 L18,6 L6,6 L6,8 M6,12 L18,12 L18,10 L6,10 L6,12 M6,16 L12,16 L12,14 L6,14 L6,16" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
-              <TextBlock Name="NavTab2Text" Text="⚡ 手势与动作" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M19,3H5C3.89,3 3,3.89 3,5V19C3,20.1 3.89,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z" />
+              <TextBlock Name="NavTab2Text" Text="手势与动作" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab3" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="3" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab3Text}">
-            <StackPanel Name="NavTab3Content" HorizontalAlignment="Left" Orientation="Horizontal">
-              <Path Width="16" Height="16" Stretch="Uniform" Data="M12,15.5 A3.5,3.5 0 0 1 8.5,12A3.5,3.5 0 0 1 12,8.5A3.5,3.5 0 0 1 15.5,12A3.5,3.5 0 0 1 12,15.5M19.43,12.97 C19.47,12.65 19.5,12.33 19.5,12 C19.5,11.67 19.47,11.34 19.43,11 L21.54,9.37 C21.73,9.22 21.78,8.95 21.66,8.73 L19.66,5.27 C19.54,5.05 19.27,4.96 19.05,5.05 L16.56,6.05 C16.04,5.66 15.5,5.32 14.87,5.07 L14.5,2.42 C14.46,2.18 14.25,2 14,2 L10,2 C9.75,2 9.54,2.18 9.5,2.42 L9.13,5.07 C8.5,5.32 7.96,5.66 7.44,6.05 L4.95,5.05 C4.73,4.96 4.46,5.05 4.34,5.27 L2.34,8.73 C2.21,8.95 2.27,9.22 2.46,9.37 L4.57,11 C4.53,11.34 4.5,11.67 4.5,12 C4.5,12.33 4.53,12.65 4.57,12.97 L2.46,14.63 C2.27,14.78 2.21,15.05 2.34,15.27 L4.34,18.73 C4.46,18.95 4.73,19.03 4.95,18.95 L7.44,17.94 C7.96,18.34 8.5,18.68 9.13,18.93 L9.5,21.58 C9.54,21.82 9.75,22 10,22 L14,22 C14.25,22 14.46,21.82 14.5,21.58 L14.87,18.93 C15.5,18.67 16.04,18.34 16.56,17.94 L19.05,18.95 C19.27,19.03 19.54,18.95 19.66,18.73 L21.66,15.27 C21.78,15.05 21.73,14.78 21.54,14.63 L19.43,12.97" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
-              <TextBlock Name="NavTab3Text" Text="⚙️ 高级与系统" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+              <TextBlock Name="NavTab3Text" Text="高级与系统" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab4" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="4" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab4Text}">
-            <StackPanel Name="NavTab4Content" HorizontalAlignment="Left" Orientation="Horizontal">
-              <Path Width="16" Height="16" Stretch="Uniform" Data="M11,9 L13,9 L13,7 L11,7 M12,20 C7.59,20 4,16.41 4,12 C4,7.59 7.59,4 12,4 C16.41,4 20,7.59 20,12 C20,16.41 16.41,20 12,20 M12,2 A10,10 0 0 0 2,12A10,10 0 0 0 12,22A10,10 0 0 0 22,12A10,10 0 0 0 12,2M11,17 L13,17 L13,11 L11,11 L11,17" Fill="{Binding Path=Foreground, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=RadioButton}}" />
-              <TextBlock Name="NavTab4Text" Text="📋 关于与更新" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="13" />
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+              <TextBlock Name="NavTab4Text" Text="关于与更新" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
         </StackPanel>
-        <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5">
+        <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5" Visibility="Collapsed">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.5.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.6.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -1195,8 +1222,33 @@
                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                   </UIElement.Effect>
                   <StackPanel>
-                    <TextBlock Text="图标与排版选项" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                    <TextBlock Text="排版模式 (Layout Mode):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Name="LayoutOptionsSectionTitle" Text="图标与排版选项" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                    <!-- 排版目标切换条：全局统一 vs 扇区独立 -->
+                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <RadioButton Name="LayoutTargetGlobalRadio" Content="🌐 全局统一排版" GroupName="LayoutTargetMode" IsChecked="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="28" Cursor="Hand" FontWeight="SemiBold" Checked="LayoutTargetRadio_Checked" />
+                        <RadioButton Name="LayoutTargetSlotRadio" Grid.Column="1" Content="🎯 扇区独立定制" GroupName="LayoutTargetMode" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="28" Cursor="Hand" FontWeight="SemiBold" Checked="LayoutTargetRadio_Checked" />
+                      </Grid>
+                    </Border>
+                    <!-- 扇区独立定制时的当前选中信息与一键重置 -->
+                    <Border Name="SlotSelectionContainer" Visibility="Collapsed" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource AccentPrimaryBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Name="CurrentTargetSlotLabel" Text="📍 正在定制: 主轮盘 - 扇区 1" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Name="ClickSectorHintText" Text="💡 提示：在右侧画布中点击任意扇区可直接切换选中" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button Name="ResetSlotLayoutButton" Grid.Column="1" Content="🔄 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" VerticalAlignment="Center" Click="ResetSlotLayoutButton_Click" />
+                      </Grid>
+                    </Border>
+                    <TextBlock Name="IconLayoutModeTitleText" Text="排版模式 (Layout Mode):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <ComboBox Name="IconLayoutModeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="IconLayoutModeComboBox_SelectionChanged">
                       <ComboBoxItem Content="图标 + 文字 (双行居中)" Tag="IconAndText" IsSelected="True" />
                       <ComboBoxItem Content="仅显示图标 (极大化居中)" Tag="IconOnly" />
@@ -1216,7 +1268,20 @@
                       <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
                       <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
                     </ComboBox>
-                    <TextBlock Text="图标尺寸大小 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Name="SectorTextColorTitleText" Text="轮盘文字颜色 (Sector Text Color):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <Grid Margin="0,0,0,10">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="32" />
+                      </Grid.ColumnDefinitions>
+                      <Border Name="SectorTextColorPreview" Width="20" Height="20" CornerRadius="4" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center" />
+                      <TextBox Name="SectorTextColorTextBox" Grid.Column="1" Height="30" VerticalContentAlignment="Center" Margin="0,0,6,0" TextChanged="SectorTextColorTextBox_TextChanged" />
+                      <Button Grid.Column="2" Content="🎨" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SectorCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click" />
+                      <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SectorCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                    </Grid>
+                    <TextBlock Name="SectorIconSizeTitleText" Text="图标尺寸大小 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <Grid Margin="0,2,0,8">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -1225,7 +1290,7 @@
                       <Slider Name="SectorIconSizeSlider" Minimum="14" Maximum="36" Value="20" SmallChange="1" LargeChange="2" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorIconSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorIconSizeLabel" Grid.Column="1" Text="20 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
-                    <TextBlock Text="文字字号大小 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Name="SectorFontSizeTitleText" Text="文字字号大小 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <Grid Margin="0,2,0,8">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -1234,10 +1299,6 @@
                       <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="11.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
-                    <WrapPanel Margin="0,8,0,0">
-                      <CheckBox Name="ShowTextCheckBox" Content="在轮盘扇区中显示动作名称文字" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,30,10" Checked="ShowTextCheckBox_Changed" Unchecked="ShowTextCheckBox_Changed" />
-                      <CheckBox Name="ShowSelectedActionTextCheckBox" Content="选中扇区时在中心显示动作名称" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowSelectedActionTextCheckBox_Changed" Unchecked="ShowSelectedActionTextCheckBox_Changed" />
-                    </WrapPanel>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
@@ -1245,7 +1306,7 @@
                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                   </UIElement.Effect>
                   <StackPanel>
-                    <TextBlock Text="中心核心圆与图案设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                    <TextBlock Name="CoreSectionTitle" Text="中心核心圆与图案文字设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
                     <CheckBox Name="ShowCoreIconCheckBox" Content="启用中心图案/图标显示" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowCoreIconCheckBox_Changed" Unchecked="ShowCoreIconCheckBox_Changed" />
                     <TextBlock Text="图案类型 (Pattern Type):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <ComboBox Name="CoreIconTypeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="CoreIconTypeComboBox_SelectionChanged">
@@ -1318,17 +1379,60 @@
                           <TextBlock Name="CoreImageOffsetYLabel" Grid.Column="1" Text="0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                         <Button Name="ResetCoreTransformButton" Content="🔄 重置图案大小与居中位置" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,4" Click="ResetCoreTransformButton_Click" />
-                        <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,10,0,0">
-                          <Grid>
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="Auto" />
-                              <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="💡" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Top" />
-                            <TextBlock Name="CoreImagePerformanceTipText" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="16" Text="提示：推荐使用 256×256 ~ 512×512 适中分辨率的图片或 SVG 矢量图。导入超高分辨率（如 4K/8K 原图）会增加 GPU 内存占用与重采样计算开销，可能影响手势呼出与高刷响应性能。" />
-                          </Grid>
-                        </Border>
                       </StackPanel>
+                    </Border>
+                    <!-- 中心文字独立解耦设置面板 -->
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
+                      <StackPanel>
+                        <TextBlock Name="CoreTextOptionsSectionTitle" Text="中心文字与选中显示定制 (Center Text &amp; Selection)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <CheckBox Name="ShowSelectedActionTextCheckBox" Content="选中扇区时在中心显示动作名称" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowSelectedActionTextCheckBox_Changed" Unchecked="ShowSelectedActionTextCheckBox_Changed" />
+                        <TextBlock Name="CoreFontFamilyTitleText" Text="中心文字字体 (Core Font Family):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <ComboBox Name="CoreFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="CoreFontFamilyComboBox_SelectionChanged">
+                          <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
+                          <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
+                          <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
+                          <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
+                          <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
+                          <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
+                          <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
+                          <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
+                          <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
+                          <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
+                          <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
+                        </ComboBox>
+                        <TextBlock Name="CoreFontSizeTitleText" Text="中心文字字号大小 (Core Font Size):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Grid Margin="0,2,0,8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="45" />
+                          </Grid.ColumnDefinitions>
+                          <Slider Name="CoreFontSizeSlider" Minimum="8" Maximum="24" Value="13.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreFontSizeSlider_ValueChanged" />
+                          <TextBlock Name="CoreFontSizeLabel" Grid.Column="1" Text="13.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Name="CoreTextColorTitleText" Text="中心文字颜色 (Core Text Color):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <Grid Margin="0,0,0,6">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="32" />
+                            <ColumnDefinition Width="32" />
+                          </Grid.ColumnDefinitions>
+                          <Border Name="CoreTextColorPreview" Width="20" Height="20" CornerRadius="4" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center" />
+                          <TextBox Name="CoreTextColorTextBox" Grid.Column="1" Height="30" VerticalContentAlignment="Center" Margin="0,0,6,0" TextChanged="CoreTextColorTextBox_TextChanged" />
+                          <Button Grid.Column="2" Content="🎨" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="CoreCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click" />
+                          <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="CoreCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,10,0,0">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="💡" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Top" />
+                        <TextBlock Name="CoreImagePerformanceTipText" Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="16" Text="提示：推荐使用 256×256 ~ 512×512 适中分辨率的图片或 SVG 矢量图。中心文字与轮盘扇区文字已完全解耦，可分别自定义色彩与字体。" />
+                      </Grid>
                     </Border>
                   </StackPanel>
                 </Border>
@@ -1369,9 +1473,31 @@
                   </Border>
                 </StackPanel>
                 <Border Grid.Row="1" Background="{DynamicResource PreviewCanvasBackgroundBrush}" BorderBrush="{DynamicResource PreviewCanvasBorderBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,4,0,10">
-                  <Grid>
-                    <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Canvas Name="LiveWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center" MouseMove="LiveWheelPreviewCanvas_MouseMove" MouseLeave="LiveWheelPreviewCanvas_MouseLeave" />
+                  <Grid Name="PreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="PreviewViewport_MouseWheel" MouseDown="PreviewViewport_MouseDown" MouseMove="PreviewViewport_MouseMove" MouseUp="PreviewViewport_MouseUp">
+                    <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+                    <Canvas Name="LiveWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center" MouseMove="LiveWheelPreviewCanvas_MouseMove" MouseLeave="LiveWheelPreviewCanvas_MouseLeave">
+                      <Canvas.RenderTransform>
+                        <TransformGroup>
+                          <ScaleTransform x:Name="PreviewScaleTransform" ScaleX="1.0" ScaleY="1.0" CenterX="150" CenterY="150" />
+                          <TranslateTransform x:Name="PreviewTranslateTransform" X="0" Y="0" />
+                        </TransformGroup>
+                      </Canvas.RenderTransform>
+                    </Canvas>
+                    <!-- 视口缩放与平移悬浮工具栏 -->
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="3,2">
+                      <Border.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.12" />
+                      </Border.Effect>
+                      <StackPanel Orientation="Horizontal">
+                        <Button Name="PreviewZoomOutBtn" Content="➖" ToolTip="缩小视图 (或使用鼠标滚轮)" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="PreviewZoomOutBtn_Click" />
+                        <TextBlock Name="PreviewZoomLabel" Text="100%" Width="38" TextAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand" ToolTip="点击复位为 100%" MouseLeftButtonDown="PreviewZoomLabel_MouseLeftButtonDown" />
+                        <Button Name="PreviewZoomInBtn" Content="➕" ToolTip="放大视图 (或使用鼠标滚轮)" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="PreviewZoomInBtn_Click" />
+                        <Border Width="1" Height="14" Background="{DynamicResource CardBorderBrush}" Margin="3,0" VerticalAlignment="Center" />
+                        <Button Name="PreviewResetViewBtn" Content="🎯" ToolTip="重置视图位置与缩放 (双击画布空白处也可复位)" Style="{StaticResource CanvasToolBtnStyle}" FontSize="11" Click="PreviewResetViewBtn_Click" />
+                      </StackPanel>
+                    </Border>
+                    <!-- 左下角操作提示 -->
+                    <TextBlock Name="PreviewPanHintText" Text="💡 鼠标中键/右键拖拽平移 / 滚轮缩放 / 双击复位" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8,0,0,6" IsHitTestVisible="False" Opacity="0.75" />
                   </Grid>
                 </Border>
                 <Button Name="ResetDimensionsButton" Grid.Row="2" Content="一键重置为推荐几何尺寸" Style="{StaticResource ModernButtonStyle}" Height="32" HorizontalAlignment="Right" Click="ResetDimensionsButton_Click" />

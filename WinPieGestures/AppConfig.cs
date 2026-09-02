@@ -99,6 +99,16 @@ public class AppConfig
 
 	public double SectorFontSize { get; set; } = 11.0;
 
+	public string CoreFontFamily { get; set; } = "Microsoft YaHei UI, Segoe UI";
+
+	public double CoreFontSize { get; set; } = 13.0;
+
+	public string CoreTextColor { get; set; } = "#FFFFFFFF";
+
+	public string CoreTitle { get; set; } = "StarPie";
+
+	public string CoreSubtitle { get; set; } = "RMB Drag";
+
 	public bool ShowCoreIcon { get; set; } = true;
 
 	public string CoreIconType { get; set; } = "Exit";
