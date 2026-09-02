@@ -85,7 +85,7 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
-		AppLogger.LogInfo($"=== StarPie v1.5.8 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
+		AppLogger.LogInfo($"=== StarPie v1.6.0 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try
@@ -105,7 +105,6 @@ public partial class App : Application
 			{
 				MainSettingsWindow.Show();
 			}
-			MemoryOptimizer.TrimMemory(force: true);
 		}
 		catch (Exception ex)
 		{

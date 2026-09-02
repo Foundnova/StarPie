@@ -161,6 +161,18 @@ public static class WindowTaskbarHelper
 	[DllImport("user32.dll")]
 	private static extern bool DestroyIcon(nint hIcon);
 
+	private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern nint OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern bool QueryFullProcessImageName(nint hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CloseHandle(nint hObject);
+
 	// ---- 当前虚拟桌面过滤（Win10+；不可用则跳过）----
 	[ComImport, Guid("a5cd92ff-29be-454c-8d04-d82879fb3f1b")]
 	private class VirtualDesktopManager
@@ -531,6 +543,7 @@ public static class WindowTaskbarHelper
 	private static string? ProcessDescriptionOf(nint hWnd)
 	{
 		GetWindowThreadProcessId(hWnd, out uint pid);
+		if (pid == 0) return null;
 		lock (s_procDescCache)
 		{
 			if (s_procDescCache.TryGetValue(pid, out string? desc))
@@ -541,15 +554,30 @@ public static class WindowTaskbarHelper
 		string? computed = null;
 		try
 		{
-			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+			nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+			if (hProcess != IntPtr.Zero)
 			{
-				string? exe = proc?.MainModule?.FileName;
-				if (!string.IsNullOrEmpty(exe))
+				try
 				{
-					System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
-					computed = !string.IsNullOrEmpty(fvi.FileDescription)
-						? fvi.FileDescription
-						: System.IO.Path.GetFileNameWithoutExtension(exe);
+					uint size = 1024;
+					StringBuilder sb = new StringBuilder((int)size);
+					if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+					{
+						string exePath = sb.ToString();
+						try
+						{
+							var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath);
+							computed = !string.IsNullOrEmpty(fvi.FileDescription) ? fvi.FileDescription : System.IO.Path.GetFileNameWithoutExtension(exePath);
+						}
+						catch
+						{
+							computed = System.IO.Path.GetFileNameWithoutExtension(exePath);
+						}
+					}
+				}
+				finally
+				{
+					CloseHandle(hProcess);
 				}
 			}
 		}
@@ -717,14 +745,14 @@ public static class WindowTaskbarHelper
 	{
 		try
 		{
-			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——目标窗口假死时不阻塞轮盘渲染
+			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——超时缩短至 25ms，目标窗口假死时不阻塞轮盘渲染
 			nint hIcon = IntPtr.Zero;
 			nint result = IntPtr.Zero;
-			if (SendMessageTimeout(hWnd, WM_GETICON, (nint)1, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
+			if (SendMessageTimeout(hWnd, WM_GETICON, (nint)1, IntPtr.Zero, SMTO_ABORTIFHUNG, 25u, out result) != IntPtr.Zero && result != IntPtr.Zero)
 			{
 				hIcon = result;
 			}
-			if (hIcon == IntPtr.Zero && SendMessageTimeout(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
+			if (hIcon == IntPtr.Zero && SendMessageTimeout(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 25u, out result) != IntPtr.Zero && result != IntPtr.Zero)
 			{
 				hIcon = result;
 			}
@@ -743,24 +771,40 @@ public static class WindowTaskbarHelper
 
 			// 进程 exe 图标兜底
 			GetWindowThreadProcessId(hWnd, out uint pid);
-			try
+			if (pid != 0)
 			{
-				using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+				try
 				{
-					string? exe = proc?.MainModule?.FileName;
-					if (!string.IsNullOrEmpty(exe) && ExtractIconEx(exe, 0, out nint big, out _, 1) > 0 && big != IntPtr.Zero)
+					nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+					if (hProcess != IntPtr.Zero)
 					{
-						BitmapSource? bmp = ToBitmapSource(big);
-						DestroyIcon(big);
-						if (bmp != null)
+						try
 						{
-							return bmp;
+							uint size = 1024;
+							StringBuilder sb = new StringBuilder((int)size);
+							if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+							{
+								string exe = sb.ToString();
+								if (!string.IsNullOrEmpty(exe) && ExtractIconEx(exe, 0, out nint big, out _, 1) > 0 && big != IntPtr.Zero)
+								{
+									BitmapSource? bmp = ToBitmapSource(big);
+									DestroyIcon(big);
+									if (bmp != null)
+									{
+										return bmp;
+									}
+								}
+							}
+						}
+						finally
+						{
+							CloseHandle(hProcess);
 						}
 					}
 				}
-			}
-			catch
-			{
+				catch
+				{
+				}
 			}
 			return null;
 		}

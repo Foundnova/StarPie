@@ -473,6 +473,7 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
+				ActionItem? targetAction = null;
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -483,15 +484,27 @@ public class GestureController
 							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
 							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								targetAction = actionItem2;
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+						if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
 						{
-							ActionExecutor.Execute(actionItem);
+							targetAction = actionItem;
 						}
 					}
+				}
+				if (targetAction != null)
+				{
+					ThreadPool.QueueUserWorkItem(delegate
+					{
+						try
+						{
+							ActionExecutor.Execute(targetAction);
+						}
+						catch
+						{
+						}
+					});
 				}
 			}, (DispatcherPriority)5, Array.Empty<object>());
 			e.Handled = true;
@@ -602,6 +615,7 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
+				ActionItem? targetAction = null;
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -612,15 +626,27 @@ public class GestureController
 							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
 							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								targetAction = actionItem2;
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+						if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
 						{
-							ActionExecutor.Execute(actionItem);
+							targetAction = actionItem;
 						}
 					}
+				}
+				if (targetAction != null)
+				{
+					ThreadPool.QueueUserWorkItem(delegate
+					{
+						try
+						{
+							ActionExecutor.Execute(targetAction);
+						}
+						catch
+						{
+						}
+					});
 				}
 			}, (DispatcherPriority)5, Array.Empty<object>());
 			e.Handled = true;
@@ -772,48 +798,70 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		QueueHighlightUpdate(num4, num5, flag, flag2, GetCurrentGestureVersion());
 	}
 
+	private static int s_prefetchScheduled;
+
 	private void ShowRadialUI(Point center, WheelProfile profile)
 	{
-		// 后台 STA 预热任务栏槽位快照：大幅降低"切换窗口"图标加载/激活的首次开销（UIA 遍历较贵）
+		// 线程池轻量预热任务栏槽位快照：防抖与非阻塞调度
 		try
 		{
-			System.Threading.Thread warm = new System.Threading.Thread(delegate ()
+			if (Interlocked.CompareExchange(ref s_prefetchScheduled, 1, 0) == 0)
 			{
-				try
+				ThreadPool.QueueUserWorkItem(delegate
 				{
-					WindowTaskbarHelper.Prefetch();
-				}
-				catch
-				{
-				}
-			});
-			warm.IsBackground = true;
-			warm.SetApartmentState(ApartmentState.STA);
-			warm.Start();
+					try
+					{
+						WindowTaskbarHelper.Prefetch();
+					}
+					catch
+					{
+					}
+					finally
+					{
+						Interlocked.Exchange(ref s_prefetchScheduled, 0);
+					}
+				});
+			}
 		}
 		catch
 		{
 		}
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
+		RadialWindow? oldWindow;
+		RadialWindow newWindow = new RadialWindow(center, profile);
 		lock (_uiUpdateSync)
 		{
-			if (_radialWindow != null)
-			{
-				_radialWindow.Close();
-			}
-			_radialWindow = new RadialWindow(center, profile);
-			_radialWindow.Show();
+			oldWindow = _radialWindow;
+			_radialWindow = newWindow;
 		}
+		if (oldWindow != null)
+		{
+			try
+			{
+				oldWindow.Close();
+			}
+			catch
+			{
+			}
+		}
+		newWindow.Show();
 	}
 
 	private void HideRadialUI()
 	{
+		RadialWindow? windowToClose;
 		lock (_uiUpdateSync)
 		{
-			if (_radialWindow != null)
+			windowToClose = _radialWindow;
+			_radialWindow = null;
+		}
+		if (windowToClose != null)
+		{
+			try
 			{
-				_radialWindow.Close();
-				_radialWindow = null;
+				windowToClose.Close();
+			}
+			catch
+			{
 			}
 		}
 	}
@@ -829,9 +877,7 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		{
 			if (ReferenceEquals(_radialWindow, gestureWindow))
 			{
-				gestureWindow.Close();
 				_radialWindow = null;
-				return;
 			}
 		}
 
