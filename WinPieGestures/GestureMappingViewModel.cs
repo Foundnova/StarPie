@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace WinPieGestures;
 
@@ -76,6 +77,74 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 			{
 				Mapping.Action.Type = value;
 				OnPropertyChanged(nameof(Type));
+				OnPropertyChanged(nameof(IsHotkeyType));
+				OnPropertyChanged(nameof(IsLaunchType));
+				OnPropertyChanged(nameof(IsFolderType));
+				OnPropertyChanged(nameof(IsSystemType));
+				OnPropertyChanged(nameof(IsCommandType));
+				OnPropertyChanged(nameof(IsSwitchWindowType));
+			}
+		}
+	}
+
+	public bool IsHotkeyType => Type == "Hotkey";
+
+	public bool IsLaunchType => Type == "Launch" || Type == "App";
+
+	public bool IsFolderType => Type == "Folder" || Type == "OpenFolder";
+
+	public bool IsSystemType => Type == "System";
+
+	public bool IsCommandType => Type == "Command";
+
+	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	/// <summary>命令动作的终端选项。</summary>
+	public List<ActionTypeItem> Terminals => SlotViewModel.LocalizedTerminals;
+
+	public string CommandTerminal
+	{
+		get => Mapping.Action.CommandTerminal ?? "cmd";
+		set
+		{
+			if (Mapping.Action.CommandTerminal != value && !string.IsNullOrEmpty(value))
+			{
+				Mapping.Action.CommandTerminal = value;
+				OnPropertyChanged(nameof(CommandTerminal));
+			}
+		}
+	}
+
+	/// <summary>系统控制预设（Key ↔ Parameter）。</summary>
+	public string SelectedSystemPreset
+	{
+		get => Parameter;
+		set
+		{
+			if (Parameter != value && !string.IsNullOrEmpty(value))
+			{
+				Parameter = value;
+				OnPropertyChanged(nameof(SelectedSystemPreset));
+			}
+		}
+	}
+
+	/// <summary>切换窗口的序号（仅数字 1~20）。</summary>
+	public string NthWindowIndex
+	{
+		get => Parameter;
+		set
+		{
+			string digits = string.IsNullOrEmpty(value) ? "" : new string(value.Where(char.IsDigit).ToArray());
+			if (int.TryParse(digits, out int n))
+			{
+				n = Math.Max(1, Math.Min(20, n));
+				digits = n.ToString();
+			}
+			if (Parameter != digits)
+			{
+				Parameter = digits;
+				OnPropertyChanged(nameof(NthWindowIndex));
 			}
 		}
 	}

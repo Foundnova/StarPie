@@ -6579,6 +6579,44 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void GestureBrowse_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is FrameworkElement fe && fe.DataContext is GestureMappingViewModel vm)
+		{
+			ProgramPickerWindow picker = new ProgramPickerWindow();
+			picker.Owner = this;
+			if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+			{
+				vm.Parameter = picker.SelectedPath;
+				if (string.IsNullOrEmpty(vm.Name))
+				{
+					vm.Name = !string.IsNullOrEmpty(picker.SelectedName) ? picker.SelectedName : System.IO.Path.GetFileNameWithoutExtension(picker.SelectedPath);
+				}
+			}
+		}
+	}
+
+	private void GestureBrowseFolder_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is FrameworkElement fe && fe.DataContext is GestureMappingViewModel vm)
+		{
+			using (System.Windows.Forms.FolderBrowserDialog dialog = new System.Windows.Forms.FolderBrowserDialog())
+			{
+				dialog.Description = "选择要打开的本地文件夹";
+				dialog.UseDescriptionForTitle = true;
+				dialog.ShowNewFolderButton = true;
+				if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+				{
+					vm.Parameter = dialog.SelectedPath;
+					if (string.IsNullOrEmpty(vm.Name))
+					{
+						vm.Name = System.IO.Path.GetFileName(dialog.SelectedPath);
+					}
+				}
+			}
+		}
+	}
+
 		private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
 	{
 		try
