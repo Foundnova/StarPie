@@ -100,6 +100,7 @@ public class GestureController
 		_mouseHook.OnTriggerButtonDown += Hook_OnTriggerButtonDown;
 		_mouseHook.OnTriggerButtonUp += Hook_OnTriggerButtonUp;
 		_mouseHook.OnMouseMove += Hook_OnMouseMove;
+		_mouseHook.OnRawMouseButtonEvent += Hook_OnRawMouseButton;
 		if (_keyboardHook != null)
 		{
 			_keyboardHook.OnKeyDown += KeyboardHook_OnKeyDown;
@@ -361,11 +362,10 @@ public class GestureController
 				return;
 			}
 			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
-			// 鼠标手势模式：手势触发键按下 → 进入画轨迹流程（不弹轮盘）
+			// 手势触发键已被 Raw 事件接管：这里只吞掉，不再走轮盘流程
 			if (ConfigManager.CurrentConfig.GestureEnabled &&
 				string.Equals(triggerBtn, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton", StringComparison.OrdinalIgnoreCase))
 			{
-				BeginGesture(e.Position);
 				e.Handled = true;
 				return;
 			}
@@ -387,6 +387,62 @@ public class GestureController
 	}
 
 	// ==================== 鼠标手势 ====================
+
+	/// <summary>
+	/// 任意鼠标按键原始事件：手势触发键由此接管（与"轮盘触发键"可以不同）。
+	/// 按下 → 开始画轨迹；抬起 → 识别执行（轻点透传原生点击）。
+	/// </summary>
+	private void Hook_OnRawMouseButton(object? sender, RawMouseEventArgs e)
+	{
+		if (!ConfigManager.CurrentConfig.GestureEnabled)
+		{
+			return;
+		}
+		string gestureButton = ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton";
+		if (!string.Equals(e.MouseButton, gestureButton, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+		if (e.IsButtonDown)
+		{
+			if (CheckIsIsolated(out _))
+			{
+				_gestureMode = false;
+				e.Handled = false;
+				return;
+			}
+			BeginGesture(e.Position);
+			e.Handled = true;
+			return;
+		}
+		if (!_gestureMode)
+		{
+			return;
+		}
+		EndGesture(e.Position);
+		if (_gestureSegmentCount > 0)
+		{
+			ActionItem? ga = FindGestureAction(_gestureSegments.ToString());
+			if (ga != null)
+			{
+				ActionItem action = ga;
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					ActionExecutor.Execute(action);
+				}, (DispatcherPriority)5, Array.Empty<object>());
+			}
+			// 未映射的轨迹：吞掉不执行
+		}
+		else
+		{
+			// 轻点：透传原生点击
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+			{
+				_mouseHook.ReplayTriggerClick(gestureButton);
+			}, (DispatcherPriority)5, Array.Empty<object>());
+		}
+		e.Handled = true;
+	}
 
 	/// <summary>方向码 → 图样字符（8 方向，屏幕坐标 y 向下）。</summary>
 	private static string GestureDirCode(int dir)
@@ -577,32 +633,9 @@ public class GestureController
 		{
 			return;
 		}
-		// 鼠标手势：抬起即识别执行
+		// 手势键抬起已由 Raw 事件处理，这里直接吞掉
 		if (_gestureMode)
 		{
-			EndGesture(e.Position);
-			ActionItem? gestureAction = FindGestureAction(_gestureSegments.ToString());
-			if (gestureAction != null)
-			{
-				ActionItem action = gestureAction;
-				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-				{
-					ActionExecutor.Execute(action);
-				}, (DispatcherPriority)5, Array.Empty<object>());
-				e.Handled = true;
-				return;
-			}
-			if (_gestureSegmentCount > 0)
-			{
-				e.Handled = true; // 已画轨迹但未映射：吞掉，不执行
-				return;
-			}
-			// 轻点：透传原生点击
-			string gbtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
-			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-			{
-				_mouseHook.ReplayTriggerClick(gbtn);
-			}, (DispatcherPriority)5, Array.Empty<object>());
 			e.Handled = true;
 			return;
 		}
