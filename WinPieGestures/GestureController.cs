@@ -60,6 +60,17 @@ public class GestureController
 
 	private System.Text.StringBuilder _gestureSegments = new System.Text.StringBuilder();
 
+	// 手势轨迹浮层（可视化）
+	private GestureTrailOverlay? _trail;
+
+	private double _trailLastX = double.NaN;
+
+	private double _trailLastY = double.NaN;
+
+	private double _trailScaleX = 1.0;
+
+	private double _trailScaleY = 1.0;
+
 	private WheelProfile? _activeProfile;
 
 	private int _selectedSectorIndex = -1;
@@ -480,6 +491,22 @@ public class GestureController
 		_gestureLastDir = -1;
 		_gestureSegmentCount = 0;
 		_gestureSegments.Clear();
+		var (tScaleX, tScaleY) = RadialWindow.GetMonitorDpiScale(pressPoint);
+		_trailScaleX = tScaleX;
+		_trailScaleY = tScaleY;
+		_trailLastX = pressPoint.X;
+		_trailLastY = pressPoint.Y;
+		Point p0 = pressPoint;
+		double sx = tScaleX, sy = tScaleY;
+		DispatchUi(delegate
+		{
+			if (_trail == null)
+			{
+				_trail = new GestureTrailOverlay();
+			}
+			_trail.BeginAt(p0.X, p0.Y, sx, sy);
+			_trail.Show();
+		});
 	}
 
 	/// <summary>追加一段方向码（段间以 "-" 分隔，最多 3 段；单段对角线 "DR" 与双段 "D-R" 不冲突）。</summary>
@@ -516,6 +543,17 @@ public class GestureController
 			_gestureLastDir = dir;
 		}
 		_gestureAnchor = current;
+		// 轨迹：距离够才加一次，避免污染 Hook 消息调度的消息队列
+		if (Math.Abs(current.X - _trailLastX) + Math.Abs(current.Y - _trailLastY) >= 4.0)
+		{
+			_trailLastX = current.X;
+			_trailLastY = current.Y;
+			double tx = current.X, ty = current.Y;
+			DispatchUi(delegate
+			{
+				_trail?.AddPoint(tx, ty, _trailScaleX, _trailScaleY);
+			});
+		}
 	}
 
 	private void EndGesture(Point current)
@@ -529,6 +567,27 @@ public class GestureController
 		_gestureMode = false;
 		_gestureWaiting = false;
 		_gestureTracking = false;
+		_trailLastX = double.NaN;
+		_trailLastY = double.NaN;
+		DispatchUi(delegate
+		{
+			if (_trail != null)
+			{
+				_trail.ClearTrail();
+				_trail.Hide();
+			}
+		});
+	}
+
+	private void DispatchUi(Action action)
+	{
+		try
+		{
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke(action, DispatcherPriority.Background);
+		}
+		catch
+		{
+		}
 	}
 
 	/// <summary>查找手势图样映射的动作。</summary>
