@@ -418,21 +418,31 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。</summary>
+	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。
+	/// 非阻塞：若另一线程（后台预热/激活）正在计算，直接返回当前快照，绝不阻塞 UI/钩子线程。</summary>
 	public static List<nint> GetTaskbarOrderedWindows()
 	{
-		lock (s_snapshotLock)
+		if (Monitor.TryEnter(s_snapshotLock, TimeSpan.Zero))
 		{
-			if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+			try
 			{
+				if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+				{
+					return s_snapshot;
+				}
+				s_procDescCache.Clear();
+				s_iconCache.Clear();
+				s_snapshot = ComputeOrderedWindows();
+				s_snapshotAt = DateTime.UtcNow;
 				return s_snapshot;
 			}
-			s_procDescCache.Clear();
-			s_iconCache.Clear();
-			s_snapshot = ComputeOrderedWindows();
-			s_snapshotAt = DateTime.UtcNow;
-			return s_snapshot;
+			finally
+			{
+				Monitor.Exit(s_snapshotLock);
+			}
 		}
+		// 计算进行中：用当前快照（可能过期/为空 → 图标回退默认），不等待
+		return s_snapshot ?? new List<nint>();
 	}
 
 	/// <summary>实际计算：只保留能对应到任务栏按钮的窗口（鬼窗口丢弃）；同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定）。</summary>
@@ -573,7 +583,7 @@ public static class WindowTaskbarHelper
 	private static DateTime s_snapshotAt;
 	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
 	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
-	private const double SNAPSHOT_TTL_MS = 1500.0;
+	private const double SNAPSHOT_TTL_MS = 2500.0;
 
 	/// <summary>后台预热任务栏槽位快照（供下一次手势首帧直接命中缓存）。</summary>
 	public static void Prefetch()
