@@ -1046,6 +1046,13 @@ public static class I18n
 			[LanguageCode.En] = "Release-hint position:",
 			[LanguageCode.Ja] = "離した時のヒント位置："
 		};
+		dictionary["GestureSensitivityTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "手势段灵敏度：",
+			[LanguageCode.ZhTw] = "手勢段靈敏度：",
+			[LanguageCode.En] = "Gesture segment sensitivity:",
+			[LanguageCode.Ja] = "ジェスチャー感度："
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",

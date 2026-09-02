@@ -557,7 +557,8 @@ public class GestureController
 	{
 		double dy = current.Y - _gestureAnchor.Y;
 		double dx = current.X - _gestureAnchor.X;
-		if (Math.Sqrt(dx * dx + dy * dy) < 12.0)
+		double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
+		if (Math.Sqrt(dx * dx + dy * dy) < segMin)
 		{
 			return;
 		}

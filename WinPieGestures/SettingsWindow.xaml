@@ -619,6 +619,16 @@
                       <ComboBoxItem Tag="DR" Content="↘ 右下" />
                     </ComboBox>
                   </Grid>
+                  <Grid Margin="0,2,0,10">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="70" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Name="GestureSensitivityTitleText" Text="手势段灵敏度：" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Slider Name="GestureSensitivitySlider" Grid.Column="1" Minimum="8" Maximum="80" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="GestureSensitivitySlider_ValueChanged" ToolTip="最小段长（像素）：越大越难把中途小拐弯误识别为方向段" />
+                    <TextBlock Name="GestureSensitivityLabel" Grid.Column="2" Text="16 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  </Grid>
                   <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
                     <StackPanel>
                       <TextBlock Name="GestureMappingTitleText" Text="手势图样映射" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />

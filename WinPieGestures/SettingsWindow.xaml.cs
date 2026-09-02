@@ -362,6 +362,14 @@ public partial class SettingsWindow : Window
 		}
 		SetComboBoxSelectedValue(GestureTriggerButtonComboBox, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton");
 		SetComboBoxSelectedValue(GestureHintPlacementComboBox, ConfigManager.CurrentConfig.GestureHintPlacement ?? "Auto");
+		if (GestureSensitivitySlider != null)
+		{
+			GestureSensitivitySlider.Value = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 0.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 16.0;
+		}
+		if (GestureSensitivityLabel != null)
+		{
+			GestureSensitivityLabel.Text = $"{GestureSensitivitySlider.Value:0} px";
+		}
 		RefreshGestureMappings();
 		if (EnableOuterEscapeCheckBox != null)
 		{
@@ -877,6 +885,10 @@ public partial class SettingsWindow : Window
 		if (GestureHintPlaceText != null)
 		{
 			GestureHintPlaceText.Text = I18n.T("GestureHintPlaceText");
+		}
+		if (GestureSensitivityTitleText != null)
+		{
+			GestureSensitivityTitleText.Text = I18n.T("GestureSensitivityTitle");
 		}
 		if (GestureMappingTitleText != null)
 		{
@@ -6560,6 +6572,20 @@ public partial class SettingsWindow : Window
 			ConfigManager.CurrentConfig.GestureHintPlacement = tag;
 			SyncUiToConfigAndSave();
 		}
+	}
+
+	private void GestureSensitivitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.GestureSegmentSensitivity = e.NewValue;
+		if (GestureSensitivityLabel != null)
+		{
+			GestureSensitivityLabel.Text = $"{e.NewValue:0} px";
+		}
+		SyncUiToConfigAndSave();
 	}
 
 	private void AddGestureMappingButton_Click(object sender, RoutedEventArgs e)
