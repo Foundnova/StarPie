@@ -7185,4 +7185,125 @@ public partial class SettingsWindow : Window
 			System.Windows.MessageBox.Show(this, "打开按键拼装器失败: " + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
+
+	private bool _isPanning;
+	private Point _panStartPoint;
+	private double _startTranslateX;
+	private double _startTranslateY;
+
+	private void PreviewViewport_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+	{
+		if (PreviewScaleTransform == null)
+		{
+			return;
+		}
+		double zoomStep = (e.Delta > 0) ? 1.15 : (1.0 / 1.15);
+		double currentScale = PreviewScaleTransform.ScaleX;
+		double newScale = Math.Clamp(currentScale * zoomStep, 0.4, 3.0);
+		PreviewScaleTransform.ScaleX = newScale;
+		PreviewScaleTransform.ScaleY = newScale;
+		UpdateZoomLabel();
+		e.Handled = true;
+	}
+
+	private void PreviewViewport_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+	{
+		if (e.ClickCount == 2)
+		{
+			ResetPreviewViewport();
+			e.Handled = true;
+			return;
+		}
+
+		if (e.MiddleButton == System.Windows.Input.MouseButtonState.Pressed || e.RightButton == System.Windows.Input.MouseButtonState.Pressed)
+		{
+			_isPanning = true;
+			_panStartPoint = e.GetPosition(PreviewViewportContainer);
+			_startTranslateX = PreviewTranslateTransform?.X ?? 0.0;
+			_startTranslateY = PreviewTranslateTransform?.Y ?? 0.0;
+			PreviewViewportContainer?.CaptureMouse();
+			if (PreviewViewportContainer != null)
+			{
+				PreviewViewportContainer.Cursor = System.Windows.Input.Cursors.SizeAll;
+			}
+			e.Handled = true;
+		}
+	}
+
+	private void PreviewViewport_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+	{
+		if (!_isPanning || PreviewViewportContainer == null || PreviewTranslateTransform == null)
+		{
+			return;
+		}
+		Point currentPoint = e.GetPosition(PreviewViewportContainer);
+		PreviewTranslateTransform.X = _startTranslateX + (currentPoint.X - _panStartPoint.X);
+		PreviewTranslateTransform.Y = _startTranslateY + (currentPoint.Y - _panStartPoint.Y);
+	}
+
+	private void PreviewViewport_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+	{
+		if (_isPanning)
+		{
+			_isPanning = false;
+			PreviewViewportContainer?.ReleaseMouseCapture();
+			if (PreviewViewportContainer != null)
+			{
+				PreviewViewportContainer.Cursor = System.Windows.Input.Cursors.Arrow;
+			}
+			e.Handled = true;
+		}
+	}
+
+	private void PreviewZoomInBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (PreviewScaleTransform == null) return;
+		double newScale = Math.Min(3.0, PreviewScaleTransform.ScaleX + 0.15);
+		PreviewScaleTransform.ScaleX = newScale;
+		PreviewScaleTransform.ScaleY = newScale;
+		UpdateZoomLabel();
+	}
+
+	private void PreviewZoomOutBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (PreviewScaleTransform == null) return;
+		double newScale = Math.Max(0.4, PreviewScaleTransform.ScaleX - 0.15);
+		PreviewScaleTransform.ScaleX = newScale;
+		PreviewScaleTransform.ScaleY = newScale;
+		UpdateZoomLabel();
+	}
+
+	private void PreviewZoomLabel_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+	{
+		ResetPreviewViewport();
+	}
+
+	private void PreviewResetViewBtn_Click(object sender, RoutedEventArgs e)
+	{
+		ResetPreviewViewport();
+	}
+
+	public void ResetPreviewViewport()
+	{
+		if (PreviewScaleTransform != null)
+		{
+			PreviewScaleTransform.ScaleX = 1.0;
+			PreviewScaleTransform.ScaleY = 1.0;
+		}
+		if (PreviewTranslateTransform != null)
+		{
+			PreviewTranslateTransform.X = 0.0;
+			PreviewTranslateTransform.Y = 0.0;
+		}
+		UpdateZoomLabel();
+	}
+
+	private void UpdateZoomLabel()
+	{
+		if (PreviewZoomLabel != null && PreviewScaleTransform != null)
+		{
+			int pct = (int)Math.Round(PreviewScaleTransform.ScaleX * 100.0);
+			PreviewZoomLabel.Text = $"{pct}%";
+		}
+	}
 }
