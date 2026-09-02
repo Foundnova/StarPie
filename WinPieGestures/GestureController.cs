@@ -519,8 +519,8 @@ public class GestureController
 			{
 				_trail = new GestureTrailOverlay();
 			}
-			_trail.BeginAt(p0.X, p0.Y, sx, sy);
-			_trail.Show();
+			_trail.ShowCoveringScreen(sx, sy);
+			_trail.BeginAt(p0.X, p0.Y);
 		});
 	}
 
@@ -566,7 +566,7 @@ public class GestureController
 			double tx = current.X, ty = current.Y;
 			DispatchUi(delegate
 			{
-				_trail?.AddPoint(tx, ty, _trailScaleX, _trailScaleY);
+				_trail?.AddPoint(tx, ty);
 			});
 		}
 	}

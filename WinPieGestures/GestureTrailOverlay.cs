@@ -5,14 +5,19 @@ using System.Windows.Shapes;
 
 namespace WinPieGestures;
 
-/// <summary>手势轨迹浮层：透明置顶小窗，绘制手势拖动轨迹与起点（仅供盲操可视化，不拦截鼠标）。</summary>
+/// <summary>
+/// 手势轨迹浮层：覆盖整个虚拟屏幕的透明置顶窗（固定不动，无缩放/移动），
+/// 轨迹点按手势起点所在屏的 DIP 缩放换算后直接绘制——任意方向/任意长度都不会裁剪或变形。
+/// </summary>
 public class GestureTrailOverlay : Window
 {
 	private readonly Canvas _canvas;
 	private readonly Polyline _line;
 	private readonly Ellipse _startDot;
-	private double _originX;
-	private double _originY;
+	private double _scaleX = 1.0;
+	private double _scaleY = 1.0;
+	private double _leftDIP;
+	private double _topDIP;
 
 	public GestureTrailOverlay()
 	{
@@ -45,76 +50,34 @@ public class GestureTrailOverlay : Window
 		Content = _canvas;
 	}
 
-	/// <summary>在屏幕物理坐标（按所在屏 DIP 缩放换算）定位并开始轨迹。</summary>
-	public void BeginAt(double screenX, double screenY, double scaleX, double scaleY)
+	/// <summary>覆盖整个虚拟屏幕并显示（只定位一次，之后不再移动/缩放）。</summary>
+	public void ShowCoveringScreen(double scaleX, double scaleY)
 	{
-		double sx = scaleX > 0.0 ? scaleX : 1.0;
-		double sy = scaleY > 0.0 ? scaleY : 1.0;
-		_originX = screenX / sx - 120.0;
-		_originY = screenY / sy - 120.0;
-		Left = _originX;
-		Top = _originY;
-		Width = 240.0;
-		Height = 240.0;
+		_scaleX = scaleX > 0.0 ? scaleX : 1.0;
+		_scaleY = scaleY > 0.0 ? scaleY : 1.0;
+		_leftDIP = SystemParameters.VirtualScreenLeft;
+		_topDIP = SystemParameters.VirtualScreenTop;
+		Left = _leftDIP;
+		Top = _topDIP;
+		Width = SystemParameters.VirtualScreenWidth;
+		Height = SystemParameters.VirtualScreenHeight;
+		Show();
+	}
+
+	/// <summary>开始轨迹：屏幕物理坐标 → 覆盖层局部坐标，画起点。</summary>
+	public void BeginAt(double screenX, double screenY)
+	{
+		double lx = screenX / _scaleX - _leftDIP;
+		double ly = screenY / _scaleY - _topDIP;
 		_line.Points.Clear();
-		Point start = new Point(screenX / sx - _originX, screenY / sy - _originY);
-		_line.Points.Add(start);
-		Canvas.SetLeft(_startDot, start.X - 3.0);
-		Canvas.SetTop(_startDot, start.Y - 3.0);
+		_line.Points.Add(new Point(lx, ly));
+		Canvas.SetLeft(_startDot, lx - 3.0);
+		Canvas.SetTop(_startDot, ly - 3.0);
 	}
 
-	public void AddPoint(double screenX, double screenY, double scaleX, double scaleY)
+	public void AddPoint(double screenX, double screenY)
 	{
-		double sx = scaleX > 0.0 ? scaleX : 1.0;
-		double sy = scaleY > 0.0 ? scaleY : 1.0;
-		double px = screenX / sx - _originX;
-		double py = screenY / sy - _originY;
-		// 若落点靠近窗口边缘：窗口随轨迹动态扩张（向右下扩展尺寸，向左上平移原点），轨迹不再裁剪
-		const double margin = 80.0;
-		double shiftX = 0.0;
-		double shiftY = 0.0;
-		if (px < margin)
-		{
-			shiftX = margin - px;
-		}
-		if (py < margin)
-		{
-			shiftY = margin - py;
-		}
-		if (shiftX != 0.0 || shiftY != 0.0)
-		{
-			Left -= shiftX;
-			Top -= shiftY;
-			_originX += shiftX;
-			_originY += shiftY;
-			ShiftTrail(shiftX, shiftY);
-			px += shiftX;
-			py += shiftY;
-		}
-		if (px > Width - margin)
-		{
-			Width = px + margin;
-		}
-		if (py > Height - margin)
-		{
-			Height = py + margin;
-		}
-		_line.Points.Add(new Point(px, py));
-	}
-
-	private void ShiftTrail(double shiftX, double shiftY)
-	{
-		for (int i = 0; i < _line.Points.Count; i++)
-		{
-			Point pt = _line.Points[i];
-			pt.X += shiftX;
-			pt.Y += shiftY;
-			_line.Points[i] = pt;
-		}
-		double dotX = Canvas.GetLeft(_startDot);
-		double dotY = Canvas.GetTop(_startDot);
-		Canvas.SetLeft(_startDot, dotX + shiftX);
-		Canvas.SetTop(_startDot, dotY + shiftY);
+		_line.Points.Add(new Point(screenX / _scaleX - _leftDIP, screenY / _scaleY - _topDIP));
 	}
 
 	public void ClearTrail()
