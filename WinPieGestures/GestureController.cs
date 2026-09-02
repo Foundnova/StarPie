@@ -43,6 +43,37 @@ public class GestureController
 
 	private bool _mouseTriggerDown;
 
+	// ---- 鼠标手势（画轨迹识别；延迟分段缓冲：短段过滤 + 相邻同向合并 + 完全匹配才触发）----
+	private bool _gestureMode;
+
+	private bool _gestureWaiting;
+
+	private bool _gestureTracking;
+
+	private Point _gesturePressPoint;
+
+	private Point _gestureLastSample;
+
+	private readonly List<(int dir, double len)> _gestureRuns = new List<(int, double)>();
+
+	private int _gesturePendingDir = -1;
+
+	private double _gesturePendingLen;
+
+	// 手势轨迹浮层（可视化）
+	private GestureTrailOverlay? _trail;
+
+	private double _trailLastX = double.NaN;
+
+	private double _trailLastY = double.NaN;
+
+	private double _trailScaleX = 1.0;
+
+	private double _trailScaleY = 1.0;
+
+	/// <summary>轻点回放后，下一次该键事件放行（SendInput 重放的按下需穿透给应用）。</summary>
+	private bool _gestureReplayPending;
+
 	private WheelProfile? _activeProfile;
 
 	private int _selectedSectorIndex = -1;
@@ -83,6 +114,7 @@ public class GestureController
 		_mouseHook.OnTriggerButtonDown += Hook_OnTriggerButtonDown;
 		_mouseHook.OnTriggerButtonUp += Hook_OnTriggerButtonUp;
 		_mouseHook.OnMouseMove += Hook_OnMouseMove;
+		_mouseHook.OnRawMouseButtonEvent += Hook_OnRawMouseButton;
 		if (_keyboardHook != null)
 		{
 			_keyboardHook.OnKeyDown += KeyboardHook_OnKeyDown;
@@ -343,6 +375,14 @@ public class GestureController
 				e.Handled = false;
 				return;
 			}
+			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+			// 手势触发键已被 Raw 事件接管：这里只吞掉，不再走轮盘流程
+			if (ConfigManager.CurrentConfig.GestureEnabled &&
+				string.Equals(triggerBtn, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton", StringComparison.OrdinalIgnoreCase))
+			{
+				e.Handled = true;
+				return;
+			}
 			_startPoint = e.Position;
 			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 			_currentDpiScaleX = scaleX;
@@ -358,6 +398,339 @@ public class GestureController
 			}
 			e.Handled = true;
 		}
+	}
+
+	// ==================== 鼠标手势 ====================
+
+	/// <summary>
+	/// 任意鼠标按键原始事件：手势触发键由此接管（与"轮盘触发键"可以不同）。
+	/// 按下 → 开始画轨迹；抬起 → 识别执行（轻点透传原生点击）。
+	/// </summary>
+	private void Hook_OnRawMouseButton(object? sender, RawMouseEventArgs e)
+	{
+		if (!ConfigManager.CurrentConfig.GestureEnabled)
+		{
+			return;
+		}
+		string gestureButton = ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton";
+		if (!string.Equals(e.MouseButton, gestureButton, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+		if (e.IsButtonDown)
+		{
+			// SendInput 重放回来的按下：放行（不重新开始手势）
+			if (_gestureReplayPending)
+			{
+				_gestureReplayPending = false;
+				return;
+			}
+			if (CheckIsIsolated(out _))
+			{
+				_gestureMode = false;
+				e.Handled = false;
+				return;
+			}
+			BeginGesture(e.Position);
+			e.Handled = true; // 拦截原生按下
+			return;
+		}
+		if (!_gestureMode)
+		{
+			return;
+		}
+		bool hadPath = _gestureTracking;
+		EndGesture(e.Position);
+		string pattern = GetPreviewPattern();
+		if (hadPath)
+		{
+			if (pattern.Length > 0)
+			{
+				ActionItem? ga = FindGestureAction(pattern);
+				if (ga != null)
+				{
+					ActionItem action = ga;
+					((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+					{
+						ActionExecutor.Execute(action);
+					}, (DispatcherPriority)5, Array.Empty<object>());
+				}
+			}
+			// 已画但未映射/未成图样：吞掉不执行
+		}
+		else
+		{
+			// 轻点：SendInput 回放原生点击（回放事件放行，见 _gestureReplayPending）
+			_gestureReplayPending = true;
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+			{
+				_mouseHook.ReplayTriggerClick(gestureButton);
+			}, (DispatcherPriority)5, Array.Empty<object>());
+		}
+		e.Handled = true; // 拦截原生抬起
+	}
+
+	/// <summary>方向码 → 图样字符（8 方向，方位码与图样选项一致：U/D/L/R/UL/UR/DL/DR，屏幕坐标 y 向下）。</summary>
+	private static string GestureDirCode(int dir)
+	{
+		return dir switch
+		{
+			0 => "R",  // 右
+			1 => "DR", // 右下
+			2 => "D",  // 下
+			3 => "DL", // 左下
+			4 => "L",  // 左
+			5 => "UL", // 左上
+			6 => "U",  // 上
+			_ => "UR"  // 右上
+		};
+	}
+
+	private static int GestureQuantizeDir(double dx, double dy)
+	{
+		double deg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+		if (deg < 0.0)
+		{
+			deg += 360.0;
+		}
+		return (int)Math.Round(deg / 45.0) % 8;
+	}
+
+	private void BeginGesture(Point pressPoint)
+	{
+		_gestureMode = true;
+		_gestureWaiting = true;
+		_gestureTracking = false;
+		_gesturePressPoint = pressPoint;
+		_gestureLastSample = pressPoint;
+		_gestureRuns.Clear();
+		_gesturePendingDir = -1;
+		_gesturePendingLen = 0.0;
+		var (tScaleX, tScaleY) = RadialWindow.GetMonitorDpiScale(pressPoint);
+		_trailScaleX = tScaleX;
+		_trailScaleY = tScaleY;
+		_trailLastX = pressPoint.X;
+		_trailLastY = pressPoint.Y;
+		// 按下即清空并隐藏浮层：杜绝上一次手势轨迹在触发瞬间闪现
+		DispatchUi(delegate
+		{
+			if (_trail != null)
+			{
+				_trail.ClearTrail();
+				_trail.Hide();
+			}
+		});
+		// 轨迹在越过阈值后才显示（见 ShowGestureTrail）
+	}
+
+	private void ShowGestureTrail()
+	{
+		Point p0 = _gesturePressPoint;
+		double sx = _trailScaleX, sy = _trailScaleY;
+		DispatchUi(delegate
+		{
+			if (_trail == null)
+			{
+				_trail = new GestureTrailOverlay();
+			}
+			// 顺序关键：先清空 → 画新起点 → 最后才 Show。
+			// Show 会同步触发一次 WM_PAINT（嵌套消息泵），若此时画布还是旧内容就会闪现一次，故必须先清先画后显示。
+			_trail.ClearTrail();
+			_trail.PositionAt(p0.X, p0.Y, sx, sy);
+			_trail.BeginAt(p0.X, p0.Y, sx, sy);
+			_trail.Show();
+		});
+	}
+
+	/// <summary>
+	/// 移动采样（延迟分段缓冲）：每步把位移并入当前方向行程；
+	/// 方向切换时把上一行程存入缓冲列表。短段/曲线抖动的过滤在构建图样时统一做，
+	/// 因此"画的线可以弯曲"，微拐弯不会产生方向段。
+	/// </summary>
+	private void FeedGesturePoint(Point current)
+	{
+		double dx = current.X - _gestureLastSample.X;
+		double dy = current.Y - _gestureLastSample.Y;
+		double dist = Math.Sqrt(dx * dx + dy * dy);
+		if (dist < 2.0)
+		{
+			return; // 微抖动忽略
+		}
+		int dir = GestureQuantizeDir(dx, dy);
+		if (dir == _gesturePendingDir)
+		{
+			_gesturePendingLen += dist;
+		}
+		else
+		{
+			if (_gesturePendingLen > 0.0)
+			{
+				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+				if (_gestureRuns.Count > 12)
+				{
+					_gestureRuns.RemoveAt(0);
+				}
+			}
+			_gesturePendingDir = dir;
+			_gesturePendingLen = dist;
+		}
+		_gestureLastSample = current;
+		// 轨迹：距离够才加一次，避免污染 Hook 消息调度的消息队列；同时更新"松手将执行"提示
+		if (Math.Abs(current.X - _trailLastX) + Math.Abs(current.Y - _trailLastY) >= 4.0)
+		{
+			_trailLastX = current.X;
+			_trailLastY = current.Y;
+			double tx = current.X, ty = current.Y;
+			string hint = BuildGestureHint(GetPreviewPattern());
+			string placement = ConfigManager.CurrentConfig.GestureHintPlacement ?? "Auto";
+			if (placement == "Auto")
+			{
+				int curDir = GestureQuantizeDir(current.X - _gesturePressPoint.X, current.Y - _gesturePressPoint.Y);
+				placement = GestureDirCode((curDir + 4) % 8); // 提示放在运动反方向，避免被手遮挡
+			}
+			string hintPlacement = placement;
+			DispatchUi(delegate
+			{
+				_trail?.AddPoint(tx, ty, _trailScaleX, _trailScaleY);
+				_trail?.UpdateHint(hint, tx, ty, _trailScaleX, _trailScaleY, hintPlacement);
+			});
+		}
+	}
+
+	/// <summary>
+	/// 构建最终图样：过滤掉长度低于灵敏度的短段（屏蔽过短的线段/曲线抖动），
+	/// 相邻同向合并，最多 3 段；只有完整匹配映射才触发。
+	/// </summary>
+	private string GetPreviewPattern()
+	{
+		double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
+		List<(int dir, double len)> runs = new List<(int, double)>(_gestureRuns);
+		if (_gesturePendingDir >= 0 && _gesturePendingLen > 0.0)
+		{
+			runs.Add((_gesturePendingDir, _gesturePendingLen));
+		}
+		List<int> dirs = new List<int>();
+		foreach (var (dir, len) in runs)
+		{
+			if (len < segMin)
+			{
+				continue; // 短段屏蔽
+			}
+			if (dirs.Count > 0 && dirs[dirs.Count - 1] == dir)
+			{
+				continue; // 相邻同向合并
+			}
+			dirs.Add(dir);
+			if (dirs.Count >= 3)
+			{
+				break;
+			}
+		}
+		return string.Join("-", dirs.Select(GestureDirCode));
+	}
+
+	/// <summary>图样 → 箭头文本（如 "D-R" → "↓→"）。</summary>
+	private static string GesturePatternGlyph(string pattern)
+	{
+		return pattern
+			.Replace("UL", "↖")
+			.Replace("UR", "↗")
+			.Replace("DL", "↙")
+			.Replace("DR", "↘")
+			.Replace("U", "↑")
+			.Replace("D", "↓")
+			.Replace("L", "←")
+			.Replace("R", "→");
+	}
+
+	/// <summary>提示文本：图样箭头 + 映射动作名/参数；未映射只显示图样。</summary>
+	private string BuildGestureHint(string pattern)
+	{
+		string glyph = GesturePatternGlyph(pattern);
+		ActionItem? a = FindGestureAction(pattern);
+		if (a == null)
+		{
+			return glyph;
+		}
+		string label = (!string.IsNullOrEmpty(a.Name) && a.Name != "手势动作") ? a.Name : (a.Parameter ?? "");
+		if (string.IsNullOrEmpty(label))
+		{
+			label = a.Type ?? "";
+		}
+		return string.IsNullOrEmpty(label) ? glyph : $"{glyph}  {label}";
+	}
+
+	private void EndGesture(Point current)
+	{
+		// 收尾：把最后一段并入缓冲（过滤与合并交给 GetPreviewPattern）
+		{
+			double dx = current.X - _gestureLastSample.X;
+			double dy = current.Y - _gestureLastSample.Y;
+			double dist = Math.Sqrt(dx * dx + dy * dy);
+			if (dist >= 2.0)
+			{
+				int dir = GestureQuantizeDir(dx, dy);
+				if (dir == _gesturePendingDir)
+				{
+					_gesturePendingLen += dist;
+				}
+				else
+				{
+					if (_gesturePendingLen > 0.0)
+					{
+						_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+					}
+					_gesturePendingDir = dir;
+					_gesturePendingLen = dist;
+				}
+			}
+			if (_gesturePendingLen > 0.0)
+			{
+				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+			}
+		}
+		_gesturePendingDir = -1;
+		_gesturePendingLen = 0.0;
+		_gestureMode = false;
+		_gestureWaiting = false;
+		_gestureTracking = false;
+		_trailLastX = double.NaN;
+		_trailLastY = double.NaN;
+		DispatchUi(delegate
+		{
+			if (_trail != null)
+			{
+				_trail.ClearTrail();
+				_trail.Hide();
+			}
+		});
+	}
+
+	private void DispatchUi(Action action)
+	{
+		try
+		{
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke(action, DispatcherPriority.Background);
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>查找手势图样映射的动作。</summary>
+	private ActionItem? FindGestureAction(string pattern)
+	{
+		if (ConfigManager.CurrentConfig.GestureMappings != null)
+		{
+			foreach (GestureMapping m in ConfigManager.CurrentConfig.GestureMappings)
+			{
+				if (string.Equals(m.Pattern, pattern, StringComparison.OrdinalIgnoreCase))
+				{
+					return m.Action;
+				}
+			}
+		}
+		return null;
 	}
 
 	/// <summary>启动长按触发计时（按下时，仅鼠标触发）。</summary>
@@ -444,6 +817,12 @@ public class GestureController
 		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
 		if (triggerConfig.TriggerType != "Mouse")
 		{
+			return;
+		}
+		// 手势键抬起已由 Raw 事件处理，这里直接吞掉
+		if (_gestureMode)
+		{
+			e.Handled = true;
 			return;
 		}
 		_mouseTriggerDown = false;
@@ -638,6 +1017,30 @@ public class GestureController
 		//IL_008c: Unknown result type (might be due to invalid IL or missing references)
 		//IL_009f: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a4: Unknown result type (might be due to invalid IL or missing references)
+		// 鼠标手势：采集轨迹
+		if (_gestureMode)
+		{
+			if (_gestureWaiting)
+			{
+				double gScaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
+				double gScaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
+				double gdx = (e.Position.X - _gesturePressPoint.X) / gScaleX;
+				double gdy = (e.Position.Y - _gesturePressPoint.Y) / gScaleY;
+				double gDist = Math.Sqrt(gdx * gdx + gdy * gdy);
+				if (gDist >= ConfigManager.CurrentConfig.DragThreshold)
+				{
+					_gestureWaiting = false;
+					_gestureTracking = true;
+					_gestureLastSample = e.Position;
+					ShowGestureTrail();
+				}
+			}
+			else if (_gestureTracking)
+			{
+				FeedGesturePoint(e.Position);
+			}
+			return;
+		}
 		if (_isWaitingForThreshold)
 		{
 			Point position = e.Position;

@@ -1004,6 +1004,62 @@ public static class I18n
 			[LanguageCode.En] = "Hold the trigger key still for the configured duration to open the wheel. Releasing early still behaves as a normal key press. Coexists with the drag-to-open gesture.",
 			[LanguageCode.Ja] = "トリガーキーを一定時間押し続けるとホイールが開きます。時間前に離すと通常のキー操作になります。ドラッグで開く動作と共存できます。"
 		};
+		dictionary["GestureTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "鼠标手势 (Mouse Gestures)",
+			[LanguageCode.ZhTw] = "滑鼠手勢 (Mouse Gestures)",
+			[LanguageCode.En] = "Mouse Gestures",
+			[LanguageCode.Ja] = "マウスジェスチャー"
+		};
+		dictionary["GestureDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用后，按住手势触发键画出轨迹（如 ↓、→、L 形），释放即执行对应动作；支持单段、双段与三段图样。轻点仍透传原生点击。",
+			[LanguageCode.ZhTw] = "啟用後，按住手勢觸發鍵畫出軌跡（如 ↓、→、L 形），釋放即執行對應動作；支援單段、雙段與三段圖樣。輕點仍透傳原生點擊。",
+			[LanguageCode.En] = "Hold the gesture trigger button and draw a trail (e.g. ↓, →, L-shape); releasing executes the mapped action. Supports single, double and triple-segment patterns. Quick clicks still pass through.",
+			[LanguageCode.Ja] = "トリガーキーを押しながら軌跡を描くと（↓、→、L字など）、離した時点で割り当てたアクションを実行します。1〜3セグメントのジェスチャーに対応。短押しは通常通り通過します。"
+		};
+		dictionary["GestureEnableText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用鼠标手势模式",
+			[LanguageCode.ZhTw] = "啟用滑鼠手勢模式",
+			[LanguageCode.En] = "Enable mouse gesture mode",
+			[LanguageCode.Ja] = "マウスジェスチャーモードを有効化"
+		};
+		dictionary["GestureEnableDescText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "手势触发键将不再弹出轮盘，仅用于绘制手势；其它触发键照常弹轮盘。",
+			[LanguageCode.ZhTw] = "手勢觸發鍵將不再彈出輪盤，僅用於繪製手勢；其它觸發鍵照常彈輪盤。",
+			[LanguageCode.En] = "The gesture trigger button no longer opens the wheel; it is used for drawing gestures only. Other triggers keep opening the wheel.",
+			[LanguageCode.Ja] = "ジェスチャートリガーキーはホイールを開かず、ジェスチャー描画専用になります。他のトリガーは従来通りホイールを開きます。"
+		};
+		dictionary["GestureTriggerLabelText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "手势触发键：",
+			[LanguageCode.ZhTw] = "手勢觸發鍵：",
+			[LanguageCode.En] = "Gesture trigger button:",
+			[LanguageCode.Ja] = "ジェスチャートリガーキー："
+		};
+		dictionary["GestureHintPlaceText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "松手提示位置：",
+			[LanguageCode.ZhTw] = "鬆手提示位置：",
+			[LanguageCode.En] = "Release-hint position:",
+			[LanguageCode.Ja] = "離した時のヒント位置："
+		};
+		dictionary["GestureSensitivityTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "手势段灵敏度：",
+			[LanguageCode.ZhTw] = "手勢段靈敏度：",
+			[LanguageCode.En] = "Gesture segment sensitivity:",
+			[LanguageCode.Ja] = "ジェスチャー感度："
+		};
+		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "手势图样映射",
+			[LanguageCode.ZhTw] = "手勢圖樣映射",
+			[LanguageCode.En] = "Gesture Pattern Mappings",
+			[LanguageCode.Ja] = "ジェスチャーパターン割り当て"
+		};
 		dictionary["BtnRecordTrigger"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "\ud83d\udd34 点击录制触发键 / 组合键",

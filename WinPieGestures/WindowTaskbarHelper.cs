@@ -123,12 +123,26 @@ public static class WindowTaskbarHelper
 
 	private const int SW_RESTORE = 9;
 	private const int SW_MINIMIZE = 6;
+	private const byte VK_MENU = 0x12;
+	private const uint KEYEVENTF_KEYUP = 0x0002;
+	private static readonly nint HWND_TOPMOST = new nint(-1);
+	private static readonly nint HWND_NOTOPMOST = new nint(-2);
+	private const uint SWP_NOSIZE = 0x0001;
+	private const uint SWP_NOMOVE = 0x0002;
+	private const uint SWP_NOACTIVATE = 0x0010;
+	private const uint SWP_SHOWWINDOW = 0x0040;
 
 	[DllImport("user32.dll")]
 	private static extern bool BringWindowToTop(nint hWnd);
 
 	[DllImport("user32.dll")]
 	private static extern bool SetForegroundWindow(nint hWnd);
+
+	[DllImport("user32.dll")]
+	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
@@ -418,21 +432,31 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。</summary>
+	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。
+	/// 非阻塞：若另一线程（后台预热/激活）正在计算，直接返回当前快照，绝不阻塞 UI/钩子线程。</summary>
 	public static List<nint> GetTaskbarOrderedWindows()
 	{
-		lock (s_snapshotLock)
+		if (Monitor.TryEnter(s_snapshotLock, TimeSpan.Zero))
 		{
-			if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+			try
 			{
+				if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+				{
+					return s_snapshot;
+				}
+				s_procDescCache.Clear();
+				s_iconCache.Clear();
+				s_snapshot = ComputeOrderedWindows();
+				s_snapshotAt = DateTime.UtcNow;
 				return s_snapshot;
 			}
-			s_procDescCache.Clear();
-			s_iconCache.Clear();
-			s_snapshot = ComputeOrderedWindows();
-			s_snapshotAt = DateTime.UtcNow;
-			return s_snapshot;
+			finally
+			{
+				Monitor.Exit(s_snapshotLock);
+			}
 		}
+		// 计算进行中：用当前快照（可能过期/为空 → 图标回退默认），不等待
+		return s_snapshot ?? new List<nint>();
 	}
 
 	/// <summary>实际计算：只保留能对应到任务栏按钮的窗口（鬼窗口丢弃）；同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定）。</summary>
@@ -573,7 +597,7 @@ public static class WindowTaskbarHelper
 	private static DateTime s_snapshotAt;
 	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
 	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
-	private const double SNAPSHOT_TTL_MS = 1500.0;
+	private const double SNAPSHOT_TTL_MS = 2500.0;
 
 	/// <summary>后台预热任务栏槽位快照（供下一次手势首帧直接命中缓存）。</summary>
 	public static void Prefetch()
@@ -660,13 +684,22 @@ public static class WindowTaskbarHelper
 			BringWindowToTop(hWnd);
 			bool ok = SetForegroundWindow(hWnd);
 
-			// 兜底：最小化再还原可强制获得前台（否则仅闪烁任务栏）
+			// 兜底 1：模拟一次 Alt 键——系统将我们视为"近期有用户输入"的进程，从而授予前台权限
+			// （对刚启动的任务管理器等新窗口有效；Alt 按下即松开，不触发菜单）
 			if (!ok)
 			{
-				ShowWindow(hWnd, SW_MINIMIZE);
-				ShowWindow(hWnd, SW_RESTORE);
-				BringWindowToTop(hWnd);
+				keybd_event(VK_MENU, 0, 0, IntPtr.Zero);
+				keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
 				ok = SetForegroundWindow(hWnd);
+			}
+
+			// 兜底 2：前台可能是全屏/无边框全屏窗口——置顶+显示激活后取消置顶，
+			// 可把新窗口抬到全屏之上（独占全屏游戏除外，只能靠切走/Alt-Tab）
+			if (!ok)
+			{
+				SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+				ok = SetForegroundWindow(hWnd);
+				SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			}
 
 			if (attachedTarget)
