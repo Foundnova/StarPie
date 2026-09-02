@@ -1410,6 +1410,83 @@ public static class I18n
 			[LanguageCode.En] = "Font Size",
 			[LanguageCode.Ja] = "文字サイズ"
 		};
+		dictionary["LayoutTargetGlobal"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 全局统一排版",
+			[LanguageCode.ZhTw] = "🌐 全域統一排版",
+			[LanguageCode.En] = "Global Layout",
+			[LanguageCode.Ja] = "全体一括設定"
+		};
+		dictionary["LayoutTargetSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 扇区独立定制",
+			[LanguageCode.ZhTw] = "🎯 扇區獨立自訂",
+			[LanguageCode.En] = "Slot Custom",
+			[LanguageCode.Ja] = "個別カスタマイズ"
+		};
+		dictionary["EnableSlotCustomLayout"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 启用该扇区独立个性化排版",
+			[LanguageCode.ZhTw] = "⚡ 啟用該扇區獨立個性化排版",
+			[LanguageCode.En] = "Enable custom styling for this slot",
+			[LanguageCode.Ja] = "このセクターの個別スタイルを有効化"
+		};
+		dictionary["ResetToGlobalLayout"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复继承全局默认",
+			[LanguageCode.ZhTw] = "🔄 恢復繼承全域預設",
+			[LanguageCode.En] = "Reset to Global Default",
+			[LanguageCode.Ja] = "グローバル設定に戻す"
+		};
+		dictionary["SectorTextColor"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘文字颜色 (Sector Text Color):",
+			[LanguageCode.ZhTw] = "輪盤文字顏色 (Sector Text Color):",
+			[LanguageCode.En] = "Sector Text Color:",
+			[LanguageCode.Ja] = "ホイール文字色:"
+		};
+		dictionary["CoreTextOptions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心文字与选中显示选项",
+			[LanguageCode.ZhTw] = "中心文字與選取顯示選項",
+			[LanguageCode.En] = "Center Text & Selection Options",
+			[LanguageCode.Ja] = "中央テキストと選択時表示"
+		};
+		dictionary["CoreFontFamily"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心文字字体 (Core Font Family):",
+			[LanguageCode.ZhTw] = "中心文字字型 (Core Font Family):",
+			[LanguageCode.En] = "Center Font Family:",
+			[LanguageCode.Ja] = "中央フォント:"
+		};
+		dictionary["CoreFontSize"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心文字大小 (Core Font Size):",
+			[LanguageCode.ZhTw] = "中心文字大小 (Core Font Size):",
+			[LanguageCode.En] = "Center Font Size:",
+			[LanguageCode.Ja] = "中央フォントサイズ:"
+		};
+		dictionary["CoreTextColor"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心文字颜色 (Core Text Color):",
+			[LanguageCode.ZhTw] = "中心文字顏色 (Core Text Color):",
+			[LanguageCode.En] = "Center Text Color:",
+			[LanguageCode.Ja] = "中央文字色:"
+		};
+		dictionary["ClickSectorHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 提示：在右侧画布中点击任意扇区可直接选中",
+			[LanguageCode.ZhTw] = "💡 提示：在右側畫布中點選任意扇區可直接選取",
+			[LanguageCode.En] = "Tip: Click any sector on the canvas to select",
+			[LanguageCode.Ja] = "ヒント: キャンバス上の扇形をクリックして直接選択"
+		};
+		dictionary["InheritGlobal"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "跟随全局默认 (Inherit Global)",
+			[LanguageCode.ZhTw] = "跟隨全域預設 (Inherit Global)",
+			[LanguageCode.En] = "Inherit Global Default",
+			[LanguageCode.Ja] = "グローバルデフォルトを継承"
+		};
 		dictionary["CoreTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "中心核圆图案定制 (Center Core Customization)",

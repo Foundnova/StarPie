@@ -35,7 +35,9 @@ public partial class SettingsWindow : Window
 
 	private const double SidebarCollapsedWidth = 68.0;
 
-	private bool _isSidebarCollapsed;
+	private bool _isSidebarCollapsed = true;
+
+	private int _selectedLayoutSlotIndex = -1;
 
 	private bool _isRecordingTrigger;
 
@@ -267,7 +269,7 @@ public partial class SettingsWindow : Window
 		ConfigManager.LoadConfig();
 		InitializeComponent();
 		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.6");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.0");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -275,6 +277,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
+			ApplySidebarLayout();
 			LoadConfigToUi();
 			SlotsItemsControl.ItemsSource = _slotViewModels;
 			bool flag4 = IsRunningAsAdmin();
@@ -287,6 +290,7 @@ public partial class SettingsWindow : Window
 		}
 		base.Loaded += delegate
 		{
+			ApplySidebarLayout();
 			if (AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
@@ -320,13 +324,23 @@ public partial class SettingsWindow : Window
 		System.Windows.Automation.AutomationProperties.SetName(SidebarToggleButton, toggleText);
 
 		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
-		StackPanel[] navigationContents = new StackPanel[5] { NavTab0Content, NavTab1Content, NavTab2Content, NavTab3Content, NavTab4Content };
 		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
 		for (int i = 0; i < navigationButtons.Length; i++)
 		{
+			if (navigationButtons[i] == null) continue;
 			navigationButtons[i].Padding = isCollapsed ? new Thickness(10) : new Thickness(14, 10, 14, 10);
-			navigationContents[i].HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
-			navigationTexts[i].Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+			if (navigationButtons[i].Content is StackPanel sp)
+			{
+				sp.HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+				if (sp.Children.Count > 0 && sp.Children[0] is FrameworkElement iconElem)
+				{
+					iconElem.Margin = isCollapsed ? new Thickness(0) : new Thickness(0, 0, 14, 0);
+				}
+			}
+			if (navigationTexts[i] != null)
+			{
+				navigationTexts[i].Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+			}
 		}
 	}
 
@@ -528,14 +542,30 @@ public partial class SettingsWindow : Window
 
 		// Shapes & Layouts
 		SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
-		SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode);
-		PopulateWheelFontFamilies();
+		PopulateLayoutSlotComboBox();
+		RefreshLayoutOptionsUi();
 		SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
-		SetComboBoxSelectedValue(WheelFontFamilyComboBox, ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-		ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
 		if (ShowSelectedActionTextCheckBox != null)
 		{
 			ShowSelectedActionTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowSelectedActionText;
+		}
+		if (CoreFontFamilyComboBox != null)
+		{
+			PopulateCoreFontFamilies();
+			SetComboBoxSelectedValue(CoreFontFamilyComboBox, ConfigManager.CurrentConfig.CoreFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+		}
+		if (CoreFontSizeSlider != null)
+		{
+			CoreFontSizeSlider.Value = (ConfigManager.CurrentConfig.CoreFontSize > 0.0) ? ConfigManager.CurrentConfig.CoreFontSize : 13.0;
+			if (CoreFontSizeLabel != null)
+			{
+				CoreFontSizeLabel.Text = $"{CoreFontSizeSlider.Value:0.0} px";
+			}
+		}
+		if (CoreTextColorTextBox != null)
+		{
+			CoreTextColorTextBox.Text = ConfigManager.CurrentConfig.CoreTextColor ?? "#FFFFFFFF";
+			UpdateColorPreviewBorder(CoreTextColorPreview, CoreTextColorTextBox.Text);
 		}
 		if (EnableMultiTierCheckBox != null)
 		{
@@ -737,7 +767,7 @@ public partial class SettingsWindow : Window
 		if (_notifyIcon != null)
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.5.8"))
+			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.0"))
 			{
 				Enabled = false,
 				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -1016,6 +1046,42 @@ public partial class SettingsWindow : Window
 		if (WheelFontFamilyTitleText != null)
 		{
 			WheelFontFamilyTitleText.Text = I18n.T("WheelFontFamily");
+		}
+		if (LayoutTargetGlobalRadio != null)
+		{
+			LayoutTargetGlobalRadio.Content = I18n.T("LayoutTargetGlobal");
+		}
+		if (LayoutTargetSlotRadio != null)
+		{
+			LayoutTargetSlotRadio.Content = I18n.T("LayoutTargetSlot");
+		}
+		if (EnableSlotCustomLayoutCheckBox != null)
+		{
+			EnableSlotCustomLayoutCheckBox.Content = I18n.T("EnableSlotCustomLayout");
+		}
+		if (ResetSlotLayoutButton != null)
+		{
+			ResetSlotLayoutButton.Content = I18n.T("ResetToGlobalLayout");
+		}
+		if (SectorTextColorTitleText != null)
+		{
+			SectorTextColorTitleText.Text = I18n.T("SectorTextColor");
+		}
+		if (CoreTextOptionsSectionTitle != null)
+		{
+			CoreTextOptionsSectionTitle.Text = I18n.T("CoreTextOptions");
+		}
+		if (CoreFontFamilyTitleText != null)
+		{
+			CoreFontFamilyTitleText.Text = I18n.T("CoreFontFamily");
+		}
+		if (CoreFontSizeTitleText != null)
+		{
+			CoreFontSizeTitleText.Text = I18n.T("CoreFontSize");
+		}
+		if (CoreTextColorTitleText != null)
+		{
+			CoreTextColorTitleText.Text = I18n.T("CoreTextColor");
 		}
 		if (ShowTextCheckBox != null)
 		{
@@ -3562,6 +3628,291 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void LayoutTargetRadio_Checked(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi)
+		{
+			return;
+		}
+		if (LayoutTargetSlotRadio != null && LayoutTargetSlotRadio.IsChecked == true)
+		{
+			if (_selectedLayoutSlotIndex < 0)
+			{
+				_selectedLayoutSlotIndex = 0;
+			}
+		}
+		else
+		{
+			_selectedLayoutSlotIndex = -1;
+		}
+		RefreshLayoutOptionsUi();
+		RenderLiveWheelPreview();
+	}
+
+	private void LayoutTargetSlotComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || LayoutTargetSlotComboBox?.SelectedItem is not ComboBoxItem { Tag: int idx })
+		{
+			return;
+		}
+		_selectedLayoutSlotIndex = idx;
+		RefreshLayoutOptionsUi();
+		RenderLiveWheelPreview();
+	}
+
+	private void EnableSlotCustomLayoutCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || _selectedLayoutSlotIndex < 0 || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+		if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+		{
+			ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
+			bool isChecked = EnableSlotCustomLayoutCheckBox.IsChecked == true;
+			if (isChecked)
+			{
+				if (string.IsNullOrWhiteSpace(action.LayoutMode) || action.LayoutMode == "Inherit")
+				{
+					action.LayoutMode = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
+				}
+				if (string.IsNullOrWhiteSpace(action.CustomTextColor))
+				{
+					action.CustomTextColor = ConfigManager.CurrentConfig.CustomText ?? "#FFF8FAFC";
+				}
+				if (string.IsNullOrWhiteSpace(action.CustomFontFamily))
+				{
+					action.CustomFontFamily = ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI";
+				}
+				if (!action.CustomIconSize.HasValue || action.CustomIconSize <= 0.0)
+				{
+					action.CustomIconSize = ConfigManager.CurrentConfig.SectorIconSize;
+				}
+				if (!action.CustomFontSize.HasValue || action.CustomFontSize <= 0.0)
+				{
+					action.CustomFontSize = ConfigManager.CurrentConfig.SectorFontSize;
+				}
+			}
+			else
+			{
+				action.LayoutMode = "Inherit";
+				action.CustomTextColor = "";
+				action.CustomFontFamily = "";
+				action.CustomIconSize = null;
+				action.CustomFontSize = null;
+			}
+			RefreshLayoutOptionsUi();
+			RenderLiveWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void ResetSlotLayoutButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedLayoutSlotIndex < 0 || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+		if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+		{
+			ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
+			action.LayoutMode = "Inherit";
+			action.CustomTextColor = "";
+			action.CustomFontFamily = "";
+			action.CustomIconSize = null;
+			action.CustomFontSize = null;
+			RefreshLayoutOptionsUi();
+			RenderLiveWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void PopulateLayoutSlotComboBox()
+	{
+		if (LayoutTargetSlotComboBox == null)
+		{
+			return;
+		}
+		LayoutTargetSlotComboBox.Items.Clear();
+		WheelProfile wheelProfile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
+		int count = ((wheelProfile.SectorCount > 0) ? wheelProfile.SectorCount : 8);
+		string[] dirArray = count switch
+		{
+			4 => Directions4, 
+			12 => Directions12, 
+			_ => Directions8, 
+		};
+		for (int i = 0; i < count; i++)
+		{
+			string dir = ((i < dirArray.Length) ? dirArray[i] : $"扇区 {i + 1}");
+			string actName = ((wheelProfile.Actions != null && i < wheelProfile.Actions.Count && wheelProfile.Actions[i] != null && !string.IsNullOrWhiteSpace(wheelProfile.Actions[i].Name)) ? wheelProfile.Actions[i].Name : "未设置动作");
+			ComboBoxItem item = new ComboBoxItem
+			{
+				Content = $"📍 扇区 {i + 1} [{dir}] - {actName}",
+				Tag = i
+			};
+			LayoutTargetSlotComboBox.Items.Add(item);
+		}
+		if (LayoutTargetSlotComboBox.Items.Count > 0)
+		{
+			int targetIdx = ((_selectedLayoutSlotIndex >= 0 && _selectedLayoutSlotIndex < LayoutTargetSlotComboBox.Items.Count) ? _selectedLayoutSlotIndex : 0);
+			LayoutTargetSlotComboBox.SelectedIndex = targetIdx;
+		}
+	}
+
+	private void PopulateLayoutModeComboBox(bool includeInherit)
+	{
+		if (IconLayoutModeComboBox == null)
+		{
+			return;
+		}
+		IconLayoutModeComboBox.Items.Clear();
+		if (includeInherit)
+		{
+			IconLayoutModeComboBox.Items.Add(new ComboBoxItem
+			{
+				Content = "跟随全局默认 (Inherit Global)",
+				Tag = "Inherit"
+			});
+		}
+		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
+		{
+			Content = "图标 + 文字 (双行居中)",
+			Tag = "IconAndText"
+		});
+		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
+		{
+			Content = "仅显示图标 (极大化居中)",
+			Tag = "IconOnly"
+		});
+		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
+		{
+			Content = "仅显示文字 (纯文字居中)",
+			Tag = "TextOnly"
+		});
+	}
+
+	private void RefreshLayoutOptionsUi()
+	{
+		if (ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		_isUpdatingUi = true;
+		try
+		{
+			PopulateWheelFontFamilies();
+			PopulateCoreFontFamilies();
+			if (_selectedLayoutSlotIndex < 0)
+			{
+				if (LayoutTargetGlobalRadio != null)
+				{
+					LayoutTargetGlobalRadio.IsChecked = true;
+				}
+				if (SlotSelectionContainer != null)
+				{
+					SlotSelectionContainer.Visibility = Visibility.Collapsed;
+				}
+				PopulateLayoutModeComboBox(includeInherit: false);
+				SetComboBoxSelectedValue(IconLayoutModeComboBox, ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText");
+				SetComboBoxSelectedValue(WheelFontFamilyComboBox, ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+				if (SectorTextColorTextBox != null)
+				{
+					SectorTextColorTextBox.Text = ConfigManager.CurrentConfig.CustomText ?? "#FFF8FAFC";
+					UpdateColorPreviewBorder(SectorTextColorPreview, SectorTextColorTextBox.Text);
+				}
+				if (SectorIconSizeSlider != null)
+				{
+					SectorIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+					if (SectorIconSizeLabel != null)
+					{
+						SectorIconSizeLabel.Text = $"{SectorIconSizeSlider.Value:0} px";
+					}
+				}
+				if (SectorFontSizeSlider != null)
+				{
+					SectorFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
+					if (SectorFontSizeLabel != null)
+					{
+						SectorFontSizeLabel.Text = $"{SectorFontSizeSlider.Value:0.0} px";
+					}
+				}
+				if (ShowTextCheckBox != null)
+				{
+					ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
+					ShowTextCheckBox.IsEnabled = true;
+				}
+			}
+			else
+			{
+				if (LayoutTargetSlotRadio != null)
+				{
+					LayoutTargetSlotRadio.IsChecked = true;
+				}
+				if (SlotSelectionContainer != null)
+				{
+					SlotSelectionContainer.Visibility = Visibility.Visible;
+				}
+				if (LayoutTargetSlotComboBox != null && LayoutTargetSlotComboBox.SelectedIndex != _selectedLayoutSlotIndex && _selectedLayoutSlotIndex < LayoutTargetSlotComboBox.Items.Count)
+				{
+					LayoutTargetSlotComboBox.SelectedIndex = _selectedLayoutSlotIndex;
+				}
+				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+				ActionItem? action = ((profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedLayoutSlotIndex] : null);
+				bool hasCustom = action != null && ((!string.IsNullOrWhiteSpace(action.LayoutMode) && action.LayoutMode != "Inherit") || !string.IsNullOrWhiteSpace(action.CustomTextColor) || !string.IsNullOrWhiteSpace(action.CustomFontFamily) || (action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0) || (action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0));
+				if (EnableSlotCustomLayoutCheckBox != null)
+				{
+					EnableSlotCustomLayoutCheckBox.IsChecked = hasCustom;
+				}
+				PopulateLayoutModeComboBox(includeInherit: true);
+				string currentMode = ((action != null && !string.IsNullOrWhiteSpace(action.LayoutMode)) ? action.LayoutMode : "Inherit");
+				SetComboBoxSelectedValue(IconLayoutModeComboBox, currentMode);
+				string currentFont = ((action != null && !string.IsNullOrWhiteSpace(action.CustomFontFamily)) ? action.CustomFontFamily : (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"));
+				SetComboBoxSelectedValue(WheelFontFamilyComboBox, currentFont);
+				if (SectorTextColorTextBox != null)
+				{
+					SectorTextColorTextBox.Text = ((action != null && !string.IsNullOrWhiteSpace(action.CustomTextColor)) ? action.CustomTextColor : (ConfigManager.CurrentConfig.CustomText ?? "#FFF8FAFC"));
+					UpdateColorPreviewBorder(SectorTextColorPreview, SectorTextColorTextBox.Text);
+				}
+				if (SectorIconSizeSlider != null)
+				{
+					double sz = ((action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0) ? action.CustomIconSize.Value : ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0));
+					SectorIconSizeSlider.Value = sz;
+					if (SectorIconSizeLabel != null)
+					{
+						SectorIconSizeLabel.Text = $"{sz:0} px";
+					}
+				}
+				if (SectorFontSizeSlider != null)
+				{
+					double fsz = ((action != null && action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0) ? action.CustomFontSize.Value : ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0));
+					SectorFontSizeSlider.Value = fsz;
+					if (SectorFontSizeLabel != null)
+					{
+						SectorFontSizeLabel.Text = $"{fsz:0.0} px";
+					}
+				}
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+	}
+
+	public void OnPreviewSectorClicked(int sectorIndex)
+	{
+		_selectedLayoutSlotIndex = sectorIndex;
+		if (LayoutTargetSlotRadio != null)
+		{
+			LayoutTargetSlotRadio.IsChecked = true;
+		}
+		RefreshLayoutOptionsUi();
+		RenderLiveWheelPreview();
+	}
+
 	private void IconLayoutModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
 		if (IconLayoutModeComboBox == null || ConfigManager.CurrentConfig == null || _isUpdatingUi || !(IconLayoutModeComboBox.SelectedItem is ComboBoxItem { Tag: var tag }))
@@ -3569,30 +3920,46 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		string text = tag?.ToString() ?? "IconAndText";
-		ConfigManager.CurrentConfig.IconLayoutMode = text;
-		_isUpdatingUi = true;
-		try
+		if (_selectedLayoutSlotIndex < 0)
 		{
-			if (text == "IconOnly")
+			ConfigManager.CurrentConfig.IconLayoutMode = text;
+			_isUpdatingUi = true;
+			try
 			{
-				ConfigManager.CurrentConfig.ShowText = false;
-				if (ShowTextCheckBox != null)
+				if (text == "IconOnly")
 				{
-					ShowTextCheckBox.IsChecked = false;
+					ConfigManager.CurrentConfig.ShowText = false;
+					if (ShowTextCheckBox != null)
+					{
+						ShowTextCheckBox.IsChecked = false;
+					}
+				}
+				else
+				{
+					ConfigManager.CurrentConfig.ShowText = true;
+					if (ShowTextCheckBox != null)
+					{
+						ShowTextCheckBox.IsChecked = true;
+					}
 				}
 			}
-			else
+			finally
 			{
-				ConfigManager.CurrentConfig.ShowText = true;
-				if (ShowTextCheckBox != null)
-				{
-					ShowTextCheckBox.IsChecked = true;
-				}
+				_isUpdatingUi = false;
 			}
 		}
-		finally
+		else
 		{
-			_isUpdatingUi = false;
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			{
+				ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
+				action.LayoutMode = text;
+				if (text != "Inherit" && EnableSlotCustomLayoutCheckBox != null)
+				{
+					EnableSlotCustomLayoutCheckBox.IsChecked = true;
+				}
+			}
 		}
 		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
@@ -3664,6 +4031,68 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void PopulateCoreFontFamilies()
+	{
+		if (CoreFontFamilyComboBox == null)
+		{
+			return;
+		}
+		CoreFontFamilyComboBox.Items.Clear();
+		List<(string, string)> obj = new List<(string, string)>
+		{
+			("\ud83d\udda5\ufe0f 系统默认 (Microsoft YaHei UI / Segoe UI)", "Microsoft YaHei UI, Segoe UI"),
+			("\ud83d\udd24 微软雅黑 (Microsoft YaHei UI)", "Microsoft YaHei UI"),
+			("\ud83d\udd24 Segoe UI (Windows Fluent)", "Segoe UI"),
+			("\ud83d\udd24 鸿蒙字体 (HarmonyOS Sans SC)", "HarmonyOS Sans SC"),
+			("\ud83d\udd24 苹方字体 (PingFang SC)", "PingFang SC"),
+			("\ud83d\udd24 小米兰亭 (MiSans)", "MiSans"),
+			("\ud83d\udd24 思源黑体 (Source Han Sans SC)", "Source Han Sans SC"),
+			("\ud83d\udd24 Inter (Modern Sans)", "Inter"),
+			("\ud83d\udd24 Arial", "Arial"),
+			("\ud83d\udd24 黑体 (SimHei)", "SimHei"),
+			("\ud83d\udd24 楷体 (KaiTi)", "KaiTi"),
+			("\ud83d\udd24 仿宋 (FangSong)", "FangSong"),
+			("\ud83d\udd24 等宽代码体 (Consolas / Cascadia)", "Consolas, Cascadia Code"),
+			("\ud83d\udd24 JetBrains Mono", "JetBrains Mono, Consolas")
+		};
+		HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		foreach (var item2 in obj)
+		{
+			CoreFontFamilyComboBox.Items.Add(new ComboBoxItem
+			{
+				Content = item2.Item1,
+				Tag = item2.Item2,
+				FontFamily = new System.Windows.Media.FontFamily(item2.Item2)
+			});
+			hashSet.Add(item2.Item2);
+			string item = item2.Item2.Split(',')[0].Trim();
+			hashSet.Add(item);
+		}
+		CoreFontFamilyComboBox.Items.Add(new Separator());
+		try
+		{
+			foreach (System.Windows.Media.FontFamily item3 in Fonts.SystemFontFamilies.OrderBy<System.Windows.Media.FontFamily, string>((System.Windows.Media.FontFamily f) => GetFontDisplayName(f), StringComparer.CurrentCultureIgnoreCase).ToList())
+			{
+				string source = item3.Source;
+				if (!string.IsNullOrWhiteSpace(source) && !hashSet.Contains(source))
+				{
+					string fontDisplayName = GetFontDisplayName(item3);
+					string content = (string.Equals(fontDisplayName, source, StringComparison.OrdinalIgnoreCase) ? ("\ud83d\udd24 " + fontDisplayName) : $"\ud83d\udd24 {fontDisplayName} ({source})");
+					CoreFontFamilyComboBox.Items.Add(new ComboBoxItem
+					{
+						Content = content,
+						Tag = source,
+						FontFamily = item3
+					});
+					hashSet.Add(source);
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private static string GetFontDisplayName(System.Windows.Media.FontFamily font)
 	{
 		try
@@ -3688,16 +4117,116 @@ public partial class SettingsWindow : Window
 
 	private void WheelFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (!_isUpdatingUi && WheelFontFamilyComboBox != null && ConfigManager.CurrentConfig != null && WheelFontFamilyComboBox.SelectedItem is ComboBoxItem { Tag: var tag })
+		if (_isUpdatingUi || WheelFontFamilyComboBox == null || ConfigManager.CurrentConfig == null || WheelFontFamilyComboBox.SelectedItem is not ComboBoxItem { Tag: var tag })
 		{
-			string wheelFontFamily = tag?.ToString() ?? "Microsoft YaHei UI, Segoe UI";
+			return;
+		}
+		string wheelFontFamily = tag?.ToString() ?? "Microsoft YaHei UI, Segoe UI";
+		if (_selectedLayoutSlotIndex < 0)
+		{
 			ConfigManager.CurrentConfig.WheelFontFamily = wheelFontFamily;
+		}
+		else
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			{
+				profile.Actions[_selectedLayoutSlotIndex].CustomFontFamily = wheelFontFamily;
+			}
+		}
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		SyncUiToConfigAndSave();
+	}
+
+	private void CoreFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || CoreFontFamilyComboBox == null || ConfigManager.CurrentConfig == null || CoreFontFamilyComboBox.SelectedItem is not ComboBoxItem { Tag: var tag })
+		{
+			return;
+		}
+		string coreFontFamily = tag?.ToString() ?? "Microsoft YaHei UI, Segoe UI";
+		ConfigManager.CurrentConfig.CoreFontFamily = coreFontFamily;
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		SyncUiToConfigAndSave();
+	}
+
+	private void SectorTextColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (SectorTextColorTextBox == null || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		string hex = SectorTextColorTextBox.Text.Trim();
+		UpdateColorPreviewBorder(SectorTextColorPreview, hex);
+		if (_isUpdatingUi)
+		{
+			return;
+		}
+		if (_selectedLayoutSlotIndex < 0)
+		{
+			ConfigManager.CurrentConfig.CustomText = hex;
+			if (CustomTextTextBox != null && CustomTextTextBox.Text != hex)
+			{
+				CustomTextTextBox.Text = hex;
+			}
+		}
+		else
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			{
+				profile.Actions[_selectedLayoutSlotIndex].CustomTextColor = hex;
+			}
+		}
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
+	private void CoreTextColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (CoreTextColorTextBox == null || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		string hex = CoreTextColorTextBox.Text.Trim();
+		UpdateColorPreviewBorder(CoreTextColorPreview, hex);
+		if (_isUpdatingUi)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.CoreTextColor = hex;
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
+	private void CoreFontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (CoreFontSizeSlider != null && CoreFontSizeLabel != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
+		{
+			ConfigManager.CurrentConfig.CoreFontSize = e.NewValue;
+			CoreFontSizeLabel.Text = $"{e.NewValue:0.0} px";
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
 			}
-			SyncUiToConfigAndSave();
+			ScheduleAutoSave();
 		}
 	}
 
@@ -3757,8 +4286,20 @@ public partial class SettingsWindow : Window
 	{
 		if (SectorIconSizeSlider != null && SectorIconSizeLabel != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
 		{
-			ConfigManager.CurrentConfig.SectorIconSize = e.NewValue;
-			SectorIconSizeLabel.Text = $"{e.NewValue:0} px";
+			double val = e.NewValue;
+			SectorIconSizeLabel.Text = $"{val:0} px";
+			if (_selectedLayoutSlotIndex < 0)
+			{
+				ConfigManager.CurrentConfig.SectorIconSize = val;
+			}
+			else
+			{
+				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+				if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+				{
+					profile.Actions[_selectedLayoutSlotIndex].CustomIconSize = val;
+				}
+			}
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
@@ -3772,8 +4313,20 @@ public partial class SettingsWindow : Window
 	{
 		if (SectorFontSizeSlider != null && SectorFontSizeLabel != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
 		{
-			ConfigManager.CurrentConfig.SectorFontSize = e.NewValue;
-			SectorFontSizeLabel.Text = $"{e.NewValue:0.0} px";
+			double val = e.NewValue;
+			SectorFontSizeLabel.Text = $"{val:0.0} px";
+			if (_selectedLayoutSlotIndex < 0)
+			{
+				ConfigManager.CurrentConfig.SectorFontSize = val;
+			}
+			else
+			{
+				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+				if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+				{
+					profile.Actions[_selectedLayoutSlotIndex].CustomFontSize = val;
+				}
+			}
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
@@ -4749,6 +5302,8 @@ public partial class SettingsWindow : Window
 			"CustomHighlightBg" => CustomHighlightBgTextBox, 
 			"CustomHighlightBorder" => CustomHighlightBorderTextBox, 
 			"CustomText" => CustomTextTextBox, 
+			"SectorCustomText" => SectorTextColorTextBox,
+			"CoreCustomText" => CoreTextColorTextBox,
 			"HighlightGlowColor" => HighlightGlowColorTextBox, 
 			"SubHighlightGlowColor" => SubHighlightGlowColorTextBox, 
 			"SubCustomSectorBg" => SubCustomSectorBgTextBox, 
@@ -5615,11 +6170,21 @@ public partial class SettingsWindow : Window
 				Effect = new BlurEffect { Radius = 7.0, RenderingBias = RenderingBias.Performance }
 			};
 			grid.Children.Add(_previewCoreSelectionOverlay);
+			double previewCoreFontSize = (ConfigManager.CurrentConfig?.CoreFontSize > 0.0)
+				? ConfigManager.CurrentConfig.CoreFontSize
+				: Math.Max(8.0, Math.Min(16.0, num10 / 4.0));
+			Brush previewCoreTextBrush = (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
+				? CreateBrushFromHexSafe(ConfigManager.CurrentConfig.CoreTextColor, _previewTextBrush)
+				: _previewTextBrush;
+			string previewCoreFontFamily = (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreFontFamily))
+				? ConfigManager.CurrentConfig.CoreFontFamily
+				: (ConfigManager.CurrentConfig?.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 			_previewCoreSelectionText = new TextBlock
 			{
 				Width = Math.Max(24.0, Math.Min(num10 * 1.75, 150.0)),
-				Foreground = _previewTextBrush,
-				FontSize = Math.Max(8.0, Math.Min(16.0, num10 / 4.0)),
+				Foreground = previewCoreTextBrush,
+				FontSize = Math.Max(7.5, previewCoreFontSize * 0.82),
+				FontFamily = new System.Windows.Media.FontFamily(previewCoreFontFamily),
 				FontWeight = FontWeights.SemiBold,
 				HorizontalAlignment = HorizontalAlignment.Center,
 				VerticalAlignment = VerticalAlignment.Center,
@@ -5658,8 +6223,27 @@ public partial class SettingsWindow : Window
 					Stroke = _previewBorderBrush,
 					StrokeThickness = _previewStyleRenderer.BorderThickness,
 					RenderTransform = translateTransform,
-					Tag = num21
+					Tag = num21,
+					Cursor = System.Windows.Input.Cursors.Hand
 				};
+				int clickedSectorIndex = num21;
+				path.MouseLeftButtonDown += (s, e) =>
+				{
+					e.Handled = true;
+					OnPreviewSectorClicked(clickedSectorIndex);
+				};
+				if (_selectedLayoutSlotIndex == num21 && LayoutTargetSlotRadio != null && LayoutTargetSlotRadio.IsChecked == true)
+				{
+					path.Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+					path.StrokeThickness = 2.2;
+					path.Effect = new DropShadowEffect
+					{
+						Color = System.Windows.Media.Color.FromRgb(56, 189, 248),
+						BlurRadius = 12.0,
+						ShadowDepth = 0.0,
+						Opacity = 0.95
+					};
+				}
 				System.Windows.Controls.Panel.SetZIndex(path, 0);
 				LiveWheelPreviewCanvas.Children.Add(path);
 				_previewStyleRenderer?.ApplySectorHighlight(path, isHighlighted: false);
@@ -5679,9 +6263,9 @@ public partial class SettingsWindow : Window
 				string text10 = "";
 				string text11 = null;
 				IconHelper.CustomIconItem customIconItem2 = null;
-				if (wheelProfile.Actions != null && num21 < wheelProfile.Actions.Count && wheelProfile.Actions[num21] != null)
+				ActionItem? action = (wheelProfile.Actions != null && num21 < wheelProfile.Actions.Count) ? wheelProfile.Actions[num21] : null;
+				if (action != null)
 				{
-					ActionItem action = wheelProfile.Actions[num21];
 					text8 = action.Name ?? "";
 					text9 = action.Type ?? "Hotkey";
 					text10 = action.Parameter ?? "";
@@ -5721,16 +6305,32 @@ public partial class SettingsWindow : Window
 						}
 					}
 				}
-				if (text3 != "TextOnly")
+
+				string sectorLayout = text3;
+				if (action != null && !string.IsNullOrWhiteSpace(action.LayoutMode) && action.LayoutMode != "Inherit")
 				{
-					double num28 = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+					sectorLayout = action.LayoutMode;
+				}
+				bool sectorFlag = ConfigManager.CurrentConfig.ShowText && sectorLayout != "IconOnly";
+
+				Brush sectorPreviewTextBrush = _previewTextBrush;
+				if (action != null && !string.IsNullOrWhiteSpace(action.CustomTextColor))
+				{
+					sectorPreviewTextBrush = CreateBrushFromHexSafe(action.CustomTextColor, _previewTextBrush);
+				}
+
+				if (sectorLayout != "TextOnly")
+				{
+					double baseIconSize = (action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0)
+						? action.CustomIconSize.Value
+						: ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
 					double num29 = num19 switch
 					{
 						4 => 1.2, 
 						12 => 0.8, 
 						_ => 1.0, 
 					};
-					double num30 = ((text3 == "IconOnly") ? (num28 * 1.35) : num28) * 0.72 * num29 * (num7 / (135.0 / num5));
+					double num30 = ((sectorLayout == "IconOnly") ? (baseIconSize * 1.35) : baseIconSize) * 0.72 * num29 * (num7 / (135.0 / num5));
 					if (!string.IsNullOrEmpty(text11))
 					{
 						try
@@ -5738,12 +6338,12 @@ public partial class SettingsWindow : Window
 							System.Windows.Shapes.Path element = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(text11),
-								Fill = _previewTextBrush,
+								Fill = sectorPreviewTextBrush,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
 							};
 							stackPanel.Children.Add(element);
 						}
@@ -5763,7 +6363,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
 							};
 							stackPanel.Children.Add(element2);
 						}
@@ -5780,7 +6380,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
 							};
 							stackPanel.Children.Add(element3);
 						}
@@ -5792,12 +6392,12 @@ public partial class SettingsWindow : Window
 							System.Windows.Shapes.Path element4 = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse("M19,15H5V5H19M19,3H5C3.89,3 3,3.89 3,5V15C3,16.1 3.89,17 5,17H19C20.1,17 21,16.1 21,15V5C21,3.89 20.1,3 19,3M2,18H22V20H2V18Z"),
-								Fill = _previewTextBrush,
+								Fill = sectorPreviewTextBrush,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
 							};
 							stackPanel.Children.Add(element4);
 						}
@@ -5806,28 +6406,33 @@ public partial class SettingsWindow : Window
 						}
 					}
 				}
-				if (flag && !string.IsNullOrEmpty(text8))
+				if (sectorFlag && !string.IsNullOrEmpty(text8))
 				{
-					double num31 = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
+					double baseFontSize = (action != null && action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0)
+						? action.CustomFontSize.Value
+						: ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
 					double num32 = num19 switch
 					{
 						4 => 1.2, 
 						12 => 0.8, 
 						_ => 1.0, 
 					};
-					double val2 = ((text3 == "TextOnly") ? (num31 + 1.0) : num31) * 0.82 * num32 * (num7 / (135.0 / num5));
+					double val2 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.0) : baseFontSize) * 0.82 * num32 * (num7 / (135.0 / num5));
 					double maxWidth = num19 switch
 					{
 						4 => 96.0, 
 						12 => 52.0, 
 						_ => 80.0, 
 					} * num7;
+					string sectorFont = (action != null && !string.IsNullOrWhiteSpace(action.CustomFontFamily))
+						? action.CustomFontFamily
+						: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 					TextBlock element5 = new TextBlock
 					{
 						Text = text8,
 						FontSize = Math.Max(6.0, val2),
-						FontFamily = new System.Windows.Media.FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"),
-						Foreground = _previewTextBrush,
+						FontFamily = new System.Windows.Media.FontFamily(sectorFont),
+						Foreground = sectorPreviewTextBrush,
 						FontWeight = FontWeights.Medium,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 						TextAlignment = TextAlignment.Center,
@@ -6063,6 +6668,22 @@ public partial class SettingsWindow : Window
 			(byte)Math.Min(255, baseColor.R + 48),
 			(byte)Math.Min(255, baseColor.G + 56),
 			(byte)Math.Min(255, baseColor.B + 72)));
+	}
+
+	private static System.Windows.Media.Brush CreateBrushFromHexSafe(string? hex, System.Windows.Media.Brush fallback)
+	{
+		if (string.IsNullOrWhiteSpace(hex))
+		{
+			return fallback;
+		}
+		try
+		{
+			return new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex));
+		}
+		catch
+		{
+			return fallback;
+		}
 	}
 
 	private void UpdatePreviewCoreSelection(int mainIndex, int subIndex, WheelProfile? wheelProfile)
