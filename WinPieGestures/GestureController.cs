@@ -71,6 +71,9 @@ public class GestureController
 
 	private double _trailScaleY = 1.0;
 
+	/// <summary>轻点回放后，下一次该键事件放行（SendInput 重放的按下需穿透给应用）。</summary>
+	private bool _gestureReplayPending;
+
 	private WheelProfile? _activeProfile;
 
 	private int _selectedSectorIndex = -1;
@@ -416,6 +419,12 @@ public class GestureController
 		}
 		if (e.IsButtonDown)
 		{
+			// SendInput 重放回来的按下：放行（不重新开始手势）
+			if (_gestureReplayPending)
+			{
+				_gestureReplayPending = false;
+				return;
+			}
 			if (CheckIsIsolated(out _))
 			{
 				_gestureMode = false;
@@ -423,7 +432,7 @@ public class GestureController
 				return;
 			}
 			BeginGesture(e.Position);
-			e.Handled = true;
+			e.Handled = true; // 拦截原生按下
 			return;
 		}
 		if (!_gestureMode)
@@ -446,13 +455,14 @@ public class GestureController
 		}
 		else
 		{
-			// 轻点：透传原生点击
+			// 轻点：SendInput 回放原生点击（回放事件放行，见 _gestureReplayPending）
+			_gestureReplayPending = true;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				_mouseHook.ReplayTriggerClick(gestureButton);
 			}, (DispatcherPriority)5, Array.Empty<object>());
 		}
-		e.Handled = true;
+		e.Handled = true; // 拦截原生抬起
 	}
 
 	/// <summary>方向码 → 图样字符（8 方向，屏幕坐标 y 向下）。</summary>
@@ -496,8 +506,13 @@ public class GestureController
 		_trailScaleY = tScaleY;
 		_trailLastX = pressPoint.X;
 		_trailLastY = pressPoint.Y;
-		Point p0 = pressPoint;
-		double sx = tScaleX, sy = tScaleY;
+		// 轨迹在越过阈值后才显示（见 ShowGestureTrail）
+	}
+
+	private void ShowGestureTrail()
+	{
+		Point p0 = _gesturePressPoint;
+		double sx = _trailScaleX, sy = _trailScaleY;
 		DispatchUi(delegate
 		{
 			if (_trail == null)
@@ -905,6 +920,7 @@ public class GestureController
 					_gestureWaiting = false;
 					_gestureTracking = true;
 					_gestureAnchor = e.Position;
+					ShowGestureTrail();
 				}
 			}
 			else if (_gestureTracking)
