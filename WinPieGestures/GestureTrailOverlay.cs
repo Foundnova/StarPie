@@ -80,7 +80,7 @@ public class GestureTrailOverlay : Window
 		_startDot = new Ellipse { Width = 6.0, Height = 6.0, Fill = new SolidColorBrush(Color.FromRgb(244, 63, 94)) };
 		_hintText = new TextBlock
 		{
-			FontSize = 12.5,
+			FontSize = 18.0,
 			FontWeight = FontWeights.Bold,
 			Foreground = Brushes.White,
 			TextAlignment = TextAlignment.Center
@@ -88,11 +88,11 @@ public class GestureTrailOverlay : Window
 		_hintBorder = new Border
 		{
 			Child = _hintText,
-			Background = new SolidColorBrush(Color.FromArgb(200, 20, 25, 45)),
-			BorderBrush = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)),
+			Background = new SolidColorBrush(Color.FromArgb(210, 20, 25, 45)),
+			BorderBrush = new SolidColorBrush(Color.FromArgb(130, 255, 255, 255)),
 			BorderThickness = new Thickness(1.0),
-			CornerRadius = new CornerRadius(5.0),
-			Padding = new Thickness(8.0, 3.0, 8.0, 3.0),
+			CornerRadius = new CornerRadius(7.0),
+			Padding = new Thickness(12.0, 5.0, 12.0, 5.0),
 			Visibility = Visibility.Collapsed
 		};
 		Panel.SetZIndex(_line, 0);
@@ -173,37 +173,37 @@ public class GestureTrailOverlay : Window
 		double sy = scaleY > 0.0 ? scaleY : 1.0;
 		double cx = screenX / sx - _leftDIP;
 		double cy = screenY / sy - _topDIP;
-		double ox = 46.0;
-		double oy = 46.0;
+		double ox = 54.0;
+		double oy = 54.0;
 		switch (placement)
 		{
 		case "U":
 			ox = 0.0;
-			oy = -46.0;
+			oy = -54.0;
 			break;
 		case "D":
 			ox = 0.0;
-			oy = 46.0;
+			oy = 54.0;
 			break;
 		case "L":
-			ox = -46.0;
+			ox = -54.0;
 			oy = 0.0;
 			break;
 		case "UL":
-			ox = -34.0;
-			oy = -34.0;
+			ox = -40.0;
+			oy = -40.0;
 			break;
 		case "UR":
-			ox = 34.0;
-			oy = -34.0;
+			ox = 40.0;
+			oy = -40.0;
 			break;
 		case "DL":
-			ox = -34.0;
-			oy = 34.0;
+			ox = -40.0;
+			oy = 40.0;
 			break;
 		case "DR":
-			ox = 34.0;
-			oy = 34.0;
+			ox = 40.0;
+			oy = 40.0;
 			break;
 		}
 		double x = cx + ox;

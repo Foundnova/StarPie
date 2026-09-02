@@ -56,6 +56,8 @@ public class GestureController
 
 	private int _gestureLastDir = -1;
 
+	private Point _gestureDirAnchor;
+
 	private int _gestureSegmentCount;
 
 	private System.Text.StringBuilder _gestureSegments = new System.Text.StringBuilder();
@@ -569,6 +571,7 @@ public class GestureController
 			{
 				AppendGestureSegment(_gestureLastDir);
 			}
+			_gestureDirAnchor = _gestureAnchor; // 新方向的起点（供释放时校验尾段是否画足）
 			_gestureLastDir = dir;
 		}
 		_gestureAnchor = current;
@@ -642,10 +645,16 @@ public class GestureController
 
 	private void EndGesture(Point current)
 	{
-		// 追加最后一段
+		// 只有最后一段确实画足（≥最小段长）才计入——半截小尾巴不算段，
+		// 保证"完全匹配才触发"（例如 ↓ 后轻微右移不会变成 ↓→）。
 		if (_gestureLastDir >= 0)
 		{
-			AppendGestureSegment(_gestureLastDir);
+			double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
+			double tailLen = Math.Sqrt((current.X - _gestureDirAnchor.X) * (current.X - _gestureDirAnchor.X) + (current.Y - _gestureDirAnchor.Y) * (current.Y - _gestureDirAnchor.Y));
+			if (tailLen >= segMin)
+			{
+				AppendGestureSegment(_gestureLastDir);
+			}
 			_gestureLastDir = -1;
 		}
 		_gestureMode = false;
