@@ -43,7 +43,7 @@ public class GestureController
 
 	private bool _mouseTriggerDown;
 
-	// ---- 鼠标手势（画轨迹识别）----
+	// ---- 鼠标手势（画轨迹识别；延迟分段缓冲：短段过滤 + 相邻同向合并 + 完全匹配才触发）----
 	private bool _gestureMode;
 
 	private bool _gestureWaiting;
@@ -52,15 +52,13 @@ public class GestureController
 
 	private Point _gesturePressPoint;
 
-	private Point _gestureAnchor;
+	private Point _gestureLastSample;
 
-	private int _gestureLastDir = -1;
+	private readonly List<(int dir, double len)> _gestureRuns = new List<(int, double)>();
 
-	private Point _gestureDirAnchor;
+	private int _gesturePendingDir = -1;
 
-	private int _gestureSegmentCount;
-
-	private System.Text.StringBuilder _gestureSegments = new System.Text.StringBuilder();
+	private double _gesturePendingLen;
 
 	// 手势轨迹浮层（可视化）
 	private GestureTrailOverlay? _trail;
@@ -441,19 +439,24 @@ public class GestureController
 		{
 			return;
 		}
+		bool hadPath = _gestureTracking;
 		EndGesture(e.Position);
-		if (_gestureSegmentCount > 0)
+		string pattern = GetPreviewPattern();
+		if (hadPath)
 		{
-			ActionItem? ga = FindGestureAction(_gestureSegments.ToString());
-			if (ga != null)
+			if (pattern.Length > 0)
 			{
-				ActionItem action = ga;
-				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				ActionItem? ga = FindGestureAction(pattern);
+				if (ga != null)
 				{
-					ActionExecutor.Execute(action);
-				}, (DispatcherPriority)5, Array.Empty<object>());
+					ActionItem action = ga;
+					((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+					{
+						ActionExecutor.Execute(action);
+					}, (DispatcherPriority)5, Array.Empty<object>());
+				}
 			}
-			// 未映射的轨迹：吞掉不执行
+			// 已画但未映射/未成图样：吞掉不执行
 		}
 		else
 		{
@@ -499,10 +502,10 @@ public class GestureController
 		_gestureWaiting = true;
 		_gestureTracking = false;
 		_gesturePressPoint = pressPoint;
-		_gestureAnchor = pressPoint;
-		_gestureLastDir = -1;
-		_gestureSegmentCount = 0;
-		_gestureSegments.Clear();
+		_gestureLastSample = pressPoint;
+		_gestureRuns.Clear();
+		_gesturePendingDir = -1;
+		_gesturePendingLen = 0.0;
 		var (tScaleX, tScaleY) = RadialWindow.GetMonitorDpiScale(pressPoint);
 		_trailScaleX = tScaleX;
 		_trailScaleY = tScaleY;
@@ -539,42 +542,39 @@ public class GestureController
 		});
 	}
 
-	/// <summary>追加一段方向码（段间以 "-" 分隔，最多 3 段；单段对角线 "DR" 与双段 "D-R" 不冲突）。</summary>
-	private void AppendGestureSegment(int dir)
-	{
-		if (_gestureSegmentCount >= 3)
-		{
-			return;
-		}
-		if (_gestureSegmentCount > 0)
-		{
-			_gestureSegments.Append("-");
-		}
-		_gestureSegments.Append(GestureDirCode(dir));
-		_gestureSegmentCount++;
-	}
-
-	/// <summary>移动采样：越阈值开始采集；段长≥阈值且方向变化才记一段（最多 3 段）。</summary>
+	/// <summary>
+	/// 移动采样（延迟分段缓冲）：每步把位移并入当前方向行程；
+	/// 方向切换时把上一行程存入缓冲列表。短段/曲线抖动的过滤在构建图样时统一做，
+	/// 因此"画的线可以弯曲"，微拐弯不会产生方向段。
+	/// </summary>
 	private void FeedGesturePoint(Point current)
 	{
-		double dy = current.Y - _gestureAnchor.Y;
-		double dx = current.X - _gestureAnchor.X;
-		double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
-		if (Math.Sqrt(dx * dx + dy * dy) < segMin)
+		double dx = current.X - _gestureLastSample.X;
+		double dy = current.Y - _gestureLastSample.Y;
+		double dist = Math.Sqrt(dx * dx + dy * dy);
+		if (dist < 2.0)
 		{
-			return;
+			return; // 微抖动忽略
 		}
 		int dir = GestureQuantizeDir(dx, dy);
-		if (dir != _gestureLastDir)
+		if (dir == _gesturePendingDir)
 		{
-			if (_gestureLastDir >= 0)
-			{
-				AppendGestureSegment(_gestureLastDir);
-			}
-			_gestureDirAnchor = _gestureAnchor; // 新方向的起点（供释放时校验尾段是否画足）
-			_gestureLastDir = dir;
+			_gesturePendingLen += dist;
 		}
-		_gestureAnchor = current;
+		else
+		{
+			if (_gesturePendingLen > 0.0)
+			{
+				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+				if (_gestureRuns.Count > 12)
+				{
+					_gestureRuns.RemoveAt(0);
+				}
+			}
+			_gesturePendingDir = dir;
+			_gesturePendingLen = dist;
+		}
+		_gestureLastSample = current;
 		// 轨迹：距离够才加一次，避免污染 Hook 消息调度的消息队列；同时更新"松手将执行"提示
 		if (Math.Abs(current.X - _trailLastX) + Math.Abs(current.Y - _trailLastY) >= 4.0)
 		{
@@ -597,19 +597,36 @@ public class GestureController
 		}
 	}
 
-	/// <summary>当前已画图样（含正在进行的最后一段）的预览字符串。</summary>
+	/// <summary>
+	/// 构建最终图样：过滤掉长度低于灵敏度的短段（屏蔽过短的线段/曲线抖动），
+	/// 相邻同向合并，最多 3 段；只有完整匹配映射才触发。
+	/// </summary>
 	private string GetPreviewPattern()
 	{
-		System.Text.StringBuilder sb = new System.Text.StringBuilder(_gestureSegments.ToString());
-		if (_gestureLastDir >= 0)
+		double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
+		List<(int dir, double len)> runs = new List<(int, double)>(_gestureRuns);
+		if (_gesturePendingDir >= 0 && _gesturePendingLen > 0.0)
 		{
-			if (sb.Length > 0)
-			{
-				sb.Append('-');
-			}
-			sb.Append(GestureDirCode(_gestureLastDir));
+			runs.Add((_gesturePendingDir, _gesturePendingLen));
 		}
-		return sb.ToString();
+		List<int> dirs = new List<int>();
+		foreach (var (dir, len) in runs)
+		{
+			if (len < segMin)
+			{
+				continue; // 短段屏蔽
+			}
+			if (dirs.Count > 0 && dirs[dirs.Count - 1] == dir)
+			{
+				continue; // 相邻同向合并
+			}
+			dirs.Add(dir);
+			if (dirs.Count >= 3)
+			{
+				break;
+			}
+		}
+		return string.Join("-", dirs.Select(GestureDirCode));
 	}
 
 	/// <summary>图样 → 箭头文本（如 "D-R" → "↓→"）。</summary>
@@ -645,18 +662,35 @@ public class GestureController
 
 	private void EndGesture(Point current)
 	{
-		// 只有最后一段确实画足（≥最小段长）才计入——半截小尾巴不算段，
-		// 保证"完全匹配才触发"（例如 ↓ 后轻微右移不会变成 ↓→）。
-		if (_gestureLastDir >= 0)
+		// 收尾：把最后一段并入缓冲（过滤与合并交给 GetPreviewPattern）
 		{
-			double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
-			double tailLen = Math.Sqrt((current.X - _gestureDirAnchor.X) * (current.X - _gestureDirAnchor.X) + (current.Y - _gestureDirAnchor.Y) * (current.Y - _gestureDirAnchor.Y));
-			if (tailLen >= segMin)
+			double dx = current.X - _gestureLastSample.X;
+			double dy = current.Y - _gestureLastSample.Y;
+			double dist = Math.Sqrt(dx * dx + dy * dy);
+			if (dist >= 2.0)
 			{
-				AppendGestureSegment(_gestureLastDir);
+				int dir = GestureQuantizeDir(dx, dy);
+				if (dir == _gesturePendingDir)
+				{
+					_gesturePendingLen += dist;
+				}
+				else
+				{
+					if (_gesturePendingLen > 0.0)
+					{
+						_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+					}
+					_gesturePendingDir = dir;
+					_gesturePendingLen = dist;
+				}
 			}
-			_gestureLastDir = -1;
+			if (_gesturePendingLen > 0.0)
+			{
+				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+			}
 		}
+		_gesturePendingDir = -1;
+		_gesturePendingLen = 0.0;
 		_gestureMode = false;
 		_gestureWaiting = false;
 		_gestureTracking = false;
@@ -997,7 +1031,7 @@ public class GestureController
 				{
 					_gestureWaiting = false;
 					_gestureTracking = true;
-					_gestureAnchor = e.Position;
+					_gestureLastSample = e.Position;
 					ShowGestureTrail();
 				}
 			}
