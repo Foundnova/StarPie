@@ -693,11 +693,13 @@ public static class WindowTaskbarHelper
 				ok = SetForegroundWindow(hWnd);
 			}
 
-			// 兜底 2：置顶再取消置顶，把窗口抬到最前（无输入焦点但不再闪任务栏标题）
+			// 兜底 2：前台可能是全屏/无边框全屏窗口——置顶+显示激活后取消置顶，
+			// 可把新窗口抬到全屏之上（独占全屏游戏除外，只能靠切走/Alt-Tab）
 			if (!ok)
 			{
-				SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-				SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+				ok = SetForegroundWindow(hWnd);
+				SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			}
 
 			if (attachedTarget)
