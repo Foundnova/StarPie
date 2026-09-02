@@ -601,6 +601,24 @@
                       <ComboBoxItem Tag="XButton2" Content="🖱️ 鼠标侧键2 (前进)" />
                     </ComboBox>
                   </Grid>
+                  <Grid Margin="0,2,0,10">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Name="GestureHintPlaceText" Text="松手提示位置：" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox Name="GestureHintPlacementComboBox" Grid.Column="1" Width="180" HorizontalAlignment="Left" Style="{StaticResource FlatComboBoxStyle}" Height="32" SelectionChanged="GestureHintPlacementComboBox_SelectionChanged">
+                      <ComboBoxItem Tag="Auto" Content="✨ 自动（运动反方向）" />
+                      <ComboBoxItem Tag="U" Content="⬆ 上方" />
+                      <ComboBoxItem Tag="D" Content="⬇ 下方" />
+                      <ComboBoxItem Tag="L" Content="⬅ 左方" />
+                      <ComboBoxItem Tag="R" Content="➡ 右方" />
+                      <ComboBoxItem Tag="UL" Content="↖ 左上" />
+                      <ComboBoxItem Tag="UR" Content="↗ 右上" />
+                      <ComboBoxItem Tag="DL" Content="↙ 左下" />
+                      <ComboBoxItem Tag="DR" Content="↘ 右下" />
+                    </ComboBox>
+                  </Grid>
                   <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
                     <StackPanel>
                       <TextBlock Name="GestureMappingTitleText" Text="手势图样映射" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />

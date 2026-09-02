@@ -571,17 +571,72 @@ public class GestureController
 			_gestureLastDir = dir;
 		}
 		_gestureAnchor = current;
-		// 轨迹：距离够才加一次，避免污染 Hook 消息调度的消息队列
+		// 轨迹：距离够才加一次，避免污染 Hook 消息调度的消息队列；同时更新"松手将执行"提示
 		if (Math.Abs(current.X - _trailLastX) + Math.Abs(current.Y - _trailLastY) >= 4.0)
 		{
 			_trailLastX = current.X;
 			_trailLastY = current.Y;
 			double tx = current.X, ty = current.Y;
+			string hint = BuildGestureHint(GetPreviewPattern());
+			string placement = ConfigManager.CurrentConfig.GestureHintPlacement ?? "Auto";
+			if (placement == "Auto")
+			{
+				int curDir = GestureQuantizeDir(current.X - _gesturePressPoint.X, current.Y - _gesturePressPoint.Y);
+				placement = GestureDirCode((curDir + 4) % 8); // 提示放在运动反方向，避免被手遮挡
+			}
+			string hintPlacement = placement;
 			DispatchUi(delegate
 			{
 				_trail?.AddPoint(tx, ty, _trailScaleX, _trailScaleY);
+				_trail?.UpdateHint(hint, tx, ty, _trailScaleX, _trailScaleY, hintPlacement);
 			});
 		}
+	}
+
+	/// <summary>当前已画图样（含正在进行的最后一段）的预览字符串。</summary>
+	private string GetPreviewPattern()
+	{
+		System.Text.StringBuilder sb = new System.Text.StringBuilder(_gestureSegments.ToString());
+		if (_gestureLastDir >= 0)
+		{
+			if (sb.Length > 0)
+			{
+				sb.Append('-');
+			}
+			sb.Append(GestureDirCode(_gestureLastDir));
+		}
+		return sb.ToString();
+	}
+
+	/// <summary>图样 → 箭头文本（如 "D-R" → "↓→"）。</summary>
+	private static string GesturePatternGlyph(string pattern)
+	{
+		return pattern
+			.Replace("UL", "↖")
+			.Replace("UR", "↗")
+			.Replace("DL", "↙")
+			.Replace("DR", "↘")
+			.Replace("U", "↑")
+			.Replace("D", "↓")
+			.Replace("L", "←")
+			.Replace("R", "→");
+	}
+
+	/// <summary>提示文本：图样箭头 + 映射动作名/参数；未映射只显示图样。</summary>
+	private string BuildGestureHint(string pattern)
+	{
+		string glyph = GesturePatternGlyph(pattern);
+		ActionItem? a = FindGestureAction(pattern);
+		if (a == null)
+		{
+			return glyph;
+		}
+		string label = (!string.IsNullOrEmpty(a.Name) && a.Name != "手势动作") ? a.Name : (a.Parameter ?? "");
+		if (string.IsNullOrEmpty(label))
+		{
+			label = a.Type ?? "";
+		}
+		return string.IsNullOrEmpty(label) ? glyph : $"{glyph}  {label}";
 	}
 
 	private void EndGesture(Point current)

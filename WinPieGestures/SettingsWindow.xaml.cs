@@ -361,6 +361,7 @@ public partial class SettingsWindow : Window
 			GestureEnabledCheckBox.IsChecked = ConfigManager.CurrentConfig.GestureEnabled;
 		}
 		SetComboBoxSelectedValue(GestureTriggerButtonComboBox, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton");
+		SetComboBoxSelectedValue(GestureHintPlacementComboBox, ConfigManager.CurrentConfig.GestureHintPlacement ?? "Auto");
 		RefreshGestureMappings();
 		if (EnableOuterEscapeCheckBox != null)
 		{
@@ -872,6 +873,10 @@ public partial class SettingsWindow : Window
 		if (GestureTriggerLabelText != null)
 		{
 			GestureTriggerLabelText.Text = I18n.T("GestureTriggerLabelText");
+		}
+		if (GestureHintPlaceText != null)
+		{
+			GestureHintPlaceText.Text = I18n.T("GestureHintPlaceText");
 		}
 		if (GestureMappingTitleText != null)
 		{
@@ -6540,6 +6545,19 @@ public partial class SettingsWindow : Window
 		if (GestureTriggerButtonComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
 		{
 			ConfigManager.CurrentConfig.GestureTriggerButton = tag;
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void GestureHintPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (GestureHintPlacementComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+		{
+			ConfigManager.CurrentConfig.GestureHintPlacement = tag;
 			SyncUiToConfigAndSave();
 		}
 	}

@@ -26,6 +26,9 @@ public class AppConfig
 
 	public List<GestureMapping> GestureMappings { get; set; } = new List<GestureMapping>();
 
+	/// <summary>手势提示文字位置："Auto" 或 U/D/L/R/UL/UR/DL/DR（相对鼠标）。</summary>
+	public string GestureHintPlacement { get; set; } = "Auto";
+
 	public string AnimationSpeed { get; set; } = "Balanced";
 
 	public double CustomAnimationDurationMs { get; set; } = 80.0;

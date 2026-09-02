@@ -16,6 +16,8 @@ public class GestureTrailOverlay : Window
 	private readonly Canvas _canvas;
 	private readonly Polyline _line;
 	private readonly Ellipse _startDot;
+	private readonly Border _hintBorder;
+	private readonly TextBlock _hintText;
 	private double _leftDIP;
 	private double _topDIP;
 
@@ -76,10 +78,29 @@ public class GestureTrailOverlay : Window
 			StrokeLineJoin = PenLineJoin.Round
 		};
 		_startDot = new Ellipse { Width = 6.0, Height = 6.0, Fill = new SolidColorBrush(Color.FromRgb(244, 63, 94)) };
+		_hintText = new TextBlock
+		{
+			FontSize = 12.5,
+			FontWeight = FontWeights.Bold,
+			Foreground = Brushes.White,
+			TextAlignment = TextAlignment.Center
+		};
+		_hintBorder = new Border
+		{
+			Child = _hintText,
+			Background = new SolidColorBrush(Color.FromArgb(200, 20, 25, 45)),
+			BorderBrush = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)),
+			BorderThickness = new Thickness(1.0),
+			CornerRadius = new CornerRadius(5.0),
+			Padding = new Thickness(8.0, 3.0, 8.0, 3.0),
+			Visibility = Visibility.Collapsed
+		};
 		Panel.SetZIndex(_line, 0);
 		Panel.SetZIndex(_startDot, 1);
+		Panel.SetZIndex(_hintBorder, 2);
 		_canvas.Children.Add(_line);
 		_canvas.Children.Add(_startDot);
+		_canvas.Children.Add(_hintBorder);
 		Content = _canvas;
 	}
 
@@ -142,5 +163,88 @@ public class GestureTrailOverlay : Window
 	public void ClearTrail()
 	{
 		_line.Points.Clear();
+		HideHint();
+	}
+
+	/// <summary>更新提示标签：文本 + 相对鼠标的八方向定位（Auto 已由调用方解析为具体方向）。</summary>
+	public void UpdateHint(string text, double screenX, double screenY, double scaleX, double scaleY, string placement)
+	{
+		double sx = scaleX > 0.0 ? scaleX : 1.0;
+		double sy = scaleY > 0.0 ? scaleY : 1.0;
+		double cx = screenX / sx - _leftDIP;
+		double cy = screenY / sy - _topDIP;
+		double ox = 46.0;
+		double oy = 46.0;
+		switch (placement)
+		{
+		case "U":
+			ox = 0.0;
+			oy = -46.0;
+			break;
+		case "D":
+			ox = 0.0;
+			oy = 46.0;
+			break;
+		case "L":
+			ox = -46.0;
+			oy = 0.0;
+			break;
+		case "UL":
+			ox = -34.0;
+			oy = -34.0;
+			break;
+		case "UR":
+			ox = 34.0;
+			oy = -34.0;
+			break;
+		case "DL":
+			ox = -34.0;
+			oy = 34.0;
+			break;
+		case "DR":
+			ox = 34.0;
+			oy = 34.0;
+			break;
+		}
+		double x = cx + ox;
+		double y = cy + oy;
+		if (x < 6.0)
+		{
+			x = 6.0;
+		}
+		if (x > Width - 6.0)
+		{
+			x = Width - 6.0;
+		}
+		if (y < 6.0)
+		{
+			y = 6.0;
+		}
+		if (y > Height - 6.0)
+		{
+			y = Height - 6.0;
+		}
+		_hintText.Text = text;
+		Canvas.SetLeft(_hintBorder, x);
+		Canvas.SetTop(_hintBorder, y);
+		_hintBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+		double w = _hintBorder.DesiredSize.Width;
+		double h = _hintBorder.DesiredSize.Height;
+		if (x + w > Width)
+		{
+			x = Width - w - 6.0;
+		}
+		if (y + h > Height)
+		{
+			y = Height - h - 6.0;
+		}
+		Canvas.SetLeft(_hintBorder, x);
+		Canvas.SetTop(_hintBorder, y);
+		_hintBorder.Visibility = Visibility.Visible;
+	}
+
+	public void HideHint()
+	{
+		_hintBorder.Visibility = Visibility.Collapsed;
 	}
 }

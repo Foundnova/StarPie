@@ -1039,6 +1039,13 @@ public static class I18n
 			[LanguageCode.En] = "Gesture trigger button:",
 			[LanguageCode.Ja] = "ジェスチャートリガーキー："
 		};
+		dictionary["GestureHintPlaceText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "松手提示位置：",
+			[LanguageCode.ZhTw] = "鬆手提示位置：",
+			[LanguageCode.En] = "Release-hint position:",
+			[LanguageCode.Ja] = "離した時のヒント位置："
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",
