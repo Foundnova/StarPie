@@ -43,6 +43,23 @@ public class GestureController
 
 	private bool _mouseTriggerDown;
 
+	// ---- 鼠标手势（画轨迹识别）----
+	private bool _gestureMode;
+
+	private bool _gestureWaiting;
+
+	private bool _gestureTracking;
+
+	private Point _gesturePressPoint;
+
+	private Point _gestureAnchor;
+
+	private int _gestureLastDir = -1;
+
+	private int _gestureSegmentCount;
+
+	private System.Text.StringBuilder _gestureSegments = new System.Text.StringBuilder();
+
 	private WheelProfile? _activeProfile;
 
 	private int _selectedSectorIndex = -1;
@@ -343,6 +360,15 @@ public class GestureController
 				e.Handled = false;
 				return;
 			}
+			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+			// 鼠标手势模式：手势触发键按下 → 进入画轨迹流程（不弹轮盘）
+			if (ConfigManager.CurrentConfig.GestureEnabled &&
+				string.Equals(triggerBtn, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton", StringComparison.OrdinalIgnoreCase))
+			{
+				BeginGesture(e.Position);
+				e.Handled = true;
+				return;
+			}
 			_startPoint = e.Position;
 			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 			_currentDpiScaleX = scaleX;
@@ -358,6 +384,111 @@ public class GestureController
 			}
 			e.Handled = true;
 		}
+	}
+
+	// ==================== 鼠标手势 ====================
+
+	/// <summary>方向码 → 图样字符（8 方向，屏幕坐标 y 向下）。</summary>
+	private static string GestureDirCode(int dir)
+	{
+		return dir switch
+		{
+			0 => "E",
+			1 => "SE",
+			2 => "D",
+			3 => "SW",
+			4 => "W",
+			5 => "NW",
+			6 => "U",
+			_ => "NE"
+		};
+	}
+
+	private static int GestureQuantizeDir(double dx, double dy)
+	{
+		double deg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+		if (deg < 0.0)
+		{
+			deg += 360.0;
+		}
+		return (int)Math.Round(deg / 45.0) % 8;
+	}
+
+	private void BeginGesture(Point pressPoint)
+	{
+		_gestureMode = true;
+		_gestureWaiting = true;
+		_gestureTracking = false;
+		_gesturePressPoint = pressPoint;
+		_gestureAnchor = pressPoint;
+		_gestureLastDir = -1;
+		_gestureSegmentCount = 0;
+		_gestureSegments.Clear();
+	}
+
+	/// <summary>追加一段方向码（段间以 "-" 分隔，最多 3 段；单段对角线 "DR" 与双段 "D-R" 不冲突）。</summary>
+	private void AppendGestureSegment(int dir)
+	{
+		if (_gestureSegmentCount >= 3)
+		{
+			return;
+		}
+		if (_gestureSegmentCount > 0)
+		{
+			_gestureSegments.Append("-");
+		}
+		_gestureSegments.Append(GestureDirCode(dir));
+		_gestureSegmentCount++;
+	}
+
+	/// <summary>移动采样：越阈值开始采集；段长≥阈值且方向变化才记一段（最多 3 段）。</summary>
+	private void FeedGesturePoint(Point current)
+	{
+		double dy = current.Y - _gestureAnchor.Y;
+		double dx = current.X - _gestureAnchor.X;
+		if (Math.Sqrt(dx * dx + dy * dy) < 12.0)
+		{
+			return;
+		}
+		int dir = GestureQuantizeDir(dx, dy);
+		if (dir != _gestureLastDir)
+		{
+			if (_gestureLastDir >= 0)
+			{
+				AppendGestureSegment(_gestureLastDir);
+			}
+			_gestureLastDir = dir;
+		}
+		_gestureAnchor = current;
+	}
+
+	private void EndGesture(Point current)
+	{
+		// 追加最后一段
+		if (_gestureLastDir >= 0)
+		{
+			AppendGestureSegment(_gestureLastDir);
+			_gestureLastDir = -1;
+		}
+		_gestureMode = false;
+		_gestureWaiting = false;
+		_gestureTracking = false;
+	}
+
+	/// <summary>查找手势图样映射的动作。</summary>
+	private ActionItem? FindGestureAction(string pattern)
+	{
+		if (ConfigManager.CurrentConfig.GestureMappings != null)
+		{
+			foreach (GestureMapping m in ConfigManager.CurrentConfig.GestureMappings)
+			{
+				if (string.Equals(m.Pattern, pattern, StringComparison.OrdinalIgnoreCase))
+				{
+					return m.Action;
+				}
+			}
+		}
+		return null;
 	}
 
 	/// <summary>启动长按触发计时（按下时，仅鼠标触发）。</summary>
@@ -444,6 +575,35 @@ public class GestureController
 		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
 		if (triggerConfig.TriggerType != "Mouse")
 		{
+			return;
+		}
+		// 鼠标手势：抬起即识别执行
+		if (_gestureMode)
+		{
+			EndGesture(e.Position);
+			ActionItem? gestureAction = FindGestureAction(_gestureSegments.ToString());
+			if (gestureAction != null)
+			{
+				ActionItem action = gestureAction;
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					ActionExecutor.Execute(action);
+				}, (DispatcherPriority)5, Array.Empty<object>());
+				e.Handled = true;
+				return;
+			}
+			if (_gestureSegmentCount > 0)
+			{
+				e.Handled = true; // 已画轨迹但未映射：吞掉，不执行
+				return;
+			}
+			// 轻点：透传原生点击
+			string gbtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+			{
+				_mouseHook.ReplayTriggerClick(gbtn);
+			}, (DispatcherPriority)5, Array.Empty<object>());
+			e.Handled = true;
 			return;
 		}
 		_mouseTriggerDown = false;
@@ -638,6 +798,29 @@ public class GestureController
 		//IL_008c: Unknown result type (might be due to invalid IL or missing references)
 		//IL_009f: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a4: Unknown result type (might be due to invalid IL or missing references)
+		// 鼠标手势：采集轨迹
+		if (_gestureMode)
+		{
+			if (_gestureWaiting)
+			{
+				double gScaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
+				double gScaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
+				double gdx = (e.Position.X - _gesturePressPoint.X) / gScaleX;
+				double gdy = (e.Position.Y - _gesturePressPoint.Y) / gScaleY;
+				double gDist = Math.Sqrt(gdx * gdx + gdy * gdy);
+				if (gDist >= ConfigManager.CurrentConfig.DragThreshold)
+				{
+					_gestureWaiting = false;
+					_gestureTracking = true;
+					_gestureAnchor = e.Position;
+				}
+			}
+			else if (_gestureTracking)
+			{
+				FeedGesturePoint(e.Position);
+			}
+			return;
+		}
 		if (_isWaitingForThreshold)
 		{
 			Point position = e.Position;

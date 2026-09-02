@@ -580,6 +580,62 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
+                  <TextBlock Name="GestureTitleText" Text="鼠标手势 (Mouse Gestures)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="GestureDescText" Text="启用后，按住手势触发键画出轨迹（如 ↓、→、L 形），释放即执行对应动作；支持单段、双段与三段图样。轻点仍透传原生点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
+                  <CheckBox Name="GestureEnabledCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="GestureEnabledCheckBox_Changed" Unchecked="GestureEnabledCheckBox_Changed">
+                    <StackPanel Margin="6,0,0,0">
+                      <TextBlock Name="GestureEnableText" Text="启用鼠标手势模式" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="GestureEnableDescText" Text="手势触发键将不再弹出轮盘，仅用于绘制手势；其它触发键照常弹轮盘。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+                  </CheckBox>
+                  <Grid Margin="0,2,0,10">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Name="GestureTriggerLabelText" Text="手势触发键：" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox Name="GestureTriggerButtonComboBox" Grid.Column="1" Width="180" HorizontalAlignment="Left" Style="{StaticResource FlatComboBoxStyle}" Height="32" SelectionChanged="GestureTriggerButtonComboBox_SelectionChanged">
+                      <ComboBoxItem Tag="RightButton" Content="🖱️ 鼠标右键" />
+                      <ComboBoxItem Tag="MiddleButton" Content="🖱️ 鼠标中键" />
+                      <ComboBoxItem Tag="XButton1" Content="🖱️ 鼠标侧键1 (后退)" />
+                      <ComboBoxItem Tag="XButton2" Content="🖱️ 鼠标侧键2 (前进)" />
+                    </ComboBox>
+                  </Grid>
+                  <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                    <StackPanel>
+                      <TextBlock Name="GestureMappingTitleText" Text="手势图样映射" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                      <ItemsControl Name="GestureMappingsItemsControl">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Margin="0,0,0,8">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="44" />
+                                <ColumnDefinition Width="34" />
+                              </Grid.ColumnDefinitions>
+                              <ComboBox Grid.Column="0" Height="30" FontSize="11" ItemsSource="{Binding PatternChoices}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding Pattern, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" />
+                              <ComboBox Grid.Column="1" Height="30" FontSize="11" ItemsSource="{Binding ActionTypes}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding Type, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Margin="4,0,0,0" />
+                              <TextBox Grid.Column="2" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="动作参数：热键如 Ctrl+C；命令如 ping -n 3 127.0.0.1；程序/文件夹路径" />
+                              <TextBox Grid.Column="3" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（显示自定义，可留空）" />
+                              <Button Grid.Column="4" Content="测试" Height="30" Margin="4,0,0,0" Padding="4,0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TestGesture_Click" />
+                              <Button Grid.Column="5" Content="✕" Height="30" Width="30" Padding="0" Margin="4,0,0,0" FontSize="11" Style="{StaticResource DangerButtonStyle}" Click="DeleteGestureMapping_Click" ToolTip="删除此手势映射" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Button Name="AddGestureMappingButton" Content="➕ 添加手势映射" Height="32" Margin="0,6,0,0" Padding="12,0" Style="{StaticResource ModernButtonStyle}" Click="AddGestureMappingButton_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
                   <TextBlock Name="AnimSpeedTitleText" Text="功能区高亮与过渡动效速度" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Name="AnimSpeedDescText" Text="调节鼠标划向不同功能扇区时的高亮弹出与平滑过渡动画响应速度，定制专属跟手体验。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
                   <StackPanel Orientation="Horizontal" Margin="0,0,0,10">

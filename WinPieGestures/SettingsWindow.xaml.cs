@@ -356,6 +356,12 @@ public partial class SettingsWindow : Window
 		{
 			LongPressDelayPanel.Visibility = ConfigManager.CurrentConfig.LongPressTrigger ? Visibility.Visible : Visibility.Collapsed;
 		}
+		if (GestureEnabledCheckBox != null)
+		{
+			GestureEnabledCheckBox.IsChecked = ConfigManager.CurrentConfig.GestureEnabled;
+		}
+		SetComboBoxSelectedValue(GestureTriggerButtonComboBox, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton");
+		RefreshGestureMappings();
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -846,6 +852,30 @@ public partial class SettingsWindow : Window
 		if (LongPressTriggerDescText != null)
 		{
 			LongPressTriggerDescText.Text = I18n.T("LongPressTriggerDesc");
+		}
+		if (GestureTitleText != null)
+		{
+			GestureTitleText.Text = I18n.T("GestureTitle");
+		}
+		if (GestureDescText != null)
+		{
+			GestureDescText.Text = I18n.T("GestureDesc");
+		}
+		if (GestureEnableText != null)
+		{
+			GestureEnableText.Text = I18n.T("GestureEnableText");
+		}
+		if (GestureEnableDescText != null)
+		{
+			GestureEnableDescText.Text = I18n.T("GestureEnableDescText");
+		}
+		if (GestureTriggerLabelText != null)
+		{
+			GestureTriggerLabelText.Text = I18n.T("GestureTriggerLabelText");
+		}
+		if (GestureMappingTitleText != null)
+		{
+			GestureMappingTitleText.Text = I18n.T("GestureMappingTitleText");
 		}
 		if (TriggerPageSubheader != null)
 		{
@@ -6473,6 +6503,80 @@ public partial class SettingsWindow : Window
 			LongPressDelayLabel.Text = $"{e.NewValue:0} ms";
 		}
 		SyncUiToConfigAndSave();
+	}
+
+	// ==================== 鼠标手势 ====================
+
+	private void RefreshGestureMappings()
+	{
+		if (GestureMappingsItemsControl == null || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		List<GestureMappingViewModel> list = new List<GestureMappingViewModel>();
+		foreach (GestureMapping m in ConfigManager.CurrentConfig.GestureMappings ?? new List<GestureMapping>())
+		{
+			list.Add(new GestureMappingViewModel(m));
+		}
+		GestureMappingsItemsControl.ItemsSource = list;
+	}
+
+	private void GestureEnabledCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.GestureEnabled = GestureEnabledCheckBox.IsChecked == true;
+		SyncUiToConfigAndSave();
+	}
+
+	private void GestureTriggerButtonComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (GestureTriggerButtonComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+		{
+			ConfigManager.CurrentConfig.GestureTriggerButton = tag;
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void AddGestureMappingButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.GestureMappings ??= new List<GestureMapping>();
+		ConfigManager.CurrentConfig.GestureMappings.Add(new GestureMapping
+		{
+			Pattern = "D",
+			Action = new ActionItem { Type = "Hotkey", Name = "手势动作", Parameter = "" }
+		});
+		RefreshGestureMappings();
+		SyncUiToConfigAndSave();
+	}
+
+	private void DeleteGestureMapping_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null || sender is not FrameworkElement fe || fe.DataContext is not GestureMappingViewModel vm)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.GestureMappings?.RemoveAll((GestureMapping m) => ReferenceEquals(m, vm.Mapping));
+		RefreshGestureMappings();
+		SyncUiToConfigAndSave();
+	}
+
+	private void TestGesture_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is FrameworkElement fe && fe.DataContext is GestureMappingViewModel vm)
+		{
+			ActionExecutor.Execute(vm.Mapping.Action);
+		}
 	}
 
 		private void HotkeyBuilderButton_Click(object sender, RoutedEventArgs e)
