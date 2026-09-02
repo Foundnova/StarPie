@@ -83,8 +83,8 @@ public class GestureTrailOverlay : Window
 		Content = _canvas;
 	}
 
-	/// <summary>覆盖手势起点所在显示器（物理矩形 ÷ 该屏缩放 → DIP），只定位一次。</summary>
-	public void ShowCoveringScreen(double screenX, double screenY, double scaleX, double scaleY)
+	/// <summary>覆盖手势起点所在显示器（物理矩形 ÷ 该屏缩放 → DIP）；只定位，不显示。</summary>
+	public void PositionAt(double screenX, double screenY, double scaleX, double scaleY)
 	{
 		double sx = scaleX > 0.0 ? scaleX : 1.0;
 		double sy = scaleY > 0.0 ? scaleY : 1.0;
@@ -117,7 +117,6 @@ public class GestureTrailOverlay : Window
 		Top = _topDIP;
 		Width = (rc.Right - rc.Left) / sx;
 		Height = (rc.Bottom - rc.Top) / sy;
-		Show();
 	}
 
 	/// <summary>开始轨迹：屏幕物理坐标 → 覆盖层局部坐标，画起点。</summary>

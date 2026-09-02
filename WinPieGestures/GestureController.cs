@@ -528,10 +528,12 @@ public class GestureController
 			{
 				_trail = new GestureTrailOverlay();
 			}
-			// 先清空旧内容，再显示，再画新起点（同一次调度内完成，杜绝旧轨迹残影）
+			// 顺序关键：先清空 → 画新起点 → 最后才 Show。
+			// Show 会同步触发一次 WM_PAINT（嵌套消息泵），若此时画布还是旧内容就会闪现一次，故必须先清先画后显示。
 			_trail.ClearTrail();
-			_trail.ShowCoveringScreen(p0.X, p0.Y, sx, sy);
+			_trail.PositionAt(p0.X, p0.Y, sx, sy);
 			_trail.BeginAt(p0.X, p0.Y, sx, sy);
+			_trail.Show();
 		});
 	}
 
