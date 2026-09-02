@@ -701,7 +701,8 @@ public partial class RadialWindow : Window
 			{
 				sectorLayout = currentAction.LayoutMode;
 			}
-			bool sectorFlag = ConfigManager.CurrentConfig.ShowText && sectorLayout != "IconOnly";
+			bool shouldShowIcon = (sectorLayout != "TextOnly");
+			bool shouldShowText = (sectorLayout != "IconOnly");
 
 			Brush sectorTextColorBrush = _textColorBrush;
 			if (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.CustomTextColor))
@@ -729,7 +730,7 @@ public partial class RadialWindow : Window
 				text5 = currentAction.CustomIconSvg ?? "";
 			}
 			FrameworkElement frameworkElement2 = null;
-			if (sectorLayout != "TextOnly")
+			if (shouldShowIcon)
 			{
 				double baseIconSize = (currentAction != null && currentAction.CustomIconSize.HasValue && currentAction.CustomIconSize.Value > 0.0)
 					? currentAction.CustomIconSize.Value
@@ -752,7 +753,7 @@ public partial class RadialWindow : Window
 							Stretch = Stretch.Uniform,
 							Width = num11,
 							Height = num11,
-							Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
@@ -772,7 +773,7 @@ public partial class RadialWindow : Window
 								Width = num11,
 								Height = num11,
 								Stretch = Stretch.Uniform,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center,
 								Source = IconHelper.GetCustomImageSource(customIconItem.FilePath)
 							}) : ((FrameworkElement)new System.Windows.Shapes.Path
@@ -782,7 +783,7 @@ public partial class RadialWindow : Window
 								Stretch = Stretch.Uniform,
 								Width = num11,
 								Height = num11,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							}));
 						}
@@ -799,7 +800,7 @@ public partial class RadialWindow : Window
 								Stretch = Stretch.Uniform,
 								Width = num11,
 								Height = num11,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
@@ -816,14 +817,14 @@ public partial class RadialWindow : Window
 							Width = num11 + 4.0,
 							Height = num11 + 4.0,
 							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
 				}
 				if (frameworkElement2 == null && text3 == "SwitchWindow")
 				{
-					frameworkElement2 = BuildSwitchWindowIcon(text4, num11, sectorFlag);
+					frameworkElement2 = BuildSwitchWindowIcon(text4, num11, shouldShowText);
 				}
 				if (frameworkElement2 == null)
 				{
@@ -837,7 +838,7 @@ public partial class RadialWindow : Window
 							Stretch = Stretch.Uniform,
 							Width = num11,
 							Height = num11,
-							Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 2 : 0),
+							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
@@ -847,7 +848,7 @@ public partial class RadialWindow : Window
 					stackPanel.Children.Add(frameworkElement2);
 				}
 			}
-			if (sectorFlag && !string.IsNullOrEmpty(text2))
+			if (shouldShowText && !string.IsNullOrEmpty(text2))
 			{
 				double baseFontSize = (currentAction != null && currentAction.CustomFontSize.HasValue && currentAction.CustomFontSize.Value > 0.0)
 					? currentAction.CustomFontSize.Value
@@ -1168,8 +1169,29 @@ public partial class RadialWindow : Window
 			string text4 = actionItem2?.Parameter ?? "";
 			string iconKey = actionItem2?.IconKey ?? "";
 			string text5 = actionItem2?.CustomIconSvg ?? "";
+
+			string subLayout = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.LayoutMode) && actionItem2.LayoutMode != "Inherit")
+				? actionItem2.LayoutMode
+				: text;
+			bool subShouldShowIcon = (subLayout != "TextOnly");
+			bool subShouldShowText = (subLayout != "IconOnly");
+			Brush subTextColor = _subTextColorBrush;
+			if (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomTextColor))
+			{
+				try
+				{
+					subTextColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(actionItem2.CustomTextColor));
+				}
+				catch
+				{
+				}
+			}
+			double subIconSize = ((actionItem2 != null && actionItem2.CustomIconSize.HasValue && actionItem2.CustomIconSize.Value > 0.0)
+				? actionItem2.CustomIconSize.Value
+				: num7) * ((subLayout == "IconOnly") ? 1.3 : 1.0);
+
 			FrameworkElement frameworkElement = null;
-			if (text != "TextOnly")
+			if (subShouldShowIcon)
 			{
 				if (!string.IsNullOrEmpty(text5))
 				{
@@ -1178,11 +1200,11 @@ public partial class RadialWindow : Window
 						frameworkElement = new System.Windows.Shapes.Path
 						{
 							Data = Geometry.Parse(text5),
-							Fill = _subTextColorBrush,
+							Fill = subTextColor,
 							Stretch = Stretch.Uniform,
-							Width = num7,
-							Height = num7,
-							Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+							Width = subIconSize,
+							Height = subIconSize,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
@@ -1199,20 +1221,20 @@ public partial class RadialWindow : Window
 						{
 							frameworkElement = ((!customIconItem.IsSvg) ? ((FrameworkElement)new Image
 							{
-								Width = num7,
-								Height = num7,
+								Width = subIconSize,
+								Height = subIconSize,
 								Stretch = Stretch.Uniform,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center,
 								Source = IconHelper.GetCustomImageSource(customIconItem.FilePath)
 							}) : ((FrameworkElement)new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(customIconItem.SvgData),
-								Fill = _subTextColorBrush,
+								Fill = subTextColor,
 								Stretch = Stretch.Uniform,
-								Width = num7,
-								Height = num7,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+								Width = subIconSize,
+								Height = subIconSize,
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							}));
 						}
@@ -1225,11 +1247,11 @@ public partial class RadialWindow : Window
 							frameworkElement = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(svgPathByKey),
-								Fill = _subTextColorBrush,
+								Fill = subTextColor,
 								Stretch = Stretch.Uniform,
-								Width = num7,
-								Height = num7,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+								Width = subIconSize,
+								Height = subIconSize,
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
@@ -1243,49 +1265,55 @@ public partial class RadialWindow : Window
 						frameworkElement = new Image
 						{
 							Source = icon,
-							Width = num7 + 2.0,
-							Height = num7 + 2.0,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
 							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
 				}
 				if (frameworkElement == null && text3 == "SwitchWindow")
+				{
+					frameworkElement = BuildSwitchWindowIcon(text4, subIconSize, subShouldShowText);
+				}
+				if (frameworkElement == null)
+				{
+					string vectorIconPath = GetVectorIconPath(text3, text4);
+					if (!string.IsNullOrEmpty(vectorIconPath))
 					{
-						frameworkElement = BuildSwitchWindowIcon(text4, num7, flag);
-					}
-					if (frameworkElement == null)
-					{
-						string vectorIconPath = GetVectorIconPath(text3, text4);
-						if (!string.IsNullOrEmpty(vectorIconPath))
+						frameworkElement = new System.Windows.Shapes.Path
 						{
-							frameworkElement = new System.Windows.Shapes.Path
-							{
-								Data = Geometry.Parse(vectorIconPath),
-								Fill = _subTextColorBrush,
-								Stretch = Stretch.Uniform,
-								Width = num7,
-								Height = num7,
-								Margin = new Thickness(0.0, 0.0, 0.0, flag ? 2 : 0),
-								HorizontalAlignment = HorizontalAlignment.Center
-							};
-						}
+							Data = Geometry.Parse(vectorIconPath),
+							Fill = subTextColor,
+							Stretch = Stretch.Uniform,
+							Width = subIconSize,
+							Height = subIconSize,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
 					}
+				}
 				if (frameworkElement != null)
 				{
 					stackPanel.Children.Add(frameworkElement);
 				}
 			}
-			if (flag && !string.IsNullOrEmpty(text2))
+			if (subShouldShowText && !string.IsNullOrEmpty(text2))
 			{
+				double subFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
+					? actionItem2.CustomFontSize.Value
+					: fontSize;
+				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
+					? actionItem2.CustomFontFamily
+					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 				TextBlock element = new TextBlock
 				{
 					Text = text2,
-					Foreground = _subTextColorBrush,
-					FontSize = fontSize,
-					FontFamily = new FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"),
-					FontWeight = FontWeights.Medium,
+					Foreground = subTextColor,
+					FontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize,
+					FontFamily = new FontFamily(subFontFamily),
+					FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
@@ -2037,9 +2065,30 @@ public partial class RadialWindow : Window
 			string text4 = actionItem2?.Parameter ?? "";
 			string iconKey = actionItem2?.IconKey ?? "";
 			string text5 = actionItem2?.CustomIconSvg ?? "";
+
+			string subLayout = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.LayoutMode) && actionItem2.LayoutMode != "Inherit")
+				? actionItem2.LayoutMode
+				: layoutMode;
+			bool subShouldShowIcon = (subLayout != "TextOnly");
+			bool subShouldShowText = (subLayout != "IconOnly");
+			Brush subTextColor = _subTextColorBrush;
+			if (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomTextColor))
+			{
+				try
+				{
+					subTextColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(actionItem2.CustomTextColor));
+				}
+				catch
+				{
+				}
+			}
+			double subIconSize = ((actionItem2 != null && actionItem2.CustomIconSize.HasValue && actionItem2.CustomIconSize.Value > 0.0)
+				? actionItem2.CustomIconSize.Value
+				: num7) * ((subLayout == "IconOnly") ? 1.3 : 1.0);
+
 			FrameworkElement frameworkElement = null;
 
-			if (layoutMode != "TextOnly")
+			if (subShouldShowIcon)
 			{
 				if (!string.IsNullOrEmpty(text5))
 				{
@@ -2048,11 +2097,11 @@ public partial class RadialWindow : Window
 						frameworkElement = new System.Windows.Shapes.Path
 						{
 							Data = Geometry.Parse(text5),
-							Fill = _subTextColorBrush,
+							Fill = subTextColor,
 							Stretch = Stretch.Uniform,
-							Width = num7,
-							Height = num7,
-							Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+							Width = subIconSize,
+							Height = subIconSize,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
@@ -2067,20 +2116,20 @@ public partial class RadialWindow : Window
 						{
 							frameworkElement = ((!customIconItem.IsSvg) ? ((FrameworkElement)new Image
 							{
-								Width = num7,
-								Height = num7,
+								Width = subIconSize,
+								Height = subIconSize,
 								Stretch = Stretch.Uniform,
-								Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center,
 								Source = IconHelper.GetCustomImageSource(customIconItem.FilePath)
 							}) : ((FrameworkElement)new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(customIconItem.SvgData),
-								Fill = _subTextColorBrush,
+								Fill = subTextColor,
 								Stretch = Stretch.Uniform,
-								Width = num7,
-								Height = num7,
-								Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+								Width = subIconSize,
+								Height = subIconSize,
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							}));
 						}
@@ -2093,11 +2142,11 @@ public partial class RadialWindow : Window
 							frameworkElement = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(svgPathByKey),
-								Fill = _subTextColorBrush,
+								Fill = subTextColor,
 								Stretch = Stretch.Uniform,
-								Width = num7,
-								Height = num7,
-								Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+								Width = subIconSize,
+								Height = subIconSize,
+								Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
@@ -2111,17 +2160,17 @@ public partial class RadialWindow : Window
 						frameworkElement = new Image
 						{
 							Source = icon,
-							Width = num7 + 2.0,
-							Height = num7 + 2.0,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
 							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
 				}
 				if (frameworkElement == null && text3 == "SwitchWindow")
 				{
-					frameworkElement = BuildSwitchWindowIcon(text4, num7, showText);
+					frameworkElement = BuildSwitchWindowIcon(text4, subIconSize, subShouldShowText);
 				}
 				if (frameworkElement == null)
 				{
@@ -2131,11 +2180,11 @@ public partial class RadialWindow : Window
 						frameworkElement = new System.Windows.Shapes.Path
 						{
 							Data = Geometry.Parse(vectorIconPath),
-							Fill = _subTextColorBrush,
+							Fill = subTextColor,
 							Stretch = Stretch.Uniform,
-							Width = num7,
-							Height = num7,
-							Margin = new Thickness(0.0, 0.0, 0.0, showText ? 2 : 0),
+							Width = subIconSize,
+							Height = subIconSize,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
 							HorizontalAlignment = HorizontalAlignment.Center
 						};
 					}
@@ -2146,21 +2195,27 @@ public partial class RadialWindow : Window
 				}
 			}
 
-			if (showText && !string.IsNullOrEmpty(text2))
+			if (subShouldShowText && !string.IsNullOrEmpty(text2))
 			{
+				double subFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
+					? actionItem2.CustomFontSize.Value
+					: fontSize;
+				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
+					? actionItem2.CustomFontFamily
+					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 				TextBlock textBlock = new TextBlock
 				{
 					Text = text2,
-					Foreground = _subTextColorBrush,
-					FontSize = fontSize,
-					FontWeight = FontWeights.Medium,
+					Foreground = subTextColor,
+					FontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize,
+					FontFamily = new FontFamily(subFontFamily),
+					FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					MaxWidth = containerW - 4.0,
 					MaxHeight = 26.0,
-					Margin = new Thickness(0.0, 1.0, 0.0, 0.0),
-					FontFamily = new FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI")
+					Margin = new Thickness(0.0, 1.0, 0.0, 0.0)
 				};
 				if (base.Resources.Contains("TextShadow"))
 				{

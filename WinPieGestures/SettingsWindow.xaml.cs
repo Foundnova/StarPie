@@ -37,7 +37,41 @@ public partial class SettingsWindow : Window
 
 	private bool _isSidebarCollapsed = true;
 
+	private int _selectedLayoutTier = 1; // 1: 主轮盘, 2: 二级级联轮盘
+
 	private int _selectedLayoutSlotIndex = -1;
+
+	private int _selectedLayoutSubSlotIndex = -1;
+
+	private string GetDirectionDisplayName(int index, int totalCount)
+	{
+		string[] dirArray = totalCount switch
+		{
+			4 => Directions4,
+			12 => Directions12,
+			_ => Directions8,
+		};
+		return (index >= 0 && index < dirArray.Length) ? dirArray[index] : $"扇区 {index + 1}";
+	}
+
+	private ActionItem? GetCurrentEditingAction()
+	{
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+		if (profile?.Actions == null || _selectedLayoutSlotIndex < 0 || _selectedLayoutSlotIndex >= profile.Actions.Count)
+		{
+			return null;
+		}
+		ActionItem parentAction = profile.Actions[_selectedLayoutSlotIndex];
+		if (_selectedLayoutTier == 2 && _selectedLayoutSubSlotIndex >= 0)
+		{
+			if (parentAction.SubActions != null && _selectedLayoutSubSlotIndex < parentAction.SubActions.Count)
+			{
+				return parentAction.SubActions[_selectedLayoutSubSlotIndex];
+			}
+			return null;
+		}
+		return parentAction;
+	}
 
 	private bool _isRecordingTrigger;
 
@@ -84,6 +118,8 @@ public partial class SettingsWindow : Window
 	private readonly List<Grid> _previewSubContainers = new List<Grid>();
 
 	private IRadialStyleRenderer? _previewStyleRenderer;
+
+	private IRadialStyleRenderer? _previewSubStyleRenderer;
 
 	private System.Windows.Media.Brush? _previewDefaultBrush;
 
@@ -542,7 +578,6 @@ public partial class SettingsWindow : Window
 
 		// Shapes & Layouts
 		SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
-		PopulateLayoutSlotComboBox();
 		RefreshLayoutOptionsUi();
 		SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
 		if (ShowSelectedActionTextCheckBox != null)
@@ -1055,10 +1090,6 @@ public partial class SettingsWindow : Window
 		{
 			LayoutTargetSlotRadio.Content = I18n.T("LayoutTargetSlot");
 		}
-		if (EnableSlotCustomLayoutCheckBox != null)
-		{
-			EnableSlotCustomLayoutCheckBox.Content = I18n.T("EnableSlotCustomLayout");
-		}
 		if (ResetSlotLayoutButton != null)
 		{
 			ResetSlotLayoutButton.Content = I18n.T("ResetToGlobalLayout");
@@ -1082,10 +1113,6 @@ public partial class SettingsWindow : Window
 		if (CoreTextColorTitleText != null)
 		{
 			CoreTextColorTitleText.Text = I18n.T("CoreTextColor");
-		}
-		if (ShowTextCheckBox != null)
-		{
-			ShowTextCheckBox.Content = I18n.T("ShowSectorActionText");
 		}
 		if (ShowSelectedActionTextCheckBox != null)
 		{
@@ -1480,13 +1507,24 @@ public partial class SettingsWindow : Window
 			{
 				ConfigManager.CurrentConfig.Shape = comboBoxItem4.Tag?.ToString() ?? "Original";
 			}
-			if (IconLayoutModeComboBox?.SelectedItem is ComboBoxItem comboBoxItem5)
+			if (_selectedLayoutSlotIndex < 0)
 			{
-				ConfigManager.CurrentConfig.IconLayoutMode = comboBoxItem5.Tag?.ToString() ?? "IconAndText";
-			}
-			if (ShowTextCheckBox != null)
-			{
-				ConfigManager.CurrentConfig.ShowText = ShowTextCheckBox.IsChecked == true;
+				if (IconLayoutModeComboBox?.SelectedItem is ComboBoxItem comboBoxItem5)
+				{
+					ConfigManager.CurrentConfig.IconLayoutMode = comboBoxItem5.Tag?.ToString() ?? "IconAndText";
+				}
+				if (WheelFontFamilyComboBox?.SelectedItem is ComboBoxItem wheelFontItem)
+				{
+					ConfigManager.CurrentConfig.WheelFontFamily = wheelFontItem.Tag?.ToString() ?? "Microsoft YaHei UI, Segoe UI";
+				}
+				if (SectorIconSizeSlider != null)
+				{
+					ConfigManager.CurrentConfig.SectorIconSize = SectorIconSizeSlider.Value;
+				}
+				if (SectorFontSizeSlider != null)
+				{
+					ConfigManager.CurrentConfig.SectorFontSize = SectorFontSizeSlider.Value;
+				}
 			}
 			if (ShowSelectedActionTextCheckBox != null)
 			{
@@ -1567,14 +1605,6 @@ public partial class SettingsWindow : Window
 			if (SectorCornerRadiusSlider != null)
 			{
 				ConfigManager.CurrentConfig.SectorCornerRadius = SectorCornerRadiusSlider.Value;
-			}
-			if (SectorIconSizeSlider != null)
-			{
-				ConfigManager.CurrentConfig.SectorIconSize = SectorIconSizeSlider.Value;
-			}
-			if (SectorFontSizeSlider != null)
-			{
-				ConfigManager.CurrentConfig.SectorFontSize = SectorFontSizeSlider.Value;
 			}
 			if (ThresholdSlider != null)
 			{
@@ -3649,119 +3679,6 @@ public partial class SettingsWindow : Window
 		RenderLiveWheelPreview();
 	}
 
-	private void LayoutTargetSlotComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-	{
-		if (_isUpdatingUi || LayoutTargetSlotComboBox?.SelectedItem is not ComboBoxItem { Tag: int idx })
-		{
-			return;
-		}
-		_selectedLayoutSlotIndex = idx;
-		RefreshLayoutOptionsUi();
-		RenderLiveWheelPreview();
-	}
-
-	private void EnableSlotCustomLayoutCheckBox_Changed(object sender, RoutedEventArgs e)
-	{
-		if (_isUpdatingUi || _selectedLayoutSlotIndex < 0 || ConfigManager.CurrentConfig == null)
-		{
-			return;
-		}
-		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-		if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
-		{
-			ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
-			bool isChecked = EnableSlotCustomLayoutCheckBox.IsChecked == true;
-			if (isChecked)
-			{
-				if (string.IsNullOrWhiteSpace(action.LayoutMode) || action.LayoutMode == "Inherit")
-				{
-					action.LayoutMode = ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText";
-				}
-				if (string.IsNullOrWhiteSpace(action.CustomTextColor))
-				{
-					action.CustomTextColor = ConfigManager.CurrentConfig.CustomText ?? "#FFF8FAFC";
-				}
-				if (string.IsNullOrWhiteSpace(action.CustomFontFamily))
-				{
-					action.CustomFontFamily = ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI";
-				}
-				if (!action.CustomIconSize.HasValue || action.CustomIconSize <= 0.0)
-				{
-					action.CustomIconSize = ConfigManager.CurrentConfig.SectorIconSize;
-				}
-				if (!action.CustomFontSize.HasValue || action.CustomFontSize <= 0.0)
-				{
-					action.CustomFontSize = ConfigManager.CurrentConfig.SectorFontSize;
-				}
-			}
-			else
-			{
-				action.LayoutMode = "Inherit";
-				action.CustomTextColor = "";
-				action.CustomFontFamily = "";
-				action.CustomIconSize = null;
-				action.CustomFontSize = null;
-			}
-			RefreshLayoutOptionsUi();
-			RenderLiveWheelPreview();
-			ScheduleAutoSave();
-		}
-	}
-
-	private void ResetSlotLayoutButton_Click(object sender, RoutedEventArgs e)
-	{
-		if (_selectedLayoutSlotIndex < 0 || ConfigManager.CurrentConfig == null)
-		{
-			return;
-		}
-		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-		if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
-		{
-			ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
-			action.LayoutMode = "Inherit";
-			action.CustomTextColor = "";
-			action.CustomFontFamily = "";
-			action.CustomIconSize = null;
-			action.CustomFontSize = null;
-			RefreshLayoutOptionsUi();
-			RenderLiveWheelPreview();
-			ScheduleAutoSave();
-		}
-	}
-
-	private void PopulateLayoutSlotComboBox()
-	{
-		if (LayoutTargetSlotComboBox == null)
-		{
-			return;
-		}
-		LayoutTargetSlotComboBox.Items.Clear();
-		WheelProfile wheelProfile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
-		int count = ((wheelProfile.SectorCount > 0) ? wheelProfile.SectorCount : 8);
-		string[] dirArray = count switch
-		{
-			4 => Directions4, 
-			12 => Directions12, 
-			_ => Directions8, 
-		};
-		for (int i = 0; i < count; i++)
-		{
-			string dir = ((i < dirArray.Length) ? dirArray[i] : $"扇区 {i + 1}");
-			string actName = ((wheelProfile.Actions != null && i < wheelProfile.Actions.Count && wheelProfile.Actions[i] != null && !string.IsNullOrWhiteSpace(wheelProfile.Actions[i].Name)) ? wheelProfile.Actions[i].Name : "未设置动作");
-			ComboBoxItem item = new ComboBoxItem
-			{
-				Content = $"📍 扇区 {i + 1} [{dir}] - {actName}",
-				Tag = i
-			};
-			LayoutTargetSlotComboBox.Items.Add(item);
-		}
-		if (LayoutTargetSlotComboBox.Items.Count > 0)
-		{
-			int targetIdx = ((_selectedLayoutSlotIndex >= 0 && _selectedLayoutSlotIndex < LayoutTargetSlotComboBox.Items.Count) ? _selectedLayoutSlotIndex : 0);
-			LayoutTargetSlotComboBox.SelectedIndex = targetIdx;
-		}
-	}
-
 	private void PopulateLayoutModeComboBox(bool includeInherit)
 	{
 		if (IconLayoutModeComboBox == null)
@@ -3825,24 +3742,21 @@ public partial class SettingsWindow : Window
 				}
 				if (SectorIconSizeSlider != null)
 				{
-					SectorIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+					double sz = ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+					SectorIconSizeSlider.Value = sz;
 					if (SectorIconSizeLabel != null)
 					{
-						SectorIconSizeLabel.Text = $"{SectorIconSizeSlider.Value:0} px";
+						SectorIconSizeLabel.Text = $"{sz:0} px";
 					}
 				}
 				if (SectorFontSizeSlider != null)
 				{
-					SectorFontSizeSlider.Value = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
+					double fsz = ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
+					SectorFontSizeSlider.Value = fsz;
 					if (SectorFontSizeLabel != null)
 					{
-						SectorFontSizeLabel.Text = $"{SectorFontSizeSlider.Value:0.0} px";
+						SectorFontSizeLabel.Text = $"{fsz:0.0} px";
 					}
-				}
-				if (ShowTextCheckBox != null)
-				{
-					ShowTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowText;
-					ShowTextCheckBox.IsEnabled = true;
 				}
 			}
 			else
@@ -3855,17 +3769,24 @@ public partial class SettingsWindow : Window
 				{
 					SlotSelectionContainer.Visibility = Visibility.Visible;
 				}
-				if (LayoutTargetSlotComboBox != null && LayoutTargetSlotComboBox.SelectedIndex != _selectedLayoutSlotIndex && _selectedLayoutSlotIndex < LayoutTargetSlotComboBox.Items.Count)
-				{
-					LayoutTargetSlotComboBox.SelectedIndex = _selectedLayoutSlotIndex;
-				}
 				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-				ActionItem? action = ((profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedLayoutSlotIndex] : null);
-				bool hasCustom = action != null && ((!string.IsNullOrWhiteSpace(action.LayoutMode) && action.LayoutMode != "Inherit") || !string.IsNullOrWhiteSpace(action.CustomTextColor) || !string.IsNullOrWhiteSpace(action.CustomFontFamily) || (action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0) || (action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0));
-				if (EnableSlotCustomLayoutCheckBox != null)
+				ActionItem? action = GetCurrentEditingAction();
+
+				if (CurrentTargetSlotLabel != null)
 				{
-					EnableSlotCustomLayoutCheckBox.IsChecked = hasCustom;
+					string tierName = (_selectedLayoutTier == 2) ? "二级级联轮盘" : "一级主轮盘";
+					string slotDirName = GetDirectionDisplayName(_selectedLayoutSlotIndex, profile?.SectorCount ?? 8);
+					string actName = action?.Name ?? "未设置动作";
+					if (_selectedLayoutTier == 2 && _selectedLayoutSubSlotIndex >= 0)
+					{
+						CurrentTargetSlotLabel.Text = $"📍 正在定制: {tierName} [{slotDirName}] -> 子项 {_selectedLayoutSubSlotIndex + 1}: {actName}";
+					}
+					else
+					{
+						CurrentTargetSlotLabel.Text = $"📍 正在定制: {tierName} - 扇区 {_selectedLayoutSlotIndex + 1} [{slotDirName}]: {actName}";
+					}
 				}
+
 				PopulateLayoutModeComboBox(includeInherit: true);
 				string currentMode = ((action != null && !string.IsNullOrWhiteSpace(action.LayoutMode)) ? action.LayoutMode : "Inherit");
 				SetComboBoxSelectedValue(IconLayoutModeComboBox, currentMode);
@@ -3904,13 +3825,48 @@ public partial class SettingsWindow : Window
 
 	public void OnPreviewSectorClicked(int sectorIndex)
 	{
+		_selectedLayoutTier = 1;
 		_selectedLayoutSlotIndex = sectorIndex;
+		_selectedLayoutSubSlotIndex = -1;
 		if (LayoutTargetSlotRadio != null)
 		{
 			LayoutTargetSlotRadio.IsChecked = true;
 		}
 		RefreshLayoutOptionsUi();
 		RenderLiveWheelPreview();
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+		UpdatePreviewCoreSelection(sectorIndex, -1, profile);
+	}
+
+	public void OnPreviewSubSectorClicked(int parentIndex, int subIndex)
+	{
+		_selectedLayoutTier = 2;
+		_selectedLayoutSlotIndex = parentIndex;
+		_selectedLayoutSubSlotIndex = subIndex;
+		if (LayoutTargetSlotRadio != null)
+		{
+			LayoutTargetSlotRadio.IsChecked = true;
+		}
+		RefreshLayoutOptionsUi();
+		RenderLiveWheelPreview();
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+		UpdatePreviewCoreSelection(parentIndex, subIndex, profile);
+	}
+
+	private void ResetSlotLayoutButton_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? action = GetCurrentEditingAction();
+		if (action != null)
+		{
+			action.LayoutMode = "Inherit";
+			action.CustomTextColor = null;
+			action.CustomFontFamily = null;
+			action.CustomIconSize = null;
+			action.CustomFontSize = null;
+			RefreshLayoutOptionsUi();
+			RenderLiveWheelPreview();
+			ScheduleAutoSave();
+		}
 	}
 
 	private void IconLayoutModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -3923,42 +3879,34 @@ public partial class SettingsWindow : Window
 		if (_selectedLayoutSlotIndex < 0)
 		{
 			ConfigManager.CurrentConfig.IconLayoutMode = text;
-			_isUpdatingUi = true;
-			try
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles?.FirstOrDefault();
+			if (profile?.Actions != null)
 			{
-				if (text == "IconOnly")
+				foreach (var act in profile.Actions)
 				{
-					ConfigManager.CurrentConfig.ShowText = false;
-					if (ShowTextCheckBox != null)
+					if (act != null)
 					{
-						ShowTextCheckBox.IsChecked = false;
+						act.LayoutMode = "Inherit";
+						if (act.SubActions != null)
+						{
+							foreach (var subAct in act.SubActions)
+							{
+								if (subAct != null)
+								{
+									subAct.LayoutMode = "Inherit";
+								}
+							}
+						}
 					}
 				}
-				else
-				{
-					ConfigManager.CurrentConfig.ShowText = true;
-					if (ShowTextCheckBox != null)
-					{
-						ShowTextCheckBox.IsChecked = true;
-					}
-				}
-			}
-			finally
-			{
-				_isUpdatingUi = false;
 			}
 		}
 		else
 		{
-			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			ActionItem? action = GetCurrentEditingAction();
+			if (action != null)
 			{
-				ActionItem action = profile.Actions[_selectedLayoutSlotIndex];
 				action.LayoutMode = text;
-				if (text != "Inherit" && EnableSlotCustomLayoutCheckBox != null)
-				{
-					EnableSlotCustomLayoutCheckBox.IsChecked = true;
-				}
 			}
 		}
 		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
@@ -3966,7 +3914,7 @@ public partial class SettingsWindow : Window
 		{
 			RenderLiveWheelPreview();
 		}
-		SyncUiToConfigAndSave();
+		ScheduleAutoSave();
 	}
 
 	private void PopulateWheelFontFamilies()
@@ -4128,10 +4076,10 @@ public partial class SettingsWindow : Window
 		}
 		else
 		{
-			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			ActionItem? action = GetCurrentEditingAction();
+			if (action != null)
 			{
-				profile.Actions[_selectedLayoutSlotIndex].CustomFontFamily = wheelFontFamily;
+				action.CustomFontFamily = wheelFontFamily;
 			}
 		}
 		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
@@ -4139,7 +4087,7 @@ public partial class SettingsWindow : Window
 		{
 			RenderLiveWheelPreview();
 		}
-		SyncUiToConfigAndSave();
+		ScheduleAutoSave();
 	}
 
 	private void CoreFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -4180,10 +4128,10 @@ public partial class SettingsWindow : Window
 		}
 		else
 		{
-			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-			if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+			ActionItem? action = GetCurrentEditingAction();
+			if (action != null)
 			{
-				profile.Actions[_selectedLayoutSlotIndex].CustomTextColor = hex;
+				action.CustomTextColor = hex;
 			}
 		}
 		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
@@ -4230,43 +4178,6 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private void ShowTextCheckBox_Changed(object sender, RoutedEventArgs e)
-	{
-		if (ShowTextCheckBox == null || ConfigManager.CurrentConfig == null || _isUpdatingUi)
-		{
-			return;
-		}
-		bool valueOrDefault = ShowTextCheckBox.IsChecked == true;
-		ConfigManager.CurrentConfig.ShowText = valueOrDefault;
-		_isUpdatingUi = true;
-		try
-		{
-			if (valueOrDefault)
-			{
-				if (ConfigManager.CurrentConfig.IconLayoutMode == "IconOnly")
-				{
-					ConfigManager.CurrentConfig.IconLayoutMode = "IconAndText";
-					SetComboBoxSelectedValue(IconLayoutModeComboBox, "IconAndText");
-				}
-			}
-			else if (ConfigManager.CurrentConfig.IconLayoutMode != "IconOnly")
-			{
-				ConfigManager.CurrentConfig.IconLayoutMode = "IconOnly";
-				SetComboBoxSelectedValue(IconLayoutModeComboBox, "IconOnly");
-			}
-		}
-		finally
-		{
-			_isUpdatingUi = false;
-		}
-		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
-		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
-		{
-			RenderLiveWheelPreview();
-		}
-		SyncUiToConfigAndSave();
-	}
-
 	private void ShowSelectedActionTextCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
 		if (ShowSelectedActionTextCheckBox == null || ConfigManager.CurrentConfig == null || _isUpdatingUi)
@@ -4294,10 +4205,10 @@ public partial class SettingsWindow : Window
 			}
 			else
 			{
-				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-				if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+				ActionItem? action = GetCurrentEditingAction();
+				if (action != null)
 				{
-					profile.Actions[_selectedLayoutSlotIndex].CustomIconSize = val;
+					action.CustomIconSize = val;
 				}
 			}
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
@@ -4321,10 +4232,10 @@ public partial class SettingsWindow : Window
 			}
 			else
 			{
-				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
-				if (profile?.Actions != null && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex] != null)
+				ActionItem? action = GetCurrentEditingAction();
+				if (action != null)
 				{
-					profile.Actions[_selectedLayoutSlotIndex].CustomFontSize = val;
+					action.CustomFontSize = val;
 				}
 			}
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
@@ -4378,6 +4289,39 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		bool flag = sender == Tier2ConfigSegmentRadio || (sender == null && ((Tier2ConfigSegmentRadio?.IsChecked == true)));
+		_selectedLayoutTier = flag ? 2 : 1;
+		if (!flag)
+		{
+			_selectedLayoutSubSlotIndex = -1;
+		}
+		else
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+			if (profile?.Actions != null)
+			{
+				bool currentHasSub = (_selectedLayoutSlotIndex >= 0 && _selectedLayoutSlotIndex < profile.Actions.Count && profile.Actions[_selectedLayoutSlotIndex]?.SubActions?.Count > 0);
+				if (!currentHasSub)
+				{
+					for (int k = 0; k < profile.Actions.Count; k++)
+					{
+						if (profile.Actions[k]?.SubActions?.Count > 0)
+						{
+							_selectedLayoutSlotIndex = k;
+							_selectedLayoutSubSlotIndex = 0;
+							currentHasSub = true;
+							break;
+						}
+					}
+				}
+				if (currentHasSub)
+				{
+					if (_selectedLayoutSubSlotIndex < 0 || _selectedLayoutSubSlotIndex >= (profile.Actions[_selectedLayoutSlotIndex]?.SubActions?.Count ?? 0))
+					{
+						_selectedLayoutSubSlotIndex = 0;
+					}
+				}
+			}
+		}
 		_isUpdatingUi = true;
 		try
 		{
@@ -4418,6 +4362,7 @@ public partial class SettingsWindow : Window
 		{
 			_isUpdatingUi = false;
 		}
+		RefreshLayoutOptionsUi();
 		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 		{
@@ -5936,20 +5881,44 @@ public partial class SettingsWindow : Window
 			}
 			string text4 = ((!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelUiStyle) && ConfigManager.CurrentConfig.SubWheelUiStyle != "FollowPrimary") ? ConfigManager.CurrentConfig.SubWheelUiStyle : text);
 			string text5 = ((!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelTheme) && ConfigManager.CurrentConfig.SubWheelTheme != "FollowPrimary") ? ConfigManager.CurrentConfig.SubWheelTheme : text2);
-			if (text4 != text || text5 != text2 || ConfigManager.CurrentConfig.UseIndependentSubWheelTheme)
+			if (ConfigManager.CurrentConfig.UseIndependentSubWheelTheme || text4 != text || text5 != text2)
 			{
 				try
 				{
-					IRadialStyleRenderer radialStyleRenderer = StyleRendererFactory.CreateRenderer(text4);
-					radialStyleRenderer.Initialize(text5, ConfigManager.CurrentConfig);
-					_previewSubDefaultBrush = radialStyleRenderer.DefaultSectorBrush;
-					_previewSubHighlightBrush = radialStyleRenderer.HighlightSectorBrush;
-					_previewSubBorderBrush = radialStyleRenderer.SectorBorderBrush;
-					_previewSubHighlightBorderBrush = radialStyleRenderer.HighlightBorderBrush;
-					_previewSubTextBrush = radialStyleRenderer.TextColorBrush;
+					_previewSubStyleRenderer = StyleRendererFactory.CreateRenderer(text4);
+					_previewSubStyleRenderer.Initialize(text5, ConfigManager.CurrentConfig);
+					_previewSubDefaultBrush = _previewSubStyleRenderer.DefaultSectorBrush;
+					_previewSubHighlightBrush = _previewSubStyleRenderer.HighlightSectorBrush;
+					_previewSubBorderBrush = _previewSubStyleRenderer.SectorBorderBrush;
+					_previewSubHighlightBorderBrush = _previewSubStyleRenderer.HighlightBorderBrush;
+					_previewSubTextBrush = _previewSubStyleRenderer.TextColorBrush;
+					if (text5 == "Custom")
+					{
+						if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig.SubWheelCustomSectorBg))
+						{
+							_previewSubDefaultBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomSectorBg));
+						}
+						if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig.SubWheelCustomSectorBorder))
+						{
+							_previewSubBorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomSectorBorder));
+						}
+						if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig.SubWheelCustomHighlightBg))
+						{
+							_previewSubHighlightBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomHighlightBg));
+						}
+						if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder))
+						{
+							_previewSubHighlightBorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder));
+						}
+						if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig.SubWheelCustomText))
+						{
+							_previewSubTextBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomText));
+						}
+					}
 				}
 				catch
 				{
+					_previewSubStyleRenderer = _previewStyleRenderer;
 					_previewSubDefaultBrush = _previewDefaultBrush;
 					_previewSubHighlightBrush = _previewHighlightBrush;
 					_previewSubBorderBrush = _previewBorderBrush;
@@ -5959,6 +5928,7 @@ public partial class SettingsWindow : Window
 			}
 			else
 			{
+				_previewSubStyleRenderer = _previewStyleRenderer;
 				_previewSubDefaultBrush = _previewDefaultBrush;
 				_previewSubHighlightBrush = _previewHighlightBrush;
 				_previewSubBorderBrush = _previewBorderBrush;
@@ -5992,59 +5962,6 @@ public partial class SettingsWindow : Window
 				}
 				catch
 				{
-				}
-			}
-			else
-			{
-				if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelCustomSectorBg))
-				{
-					try
-					{
-						_previewSubDefaultBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomSectorBg));
-					}
-					catch
-					{
-					}
-				}
-				if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelCustomSectorBorder))
-				{
-					try
-					{
-						_previewSubBorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomSectorBorder));
-					}
-					catch
-					{
-					}
-				}
-				if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelCustomHighlightBg))
-				{
-					try
-					{
-						_previewSubHighlightBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomHighlightBg));
-					}
-					catch
-					{
-					}
-				}
-				if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder))
-				{
-					try
-					{
-						_previewSubHighlightBorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomHighlightBorder));
-					}
-					catch
-					{
-					}
-				}
-				if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.SubWheelCustomText))
-				{
-					try
-					{
-						_previewSubTextBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.SubWheelCustomText));
-					}
-					catch
-					{
-					}
 				}
 			}
 			Grid grid = new Grid
@@ -6311,7 +6228,8 @@ public partial class SettingsWindow : Window
 				{
 					sectorLayout = action.LayoutMode;
 				}
-				bool sectorFlag = ConfigManager.CurrentConfig.ShowText && sectorLayout != "IconOnly";
+				bool shouldShowIcon = (sectorLayout != "TextOnly");
+				bool shouldShowText = (sectorLayout != "IconOnly");
 
 				Brush sectorPreviewTextBrush = _previewTextBrush;
 				if (action != null && !string.IsNullOrWhiteSpace(action.CustomTextColor))
@@ -6319,7 +6237,7 @@ public partial class SettingsWindow : Window
 					sectorPreviewTextBrush = CreateBrushFromHexSafe(action.CustomTextColor, _previewTextBrush);
 				}
 
-				if (sectorLayout != "TextOnly")
+				if (shouldShowIcon)
 				{
 					double baseIconSize = (action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0)
 						? action.CustomIconSize.Value
@@ -6343,7 +6261,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
 							};
 							stackPanel.Children.Add(element);
 						}
@@ -6363,7 +6281,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
 							};
 							stackPanel.Children.Add(element2);
 						}
@@ -6380,7 +6298,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
 							};
 							stackPanel.Children.Add(element3);
 						}
@@ -6397,7 +6315,7 @@ public partial class SettingsWindow : Window
 								Height = num30,
 								Stretch = Stretch.Uniform,
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, sectorFlag ? 1 : 0)
+								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
 							};
 							stackPanel.Children.Add(element4);
 						}
@@ -6406,7 +6324,7 @@ public partial class SettingsWindow : Window
 						}
 					}
 				}
-				if (sectorFlag && !string.IsNullOrEmpty(text8))
+				if (shouldShowText && !string.IsNullOrEmpty(text8))
 				{
 					double baseFontSize = (action != null && action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0)
 						? action.CustomFontSize.Value
@@ -6417,7 +6335,7 @@ public partial class SettingsWindow : Window
 						12 => 0.8, 
 						_ => 1.0, 
 					};
-					double val2 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.0) : baseFontSize) * 0.82 * num32 * (num7 / (135.0 / num5));
+					double val2 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.2) : baseFontSize) * 0.82 * num32 * (num7 / (135.0 / num5));
 					double maxWidth = num19 switch
 					{
 						4 => 96.0, 
@@ -6433,7 +6351,7 @@ public partial class SettingsWindow : Window
 						FontSize = Math.Max(6.0, val2),
 						FontFamily = new System.Windows.Media.FontFamily(sectorFont),
 						Foreground = sectorPreviewTextBrush,
-						FontWeight = FontWeights.Medium,
+						FontWeight = (sectorLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 						TextAlignment = TextAlignment.Center,
 						TextTrimming = TextTrimming.CharacterEllipsis,
@@ -6464,7 +6382,10 @@ public partial class SettingsWindow : Window
 				Canvas.SetLeft(grid2, num26 - num33 / 2.0);
 				Canvas.SetTop(grid2, num27 - num34 / 2.0);
 				System.Windows.Controls.Panel.SetZIndex(grid2, 10);
-				LiveWheelPreviewCanvas.Children.Add(grid2);if (!enableMultiTier || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
+				LiveWheelPreviewCanvas.Children.Add(grid2);
+
+				bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
+				if (!enableMultiTier || !isTier2Mode || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
 				{
 					continue;
 				}
@@ -6474,7 +6395,6 @@ public partial class SettingsWindow : Window
 					continue;
 				}
 				bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
-				bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
 				int count = actionItem.SubActions.Count;
 				int activeCount = isFan ? Math.Min(3, count) : count;
 				double num35 = num20 / (double)count;
@@ -6509,17 +6429,37 @@ public partial class SettingsWindow : Window
 					}
 
 					TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
+					bool isSelectedSub = (LayoutTargetSlotRadio != null && LayoutTargetSlotRadio.IsChecked == true && _selectedLayoutSlotIndex >= 0 && _selectedLayoutTier == 2 && num21 == _selectedLayoutSlotIndex && num36 == _selectedLayoutSubSlotIndex);
 					System.Windows.Shapes.Path path2 = new System.Windows.Shapes.Path
 					{
 						Data = data2,
 						Fill = _previewSubDefaultBrush,
-						Stroke = _previewSubBorderBrush,
-						StrokeThickness = (_previewStyleRenderer?.BorderThickness ?? 1.2),
+						Stroke = isSelectedSub ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : _previewSubBorderBrush,
+						StrokeThickness = isSelectedSub ? 2.4 : (_previewSubStyleRenderer?.BorderThickness ?? _previewStyleRenderer?.BorderThickness ?? 1.2),
 						RenderTransform = translateTransform2,
 						Tag = $"sub_{num21}_{num36}",
-						Opacity = (isFan ? (isTier2Mode ? 0.95 : 0.0) : 0.88)
+						Opacity = 0.95,
+						Cursor = System.Windows.Input.Cursors.Hand,
+						Effect = isSelectedSub ? new DropShadowEffect
+						{
+							Color = System.Windows.Media.Color.FromRgb(56, 189, 248),
+							BlurRadius = 14.0,
+							ShadowDepth = 0.0,
+							Opacity = 0.95
+						} : null
 					};
-					System.Windows.Controls.Panel.SetZIndex(path2, 15);
+					int clickedParentIdx = num21;
+					int clickedSubIdx = num36;
+					path2.MouseLeftButtonDown += (s, e) =>
+					{
+						e.Handled = true;
+						OnPreviewSubSectorClicked(clickedParentIdx, clickedSubIdx);
+					};
+					if (!isSelectedSub)
+					{
+						_previewSubStyleRenderer?.ApplySectorHighlight(path2, isHighlighted: false);
+					}
+					System.Windows.Controls.Panel.SetZIndex(path2, isSelectedSub ? 35 : 15);
 					LiveWheelPreviewCanvas.Children.Add(path2);
 					_previewSubSectorPaths.Add(path2);
 					_previewSubTransforms.Add(translateTransform2);
@@ -6535,69 +6475,94 @@ public partial class SettingsWindow : Window
 						IsHitTestVisible = false,
 						RenderTransform = translateTransform2
 					};
-					double num43 = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0) * 0.65 * num7;
-					string text12 = null;
-					if (!string.IsNullOrEmpty(actionItem2.CustomIconSvg))
+
+					string subLayout = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.LayoutMode) && actionItem2.LayoutMode != "Inherit")
+						? actionItem2.LayoutMode
+						: (ConfigManager.CurrentConfig.IconLayoutMode ?? "IconAndText");
+					bool subShouldShowIcon = (subLayout != "TextOnly");
+					bool subShouldShowText = (subLayout != "IconOnly");
+					Brush subSectorPreviewTextBrush = _previewSubTextBrush;
+					if (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomTextColor))
 					{
-						text12 = actionItem2.CustomIconSvg;
+						subSectorPreviewTextBrush = CreateBrushFromHexSafe(actionItem2.CustomTextColor, _previewSubTextBrush);
 					}
-					else if (!string.IsNullOrEmpty(actionItem2.IconKey))
+
+					if (subShouldShowIcon)
 					{
-						text12 = IconHelper.GetSvgPathByKey(actionItem2.IconKey);
-					}
-					else if (actionItem2.Type == "Folder" || actionItem2.Type == "OpenFolder")
-					{
-						text12 = IconHelper.GetSvgPathByKey("Folder");
-					}
-					else if (actionItem2.Type == "System" && !string.IsNullOrEmpty(actionItem2.Parameter))
-					{
-						text12 = IconHelper.GetSvgPathByKey(actionItem2.Parameter);
-					}
-					if (!string.IsNullOrEmpty(text12))
-					{
-						try
+						double subBaseIconSize = (actionItem2 != null && actionItem2.CustomIconSize.HasValue && actionItem2.CustomIconSize.Value > 0.0)
+							? actionItem2.CustomIconSize.Value
+							: ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
+						double num43 = ((subLayout == "IconOnly") ? (subBaseIconSize * 1.35) : subBaseIconSize) * 0.65 * num7;
+						string text12 = null;
+						if (!string.IsNullOrEmpty(actionItem2.CustomIconSvg))
 						{
-							System.Windows.Shapes.Path element6 = new System.Windows.Shapes.Path
+							text12 = actionItem2.CustomIconSvg;
+						}
+						else if (!string.IsNullOrEmpty(actionItem2.IconKey))
+						{
+							text12 = IconHelper.GetSvgPathByKey(actionItem2.IconKey);
+						}
+						else if (actionItem2.Type == "Folder" || actionItem2.Type == "OpenFolder")
+						{
+							text12 = IconHelper.GetSvgPathByKey("Folder");
+						}
+						else if (actionItem2.Type == "System" && !string.IsNullOrEmpty(actionItem2.Parameter))
+						{
+							text12 = IconHelper.GetSvgPathByKey(actionItem2.Parameter);
+						}
+						if (!string.IsNullOrEmpty(text12))
+						{
+							try
 							{
-								Data = Geometry.Parse(text12),
-								Fill = _previewSubTextBrush,
-								Width = num43,
-								Height = num43,
-								Stretch = Stretch.Uniform,
-								HorizontalAlignment = HorizontalAlignment.Center
-							};
-							stackPanel2.Children.Add(element6);
-						}
-						catch
-						{
-						}
-					}
-					else if (actionItem2.Type == "Launch" && !string.IsNullOrEmpty(actionItem2.Parameter))
-					{
-						BitmapSource icon2 = IconHelper.GetIcon(actionItem2.Parameter);
-						if (icon2 != null)
-						{
-							Image element7 = new Image
+								System.Windows.Shapes.Path element6 = new System.Windows.Shapes.Path
+								{
+									Data = Geometry.Parse(text12),
+									Fill = subSectorPreviewTextBrush,
+									Width = num43,
+									Height = num43,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
+								};
+								stackPanel2.Children.Add(element6);
+							}
+							catch
 							{
-								Source = icon2,
-								Width = num43,
-								Height = num43,
-								Stretch = Stretch.Uniform,
-								HorizontalAlignment = HorizontalAlignment.Center
-							};
-							stackPanel2.Children.Add(element7);
+							}
+						}
+						else if (actionItem2.Type == "Launch" && !string.IsNullOrEmpty(actionItem2.Parameter))
+						{
+							BitmapSource icon2 = IconHelper.GetIcon(actionItem2.Parameter);
+							if (icon2 != null)
+							{
+								Image element7 = new Image
+								{
+									Source = icon2,
+									Width = num43,
+									Height = num43,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
+								};
+								stackPanel2.Children.Add(element7);
+							}
 						}
 					}
-					if (flag && !string.IsNullOrEmpty(actionItem2.Name))
+					if (subShouldShowText && !string.IsNullOrEmpty(actionItem2.Name))
 					{
-						double num44 = ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 10.0);
+						double subBaseFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
+							? actionItem2.CustomFontSize.Value
+							: ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 10.0);
+						string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
+							? actionItem2.CustomFontFamily
+							: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 						TextBlock element8 = new TextBlock
 						{
 							Text = actionItem2.Name,
-							FontSize = Math.Max(5.0, num44 * 0.75 * num7),
-							FontFamily = new FontFamily(ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI"),
-							Foreground = _previewSubTextBrush,
-							FontWeight = FontWeights.Normal,
+							FontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.75 * num7),
+							FontFamily = new FontFamily(subFontFamily),
+							Foreground = subSectorPreviewTextBrush,
+							FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Normal,
 							HorizontalAlignment = HorizontalAlignment.Center,
 							TextAlignment = TextAlignment.Center,
 							TextTrimming = TextTrimming.CharacterEllipsis,
@@ -6613,7 +6578,7 @@ public partial class SettingsWindow : Window
 						Height = num46,
 						IsHitTestVisible = false,
 						RenderTransform = translateTransform2,
-						Opacity = (isFan ? (isTier2Mode ? 1.0 : 0.0) : 1.0)
+						Opacity = 1.0
 					};
 					grid3.Children.Add(stackPanel2);
 					Canvas.SetLeft(grid3, num41 - num45 / 2.0);
@@ -6828,6 +6793,7 @@ public partial class SettingsWindow : Window
 					translateTransform.Y = 0.0;
 				}
 			}
+			ApplyPreviewSelectedVisuals();
 
 			for (int num25 = 0; num25 < _previewSubSectorPaths.Count; num25++)
 			{
@@ -6841,7 +6807,8 @@ public partial class SettingsWindow : Window
 				{
 					path3.Fill = _previewSubHighlightBrush ?? _previewHighlightBrush;
 					path3.Stroke = _previewSubHighlightBorderBrush ?? _previewHighlightBorderBrush;
-					path3.StrokeThickness = _previewStyleRenderer?.HighlightBorderThickness ?? 2.0;
+					path3.StrokeThickness = (_previewSubStyleRenderer?.HighlightBorderThickness ?? _previewStyleRenderer?.HighlightBorderThickness ?? 2.0);
+					_previewSubStyleRenderer?.ApplySectorHighlight(path3, isHighlighted: true);
 					path3.Opacity = 1.0;
 					if (grid != null) grid.Opacity = 1.0;
 					System.Windows.Controls.Panel.SetZIndex(path3, 20);
@@ -6874,7 +6841,8 @@ public partial class SettingsWindow : Window
 				{
 					path3.Fill = _previewSubDefaultBrush ?? _previewDefaultBrush;
 					path3.Stroke = _previewSubHighlightBorderBrush ?? _previewHighlightBorderBrush;
-					path3.StrokeThickness = _previewStyleRenderer?.BorderThickness ?? 1.5;
+					path3.StrokeThickness = (_previewSubStyleRenderer?.BorderThickness ?? _previewStyleRenderer?.BorderThickness ?? 1.5);
+					_previewSubStyleRenderer?.ApplySectorHighlight(path3, isHighlighted: false);
 					path3.Opacity = 1.0;
 					if (grid != null) grid.Opacity = 1.0;
 					System.Windows.Controls.Panel.SetZIndex(path3, 15);
@@ -6905,7 +6873,8 @@ public partial class SettingsWindow : Window
 
 				path3.Fill = _previewSubDefaultBrush ?? _previewDefaultBrush;
 				path3.Stroke = _previewSubBorderBrush ?? _previewBorderBrush;
-				path3.StrokeThickness = _previewStyleRenderer?.BorderThickness ?? 1.2;
+				path3.StrokeThickness = (_previewSubStyleRenderer?.BorderThickness ?? _previewStyleRenderer?.BorderThickness ?? 1.2);
+				_previewSubStyleRenderer?.ApplySectorHighlight(path3, isHighlighted: false);
 				path3.Opacity = (isFan ? (isTier2Mode ? 0.95 : 0.0) : 0.85);
 				if (grid != null) grid.Opacity = (isFan ? (isTier2Mode ? 1.0 : 0.0) : 0.85);
 				System.Windows.Controls.Panel.SetZIndex(path3, 15);
@@ -6932,6 +6901,7 @@ public partial class SettingsWindow : Window
 					}
 				}
 			}
+			ApplyPreviewSelectedVisuals();
 		}
 		catch (Exception)
 		{
@@ -6956,6 +6926,25 @@ public partial class SettingsWindow : Window
 				translateTransform.X = 0.0;
 				translateTransform.Y = 0.0;
 			}
+
+			bool isFan = (ConfigManager.CurrentConfig?.SubmenuStyle ?? "Wheel") == "Fan";
+			bool isTier2Mode = (Tier2ConfigSegmentRadio?.IsChecked == true);
+			for (int num28 = 0; num28 < _previewSubSectorPaths.Count; num28++)
+			{
+				System.Windows.Shapes.Path path4 = _previewSubSectorPaths[num28];
+				path4.Fill = _previewSubDefaultBrush ?? _previewDefaultBrush;
+				path4.Stroke = _previewSubBorderBrush ?? _previewBorderBrush;
+				path4.StrokeThickness = (_previewSubStyleRenderer?.BorderThickness ?? _previewStyleRenderer?.BorderThickness ?? 1.2);
+				_previewSubStyleRenderer?.ApplySectorHighlight(path4, isHighlighted: false);
+				ApplySubSectorGlow(path4, isHighlighted: false);
+				path4.Opacity = (isFan ? (isTier2Mode ? 0.95 : 0.0) : 0.85);
+				if (num28 < _previewSubContainers.Count && _previewSubContainers[num28] != null)
+				{
+					_previewSubContainers[num28].Opacity = (isFan ? (isTier2Mode ? 1.0 : 0.0) : 0.85);
+				}
+			}
+			ApplyPreviewSelectedVisuals();
+
 			if (_previewCoreCircle != null)
 			{
 				_previewCoreCircle.Fill = _previewCoreBgBrush;
@@ -6973,6 +6962,84 @@ public partial class SettingsWindow : Window
 		}
 		catch
 		{
+		}
+	}
+
+	private void ApplyPreviewSelectedVisuals()
+	{
+		bool isSlotMode = (LayoutTargetSlotRadio != null && LayoutTargetSlotRadio.IsChecked == true && _selectedLayoutSlotIndex >= 0);
+		
+		if (_previewSectorPaths != null)
+		{
+			for (int i = 0; i < _previewSectorPaths.Count; i++)
+			{
+				System.Windows.Shapes.Path path = _previewSectorPaths[i];
+				if (isSlotMode && _selectedLayoutTier == 1 && i == _selectedLayoutSlotIndex)
+				{
+					path.Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+					path.StrokeThickness = 2.4;
+					path.Effect = new DropShadowEffect
+					{
+						Color = System.Windows.Media.Color.FromRgb(56, 189, 248),
+						BlurRadius = 14.0,
+						ShadowDepth = 0.0,
+						Opacity = 0.95
+					};
+					System.Windows.Controls.Panel.SetZIndex(path, 10);
+				}
+				else if (isSlotMode && _selectedLayoutTier == 2 && i == _selectedLayoutSlotIndex)
+				{
+					// 二级定制时，父级扇区带有柔和天蓝关联指示轮廓
+					path.Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 56, 189, 248));
+					path.StrokeThickness = 1.8;
+					path.Effect = new DropShadowEffect
+					{
+						Color = System.Windows.Media.Color.FromRgb(56, 189, 248),
+						BlurRadius = 8.0,
+						ShadowDepth = 0.0,
+						Opacity = 0.55
+					};
+					System.Windows.Controls.Panel.SetZIndex(path, 8);
+				}
+				else if (i != _lastHoveredSector)
+				{
+					path.Stroke = _previewBorderBrush;
+					path.StrokeThickness = _previewStyleRenderer?.BorderThickness ?? 1.5;
+					path.Effect = null;
+					System.Windows.Controls.Panel.SetZIndex(path, 0);
+				}
+			}
+		}
+
+		if (_previewSubSectorPaths != null)
+		{
+			for (int j = 0; j < _previewSubSectorPaths.Count; j++)
+			{
+				System.Windows.Shapes.Path subPath = _previewSubSectorPaths[j];
+				int pIdx = (j < _previewSubParentIndices.Count) ? _previewSubParentIndices[j] : -1;
+				int sIdx = (j < _previewSubIndices.Count) ? _previewSubIndices[j] : -1;
+
+				if (isSlotMode && _selectedLayoutTier == 2 && pIdx == _selectedLayoutSlotIndex && sIdx == _selectedLayoutSubSlotIndex)
+				{
+					subPath.Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+					subPath.StrokeThickness = 2.4;
+					subPath.Effect = new DropShadowEffect
+					{
+						Color = System.Windows.Media.Color.FromRgb(56, 189, 248),
+						BlurRadius = 14.0,
+						ShadowDepth = 0.0,
+						Opacity = 0.95
+					};
+					System.Windows.Controls.Panel.SetZIndex(subPath, 35);
+				}
+				else if (j != _lastHoveredSubIndex)
+				{
+					subPath.Stroke = _previewSubBorderBrush ?? _previewBorderBrush;
+					subPath.StrokeThickness = (_previewSubStyleRenderer?.BorderThickness ?? _previewStyleRenderer?.BorderThickness ?? 1.2);
+					subPath.Effect = null;
+					System.Windows.Controls.Panel.SetZIndex(subPath, 15);
+				}
+			}
 		}
 	}
 
@@ -7118,5 +7185,4 @@ public partial class SettingsWindow : Window
 			System.Windows.MessageBox.Show(this, "打开按键拼装器失败: " + ex.Message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
-
 }

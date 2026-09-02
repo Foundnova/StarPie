@@ -1207,22 +1207,20 @@
                         <RadioButton Name="LayoutTargetSlotRadio" Grid.Column="1" Content="🎯 扇区独立定制" GroupName="LayoutTargetMode" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="28" Cursor="Hand" FontWeight="SemiBold" Checked="LayoutTargetRadio_Checked" />
                       </Grid>
                     </Border>
-                    <!-- 扇区独立定制时的槽位选择与开关 -->
-                    <Grid Name="SlotSelectionContainer" Visibility="Collapsed" Margin="0,0,0,10">
-                      <StackPanel>
-                        <TextBlock Name="SlotSelectTitleText" Text="选择定制的轮盘扇区方位:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                        <ComboBox Name="LayoutTargetSlotComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,6" SelectionChanged="LayoutTargetSlotComboBox_SelectionChanged" />
-                        <Grid Margin="0,2,0,4">
-                          <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                          </Grid.ColumnDefinitions>
-                          <CheckBox Name="EnableSlotCustomLayoutCheckBox" Content="⚡ 启用该扇区独立个性化排版" Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center" Checked="EnableSlotCustomLayoutCheckBox_Changed" Unchecked="EnableSlotCustomLayoutCheckBox_Changed" />
-                          <Button Name="ResetSlotLayoutButton" Grid.Column="1" Content="🔄 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" VerticalAlignment="Center" Click="ResetSlotLayoutButton_Click" />
-                        </Grid>
-                        <TextBlock Name="ClickSectorHintText" Text="💡 提示：在右侧画布中点击任意扇区可直接选中" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="0,2,0,0" />
-                      </StackPanel>
-                    </Grid>
+                    <!-- 扇区独立定制时的当前选中信息与一键重置 -->
+                    <Border Name="SlotSelectionContainer" Visibility="Collapsed" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource AccentPrimaryBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Name="CurrentTargetSlotLabel" Text="📍 正在定制: 主轮盘 - 扇区 1" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Name="ClickSectorHintText" Text="💡 提示：在右侧画布中点击任意扇区可直接切换选中" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button Name="ResetSlotLayoutButton" Grid.Column="1" Content="🔄 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" VerticalAlignment="Center" Click="ResetSlotLayoutButton_Click" />
+                      </Grid>
+                    </Border>
                     <TextBlock Name="IconLayoutModeTitleText" Text="排版模式 (Layout Mode):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <ComboBox Name="IconLayoutModeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="IconLayoutModeComboBox_SelectionChanged">
                       <ComboBoxItem Content="图标 + 文字 (双行居中)" Tag="IconAndText" IsSelected="True" />
@@ -1274,9 +1272,6 @@
                       <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="11.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
-                    <WrapPanel Margin="0,8,0,0">
-                      <CheckBox Name="ShowTextCheckBox" Content="在轮盘扇区中显示动作名称文字" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowTextCheckBox_Changed" Unchecked="ShowTextCheckBox_Changed" />
-                    </WrapPanel>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
