@@ -420,8 +420,10 @@ public class GestureController
 					{
 						return;
 					}
-					ShowRadialUI(startPoint, profile);
-					ApplyPendingHighlight();
+					if (ShowRadialUI(startPoint, profile, gestureVersion))
+					{
+						ApplyPendingHighlight();
+					}
 				}
 				catch
 				{
@@ -694,8 +696,10 @@ public class GestureController
 					{
 						return;
 					}
-					ShowRadialUI(center, profile);
-					ApplyPendingHighlight();
+					if (ShowRadialUI(center, profile, gestureVersion))
+					{
+						ApplyPendingHighlight();
+					}
 				}, (DispatcherPriority)7, Array.Empty<object>());
 			}
 		}
@@ -798,52 +802,77 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		QueueHighlightUpdate(num4, num5, flag, flag2, GetCurrentGestureVersion());
 	}
 
-	private static int s_prefetchScheduled;
-
-	private void ShowRadialUI(Point center, WheelProfile profile)
+	private bool ShowRadialUI(Point center, WheelProfile profile, long gestureVersion)
 	{
-		// 线程池轻量预热任务栏槽位快照：防抖与非阻塞调度
+		// 预加载的线程调度与 single-flight 统一由 WindowTaskbarHelper 管理。
 		try
 		{
-			if (Interlocked.CompareExchange(ref s_prefetchScheduled, 1, 0) == 0)
-			{
-				ThreadPool.QueueUserWorkItem(delegate
-				{
-					try
-					{
-						WindowTaskbarHelper.Prefetch();
-					}
-					catch
-					{
-					}
-					finally
-					{
-						Interlocked.Exchange(ref s_prefetchScheduled, 0);
-					}
-				});
-			}
+			WindowTaskbarHelper.Prefetch();
 		}
 		catch
 		{
 		}
-		RadialWindow? oldWindow;
+
+		// 构造过程可能同步读取缓存图标，必须在手势状态锁外执行。
 		RadialWindow newWindow = new RadialWindow(center, profile);
+		RadialWindow? previousWindow;
+		bool shouldPublish;
 		lock (_uiUpdateSync)
 		{
-			oldWindow = _radialWindow;
-			_radialWindow = newWindow;
+			shouldPublish = _isGestureActive && gestureVersion == _gestureVersion;
+			previousWindow = shouldPublish ? _radialWindow : null;
+			if (shouldPublish)
+			{
+				_radialWindow = newWindow;
+			}
 		}
-		if (oldWindow != null)
+
+		if (!shouldPublish)
 		{
 			try
 			{
-				oldWindow.Close();
+				newWindow.Close();
+			}
+			catch
+			{
+			}
+			return false;
+		}
+
+		if (previousWindow != null)
+		{
+			try
+			{
+				previousWindow.Close();
 			}
 			catch
 			{
 			}
 		}
-		newWindow.Show();
+
+		try
+		{
+			newWindow.Show();
+			return true;
+		}
+		catch
+		{
+			lock (_uiUpdateSync)
+			{
+				if (ReferenceEquals(_radialWindow, newWindow))
+				{
+					_radialWindow = null;
+				}
+			}
+			try
+			{
+				newWindow.Close();
+			}
+			catch
+			{
+			}
+			throw;
+		}
 	}
 
 	private void HideRadialUI()
