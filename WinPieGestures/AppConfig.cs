@@ -192,4 +192,16 @@ public class AppConfig
 	public bool DisableOnAlt { get; set; }
 
 	public bool DisableOnFullScreen { get; set; } = true;
+
+	public bool AutoCheckUpdate { get; set; } = true;
+
+	public string UpdateChannel { get; set; } = "Stable";
+
+	public string UpdateProxySource { get; set; } = "ghproxy";
+
+	public string CustomProxyUrl { get; set; } = "";
+
+	public string LastCheckUpdateTime { get; set; } = "";
+
+	public string IgnoredVersion { get; set; } = "";
 }

@@ -4,7 +4,22 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.6.2] - 2026-09-03 (手势区纯图标美化 & 指定浏览器精准调度 & 画布拖拽对调修复 & 核圆开关修复 & 控制台状态记忆)
+## [v1.6.2] - 2026-09-03 (手势区纯图标美化 & 指定浏览器精准调度 & 画布拖拽对调修复 & 核圆开关修复 & 控制台状态记忆 & GitHub在线更新)
+
+### 🚀 GitHub Releases 系统在线更新与版本管理 (Software Updates & Smooth Upgrades)
+1. **轻量解耦的更新架构 (UpdateManager)**：
+   - 原生基于 .NET 8 `HttpClient` 与 `System.Text.Json`，无需任何外部第三方依赖，保持后台零常驻侵占；
+   - 自动请求 GitHub REST API 获取最新 Releases 信息，支持「正式稳定版 (Stable)」与「尝鲜体验版 (Beta/Preview)」双通道筛选与语义化版本比较；
+2. **国内加速镜像与下载代理 (Mirror Acceleration)**：
+   - 针对国内连接 GitHub 丢包与限速问题，默认接入 `ghproxy.net` 与 `github.moeyy.xyz` 镜像加速，并支持官方直连与自定义反向代理前缀；
+   - 支持流式断点监控下载，实时上报进度百分比、平滑进度条、下载速度与已接收字节；
+3. **安全平滑重启覆盖机制 (Smooth Self-Update)**：
+   - 规避 Windows 运行中文件锁问题：下载完成校验后，一键生成临时解压更新脚本（`StarPie_Updater.cmd`）；
+   - 主程序安全注销钩子并保存配置退出，脚本等待进程句柄释放后静默使用系统 `tar` / `Expand-Archive` 解压覆盖安装目录，并自动重新唤起新版 `StarPie.exe`；
+4. **控制台界面无缝集成 (Console UI Integration)**：
+   - 在 Tab 4【高级与系统】顶部增设现代化卡片，配备「已是最新 / 发现新版 / 下载中 / 就绪重启」全状态徽章；
+   - 自动智能识别用户正在运行的是「独立单文件免安装版」还是「依赖运行时轻量版」，默认选中匹配的 Zip 资产，同时支持自由切换；
+   - 【关于与更新】页面与左侧边栏同步联动，支持一键快捷检查。
 
 ### 🎨 手势动作区画布渲染对齐外观形态预览 (Icon-Only Clean Canvas Aesthetics)
 1. **纯图标无文字极简美学**：

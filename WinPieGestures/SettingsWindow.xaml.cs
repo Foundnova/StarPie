@@ -174,6 +174,10 @@ public partial class SettingsWindow : Window
 
 	private int _lastHoveredSubIndex = -2;
 
+	private ReleaseInfo? _latestReleaseInfo = null;
+	private CancellationTokenSource? _downloadCts = null;
+	private string? _downloadedZipPath = null;
+
 	private static readonly string[] Directions4 = new string[4] { "右 (E / 0°)", "下 (S / 90°)", "左 (W / 180°)", "上 (N / 270°)" };
 
 	private static readonly string[] Directions8 = new string[8] { "右 (E / 0°)", "右下 (SE / 45°)", "下 (S / 90°)", "左下 (SW / 135°)", "左 (W / 180°)", "左上 (NW / 225°)", "上 (N / 270°)", "右上 (NE / 315°)" };
@@ -323,6 +327,10 @@ public partial class SettingsWindow : Window
 		{
 			SidebarVersionText.Text = text;
 		}
+		if (AboutVersionBadgeText != null)
+		{
+			AboutVersionBadgeText.Text = text;
+		}
 		try
 		{
 			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
@@ -345,6 +353,14 @@ public partial class SettingsWindow : Window
 				RenderLiveWheelPreview();
 			}
 			MemoryOptimizer.TrimMemory();
+			if (ConfigManager.CurrentConfig?.AutoCheckUpdate == true)
+			{
+				Task.Run(async () =>
+				{
+					await Task.Delay(2500);
+					await Dispatcher.InvokeAsync(() => CheckForUpdateInternalAsync(silent: true));
+				});
+			}
 		};
 	}
 
@@ -772,6 +788,24 @@ public partial class SettingsWindow : Window
 			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
 			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
 			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
+		}
+
+		// System Update Settings
+		if (AutoCheckUpdateCheckBox != null)
+		{
+			AutoCheckUpdateCheckBox.IsChecked = ConfigManager.CurrentConfig.AutoCheckUpdate;
+		}
+		SetComboBoxSelectedValue(UpdateChannelComboBox, ConfigManager.CurrentConfig.UpdateChannel ?? "Stable");
+		SetComboBoxSelectedValue(UpdateProxyComboBox, ConfigManager.CurrentConfig.UpdateProxySource ?? "ghproxy");
+
+		bool isStandalone = UpdateManager.Instance.IsCurrentInstallationStandalone();
+		if (UpdatePkgStandaloneRadio != null) UpdatePkgStandaloneRadio.IsChecked = isStandalone;
+		if (UpdatePkgLightweightRadio != null) UpdatePkgLightweightRadio.IsChecked = !isStandalone;
+
+		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
+		if (UpdateStatusDescText != null)
+		{
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"} (64位)。上次检查: {lastCheck}";
 		}
 	}
 
@@ -7156,6 +7190,299 @@ public partial class SettingsWindow : Window
 			}
 			SyncUiToConfigAndSave();
 		}
+	}
+
+	private async void CheckUpdateNowBtn_Click(object sender, RoutedEventArgs e)
+	{
+		await CheckForUpdateInternalAsync(silent: false);
+	}
+
+	private async Task CheckForUpdateInternalAsync(bool silent = false)
+	{
+		try
+		{
+			if (CheckUpdateNowBtn != null)
+			{
+				CheckUpdateNowBtn.IsEnabled = false;
+				CheckUpdateNowBtn.Content = "⏳ 正在检查...";
+			}
+			if (UpdateStatusBadgeText != null)
+			{
+				UpdateStatusBadgeText.Text = "正在检查更新...";
+			}
+
+			string channel = ConfigManager.CurrentConfig?.UpdateChannel ?? "Stable";
+			string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghproxy";
+			string customProxy = ConfigManager.CurrentConfig?.CustomProxyUrl ?? "";
+
+			ReleaseInfo? rel = await UpdateManager.Instance.CheckForUpdateAsync(channel, proxy, customProxy);
+
+			if (ConfigManager.CurrentConfig != null)
+			{
+				ConfigManager.CurrentConfig.LastCheckUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+				ScheduleAutoSave();
+			}
+
+			if (rel != null && rel.IsNewerVersion)
+			{
+				_latestReleaseInfo = rel;
+
+				if (UpdateStatusBadgeText != null)
+				{
+					UpdateStatusBadgeText.Text = $"发现新版本 {rel.TagName}";
+					UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+				}
+				if (UpdateStatusBadge != null)
+				{
+					UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 245, 158, 11));
+				}
+				if (UpdateStatusDescText != null)
+				{
+					UpdateStatusDescText.Text = $"GitHub Releases 探测到更高版本 {rel.TagName} 可供升级！";
+				}
+
+				if (UpdateNewVersionTagText != null)
+				{
+					UpdateNewVersionTagText.Text = $"🎉 发现新版本 {rel.TagName}";
+				}
+				if (UpdateReleaseChannelTag != null)
+				{
+					UpdateReleaseChannelTag.Text = rel.IsPrerelease ? "尝鲜体验版 (Pre-release)" : "正式稳定版 (Stable)";
+				}
+				if (UpdateReleaseDateText != null)
+				{
+					UpdateReleaseDateText.Text = $"发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm} · GitHub Releases";
+				}
+				if (UpdateChangelogTextBlock != null)
+				{
+					UpdateChangelogTextBlock.Text = string.IsNullOrWhiteSpace(rel.Body) ? "作者暂未提供更新日志说明。" : rel.Body;
+				}
+
+				if (UpdateNewVersionPanel != null)
+				{
+					UpdateNewVersionPanel.Visibility = Visibility.Visible;
+				}
+				if (UpdateReadyToInstallPanel != null)
+				{
+					UpdateReadyToInstallPanel.Visibility = Visibility.Collapsed;
+				}
+				if (UpdateDownloadProgressPanel != null)
+				{
+					UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+				}
+			}
+			else if (rel != null)
+			{
+				_latestReleaseInfo = rel;
+				if (UpdateStatusBadgeText != null)
+				{
+					UpdateStatusBadgeText.Text = "当前已是最新版本";
+					UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+				}
+				if (UpdateStatusBadge != null)
+				{
+					UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+				}
+				if (UpdateStatusDescText != null)
+				{
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"} (64位)。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+				}
+				if (UpdateNewVersionPanel != null)
+				{
+					UpdateNewVersionPanel.Visibility = Visibility.Collapsed;
+				}
+			}
+			else
+			{
+				if (!silent)
+				{
+					if (UpdateStatusBadgeText != null)
+					{
+						UpdateStatusBadgeText.Text = "检查更新超时";
+						UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
+					}
+					if (UpdateStatusBadge != null)
+					{
+						UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 239, 68, 68));
+					}
+					if (UpdateStatusDescText != null)
+					{
+						UpdateStatusDescText.Text = "无法连接至 GitHub Releases API，建议在下方切换为国内加速镜像源重试。";
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("CheckForUpdateInternalAsync error", ex);
+		}
+		finally
+		{
+			if (CheckUpdateNowBtn != null)
+			{
+				CheckUpdateNowBtn.IsEnabled = true;
+				CheckUpdateNowBtn.Content = "🔄 立即检查更新";
+			}
+		}
+	}
+
+	private async void StartDownloadUpdateBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_latestReleaseInfo == null) return;
+
+		bool isStandalone = (UpdatePkgStandaloneRadio?.IsChecked == true);
+		string? rawAssetUrl = isStandalone ? _latestReleaseInfo.StandaloneAssetUrl : _latestReleaseInfo.LightweightAssetUrl;
+
+		if (string.IsNullOrEmpty(rawAssetUrl))
+		{
+			OpenWebReleaseBtn_Click(sender, e);
+			return;
+		}
+
+		string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghproxy";
+		string customProxy = ConfigManager.CurrentConfig?.CustomProxyUrl ?? "";
+		string downloadUrl = UpdateManager.Instance.GetProxiedDownloadUrl(rawAssetUrl, proxy, customProxy);
+
+		string fileName = isStandalone
+			? $"StarPie-{_latestReleaseInfo.TagName}-Standalone-win-x64.zip"
+			: $"StarPie-{_latestReleaseInfo.TagName}-Lightweight-win-x64.zip";
+
+		string destPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "StarPie_Updates", fileName);
+		_downloadedZipPath = destPath;
+
+		if (UpdateNewVersionPanel != null) UpdateNewVersionPanel.Visibility = Visibility.Collapsed;
+		if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Collapsed;
+		if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Visible;
+
+		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = $"正在高速下载 {fileName}...";
+		if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = "0%";
+		if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = 0;
+		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = "⚡ 连接下载源中...";
+
+		_downloadCts?.Dispose();
+		_downloadCts = new CancellationTokenSource();
+
+		Progress<UpdateProgressInfo> progress = new Progress<UpdateProgressInfo>(info =>
+		{
+			if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = info.Percent;
+			if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = $"{info.Percent}%";
+			if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = $"⚡ {info.FormattedSpeed}";
+			if (UpdateDownloadSizeText != null) UpdateDownloadSizeText.Text = info.FormattedProgress;
+		});
+
+		try
+		{
+			await UpdateManager.Instance.DownloadAssetAsync(downloadUrl, destPath, progress, _downloadCts.Token);
+
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+			if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Visible;
+
+			if (UpdateStatusBadgeText != null)
+			{
+				UpdateStatusBadgeText.Text = "下载完成 · 就绪安装";
+				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+			}
+			if (UpdateStatusBadge != null)
+			{
+				UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+			if (UpdateNewVersionPanel != null) UpdateNewVersionPanel.Visibility = Visibility.Visible;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("DownloadUpdate failed", ex);
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+			if (UpdateNewVersionPanel != null) UpdateNewVersionPanel.Visibility = Visibility.Visible;
+			System.Windows.MessageBox.Show($"下载更新包失败：{ex.Message}\n建议切换加速镜像源重试或点击前往网页下载。", "StarPie 更新", MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+	}
+
+	private void CancelDownloadBtn_Click(object sender, RoutedEventArgs e)
+	{
+		_downloadCts?.Cancel();
+	}
+
+	private void ApplyRestartUpdateBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (!string.IsNullOrEmpty(_downloadedZipPath) && File.Exists(_downloadedZipPath))
+		{
+			UpdateManager.Instance.RestartAndApplyUpdate(_downloadedZipPath);
+		}
+		else
+		{
+			System.Windows.MessageBox.Show("未找到已下载的更新包，请重新点击下载。", "StarPie 更新", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+	}
+
+	private void OpenUpdateFolderBtn_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			if (!string.IsNullOrEmpty(_downloadedZipPath) && File.Exists(_downloadedZipPath))
+			{
+				Process.Start("explorer.exe", $"/select,\"{_downloadedZipPath}\"");
+			}
+			else
+			{
+				string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "StarPie_Updates");
+				if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+				Process.Start("explorer.exe", folder);
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("OpenUpdateFolder failed", ex);
+		}
+	}
+
+	private void OpenWebReleaseBtn_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			string url = _latestReleaseInfo?.HtmlUrl ?? "https://github.com/SoftBlack42/StarPie/releases";
+			Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("OpenWebRelease failed", ex);
+		}
+	}
+
+	private void AutoCheckUpdateCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		{
+			ConfigManager.CurrentConfig.AutoCheckUpdate = (AutoCheckUpdateCheckBox.IsChecked == true);
+			ScheduleAutoSave();
+		}
+	}
+
+	private void UpdateChannelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && UpdateChannelComboBox.SelectedItem is ComboBoxItem item)
+		{
+			ConfigManager.CurrentConfig.UpdateChannel = item.Tag?.ToString() ?? "Stable";
+			ScheduleAutoSave();
+		}
+	}
+
+	private void UpdateProxyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && UpdateProxyComboBox.SelectedItem is ComboBoxItem item)
+		{
+			ConfigManager.CurrentConfig.UpdateProxySource = item.Tag?.ToString() ?? "ghproxy";
+			ScheduleAutoSave();
+		}
+	}
+
+	private async void AboutCheckUpdateBtn_Click(object sender, RoutedEventArgs e)
+	{
+		SwitchToTab(3);
+		await CheckForUpdateInternalAsync(silent: false);
 	}
 
 	private void AutoStartCheckBox_Changed(object sender, RoutedEventArgs e)
