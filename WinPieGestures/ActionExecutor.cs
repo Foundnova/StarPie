@@ -163,6 +163,40 @@ public static class ActionExecutor
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
+	[DllImport("user32.dll")]
+	private static extern short GetAsyncKeyState(int nVirtKey);
+
+	/// <summary>
+	/// 解锁可能"卡住"的修饰键（Ctrl/Shift/Alt/Win）：仅当物理上并未按着该键时才补发 KeyUp 清空系统粘滞状态。
+	/// 修复手势/轮盘/前台激活（含 Alt 模拟）后修饰键残留导致后续触发异常（如桌面唤醒失效）。
+	/// </summary>
+	public static void ReleaseStuckModifiers()
+	{
+		try
+		{
+			ushort[] modifiers = new ushort[]
+			{
+				162, 160, 164, 91, // L Ctrl, L Shift, L Alt, L Win
+				163, 161, 165, 92  // R Ctrl, R Shift, R Alt, R Win
+			};
+			List<INPUT> upInputs = new List<INPUT>();
+			foreach (ushort mod in modifiers)
+			{
+				if ((GetAsyncKeyState(mod) & 0x8000) == 0)
+				{
+					upInputs.Add(CreateKeyInput(mod, down: false));
+				}
+			}
+			if (upInputs.Count > 0)
+			{
+				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	public static void Execute(ActionItem action)
 	{
 		if (action == null)
@@ -171,6 +205,7 @@ public static class ActionExecutor
 		}
 		try
 		{
+			ReleaseStuckModifiers();
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
 			switch (action.Type.Trim())
 			{

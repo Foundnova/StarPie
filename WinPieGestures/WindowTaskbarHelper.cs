@@ -563,6 +563,58 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
+	/// <summary>
+	/// 抗权限地获取进程 exe 路径：OpenProcess(QUERY_LIMITED_INFORMATION) + QueryFullProcessImageName 优先，
+	/// 失败回退 Process.MainModule（对提权进程可返回 null）。
+	/// </summary>
+	private static string? GetProcessImageNameByPid(uint pid)
+	{
+		try
+		{
+			nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+			if (hProcess != IntPtr.Zero)
+			{
+				try
+				{
+					uint size = 1024;
+					StringBuilder sb = new StringBuilder((int)size);
+					if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+					{
+						string exePath = sb.ToString();
+						if (!string.IsNullOrWhiteSpace(exePath))
+						{
+							return exePath;
+						}
+					}
+				}
+				finally
+				{
+					CloseHandle(hProcess);
+				}
+			}
+			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+			{
+				return proc?.MainModule?.FileName;
+			}
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern nint OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern bool QueryFullProcessImageName(nint hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CloseHandle(nint hObject);
+
 	/// <summary>窗口所属进程的显示名（exe 的 FileDescription，取不到用文件名），按进程缓存；便于匹配任务栏分组按钮名。</summary>
 	private static string? ProcessDescriptionOf(nint hWnd)
 	{
@@ -577,16 +629,15 @@ public static class WindowTaskbarHelper
 		string? computed = null;
 		try
 		{
-			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+			// 抗权限/提权进程：优先用 OpenProcess(QUERY_LIMITED_INFORMATION)+QueryFullProcessImageName，
+			// 失败再退回 Process.MainModule（提权进程可能取不到）。
+			string? exe = GetProcessImageNameByPid(pid);
+			if (!string.IsNullOrEmpty(exe))
 			{
-				string? exe = proc?.MainModule?.FileName;
-				if (!string.IsNullOrEmpty(exe))
-				{
-					System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
-					computed = !string.IsNullOrEmpty(fvi.FileDescription)
-						? fvi.FileDescription
-						: System.IO.Path.GetFileNameWithoutExtension(exe);
-				}
+				System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
+				computed = !string.IsNullOrEmpty(fvi.FileDescription)
+					? fvi.FileDescription
+					: System.IO.Path.GetFileNameWithoutExtension(exe);
 			}
 		}
 		catch

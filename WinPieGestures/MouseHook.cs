@@ -194,6 +194,9 @@ public class MouseHook
 	[DllImport("user32.dll")]
 	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
 
+	/// <summary>StarPie 自发注入鼠标事件的标记：钩子遇到该值直接放行，杜绝自身捕获与竞争。</summary>
+	internal const nint StarPieExtraInfo = 0x53544152;
+
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool GetCursorPos(out POINT lpPoint);
@@ -423,6 +426,11 @@ public class MouseHook
 		{
 			int num = (int)wParam;
 			MSLLHOOKSTRUCT mSLLHOOKSTRUCT = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+			// StarPie 自发模拟的鼠标事件直接快速放行，杜绝自身捕获与竞争
+			if (mSLLHOOKSTRUCT.dwExtraInfo == StarPieExtraInfo)
+			{
+				return CallNextHookEx(_hookId, nCode, wParam, lParam);
+			}
 			if (num == 512)
 			{
 				MouseEventArgs e = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
@@ -515,20 +523,20 @@ public class MouseHook
 		switch (text)
 		{
 		case "MiddleButton":
-			mouse_event(32u, 0u, 0u, 0u, 0u);
-			mouse_event(64u, 0u, 0u, 0u, 0u);
+			mouse_event(32u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
+			mouse_event(64u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
 			break;
 		case "XButton1":
-			mouse_event(128u, 0u, 0u, 1u, 0u);
-			mouse_event(256u, 0u, 0u, 1u, 0u);
+			mouse_event(128u, 0u, 0u, 1u, (uint)StarPieExtraInfo);
+			mouse_event(256u, 0u, 0u, 1u, (uint)StarPieExtraInfo);
 			break;
 		case "XButton2":
-			mouse_event(128u, 0u, 0u, 2u, 0u);
-			mouse_event(256u, 0u, 0u, 2u, 0u);
+			mouse_event(128u, 0u, 0u, 2u, (uint)StarPieExtraInfo);
+			mouse_event(256u, 0u, 0u, 2u, (uint)StarPieExtraInfo);
 			break;
 		default:
-			mouse_event(8u, 0u, 0u, 0u, 0u);
-			mouse_event(16u, 0u, 0u, 0u, 0u);
+			mouse_event(8u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
+			mouse_event(16u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
 			break;
 		}
 	}
