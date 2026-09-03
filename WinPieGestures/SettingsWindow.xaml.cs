@@ -5544,6 +5544,7 @@ public partial class SettingsWindow : Window
 	private void UpdateCancelActionAvailability()
 	{
 		bool master = ConfigManager.CurrentConfig?.EnableOuterEscapeCancel == true;
+		bool isEnabled = ConfigManager.CurrentConfig?.EnableCancelAction == true;
 		if (EnableCancelActionCheckBox != null)
 		{
 			EnableCancelActionCheckBox.IsEnabled = master;
@@ -5551,10 +5552,12 @@ public partial class SettingsWindow : Window
 		if (CancelActionEditorHost != null)
 		{
 			CancelActionEditorHost.IsEnabled = master;
+			CancelActionEditorHost.Visibility = (master && isEnabled) ? Visibility.Visible : Visibility.Collapsed;
 		}
 		if (TestCancelActionButton != null)
 		{
 			TestCancelActionButton.IsEnabled = master;
+			TestCancelActionButton.Visibility = (master && isEnabled) ? Visibility.Visible : Visibility.Collapsed;
 		}
 	}
 
@@ -9963,6 +9966,7 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		ConfigManager.CurrentConfig.EnableCancelAction = EnableCancelActionCheckBox.IsChecked == true;
+		UpdateCancelActionAvailability();
 		SyncUiToConfigAndSave();
 	}
 
