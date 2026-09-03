@@ -269,6 +269,11 @@ public static class WindowTiler
 			{
 				return;
 			}
+			foreach (nint t in targets)
+			{
+				GetWindowThreadProcessId(t, out uint tp);
+				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"}");
+			}
 			List<double[]> cells = LayoutCells(key, targets.Count);
 			int count = Math.Min(targets.Count, cells.Count);
 			Dictionary<nint, RECT> snapshot = new Dictionary<nint, RECT>();
@@ -350,22 +355,24 @@ public static class WindowTiler
 	}
 
 	/// <summary>
-/// 平铺对象：当前虚拟桌面上的可见窗口。按进程 exe 分组全量枚举（同名/同 exe 的多窗口——如两个终端——全部参与，
-/// 不依赖任务栏槽位折叠）；组间顺序 = 任务栏槽位顺序，组内按句柄升序（≈先启动在前，先启动者为 Master）。
-/// 排除：无标题/隐藏/本进程/排除名单；是否含最小化按配置。
+/// 平铺对象：当前虚拟桌面上的可见窗口。只管理"exe 出现在任务栏槽位"的应用窗口（Dwalia 语义：
+/// 只处理真实驻留应用），同 exe 多窗口全收（两个终端都参与）；组间顺序 = 任务栏槽位顺序，
+/// 组内按句柄升序（≈先启动在前，先启动者为 Master）。
+/// 排除：无标题栏/工具窗/透明/遮蔽/无拥有者/无标题/本进程/排除名单/非任务栏应用的杂窗。
 /// </summary>
 	private static List<nint> GetTileTargets(HashSet<string> excludedExes, bool includeMinimized)
 	{
 		List<nint> result = new List<nint>();
 		uint selfPid = (uint)Environment.ProcessId;
 
-		// 槽位顺序 → exe 名顺序（分组排序基准）
+		// 槽位顺序 → exe 名顺序（分组排序基准 + 白名单：只收这些 exe 的窗口）
 		List<string> slotExeOrder = new List<string>();
+		HashSet<string> slotExes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (nint slot in WindowTaskbarHelper.GetTaskbarOrderedWindows())
 		{
 			GetWindowThreadProcessId(slot, out uint pid);
 			string? exe = ExeNameOfPid(pid);
-			if (exe != null && !slotExeOrder.Contains(exe))
+			if (exe != null && slotExes.Add(exe))
 			{
 				slotExeOrder.Add(exe);
 			}
@@ -373,7 +380,6 @@ public static class WindowTiler
 
 		// 同 exe 分组：exe(lower) -> hwnds
 		Dictionary<string, List<nint>> groups = new Dictionary<string, List<nint>>(StringComparer.OrdinalIgnoreCase);
-		List<nint> noExe = new List<nint>();
 		foreach (nint h in EnumerateAllTopLevelWindows())
 		{
 			try
@@ -445,11 +451,12 @@ public static class WindowTiler
 					continue;
 				}
 				string? exeKey = ExeNameOfPid(pid);
-				if (exeKey == null)
+				// 只收任务栏存在应用的窗口（Dwalia：只管理真实驻留应用的窗口）——杂窗/后台窗一律不入布局
+				if (exeKey == null || !slotExes.Contains(exeKey))
 				{
-					noExe.Add(h);
+					continue;
 				}
-				else if (!groups.TryGetValue(exeKey, out List<nint>? g))
+				if (!groups.TryGetValue(exeKey, out List<nint>? g))
 				{
 					g = new List<nint>();
 					groups[exeKey] = g;
@@ -483,8 +490,6 @@ public static class WindowTiler
 		{
 			result.AddRange(groups[exe]);
 		}
-		noExe.Sort();
-		result.AddRange(noExe);
 
 		if (result.Count == 0)
 		{
