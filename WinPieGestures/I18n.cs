@@ -1137,6 +1137,13 @@ public static class I18n
 			[LanguageCode.En] = "3×2 Grid",
 			[LanguageCode.Ja] = "3×2 グリッド"
 		};
+		dictionary["ActionTypeWindowManagerShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口管理",
+			[LanguageCode.ZhTw] = "視窗管理",
+			[LanguageCode.En] = "Window Management",
+			[LanguageCode.Ja] = "ウィンドウ管理"
+		};
 		dictionary["ActionTypeTileRestoreShort"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "恢复上次平铺",

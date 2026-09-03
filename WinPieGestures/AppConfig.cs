@@ -63,6 +63,9 @@ public class AppConfig
 
 	public bool EnableMultiTier { get; set; } = true;
 
+	/// <summary>在设置控制台拖拽对调一级扇区时，是否连同其绑定的二级级联子动作一块换位（默认 true）。</summary>
+	public bool LinkSubActionsWhenDragging { get; set; } = true;
+
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 
 	public double SubWheelTriggerDistance { get; set; } = 95.0;
