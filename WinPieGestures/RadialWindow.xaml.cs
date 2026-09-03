@@ -1767,11 +1767,11 @@ public partial class RadialWindow : Window
 			ActionItem action = _profile.Actions[mainIndex];
 			if (subIndex >= 0 && action?.SubActions != null && subIndex < action.SubActions.Count)
 			{
-				selectedName = action.SubActions[subIndex]?.Name ?? string.Empty;
+				selectedName = SelectionDisplayName(action.SubActions[subIndex]);
 			}
 			if (string.IsNullOrWhiteSpace(selectedName))
 			{
-				selectedName = action?.Name ?? string.Empty;
+				selectedName = SelectionDisplayName(action);
 			}
 		}
 
@@ -1797,6 +1797,25 @@ public partial class RadialWindow : Window
 		CoreExitIcon.Opacity = _defaultCoreExitIconOpacity;
 		CoreCustomImageEllipse.Opacity = _defaultCoreCustomImageOpacity;
 		CoreCustomImageEllipse.Effect = _defaultCoreCustomImageEffect;
+	}
+
+	/// <summary>轮盘中心选中文字：切换窗口动作显示"将要激活窗口"的真实标题；其它动作显示动作名。</summary>
+	private static string SelectionDisplayName(ActionItem? action)
+	{
+		if (action == null)
+		{
+			return string.Empty;
+		}
+		if (string.Equals(action.Type, "SwitchWindow", StringComparison.OrdinalIgnoreCase) &&
+			int.TryParse(action.Parameter?.Trim(), out int n) && n > 0)
+		{
+			string? title = WindowTaskbarHelper.GetNthTaskbarWindowTitle(n);
+			if (!string.IsNullOrWhiteSpace(title))
+			{
+				return title;
+			}
+		}
+		return action.Name ?? string.Empty;
 	}
 
 	private static Brush CreateFrostedCoreBrush(Brush baseBrush)

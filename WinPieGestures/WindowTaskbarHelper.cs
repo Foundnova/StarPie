@@ -427,6 +427,18 @@ public static class WindowTaskbarHelper
 		}
 	}
 
+	/// <summary>任务栏第 n 个运行窗口的窗口标题（无则返回 null）；供轮盘中心显示"将要激活的窗口"。</summary>
+	public static string? GetNthTaskbarWindowTitle(int n)
+	{
+		nint hWnd = GetNthTaskbarWindow(n);
+		if (hWnd == IntPtr.Zero)
+		{
+			return null;
+		}
+		string title = TitleOf(hWnd);
+		return string.IsNullOrWhiteSpace(title) ? null : title;
+	}
+
 	private static bool NameMatchesWindow(string name, string title)
 	{
 		if (string.IsNullOrEmpty(title))
