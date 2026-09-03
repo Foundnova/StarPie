@@ -123,12 +123,26 @@ public static class WindowTaskbarHelper
 
 	private const int SW_RESTORE = 9;
 	private const int SW_MINIMIZE = 6;
+	private const byte VK_MENU = 0x12;
+	private const uint KEYEVENTF_KEYUP = 0x0002;
+	private static readonly nint HWND_TOPMOST = new nint(-1);
+	private static readonly nint HWND_NOTOPMOST = new nint(-2);
+	private const uint SWP_NOSIZE = 0x0001;
+	private const uint SWP_NOMOVE = 0x0002;
+	private const uint SWP_NOACTIVATE = 0x0010;
+	private const uint SWP_SHOWWINDOW = 0x0040;
 
 	[DllImport("user32.dll")]
 	private static extern bool BringWindowToTop(nint hWnd);
 
 	[DllImport("user32.dll")]
 	private static extern bool SetForegroundWindow(nint hWnd);
+
+	[DllImport("user32.dll")]
+	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
@@ -647,7 +661,7 @@ public static class WindowTaskbarHelper
 	private static int s_prefetchRunning;
 	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
 	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
-	private const double SNAPSHOT_TTL_MS = 1500.0;
+	private const double SNAPSHOT_TTL_MS = 2500.0;
 
 	/// <summary>在线程池 MTA 中调度一次任务栏快照预热；重复请求合并为一个后台刷新。</summary>
 	public static void Prefetch()
@@ -759,13 +773,22 @@ public static class WindowTaskbarHelper
 			BringWindowToTop(hWnd);
 			bool ok = SetForegroundWindow(hWnd);
 
-			// 兜底：最小化再还原可强制获得前台（否则仅闪烁任务栏）
+			// 兜底 1：模拟一次 Alt 键——系统将我们视为"近期有用户输入"的进程，从而授予前台权限
+			// （对刚启动的任务管理器等新窗口有效；Alt 按下即松开，不触发菜单）
 			if (!ok)
 			{
-				ShowWindow(hWnd, SW_MINIMIZE);
-				ShowWindow(hWnd, SW_RESTORE);
-				BringWindowToTop(hWnd);
+				keybd_event(VK_MENU, 0, 0, IntPtr.Zero);
+				keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
 				ok = SetForegroundWindow(hWnd);
+			}
+
+			// 兜底 2：前台可能是全屏/无边框全屏窗口——置顶+显示激活后取消置顶，
+			// 可把新窗口抬到全屏之上（独占全屏游戏除外，只能靠切走/Alt-Tab）
+			if (!ok)
+			{
+				SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+				ok = SetForegroundWindow(hWnd);
+				SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 			}
 
 			if (attachedTarget)

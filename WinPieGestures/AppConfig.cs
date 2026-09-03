@@ -18,6 +18,20 @@ public class AppConfig
 	/// <summary>长按响应时长（毫秒）。</summary>
 	public double LongPressDelayMs { get; set; } = 450.0;
 
+	// ---- 鼠标手势（画轨迹识别，最多三段图样）----
+	public bool GestureEnabled { get; set; }
+
+	/// <summary>手势触发键："RightButton"/"MiddleButton"/"XButton1"/"XButton2"。</summary>
+	public string GestureTriggerButton { get; set; } = "MiddleButton";
+
+	public List<GestureMapping> GestureMappings { get; set; } = new List<GestureMapping>();
+
+	/// <summary>手势提示文字位置："Auto" 或 U/D/L/R/UL/UR/DL/DR（相对鼠标）。</summary>
+	public string GestureHintPlacement { get; set; } = "Auto";
+
+	/// <summary>手势段灵敏度：最小段长（像素）。越大越难把中途小拐弯误识别为方向段。</summary>
+	public double GestureSegmentSensitivity { get; set; } = 16.0;
+
 	public string AnimationSpeed { get; set; } = "Balanced";
 
 	public double CustomAnimationDurationMs { get; set; } = 80.0;

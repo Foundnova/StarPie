@@ -411,6 +411,10 @@ public class MouseHook
 			{
 				RawMouseEventArgs e3 = new RawMouseEventArgs(num, text, mSLLHOOKSTRUCT.mouseData, flag, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnRawMouseButtonEvent?.Invoke(this, e3);
+				if (e3.Handled)
+				{
+					return 1; // 手势等已接管该按键：拦截原生事件
+				}
 			}
 			string text2 = ConfigManager.CurrentConfig?.Trigger?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
 			bool num2 = flag && text == text2;
