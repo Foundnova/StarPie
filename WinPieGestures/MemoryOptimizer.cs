@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -20,7 +20,7 @@ public static class MemoryOptimizer
 
 	public static void TrimMemory(bool force = false)
 	{
-		if ((!force && (DateTime.UtcNow - _lastTrimTime).TotalSeconds < 2.0) || Interlocked.Exchange(ref _isTrimming, 1) == 1)
+		if ((!force && (DateTime.UtcNow - _lastTrimTime).TotalSeconds < 5.0) || Interlocked.Exchange(ref _isTrimming, 1) == 1)
 		{
 			return;
 		}
@@ -29,14 +29,22 @@ public static class MemoryOptimizer
 			try
 			{
 				_lastTrimTime = DateTime.UtcNow;
-				GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-				GC.WaitForPendingFinalizers();
-				GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-				if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+				if (force)
 				{
-					nint handle = Process.GetCurrentProcess().Handle;
-					EmptyWorkingSet(handle);
-					SetProcessWorkingSetSize(handle, new IntPtr(-1), new IntPtr(-1));
+					// 用户在设置中手动点击【立即压缩物理内存】时才执行深度工作集剥离
+					GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+					GC.WaitForPendingFinalizers();
+					if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+					{
+						nint handle = Process.GetCurrentProcess().Handle;
+						EmptyWorkingSet(handle);
+						SetProcessWorkingSetSize(handle, new IntPtr(-1), new IntPtr(-1));
+					}
+				}
+				else
+				{
+					// 日常关闭隐藏或后台驻留采用非阻塞温和回收，保留热代码在 RAM 中，杜绝唤出硬缺页顿卡
+					GC.Collect(0, GCCollectionMode.Optimized, blocking: false);
 				}
 			}
 			catch (Exception)

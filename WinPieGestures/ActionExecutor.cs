@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Channels;
 using System.Windows;
 
 namespace WinPieGestures;
@@ -160,8 +162,66 @@ public static class ActionExecutor
 	[DllImport("user32.dll")]
 	private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
+	[DllImport("user32.dll")]
+	private static extern short GetAsyncKeyState(int nVirtKey);
+
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+	private static readonly Channel<ActionItem> s_actionChannel = Channel.CreateUnbounded<ActionItem>(new UnboundedChannelOptions
+	{
+		SingleReader = true,
+		SingleWriter = false
+	});
+
+	static ActionExecutor()
+	{
+		Thread worker = new Thread(ProcessActionQueue)
+		{
+			Name = "StarPie.ActionExecutor",
+			IsBackground = true,
+			Priority = ThreadPriority.AboveNormal
+		};
+		worker.Start();
+	}
+
+	public static void EnqueueAction(ActionItem action)
+	{
+		if (action != null)
+		{
+			s_actionChannel.Writer.TryWrite(action);
+		}
+	}
+
+	private static void ProcessActionQueue()
+	{
+		var reader = s_actionChannel.Reader;
+		while (true)
+		{
+			try
+			{
+				if (reader.WaitToReadAsync().AsTask().Result)
+				{
+					while (reader.TryRead(out ActionItem? action))
+					{
+						if (action != null)
+						{
+							try
+							{
+								Execute(action);
+							}
+							catch
+							{
+							}
+						}
+					}
+				}
+			}
+			catch
+			{
+			}
+		}
+	}
 
 	public static void Execute(ActionItem action)
 	{
@@ -572,6 +632,32 @@ public static class ActionExecutor
 		       (t.StartsWith("num"));
 	}
 
+	public const nint StarPieExtraInfo = 0x53544152;
+
+	public static void ReleaseStuckModifiers()
+	{
+		try
+		{
+			// 智能解卡自愈：检查 Ctrl / Shift / Alt / Win，如果物理键并未按下，确保下发 KeyUp 清空系统粘滞状态
+			ushort[] modifiers = new ushort[] { 162, 160, 164, 91, 163, 161, 165, 92 }; // L/R Ctrl, Shift, Alt, Win
+			List<INPUT> upInputs = new List<INPUT>();
+			foreach (ushort mod in modifiers)
+			{
+				if ((GetAsyncKeyState(mod) & 0x8000) == 0)
+				{
+					upInputs.Add(CreateKeyInput(mod, down: false));
+				}
+			}
+			if (upInputs.Count > 0)
+			{
+				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private static void ExecuteHotkey(string hotkeyString)
 	{
 		if (string.IsNullOrWhiteSpace(hotkeyString))
@@ -589,58 +675,61 @@ public static class ActionExecutor
 
 		AppLogger.LogInfo($"Executing Hotkey: '{hotkeyString}' (MainKey: {hotkeyDetails.MainKey}, Modifiers: [{string.Join(",", hotkeyDetails.Modifiers)}])");
 
-		// 1. If pure modifier combo (e.g. Shift + Alt, Ctrl + Shift)
-		if (hotkeyDetails.MainKey == 0 && hotkeyDetails.Modifiers.Count > 0)
+		try
 		{
-			List<INPUT> modDowns = new List<INPUT>();
-			foreach (ushort mod in hotkeyDetails.Modifiers)
+			// 1. If pure modifier combo (e.g. Shift + Alt, Ctrl + Shift)
+			if (hotkeyDetails.MainKey == 0 && hotkeyDetails.Modifiers.Count > 0)
 			{
-				modDowns.Add(CreateKeyInput(mod, down: true));
+				List<INPUT> modDowns = new List<INPUT>();
+				foreach (ushort mod in hotkeyDetails.Modifiers)
+				{
+					modDowns.Add(CreateKeyInput(mod, down: true));
+				}
+				SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(6);
+				List<INPUT> modUps = new List<INPUT>();
+				for (int i = hotkeyDetails.Modifiers.Count - 1; i >= 0; i--)
+				{
+					modUps.Add(CreateKeyInput(hotkeyDetails.Modifiers[i], down: false));
+				}
+				SendInput((uint)modUps.Count, modUps.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				return;
 			}
-			SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-			System.Threading.Thread.Sleep(20);
-			List<INPUT> modUps = new List<INPUT>();
-			for (int i = hotkeyDetails.Modifiers.Count - 1; i >= 0; i--)
+
+			// 2. Standard Modifier + Main Key combo
+			List<INPUT> downInputs = new List<INPUT>();
+			foreach (ushort modifier in hotkeyDetails.Modifiers)
 			{
-				modUps.Add(CreateKeyInput(hotkeyDetails.Modifiers[i], down: false));
+				downInputs.Add(CreateKeyInput(modifier, down: true));
 			}
-			SendInput((uint)modUps.Count, modUps.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-			return;
-		}
-
-		// 2. Standard Modifier + Main Key combo
-		List<INPUT> downInputs = new List<INPUT>();
-		foreach (ushort modifier in hotkeyDetails.Modifiers)
-		{
-			downInputs.Add(CreateKeyInput(modifier, down: true));
-		}
-		if (downInputs.Count > 0)
-		{
-			SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-			System.Threading.Thread.Sleep(15);
-		}
-
-		if (hotkeyDetails.MainKey != 0)
-		{
-			INPUT[] keySeq = new INPUT[2]
+			if (downInputs.Count > 0)
 			{
-				CreateKeyInput(hotkeyDetails.MainKey, down: true),
-				CreateKeyInput(hotkeyDetails.MainKey, down: false)
-			};
-			SendInput(1u, new INPUT[] { keySeq[0] }, Marshal.SizeOf(typeof(INPUT)));
-			System.Threading.Thread.Sleep(20);
-			SendInput(1u, new INPUT[] { keySeq[1] }, Marshal.SizeOf(typeof(INPUT)));
-			System.Threading.Thread.Sleep(15);
-		}
+				SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(6);
+			}
 
-		List<INPUT> upInputs = new List<INPUT>();
-		for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
-		{
-			upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
+			if (hotkeyDetails.MainKey != 0)
+			{
+				INPUT keySeqDown = CreateKeyInput(hotkeyDetails.MainKey, down: true);
+				INPUT keySeqUp = CreateKeyInput(hotkeyDetails.MainKey, down: false);
+				SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(6);
+				SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(6);
+			}
 		}
-		if (upInputs.Count > 0)
+		finally
 		{
-			SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			// 3. 无论中间是否发生异常，始终安全下发所有已按下修饰键的抬起事件，彻底杜绝系统级粘滞
+			List<INPUT> upInputs = new List<INPUT>();
+			for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
+			{
+				upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
+			}
+			if (upInputs.Count > 0)
+			{
+				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			}
 		}
 	}
 
@@ -891,7 +980,7 @@ public static class ActionExecutor
 				wScan = (ushort)c,
 				dwFlags = 4u, // KEYEVENTF_UNICODE
 				time = 0u,
-				dwExtraInfo = IntPtr.Zero
+				dwExtraInfo = StarPieExtraInfo
 			};
 			INPUT up = new INPUT { type = 1u };
 			up.U.ki = new KEYBDINPUT
@@ -900,7 +989,7 @@ public static class ActionExecutor
 				wScan = (ushort)c,
 				dwFlags = 4u | 2u, // KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
 				time = 0u,
-				dwExtraInfo = IntPtr.Zero
+				dwExtraInfo = StarPieExtraInfo
 			};
 			inputs.Add(down);
 			inputs.Add(up);
@@ -921,7 +1010,7 @@ public static class ActionExecutor
 			wScan = scan,
 			dwFlags = ((!down) ? 2u : 0u),
 			time = 0u,
-			dwExtraInfo = IntPtr.Zero
+			dwExtraInfo = StarPieExtraInfo
 		};
 		if (vk == 33 || vk == 34 || vk == 35 || vk == 36 ||
 		    vk == 37 || vk == 38 || vk == 39 || vk == 40 ||
