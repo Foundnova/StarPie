@@ -89,6 +89,13 @@ public static class IconHelper
 			},
 			new VectorIconItem
 			{
+				Key = "Tile",
+				Category = "窗口管理",
+				DisplayName = "平铺窗口 (Tile)",
+				SvgData = "M3,3H11V11H3Z M13,3H21V11H13Z M3,13H11V21H3Z M13,13H21V21H13Z"
+			},
+			new VectorIconItem
+			{
 				Key = "Copy",
 				Category = "编辑与剪贴板",
 				DisplayName = "复制 (Copy)",

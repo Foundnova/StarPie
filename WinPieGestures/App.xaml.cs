@@ -217,6 +217,14 @@ public partial class App : Application
 			return;
 		}
 		AppLogger.LogInfo("=== StarPie Exiting ===");
+		// 退出前自动还原所有窗口到首次平铺前的样式
+		try
+		{
+			WindowTiler.RestoreLastLayout();
+		}
+		catch
+		{
+		}
 		try
 		{
 			_waitHandleRegistration?.Unregister(null);

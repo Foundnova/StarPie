@@ -61,6 +61,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			{
 				NthWindowIndex = "1";
 			}
+			if (value == "Tile" && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Tile"; // 默认使用平铺四宫格 logo
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
@@ -68,6 +72,7 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
 			OnPropertyChanged("IsSwitchWindowType");
+			OnPropertyChanged("IsTileType");
 		}
 	}
 
@@ -258,6 +263,44 @@ public class SubSlotViewModel : INotifyPropertyChanged
 	public bool IsCommandType => Type == "Command";
 
 	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	public bool IsTileType => Type == "Tile";
+
+	/// <summary>平铺布局下拉（key → 显示名）。</summary>
+	public List<ActionTypeOption> TileLayoutOptions
+	{
+		get
+		{
+			List<ActionTypeOption> list = new List<ActionTypeOption>
+			{
+				new ActionTypeOption { Tag = WindowTiler.CycleParam, DisplayText = "🔄 " + I18n.T("TileCycleLabel") },
+				new ActionTypeOption { Tag = WindowTiler.CycleBackParam, DisplayText = "⬅️ " + I18n.T("TileCycleBackLabel") },
+				new ActionTypeOption { Tag = WindowTiler.RestoreParam, DisplayText = "⏪ " + I18n.T("TileRestoreAllLabel") }
+			};
+			foreach (string key in WindowTiler.LayoutKeys)
+			{
+				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });
+			}
+			return list;
+		}
+	}
+
+	/// <summary>平铺布局（写入 Parameter）。</summary>
+	public string TileLayout
+	{
+		get
+		{
+			return Action.Parameter ?? "";
+		}
+		set
+		{
+			if (Action.Parameter != value)
+			{
+				Action.Parameter = value;
+				OnPropertyChanged("TileLayout");
+			}
+		}
+	}
 
 	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
 	public string NthWindowIndex

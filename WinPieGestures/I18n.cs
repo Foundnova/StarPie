@@ -1053,6 +1053,237 @@ public static class I18n
 			[LanguageCode.En] = "Gesture segment sensitivity:",
 			[LanguageCode.Ja] = "ジェスチャー感度："
 		};
+		dictionary["CancelActionTitleText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "外甩取消时执行的动作",
+			[LanguageCode.ZhTw] = "外甩取消時執行的動作",
+			[LanguageCode.En] = "Action on Outer-Escape Cancel",
+			[LanguageCode.Ja] = "外側スワイプキャンセル時の動作"
+		};
+		dictionary["CancelActionDescText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "仅当通过「外甩取消」（向外甩出且未选中任何动作）时执行这个自定义动作；回到中心取消按钮松手仍为默认静默关闭。",
+			[LanguageCode.ZhTw] = "僅當透過「外甩取消」（向外甩出且未選中任何動作）時執行這個自訂動作；回到中心取消按鈕鬆手仍為預設靜默關閉。",
+			[LanguageCode.En] = "Only when you cancel by flinging outward (nothing selected) does this custom action run; releasing over the center cancel button still just closes the menu silently.",
+			[LanguageCode.Ja] = "外側へフリックしてキャンセルした場合（何も選択していない）のみカスタムアクションを実行します。中央のキャンセルで離すと従来通りサイレントクローズします。"
+		};
+		dictionary["CancelActionEnableText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用自定义外甩取消动作",
+			[LanguageCode.ZhTw] = "啟用自訂外甩取消動作",
+			[LanguageCode.En] = "Enable custom outer-escape cancel action",
+			[LanguageCode.Ja] = "外側スワイプキャンセル時のカスタム動作を有効化"
+		};
+		dictionary["ActionTypeTileShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺窗口",
+			[LanguageCode.ZhTw] = "平鋪視窗",
+			[LanguageCode.En] = "Tile Windows",
+			[LanguageCode.Ja] = "ウィンドウを並べる"
+		};
+		dictionary["TileLayout2L"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左右对半",
+			[LanguageCode.ZhTw] = "左右對半",
+			[LanguageCode.En] = "Left-Right",
+			[LanguageCode.Ja] = "左右分割"
+		};
+		dictionary["TileLayout2T"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "上下对半",
+			[LanguageCode.ZhTw] = "上下對半",
+			[LanguageCode.En] = "Top-Bottom",
+			[LanguageCode.Ja] = "上下分割"
+		};
+		dictionary["TileLayout3L12"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左大列 + 右上/右下",
+			[LanguageCode.ZhTw] = "左大列 + 右上/右下",
+			[LanguageCode.En] = "Big Left + Right Two",
+			[LanguageCode.Ja] = "左大＋右二"
+		};
+		dictionary["TileLayout3R21"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "右大列 + 左上/左下",
+			[LanguageCode.ZhTw] = "右大列 + 左上/左下",
+			[LanguageCode.En] = "Big Right + Left Two",
+			[LanguageCode.Ja] = "右大＋左二"
+		};
+		dictionary["TileLayout3R"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "三等分竖列",
+			[LanguageCode.ZhTw] = "三等分豎列",
+			[LanguageCode.En] = "Three Columns",
+			[LanguageCode.Ja] = "3等分列"
+		};
+		dictionary["TileLayout4G"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "四宫格 2×2",
+			[LanguageCode.ZhTw] = "四宮格 2×2",
+			[LanguageCode.En] = "2×2 Grid",
+			[LanguageCode.Ja] = "2×2 グリッド"
+		};
+		dictionary["TileLayout6G"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "六宫格 3×2",
+			[LanguageCode.ZhTw] = "六宮格 3×2",
+			[LanguageCode.En] = "3×2 Grid",
+			[LanguageCode.Ja] = "3×2 グリッド"
+		};
+		dictionary["ActionTypeTileRestoreShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "恢复上次平铺",
+			[LanguageCode.ZhTw] = "還原上次平鋪",
+			[LanguageCode.En] = "Restore Tiles",
+			[LanguageCode.Ja] = "前の配置に戻す"
+		};
+		dictionary["ActionTypeMoveMonitorShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口移到下一屏",
+			[LanguageCode.ZhTw] = "視窗移到下一螢幕",
+			[LanguageCode.En] = "Move to Next Monitor",
+			[LanguageCode.Ja] = "次のモニターへ移動"
+		};
+		dictionary["ActionTypeTopmostShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口置顶/取消置顶",
+			[LanguageCode.ZhTw] = "視窗置頂/取消置頂",
+			[LanguageCode.En] = "Toggle Always-on-Top",
+			[LanguageCode.Ja] = "最前面表示の切替"
+		};
+		dictionary["ActionTypeOpacityShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口透明度",
+			[LanguageCode.ZhTw] = "視窗透明度",
+			[LanguageCode.En] = "Window Opacity",
+			[LanguageCode.Ja] = "ウィンドウの透明度"
+		};
+		dictionary["TileCycleLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环切换布局",
+			[LanguageCode.ZhTw] = "循環切換佈局",
+			[LanguageCode.En] = "Cycle layouts",
+			[LanguageCode.Ja] = "レイアウトを順番に切替"
+		};
+		dictionary["TileGlobalTitleText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺窗口设置",
+			[LanguageCode.ZhTw] = "平鋪視窗設定",
+			[LanguageCode.En] = "Tiling Settings",
+			[LanguageCode.Ja] = "タイリング設定"
+		};
+		dictionary["TileGlobalDescText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "「平铺窗口」动作的全局行为。",
+			[LanguageCode.ZhTw] = "「平鋪視窗」動作的全域行為。",
+			[LanguageCode.En] = "Global behaviour of the Tile Windows action.",
+			[LanguageCode.Ja] = "「ウィンドウを並べる」アクションの全体挙動です。"
+		};
+		dictionary["TileMinimizeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "包含最小化窗口（还原后参与平铺）",
+			[LanguageCode.ZhTw] = "包含最小化視窗（還原後參與平鋪）",
+			[LanguageCode.En] = "Include minimized windows (restore into the layout)",
+			[LanguageCode.Ja] = "最小化ウィンドウも含める（復元して配置）"
+		};
+		dictionary["TileExcludeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：",
+			[LanguageCode.ZhTw] = "平鋪排除名單（程序 exe 名，逗號分隔，如 notepad,spotify）：",
+			[LanguageCode.En] = "Tiling exclusion list (process exe names, comma-separated, e.g. notepad,spotify):",
+			[LanguageCode.Ja] = "並べる対象外のプロセス（exe名、カンマ区切り例 notepad,spotify）："
+		};
+		dictionary["TileRestoreAllLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "还原所有窗口（回到平铺前）",
+			[LanguageCode.ZhTw] = "還原所有視窗（回到平鋪前）",
+			[LanguageCode.En] = "Restore all windows (pre-tile state)",
+			[LanguageCode.Ja] = "すべてのウィンドウを元に戻す（並べる前の状態）"
+		};
+		dictionary["TileCycleBackLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环返回",
+			[LanguageCode.ZhTw] = "循環返回",
+			[LanguageCode.En] = "Cycle previous",
+			[LanguageCode.Ja] = "前のレイアウトへ"
+		};
+		dictionary["TileLayoutML"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居左 + 右栈",
+			[LanguageCode.ZhTw] = "主窗居左 + 右棧",
+			[LanguageCode.En] = "Master Left + Stack",
+			[LanguageCode.Ja] = "マスター左＋スタック"
+		};
+		dictionary["TileLayoutMR"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居右 + 左栈",
+			[LanguageCode.ZhTw] = "主窗居右 + 左棧",
+			[LanguageCode.En] = "Master Right + Stack",
+			[LanguageCode.Ja] = "マスター右＋スタック"
+		};
+		dictionary["TileLayoutMT"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居上 + 下栈",
+			[LanguageCode.ZhTw] = "主窗居上 + 下棧",
+			[LanguageCode.En] = "Master Top + Stack",
+			[LanguageCode.Ja] = "マスター上＋スタック"
+		};
+		dictionary["TileLayoutMB"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居下 + 上栈",
+			[LanguageCode.ZhTw] = "主窗居下 + 上棧",
+			[LanguageCode.En] = "Master Bottom + Stack",
+			[LanguageCode.Ja] = "マスター下＋スタック"
+		};
+		dictionary["TileLayoutMO"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "单窗全屏 (Monocle)",
+			[LanguageCode.ZhTw] = "單窗全螢幕 (Monocle)",
+			[LanguageCode.En] = "Monocle",
+			[LanguageCode.Ja] = "モノクル（全画面）"
+		};
+		dictionary["TileLayoutHS"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "上主 50% + 下栈 (H-Stack)",
+			[LanguageCode.ZhTw] = "上主 50% + 下棧 (H-Stack)",
+			[LanguageCode.En] = "Master Top + Stack (H-Stack)",
+			[LanguageCode.Ja] = "上マスター＋下スタック"
+		};
+		dictionary["TileLayoutVS"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左主 50% + 右栈 (V-Stack)",
+			[LanguageCode.ZhTw] = "左主 50% + 右棧 (V-Stack)",
+			[LanguageCode.En] = "Master Left + Stack (V-Stack)",
+			[LanguageCode.Ja] = "左マスター＋右スタック"
+		};
+		dictionary["TileLayoutCOL"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "等宽竖列 (Columns)",
+			[LanguageCode.ZhTw] = "等寬豎列 (Columns)",
+			[LanguageCode.En] = "Columns",
+			[LanguageCode.Ja] = "等幅カラム"
+		};
+		dictionary["TileLayoutBSP"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二叉分割 (BSP)",
+			[LanguageCode.ZhTw] = "二叉分割 (BSP)",
+			[LanguageCode.En] = "Binary Split (BSP)",
+			[LanguageCode.Ja] = "二分木分割 (BSP)"
+		};
+		dictionary["TileLayoutAG"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "自适应网格 (A-Grid)",
+			[LanguageCode.ZhTw] = "自適應網格 (A-Grid)",
+			[LanguageCode.En] = "Auto Grid",
+			[LanguageCode.Ja] = "自動グリッド"
+		};
+		dictionary["TileCycleRangeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环切换范围（布局 key 逗号分隔，空=全部，如 2L,2T,4G,ML）：",
+			[LanguageCode.ZhTw] = "循環切換範圍（佈局 key 逗號分隔，空=全部，如 2L,2T,4G,ML）：",
+			[LanguageCode.En] = "Cycle range (layout keys, comma-separated; empty = all, e.g. 2L,2T,4G,ML):",
+			[LanguageCode.Ja] = "循環切替範囲（レイアウトキーをカンマ区切り。空=全て。例 2L,2T,4G,ML）："
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",
