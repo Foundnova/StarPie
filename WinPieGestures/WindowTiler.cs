@@ -210,10 +210,14 @@ public static class WindowTiler
 			}
 			lock (s_lastSnapshot)
 			{
-				s_lastSnapshot.Clear();
-				foreach (var kv in snapshot)
+				// 只记录"第一次"平铺前的状态：后续换布局/循环不覆盖，
+				// 保证「还原所有窗口」始终回到首次平铺之前的样式。
+				if (s_lastSnapshot.Count == 0)
 				{
-					s_lastSnapshot[kv.Key] = kv.Value;
+					foreach (var kv in snapshot)
+					{
+						s_lastSnapshot[kv.Key] = kv.Value;
+					}
 				}
 			}
 		}
