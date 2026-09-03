@@ -397,6 +397,7 @@ public static class WindowTiler
 
 		// 同 exe 分组：exe(lower) -> hwnds
 		Dictionary<string, List<nint>> groups = new Dictionary<string, List<nint>>(StringComparer.OrdinalIgnoreCase);
+		int blockedCount = 0;
 		foreach (nint h in EnumerateAllTopLevelWindows())
 		{
 			try
@@ -458,6 +459,10 @@ public static class WindowTiler
 				// 只收任务栏存在应用的窗口（Dwalia：只管理真实驻留应用的窗口），且不在系统工具/用户黑名单
 				if (exeKey == null || !slotExes.Contains(exeKey) || blockedExes.Contains(exeKey))
 				{
+					if (exeKey != null && blockedExes.Contains(exeKey))
+					{
+						blockedCount++;
+					}
 					continue;
 				}
 				StringBuilder sb = new StringBuilder(128);
@@ -504,6 +509,8 @@ public static class WindowTiler
 		{
 			result.AddRange(EnumerateTopLevelWindows());
 		}
+		// 诊断：被黑名单/杂窗挡掉的数量（用于核对目标数与真实窗口数）
+		AppLogger.LogInfo($"[Tile]   blocked={blockedCount}");
 		return result;
 	}
 
