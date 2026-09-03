@@ -1235,6 +1235,48 @@ public static class I18n
 			[LanguageCode.En] = "Master Bottom + Stack",
 			[LanguageCode.Ja] = "マスター下＋スタック"
 		};
+		dictionary["TileLayoutMO"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "单窗全屏 (Monocle)",
+			[LanguageCode.ZhTw] = "單窗全螢幕 (Monocle)",
+			[LanguageCode.En] = "Monocle",
+			[LanguageCode.Ja] = "モノクル（全画面）"
+		};
+		dictionary["TileLayoutHS"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "上主 50% + 下栈 (H-Stack)",
+			[LanguageCode.ZhTw] = "上主 50% + 下棧 (H-Stack)",
+			[LanguageCode.En] = "Master Top + Stack (H-Stack)",
+			[LanguageCode.Ja] = "上マスター＋下スタック"
+		};
+		dictionary["TileLayoutVS"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左主 50% + 右栈 (V-Stack)",
+			[LanguageCode.ZhTw] = "左主 50% + 右棧 (V-Stack)",
+			[LanguageCode.En] = "Master Left + Stack (V-Stack)",
+			[LanguageCode.Ja] = "左マスター＋右スタック"
+		};
+		dictionary["TileLayoutCOL"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "等宽竖列 (Columns)",
+			[LanguageCode.ZhTw] = "等寬豎列 (Columns)",
+			[LanguageCode.En] = "Columns",
+			[LanguageCode.Ja] = "等幅カラム"
+		};
+		dictionary["TileLayoutBSP"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二叉分割 (BSP)",
+			[LanguageCode.ZhTw] = "二叉分割 (BSP)",
+			[LanguageCode.En] = "Binary Split (BSP)",
+			[LanguageCode.Ja] = "二分木分割 (BSP)"
+		};
+		dictionary["TileLayoutAG"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "自适应网格 (A-Grid)",
+			[LanguageCode.ZhTw] = "自適應網格 (A-Grid)",
+			[LanguageCode.En] = "Auto Grid",
+			[LanguageCode.Ja] = "自動グリッド"
+		};
 		dictionary["TileCycleRangeText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "循环切换范围（布局 key 逗号分隔，空=全部，如 2L,2T,4G,ML）：",

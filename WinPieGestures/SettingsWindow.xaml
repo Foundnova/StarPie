@@ -1897,8 +1897,26 @@
                   </CheckBox>
                   <TextBlock Name="TileExcludeText" Text="平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
                   <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
-                  <TextBlock Name="TileCycleRangeText" Text="循环切换范围（布局 key 逗号分隔，空=全部）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,6" />
-                  <TextBox Name="TileCycleLayoutsTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileCycleLayoutsTextBox_TextChanged" />
+                  <TextBlock Name="TileCycleRangeText" Text="循环切换布局（勾选参与项，▲▼ 调顺序；不勾任何项=全部参与）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,6" />
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="42" />
+                    </Grid.ColumnDefinitions>
+                    <ListBox Name="TileCycleListBox" Height="168" SelectionMode="Single" BorderThickness="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate>
+                          <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Display}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                      <Button Content="▲" Height="28" Width="36" Padding="0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TileCycleUp_Click" ToolTip="上移" />
+                      <Button Content="▼" Height="28" Width="36" Padding="0" FontSize="11" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleDown_Click" ToolTip="下移" />
+                      <Button Content="全" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,6,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleAll_Click" ToolTip="全部参与循环" />
+                      <Button Content="空" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleNone_Click" ToolTip="清空（等效全部参与）" />
+                    </StackPanel>
+                  </Grid>
                 </StackPanel>
               </Border>
             </StackPanel>

@@ -425,10 +425,7 @@ public partial class SettingsWindow : Window
 		{
 			TileExcludeProcessesTextBox.Text = ConfigManager.CurrentConfig.TileExcludeProcesses ?? "";
 		}
-		if (TileCycleLayoutsTextBox != null)
-		{
-			TileCycleLayoutsTextBox.Text = ConfigManager.CurrentConfig.TileCycleLayouts ?? "";
-		}
+		RefreshTileCycleList();
 		if (TileIncludeMinimizedCheckBox != null)
 		{
 			TileIncludeMinimizedCheckBox.IsChecked = ConfigManager.CurrentConfig.TileIncludeMinimized;
@@ -7450,14 +7447,151 @@ public partial class SettingsWindow : Window
 		SyncUiToConfigAndSave();
 	}
 
-	private void TileCycleLayoutsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	// ==================== 循环布局选择器 ====================
+
+	private sealed class LayoutCycleItem : INotifyPropertyChanged
+	{
+		public string Key { get; }
+		public string Display { get; }
+		private bool _isChecked;
+
+		public bool IsChecked
+		{
+			get
+			{
+				return _isChecked;
+			}
+			set
+			{
+				if (_isChecked != value)
+				{
+					_isChecked = value;
+					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+				}
+			}
+		}
+
+		public LayoutCycleItem(string key, string display, bool isChecked)
+		{
+			Key = key;
+			Display = display;
+			_isChecked = isChecked;
+		}
+
+		public event PropertyChangedEventHandler? PropertyChanged;
+	}
+
+	private List<LayoutCycleItem> _cycleItems = new List<LayoutCycleItem>();
+
+	private void RefreshTileCycleList()
+	{
+		List<string> cfg = new List<string>();
+		string? raw = ConfigManager.CurrentConfig?.TileCycleLayouts;
+		if (!string.IsNullOrWhiteSpace(raw))
+		{
+			foreach (string t in raw.Split(new[] { ',', ';', '，', '；', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+			{
+				string k = t.Trim();
+				if (WindowTiler.IsValidLayout(k) && !cfg.Contains(k))
+				{
+					cfg.Add(k);
+				}
+			}
+		}
+		List<LayoutCycleItem> items = new List<LayoutCycleItem>();
+		foreach (string key in cfg)
+		{
+			items.Add(new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), true));
+		}
+		foreach (string key in WindowTiler.LayoutKeys)
+		{
+			if (!cfg.Contains(key))
+			{
+				items.Add(new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), false));
+			}
+		}
+		_cycleItems = items;
+		if (TileCycleListBox != null)
+		{
+			TileCycleListBox.ItemsSource = null;
+			TileCycleListBox.ItemsSource = _cycleItems;
+		}
+	}
+
+	private void PersistTileCycleSelection()
+	{
+		ConfigManager.CurrentConfig.TileCycleLayouts = string.Join(",", _cycleItems.Where((LayoutCycleItem i) => i.IsChecked).Select((LayoutCycleItem i) => i.Key));
+		SyncUiToConfigAndSave();
+	}
+
+	private void TileCycleUp_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || TileCycleListBox?.SelectedItem is not LayoutCycleItem sel)
+		{
+			return;
+		}
+		int idx = _cycleItems.IndexOf(sel);
+		if (idx > 0)
+		{
+			LayoutCycleItem tmp = _cycleItems[idx - 1];
+			_cycleItems[idx - 1] = sel;
+			_cycleItems[idx] = tmp;
+			RefreshTileCycleItemsOnly();
+			TileCycleListBox.SelectedItem = sel;
+			PersistTileCycleSelection();
+		}
+	}
+
+	private void TileCycleDown_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || TileCycleListBox?.SelectedItem is not LayoutCycleItem sel)
+		{
+			return;
+		}
+		int idx = _cycleItems.IndexOf(sel);
+		if (idx >= 0 && idx < _cycleItems.Count - 1)
+		{
+			LayoutCycleItem tmp = _cycleItems[idx + 1];
+			_cycleItems[idx + 1] = sel;
+			_cycleItems[idx] = tmp;
+			RefreshTileCycleItemsOnly();
+			TileCycleListBox.SelectedItem = sel;
+			PersistTileCycleSelection();
+		}
+	}
+
+	private void RefreshTileCycleItemsOnly()
+	{
+		List<LayoutCycleItem> snapshot = new List<LayoutCycleItem>(_cycleItems);
+		TileCycleListBox.ItemsSource = null;
+		TileCycleListBox.ItemsSource = snapshot;
+		_cycleItems = snapshot;
+	}
+
+	private void TileCycleAll_Click(object sender, RoutedEventArgs e)
 	{
 		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
 		}
-		ConfigManager.CurrentConfig.TileCycleLayouts = TileCycleLayoutsTextBox.Text ?? "";
-		SyncUiToConfigAndSave();
+		foreach (LayoutCycleItem item in _cycleItems)
+		{
+			item.IsChecked = true;
+		}
+		PersistTileCycleSelection();
+	}
+
+	private void TileCycleNone_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		foreach (LayoutCycleItem item in _cycleItems)
+		{
+			item.IsChecked = false;
+		}
+		PersistTileCycleSelection();
 	}
 
 	private void GestureBrowse_Click(object sender, RoutedEventArgs e)

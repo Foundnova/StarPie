@@ -116,7 +116,7 @@ public static class WindowTiler
 	/// <summary>可选布局 key 列表（顺序即编辑器下拉顺序）。</summary>
 	public static List<string> LayoutKeys { get; } = new List<string>
 	{
-		"2L", "2T", "3L12", "3R21", "3R", "4G", "6G", "ML", "MR", "MT", "MB"
+		"2L", "2T", "3L12", "3R21", "3R", "4G", "6G", "ML", "MR", "MT", "MB", "MO", "HS", "VS", "COL", "BSP", "AG"
 	};
 
 	/// <summary>轮换模式标记：参数为 Cycle 时循环切换布局。</summary>
@@ -151,6 +151,12 @@ public static class WindowTiler
 			"MR" => I18n.T("TileLayoutMR"),
 			"MT" => I18n.T("TileLayoutMT"),
 			"MB" => I18n.T("TileLayoutMB"),
+			"MO" => I18n.T("TileLayoutMO"),
+			"HS" => I18n.T("TileLayoutHS"),
+			"VS" => I18n.T("TileLayoutVS"),
+			"COL" => I18n.T("TileLayoutCOL"),
+			"BSP" => I18n.T("TileLayoutBSP"),
+			"AG" => I18n.T("TileLayoutAG"),
 			_ => key
 		};
 	}
@@ -623,6 +629,18 @@ public static class WindowTiler
 			return MasterCells(n, MasterFactor, masterLeft: false, masterTop: true);
 		case "MB":
 			return MasterCells(n, MasterFactor, masterLeft: false, masterTop: true, masterBottom: true);
+		case "HS":
+			return MasterCells(n, 0.5, masterLeft: false, masterTop: true); // HorizontalStack：上主 50% + 下栈单行
+		case "VS":
+			return MasterCells(n, 0.5, masterLeft: true, masterTop: false); // VerticalStack：左主 50% + 右栈单列
+		case "MO":
+			return MonocleCells(n); // Monocle：每窗占满工作区
+		case "COL":
+			return ColumnsCells(n); // Columns：等宽竖列
+		case "BSP":
+			return BspCells(n);     // BSP：交替二分递归
+		case "AG":
+			return AutoGridCells(n); // AutoGrid：按数量自适应行列
 		}
 		List<double[]> fixedCells = new List<double[]>();
 		switch (key)
@@ -670,6 +688,80 @@ public static class WindowTiler
 			break;
 		}
 		return fixedCells;
+	}
+
+	/// <summary>Monocle：所有窗口占满同一工作区（层叠，最后者在上）。</summary>
+	private static List<double[]> MonocleCells(int n)
+	{
+		List<double[]> cells = new List<double[]>();
+		for (int i = 0; i < n; i++)
+		{
+			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
+		}
+		return cells;
+	}
+
+	/// <summary>Columns：等宽竖列，每窗一列。</summary>
+	private static List<double[]> ColumnsCells(int n)
+	{
+		List<double[]> cells = new List<double[]>();
+		for (int i = 0; i < n; i++)
+		{
+			cells.Add(new[] { (double)i / n, 0.0, (double)(i + 1) / n, 1.0 });
+		}
+		return cells;
+	}
+
+	/// <summary>BSP：交替二分递归——第 i 层取当前区块一半，其余窗口递归剩余区块。</summary>
+	private static List<double[]> BspCells(int n)
+	{
+		List<double[]> cells = new List<double[]>();
+		BspSplit(cells, 0.0, 0.0, 1.0, 1.0, 0, n);
+		return cells;
+	}
+
+	private static void BspSplit(List<double[]> cells, double x0, double y0, double x1, double y1, int i, int n)
+	{
+		if (i >= n)
+		{
+			return;
+		}
+		if (i == n - 1)
+		{
+			cells.Add(new[] { x0, y0, x1, y1 });
+			return;
+		}
+		if (i % 2 == 0)
+		{
+			double mx = (x0 + x1) / 2.0;
+			cells.Add(new[] { x0, y0, mx, y1 });
+			BspSplit(cells, mx, y0, x1, y1, i + 1, n);
+		}
+		else
+		{
+			double my = (y0 + y1) / 2.0;
+			cells.Add(new[] { x0, y0, x1, my });
+			BspSplit(cells, x0, my, x1, y1, i + 1, n);
+		}
+	}
+
+	/// <summary>AutoGrid：按窗口数自适应行列（cols=⌈√n⌉）。</summary>
+	private static List<double[]> AutoGridCells(int n)
+	{
+		List<double[]> cells = new List<double[]>();
+		if (n <= 0)
+		{
+			return cells;
+		}
+		int cols = (int)Math.Ceiling(Math.Sqrt(n));
+		int rows = (n + cols - 1) / cols;
+		for (int i = 0; i < n; i++)
+		{
+			int r = i / cols;
+			int c = i % cols;
+			cells.Add(new[] { (double)c / cols, (double)r / rows, (double)(c + 1) / cols, (double)(r + 1) / rows });
+		}
+		return cells;
 	}
 
 	/// <summary>Master+Stack 动态格子：Master 占 factor，Stack 区等分 n-1 块（Master 恒为 0 号窗口）。</summary>
