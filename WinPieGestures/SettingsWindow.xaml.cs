@@ -331,7 +331,6 @@ public partial class SettingsWindow : Window
 			{
 				RenderLiveWheelPreview();
 			}
-			MemoryOptimizer.TrimMemory();
 		};
 	}
 
@@ -1729,7 +1728,6 @@ public partial class SettingsWindow : Window
 	private void Window_Closing(object sender, CancelEventArgs e)
 	{
 		SyncUiToConfigAndSave();
-		MemoryOptimizer.TrimMemory();
 		if (_isClosingFromTray)
 		{
 			DisposeSlotViewModels();
@@ -1742,7 +1740,6 @@ public partial class SettingsWindow : Window
 			{
 				Hide();
 				base.Opacity = 1.0;
-				MemoryOptimizer.TrimMemory();
 			};
 			BeginAnimation(UIElement.OpacityProperty, doubleAnimation);
 			_notifyIcon.ShowBalloonTip(2000, "WinPieGestures", "应用已最小化至系统托盘，将在后台继续运行鼠标笔势监视。", ToolTipIcon.Info);

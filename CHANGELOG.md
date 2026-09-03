@@ -4,7 +4,22 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.6.0] - 2026-09-02 (侧边栏默认极简折叠 & 扇区独立排版定制 & 文字颜色调色板与中心文字解耦)
+## [v1.6.0] - 2026-09-02 (底层钩子线程化与按键防粘滞重构 & 侧边栏默认极简折叠 & 扇区独立排版定制 & 文字颜色调色板与中心文字解耦)
+
+### ⚡ 底层事件流、钩子健康检查与修饰键调度重构 (Underlying Hook Architecture & Anti-Stuck Modifier Engine)
+1. **彻底消除 `MouseHook` 假死误判与连环重启死循环**：
+   - 彻底废除存在逻辑漏洞的 3 秒激进 `CheckHookHealth` 定时器，消除静止后滑动时由于事件计数器清零导致的误判重启；
+   - 解除 `Stop()` 在 WPF 主 UI 线程上的 2 秒同步 `Join` 阻塞，杜绝界面与手势触发的规律性卡顿；
+   - 引入 `StarPieExtraInfo = (nint)0x53544152` 专属签名，在底层钩子回调中快速放行自发模拟的鼠标事件，彻底根除重放竞态。
+2. **`KeyboardHook` 独立专属后台线程化 (Dedicated Keyboard Hook Thread)**：
+   - 全面参照 `MouseHook` 将 `KeyboardHook` 重构为**独立的专属后台 STA 线程（`StarPie.KeyboardHook`）与 Win32 消息泵**；
+   - 彻底与 WPF 主 UI 线程解耦，杜绝界面繁忙或卡顿引发的 Windows 全局键盘卡死与 Windows 静默踢钩（Silent Unhook）；
+   - 使用 `SendInput` + `StarPieExtraInfo` 签名重构 `ReplayKeyPress`，彻底消除按键重放时的丢键和误吞问题。
+3. **快捷键修饰键（Ctrl / Alt / Win / Shift）防粘滞与安全释放机制 (Anti-Stuck Modifier Engine)**：
+   - 在 `ActionExecutor` 中将所有合成键（`SendInput` 与 `SendTextInput`）打上 `StarPieExtraInfo` 签名，防止自身钩子捕获自发按键；
+   - 引入 `try...finally` 结构性强制释放修饰键，增设 `ReleaseStuckModifiers()` 机制，在任何组合键执行完毕后确保 `Ctrl`、`Alt`、`Win`、`Shift` 物理状态干净，彻底根治短时间高频触发组合键后的修饰键假死卡住与打字错乱问题。
+4. **任务栏预热线程池化 (Taskbar Prefetch Optimization)**：
+   - 将 `ShowRadialUI` 中的任务栏窗口预热调用由频繁 `new Thread` 升级为轻量级 `ThreadPool.QueueUserWorkItem` + 原子防抖机制，显著降低手势呼出时的 CPU 与线程上下文切换开销。
 
 ### 📐 控制台界面空间与默认极简折叠 (Console Layout & Default Collapsed Sidebar)
 1. **启动时默认侧边栏折叠**：
