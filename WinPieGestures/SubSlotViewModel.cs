@@ -61,6 +61,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			{
 				NthWindowIndex = "1";
 			}
+			if (value == "Tile" && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Tile"; // 默认使用平铺四宫格 logo
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");

@@ -397,6 +397,10 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			{
 				Action.Parameter = "2L";
 			}
+			if (value == "Tile" && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Tile"; // 默认使用平铺四宫格 logo
+			}
 			if (value == "Tile" && (Action.SubActions == null || Action.SubActions.Count == 0))
 			{
 				// 平铺动作自带子菜单：7 布局 + 「恢复上次平铺」——放置即带还原入口
@@ -782,9 +786,9 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		List<ActionItem> list = new List<ActionItem>();
 		foreach (string key in WindowTiler.LayoutKeys)
 		{
-			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key) });
+			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key), IconKey = "Tile" });
 		}
-		list.Add(new ActionItem { Type = "Tile", Parameter = WindowTiler.RestoreParam, Name = I18n.T("TileRestoreAllLabel") });
+		list.Add(new ActionItem { Type = "Tile", Parameter = WindowTiler.RestoreParam, Name = I18n.T("TileRestoreAllLabel"), IconKey = "Tile" });
 		Action.SubActions = list;
 		NotifySubActionsChanged();
 	}
