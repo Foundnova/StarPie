@@ -765,6 +765,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			List<ActionTypeOption> list = new List<ActionTypeOption>
 			{
 				new ActionTypeOption { Tag = WindowTiler.CycleParam, DisplayText = "🔄 " + I18n.T("TileCycleLabel") },
+				new ActionTypeOption { Tag = WindowTiler.CycleBackParam, DisplayText = "⬅️ " + I18n.T("TileCycleBackLabel") },
 				new ActionTypeOption { Tag = WindowTiler.RestoreParam, DisplayText = "⏪ " + I18n.T("TileRestoreAllLabel") }
 			};
 			foreach (string key in WindowTiler.LayoutKeys)

@@ -425,6 +425,10 @@ public partial class SettingsWindow : Window
 		{
 			TileExcludeProcessesTextBox.Text = ConfigManager.CurrentConfig.TileExcludeProcesses ?? "";
 		}
+		if (TileCycleLayoutsTextBox != null)
+		{
+			TileCycleLayoutsTextBox.Text = ConfigManager.CurrentConfig.TileCycleLayouts ?? "";
+		}
 		if (TileIncludeMinimizedCheckBox != null)
 		{
 			TileIncludeMinimizedCheckBox.IsChecked = ConfigManager.CurrentConfig.TileIncludeMinimized;
@@ -982,6 +986,10 @@ public partial class SettingsWindow : Window
 		if (TileExcludeText != null)
 		{
 			TileExcludeText.Text = I18n.T("TileExcludeText");
+		}
+		if (TileCycleRangeText != null)
+		{
+			TileCycleRangeText.Text = I18n.T("TileCycleRangeText");
 		}
 		if (CancelActionTitleText != null)
 		{
@@ -7439,6 +7447,16 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		ConfigManager.CurrentConfig.TileExcludeProcesses = TileExcludeProcessesTextBox.Text ?? "";
+		SyncUiToConfigAndSave();
+	}
+
+	private void TileCycleLayoutsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileCycleLayouts = TileCycleLayoutsTextBox.Text ?? "";
 		SyncUiToConfigAndSave();
 	}
 

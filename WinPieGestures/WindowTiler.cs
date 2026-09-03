@@ -111,18 +111,25 @@ public static class WindowTiler
 	// 上次平铺快照（供「恢复」与内存记忆）
 	private static readonly Dictionary<nint, RECT> s_lastSnapshot = new Dictionary<nint, RECT>();
 	private static int s_cycleIndex;
+	private static string s_currentLayout = "2L";
 
 	/// <summary>可选布局 key 列表（顺序即编辑器下拉顺序）。</summary>
 	public static List<string> LayoutKeys { get; } = new List<string>
 	{
-		"2L", "2T", "3L12", "3R21", "3R", "4G", "6G"
+		"2L", "2T", "3L12", "3R21", "3R", "4G", "6G", "ML", "MR", "MT", "MB"
 	};
 
 	/// <summary>轮换模式标记：参数为 Cycle 时循环切换布局。</summary>
 	public const string CycleParam = "Cycle";
 
+	/// <summary>反向轮换标记。</summary>
+	public const string CycleBackParam = "CycleBack";
+
 	/// <summary>还原标记：参数为 Restore 时还原所有窗口到平铺前。</summary>
 	public const string RestoreParam = "Restore";
+
+	/// <summary>主轴布局的 Master 占比（同 Dwalia 默认 0.6）。</summary>
+	public const double MasterFactor = 0.6;
 
 	public static bool IsValidLayout(string key)
 	{
@@ -140,8 +147,44 @@ public static class WindowTiler
 			"3R" => I18n.T("TileLayout3R"),
 			"4G" => I18n.T("TileLayout4G"),
 			"6G" => I18n.T("TileLayout6G"),
+			"ML" => I18n.T("TileLayoutML"),
+			"MR" => I18n.T("TileLayoutMR"),
+			"MT" => I18n.T("TileLayoutMT"),
+			"MB" => I18n.T("TileLayoutMB"),
 			_ => key
 		};
+	}
+
+	/// <summary>循环范围：配置的 TileCycleLayouts（逗号分隔 key）；为空则全部布局参与。</summary>
+	private static List<string> GetCycleScope()
+	{
+		List<string> list = new List<string>();
+		string? cfg = ConfigManager.CurrentConfig?.TileCycleLayouts;
+		if (!string.IsNullOrWhiteSpace(cfg))
+		{
+			foreach (string token in cfg.Split(new[] { ',', ';', '，', '；', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+			{
+				string k = token.Trim();
+				if (IsValidLayout(k) && !list.Contains(k))
+				{
+					list.Add(k);
+				}
+			}
+		}
+		if (list.Count == 0)
+		{
+			list.AddRange(LayoutKeys);
+		}
+		return list;
+	}
+
+	/// <summary>当前布局（每次平铺/循环都会更新；供循环从"当前"起跳）。</summary>
+	public static string CurrentLayout
+	{
+		get
+		{
+			return s_currentLayout;
+		}
 	}
 
 	/// <summary>在后台执行平铺：取对象 → 各窗口主显示器工作区 → 按布局格子 SetWindowPos。</summary>
@@ -155,15 +198,30 @@ public static class WindowTiler
 				RestoreLastLayout();
 				return;
 			}
+			List<string> scope = GetCycleScope();
 			if (string.Equals(key, CycleParam, StringComparison.OrdinalIgnoreCase))
 			{
-				key = LayoutKeys[s_cycleIndex % LayoutKeys.Count];
-				s_cycleIndex = (s_cycleIndex + 1) % LayoutKeys.Count;
+				int cur = scope.IndexOf(s_currentLayout);
+				if (cur < 0)
+				{
+					cur = 0;
+				}
+				key = scope[(cur + 1) % scope.Count];
+			}
+			else if (string.Equals(key, CycleBackParam, StringComparison.OrdinalIgnoreCase))
+			{
+				int cur = scope.IndexOf(s_currentLayout);
+				if (cur < 0)
+				{
+					cur = 0;
+				}
+				key = scope[(cur - 1 + scope.Count) % scope.Count];
 			}
 			if (!IsValidLayout(key))
 			{
 				key = "2L";
 			}
+			s_currentLayout = key;
 			// 排除名单（进程 exe 名，逗号/分号分隔）
 			HashSet<string> exclude = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			string? excl = ConfigManager.CurrentConfig?.TileExcludeProcesses;
@@ -181,8 +239,8 @@ public static class WindowTiler
 			{
 				return;
 			}
-			double[][] cells = LayoutCells(key);
-			int count = Math.Min(targets.Count, cells.Length);
+			List<double[]> cells = LayoutCells(key, targets.Count);
+			int count = Math.Min(targets.Count, cells.Count);
 			Dictionary<nint, RECT> snapshot = new Dictionary<nint, RECT>();
 			for (int i = 0; i < count; i++)
 			{
@@ -548,56 +606,110 @@ public static class WindowTiler
 		};
 	}
 
-	/// <summary>每种布局的格子比例 [x0,y0,x1,y1]，格子顺序 = 窗口顺序。</summary>
-	private static double[][] LayoutCells(string key)
+	/// <summary>
+/// 生成布局格子比例 [x0,y0,x1,y1]，格子顺序 = 窗口顺序。
+/// 固定预设为常量表；ML/MR/MT/MB（Master+Stack，学习 Dwalia 算法）按窗口数动态切分：
+/// Master 占 60%（Dwalia 默认 masterFactor），其余窗口在 Stack 区按 n-1 等分。
+/// </summary>
+	private static List<double[]> LayoutCells(string key, int n)
 	{
-		return key switch
+		switch (key)
 		{
-			"2L" => new[]
+		case "ML":
+			return MasterCells(n, MasterFactor, masterLeft: true, masterTop: false);
+		case "MR":
+			return MasterCells(n, MasterFactor, masterLeft: false, masterTop: false);
+		case "MT":
+			return MasterCells(n, MasterFactor, masterLeft: false, masterTop: true);
+		case "MB":
+			return MasterCells(n, MasterFactor, masterLeft: false, masterTop: true, masterBottom: true);
+		}
+		List<double[]> fixedCells = new List<double[]>();
+		switch (key)
+		{
+		case "2L":
+			fixedCells.Add(new[] { 0.0, 0.0, 0.5, 1.0 });
+			fixedCells.Add(new[] { 0.5, 0.0, 1.0, 1.0 });
+			break;
+		case "2T":
+			fixedCells.Add(new[] { 0.0, 0.0, 1.0, 0.5 });
+			fixedCells.Add(new[] { 0.0, 0.5, 1.0, 1.0 });
+			break;
+		case "3L12":
+			fixedCells.Add(new[] { 0.0, 0.0, 0.5, 1.0 });
+			fixedCells.Add(new[] { 0.5, 0.0, 1.0, 0.5 });
+			fixedCells.Add(new[] { 0.5, 0.5, 1.0, 1.0 });
+			break;
+		case "3R21":
+			fixedCells.Add(new[] { 0.0, 0.0, 0.5, 0.5 });
+			fixedCells.Add(new[] { 0.0, 0.5, 0.5, 1.0 });
+			fixedCells.Add(new[] { 0.5, 0.0, 1.0, 1.0 });
+			break;
+		case "3R":
+			fixedCells.Add(new[] { 0.0, 0.0, 1.0 / 3.0, 1.0 });
+			fixedCells.Add(new[] { 1.0 / 3.0, 0.0, 2.0 / 3.0, 1.0 });
+			fixedCells.Add(new[] { 2.0 / 3.0, 0.0, 1.0, 1.0 });
+			break;
+		case "4G":
+			fixedCells.Add(new[] { 0.0, 0.0, 0.5, 0.5 });
+			fixedCells.Add(new[] { 0.5, 0.0, 1.0, 0.5 });
+			fixedCells.Add(new[] { 0.0, 0.5, 0.5, 1.0 });
+			fixedCells.Add(new[] { 0.5, 0.5, 1.0, 1.0 });
+			break;
+		case "6G":
+			fixedCells.Add(new[] { 0.0, 0.0, 1.0 / 3.0, 0.5 });
+			fixedCells.Add(new[] { 1.0 / 3.0, 0.0, 2.0 / 3.0, 0.5 });
+			fixedCells.Add(new[] { 2.0 / 3.0, 0.0, 1.0, 0.5 });
+			fixedCells.Add(new[] { 0.0, 0.5, 1.0 / 3.0, 1.0 });
+			fixedCells.Add(new[] { 1.0 / 3.0, 0.5, 2.0 / 3.0, 1.0 });
+			fixedCells.Add(new[] { 2.0 / 3.0, 0.5, 1.0, 1.0 });
+			break;
+		default:
+			fixedCells.Add(new[] { 0.0, 0.0, 0.5, 1.0 });
+			fixedCells.Add(new[] { 0.5, 0.0, 1.0, 1.0 });
+			break;
+		}
+		return fixedCells;
+	}
+
+	/// <summary>Master+Stack 动态格子：Master 占 factor，Stack 区等分 n-1 块（Master 恒为 0 号窗口）。</summary>
+	private static List<double[]> MasterCells(int n, double factor, bool masterLeft, bool masterTop, bool masterBottom = false)
+	{
+		List<double[]> cells = new List<double[]>();
+		if (n <= 0)
+		{
+			return cells;
+		}
+		if (n == 1)
+		{
+			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
+			return cells;
+		}
+		int stack = n - 1;
+		if (masterLeft || !masterTop)
+		{
+			// 左右主轴：Master 占 factor（左或右），Stack 侧列按行等分
+			double mX0 = masterLeft ? 0.0 : 1.0 - factor;
+			double mX1 = masterLeft ? factor : 1.0;
+			double sX0 = masterLeft ? factor : 0.0;
+			double sX1 = masterLeft ? 1.0 : 1.0 - factor;
+			cells.Add(new[] { mX0, 0.0, mX1, 1.0 });
+			for (int i = 0; i < stack; i++)
 			{
-				new[] { 0.0, 0.0, 0.5, 1.0 },
-				new[] { 0.5, 0.0, 1.0, 1.0 }
-			},
-			"2T" => new[]
-			{
-				new[] { 0.0, 0.0, 1.0, 0.5 },
-				new[] { 0.0, 0.5, 1.0, 1.0 }
-			},
-			"3L12" => new[]
-			{
-				new[] { 0.0, 0.0, 0.5, 1.0 },
-				new[] { 0.5, 0.0, 1.0, 0.5 },
-				new[] { 0.5, 0.5, 1.0, 1.0 }
-			},
-			"3R21" => new[]
-			{
-				new[] { 0.0, 0.0, 0.5, 0.5 },
-				new[] { 0.0, 0.5, 0.5, 1.0 },
-				new[] { 0.5, 0.0, 1.0, 1.0 }
-			},
-			"3R" => new[]
-			{
-				new[] { 0.0, 0.0, 1.0 / 3.0, 1.0 },
-				new[] { 1.0 / 3.0, 0.0, 2.0 / 3.0, 1.0 },
-				new[] { 2.0 / 3.0, 0.0, 1.0, 1.0 }
-			},
-			"4G" => new[]
-			{
-				new[] { 0.0, 0.0, 0.5, 0.5 },
-				new[] { 0.5, 0.0, 1.0, 0.5 },
-				new[] { 0.0, 0.5, 0.5, 1.0 },
-				new[] { 0.5, 0.5, 1.0, 1.0 }
-			},
-			"6G" => new[]
-			{
-				new[] { 0.0, 0.0, 1.0 / 3.0, 0.5 },
-				new[] { 1.0 / 3.0, 0.0, 2.0 / 3.0, 0.5 },
-				new[] { 2.0 / 3.0, 0.0, 1.0, 0.5 },
-				new[] { 0.0, 0.5, 1.0 / 3.0, 1.0 },
-				new[] { 1.0 / 3.0, 0.5, 2.0 / 3.0, 1.0 },
-				new[] { 2.0 / 3.0, 0.5, 1.0, 1.0 }
-			},
-			_ => new[] { new[] { 0.0, 0.0, 0.5, 1.0 }, new[] { 0.5, 0.0, 1.0, 1.0 } }
-		};
+				cells.Add(new[] { sX0, (double)i / stack, sX1, (double)(i + 1) / stack });
+			}
+			return cells;
+		}
+		// 上下主轴：Master 占 factor（顶部或底部），Stack 横排按列等分
+		double mY0 = masterBottom ? 1.0 - factor : 0.0;
+		double mY1 = masterBottom ? 1.0 : factor;
+		double sY0 = masterBottom ? 0.0 : factor;
+		double sY1 = masterBottom ? 1.0 - factor : 1.0;
+		cells.Add(new[] { 0.0, mY0, 1.0, mY1 });
+		for (int i = 0; i < stack; i++)
+		{
+			cells.Add(new[] { (double)i / stack, sY0, (double)(i + 1) / stack, sY1 });
+		}
+		return cells;
 	}
 }

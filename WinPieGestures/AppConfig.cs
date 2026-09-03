@@ -43,6 +43,9 @@ public class AppConfig
 	/// <summary>平铺是否包含最小化窗口（true=还原后参与平铺）。</summary>
 	public bool TileIncludeMinimized { get; set; }
 
+	/// <summary>平铺"循环切换"参与范围：布局 key 逗号分隔（空=全部布局参与循环）。</summary>
+	public string TileCycleLayouts { get; set; } = "";
+
 	public string AnimationSpeed { get; set; } = "Balanced";
 
 	public double CustomAnimationDurationMs { get; set; } = 80.0;

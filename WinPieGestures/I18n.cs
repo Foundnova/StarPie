@@ -1200,6 +1200,48 @@ public static class I18n
 			[LanguageCode.En] = "Restore all windows (pre-tile state)",
 			[LanguageCode.Ja] = "すべてのウィンドウを元に戻す（並べる前の状態）"
 		};
+		dictionary["TileCycleBackLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环返回",
+			[LanguageCode.ZhTw] = "循環返回",
+			[LanguageCode.En] = "Cycle previous",
+			[LanguageCode.Ja] = "前のレイアウトへ"
+		};
+		dictionary["TileLayoutML"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居左 + 右栈",
+			[LanguageCode.ZhTw] = "主窗居左 + 右棧",
+			[LanguageCode.En] = "Master Left + Stack",
+			[LanguageCode.Ja] = "マスター左＋スタック"
+		};
+		dictionary["TileLayoutMR"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居右 + 左栈",
+			[LanguageCode.ZhTw] = "主窗居右 + 左棧",
+			[LanguageCode.En] = "Master Right + Stack",
+			[LanguageCode.Ja] = "マスター右＋スタック"
+		};
+		dictionary["TileLayoutMT"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居上 + 下栈",
+			[LanguageCode.ZhTw] = "主窗居上 + 下棧",
+			[LanguageCode.En] = "Master Top + Stack",
+			[LanguageCode.Ja] = "マスター上＋スタック"
+		};
+		dictionary["TileLayoutMB"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "主窗居下 + 上栈",
+			[LanguageCode.ZhTw] = "主窗居下 + 上棧",
+			[LanguageCode.En] = "Master Bottom + Stack",
+			[LanguageCode.Ja] = "マスター下＋スタック"
+		};
+		dictionary["TileCycleRangeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环切换范围（布局 key 逗号分隔，空=全部，如 2L,2T,4G,ML）：",
+			[LanguageCode.ZhTw] = "循環切換範圍（佈局 key 逗號分隔，空=全部，如 2L,2T,4G,ML）：",
+			[LanguageCode.En] = "Cycle range (layout keys, comma-separated; empty = all, e.g. 2L,2T,4G,ML):",
+			[LanguageCode.Ja] = "循環切替範囲（レイアウトキーをカンマ区切り。空=全て。例 2L,2T,4G,ML）："
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",
