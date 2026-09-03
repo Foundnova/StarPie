@@ -253,6 +253,18 @@ public static class ActionExecutor
 			case "Tile":
 				WindowTiler.ExecuteTile(action.Parameter);
 				break;
+			case "TileRestore":
+				WindowTiler.RestoreLastLayout();
+				break;
+			case "MoveMonitor":
+				WindowTiler.MoveWindowToNextMonitor();
+				break;
+			case "ToggleTopmost":
+				WindowTiler.ToggleWindowTopmost(action.Parameter);
+				break;
+			case "WindowOpacity":
+				WindowTiler.SetWindowOpacity(action.Parameter);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);

@@ -650,6 +650,26 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "TileRestore",
+			DisplayText = I18n.T("ActionTypeTileRestoreShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "MoveMonitor",
+			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "ToggleTopmost",
+			DisplayText = I18n.T("ActionTypeTopmostShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "WindowOpacity",
+			DisplayText = I18n.T("ActionTypeOpacityShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -686,6 +706,26 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Tag = "Tile",
 			DisplayText = I18n.T("ActionTypeTileShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "TileRestore",
+			DisplayText = I18n.T("ActionTypeTileRestoreShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "MoveMonitor",
+			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "ToggleTopmost",
+			DisplayText = I18n.T("ActionTypeTopmostShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "WindowOpacity",
+			DisplayText = I18n.T("ActionTypeOpacityShort")
 		},
 		new ActionTypeItem
 		{
@@ -727,13 +767,28 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 	{
 		get
 		{
-			List<ActionTypeOption> list = new List<ActionTypeOption>();
+			List<ActionTypeOption> list = new List<ActionTypeOption>
+			{
+				new ActionTypeOption { Tag = WindowTiler.CycleParam, DisplayText = "🔄 " + I18n.T("TileCycleLabel") }
+			};
 			foreach (string key in WindowTiler.LayoutKeys)
 			{
 				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });
 			}
 			return list;
 		}
+	}
+
+	/// <summary>一键预置 7 个子布局（主动作=级联，子项=各布局的平铺）。</summary>
+	public void PopulateTileSubActions()
+	{
+		List<ActionItem> list = new List<ActionItem>();
+		foreach (string key in WindowTiler.LayoutKeys)
+		{
+			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key) });
+		}
+		Action.SubActions = list;
+		NotifySubActionsChanged();
 	}
 
 	/// <summary>平铺布局（写入 Parameter）。</summary>

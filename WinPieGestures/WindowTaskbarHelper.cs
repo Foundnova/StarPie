@@ -427,6 +427,36 @@ public static class WindowTaskbarHelper
 		}
 	}
 
+	/// <summary>抗权限获取进程 exe 路径（OpenProcess+QueryFullProcessImageName）；失败返回 null。</summary>
+	public static string? GetProcessImageNameByPid(uint pid)
+	{
+		try
+		{
+			nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+			if (hProcess == IntPtr.Zero)
+			{
+				return null;
+			}
+			try
+			{
+				uint size = 1024;
+				StringBuilder sb = new StringBuilder((int)size);
+				if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+				{
+					return sb.ToString();
+				}
+			}
+			finally
+			{
+				CloseHandle(hProcess);
+			}
+		}
+		catch
+		{
+		}
+		return null;
+	}
+
 	/// <summary>任务栏第 n 个运行窗口的窗口标题（无则返回 null）；供轮盘中心显示"将要激活的窗口"。</summary>
 	public static string? GetNthTaskbarWindowTitle(int n)
 	{

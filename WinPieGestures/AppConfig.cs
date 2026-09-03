@@ -37,6 +37,12 @@ public class AppConfig
 
 	public ActionItem CancelAction { get; set; } = new ActionItem { Type = "Hotkey", Name = "取消动作", Parameter = "" };
 
+	/// <summary>平铺排除名单：进程 exe 名（不含扩展名），逗号/分号分隔。</summary>
+	public string TileExcludeProcesses { get; set; } = "";
+
+	/// <summary>平铺是否包含最小化窗口（true=还原后参与平铺）。</summary>
+	public bool TileIncludeMinimized { get; set; }
+
 	public string AnimationSpeed { get; set; } = "Balanced";
 
 	public double CustomAnimationDurationMs { get; set; } = 80.0;

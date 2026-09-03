@@ -1130,6 +1130,69 @@ public static class I18n
 			[LanguageCode.En] = "3×2 Grid",
 			[LanguageCode.Ja] = "3×2 グリッド"
 		};
+		dictionary["ActionTypeTileRestoreShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "恢复上次平铺",
+			[LanguageCode.ZhTw] = "還原上次平鋪",
+			[LanguageCode.En] = "Restore Tiles",
+			[LanguageCode.Ja] = "前の配置に戻す"
+		};
+		dictionary["ActionTypeMoveMonitorShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口移到下一屏",
+			[LanguageCode.ZhTw] = "視窗移到下一螢幕",
+			[LanguageCode.En] = "Move to Next Monitor",
+			[LanguageCode.Ja] = "次のモニターへ移動"
+		};
+		dictionary["ActionTypeTopmostShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口置顶/取消置顶",
+			[LanguageCode.ZhTw] = "視窗置頂/取消置頂",
+			[LanguageCode.En] = "Toggle Always-on-Top",
+			[LanguageCode.Ja] = "最前面表示の切替"
+		};
+		dictionary["ActionTypeOpacityShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口透明度",
+			[LanguageCode.ZhTw] = "視窗透明度",
+			[LanguageCode.En] = "Window Opacity",
+			[LanguageCode.Ja] = "ウィンドウの透明度"
+		};
+		dictionary["TileCycleLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "循环切换布局",
+			[LanguageCode.ZhTw] = "循環切換佈局",
+			[LanguageCode.En] = "Cycle layouts",
+			[LanguageCode.Ja] = "レイアウトを順番に切替"
+		};
+		dictionary["TileGlobalTitleText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺窗口设置",
+			[LanguageCode.ZhTw] = "平鋪視窗設定",
+			[LanguageCode.En] = "Tiling Settings",
+			[LanguageCode.Ja] = "タイリング設定"
+		};
+		dictionary["TileGlobalDescText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "「平铺窗口」动作的全局行为。",
+			[LanguageCode.ZhTw] = "「平鋪視窗」動作的全域行為。",
+			[LanguageCode.En] = "Global behaviour of the Tile Windows action.",
+			[LanguageCode.Ja] = "「ウィンドウを並べる」アクションの全体挙動です。"
+		};
+		dictionary["TileMinimizeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "包含最小化窗口（还原后参与平铺）",
+			[LanguageCode.ZhTw] = "包含最小化視窗（還原後參與平鋪）",
+			[LanguageCode.En] = "Include minimized windows (restore into the layout)",
+			[LanguageCode.Ja] = "最小化ウィンドウも含める（復元して配置）"
+		};
+		dictionary["TileExcludeText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：",
+			[LanguageCode.ZhTw] = "平鋪排除名單（程序 exe 名，逗號分隔，如 notepad,spotify）：",
+			[LanguageCode.En] = "Tiling exclusion list (process exe names, comma-separated, e.g. notepad,spotify):",
+			[LanguageCode.Ja] = "並べる対象外のプロセス（exe名、カンマ区切り例 notepad,spotify）："
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",

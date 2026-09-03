@@ -267,7 +267,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 	{
 		get
 		{
-			List<ActionTypeOption> list = new List<ActionTypeOption>();
+			List<ActionTypeOption> list = new List<ActionTypeOption>
+			{
+				new ActionTypeOption { Tag = WindowTiler.CycleParam, DisplayText = "🔄 " + I18n.T("TileCycleLabel") }
+			};
 			foreach (string key in WindowTiler.LayoutKeys)
 			{
 				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });

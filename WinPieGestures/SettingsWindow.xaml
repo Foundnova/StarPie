@@ -813,7 +813,14 @@
                               <ComboBox Grid.Column="1" Width="108" Margin="4,0,0,0" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="10" />
                             </Grid>
                             <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}" />
-                            <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
+                              <Grid Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="*" />
+                                  <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" ToolTip="平铺布局预设（含循环切换）" />
+                                <Button Grid.Column="1" Content="⇅" Height="30" Width="32" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="TilePresetSubs_Click" ToolTip="一键生成 7 个子布局：级联菜单即布局选择器" />
+                              </Grid>
                           </Grid>
                           <TextBox Grid.Column="2" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（可选）" />
                         </Grid>
@@ -1873,6 +1880,23 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
+                </StackPanel>
+              </Border>
+            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Name="TileGlobalTitleText" Text="平铺窗口设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
+                  <CheckBox Name="TileIncludeMinimizedCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,10" Checked="TileIncludeMinimizedCheckBox_Changed" Unchecked="TileIncludeMinimizedCheckBox_Changed">
+                    <StackPanel Margin="6,0,0,0">
+                      <TextBlock Name="TileMinimizeText" Text="包含最小化窗口（还原后参与平铺）" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Text="默认关闭：最小化窗口不参与，仅排布可见窗口。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+                  </CheckBox>
+                  <TextBlock Name="TileExcludeText" Text="平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                  <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
                 </StackPanel>
               </Border>
             </StackPanel>

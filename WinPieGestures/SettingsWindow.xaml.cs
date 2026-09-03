@@ -421,6 +421,14 @@ public partial class SettingsWindow : Window
 		}
 		RefreshGestureMappings();
 		RefreshCancelActionEditor();
+		if (TileExcludeProcessesTextBox != null)
+		{
+			TileExcludeProcessesTextBox.Text = ConfigManager.CurrentConfig.TileExcludeProcesses ?? "";
+		}
+		if (TileIncludeMinimizedCheckBox != null)
+		{
+			TileIncludeMinimizedCheckBox.IsChecked = ConfigManager.CurrentConfig.TileIncludeMinimized;
+		}
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -958,6 +966,22 @@ public partial class SettingsWindow : Window
 		if (GestureMappingTitleText != null)
 		{
 			GestureMappingTitleText.Text = I18n.T("GestureMappingTitleText");
+		}
+		if (TileGlobalTitleText != null)
+		{
+			TileGlobalTitleText.Text = I18n.T("TileGlobalTitleText");
+		}
+		if (TileGlobalDescText != null)
+		{
+			TileGlobalDescText.Text = I18n.T("TileGlobalDescText");
+		}
+		if (TileMinimizeText != null)
+		{
+			TileMinimizeText.Text = I18n.T("TileMinimizeText");
+		}
+		if (TileExcludeText != null)
+		{
+			TileExcludeText.Text = I18n.T("TileExcludeText");
 		}
 		if (CancelActionTitleText != null)
 		{
@@ -7381,6 +7405,41 @@ public partial class SettingsWindow : Window
 		{
 			ActionExecutor.Execute(ConfigManager.CurrentConfig.CancelAction);
 		}
+	}
+
+	// ==================== 平铺窗口 ====================
+
+	private void TilePresetSubs_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (sender is FrameworkElement fe && fe.DataContext is SlotViewModel vm)
+		{
+			vm.PopulateTileSubActions();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void TileIncludeMinimizedCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileIncludeMinimized = TileIncludeMinimizedCheckBox.IsChecked == true;
+		SyncUiToConfigAndSave();
+	}
+
+	private void TileExcludeProcessesTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileExcludeProcesses = TileExcludeProcessesTextBox.Text ?? "";
+		SyncUiToConfigAndSave();
 	}
 
 	private void GestureBrowse_Click(object sender, RoutedEventArgs e)
