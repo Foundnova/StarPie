@@ -7501,13 +7501,17 @@ public partial class SettingsWindow : Window
 		List<LayoutCycleItem> items = new List<LayoutCycleItem>();
 		foreach (string key in cfg)
 		{
-			items.Add(new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), true));
+			LayoutCycleItem item = new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), true);
+			item.PropertyChanged += LayoutCycleItem_PropertyChanged;
+			items.Add(item);
 		}
 		foreach (string key in WindowTiler.LayoutKeys)
 		{
 			if (!cfg.Contains(key))
 			{
-				items.Add(new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), false));
+				LayoutCycleItem item = new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), false);
+				item.PropertyChanged += LayoutCycleItem_PropertyChanged;
+				items.Add(item);
 			}
 		}
 		_cycleItems = items;
@@ -7515,6 +7519,19 @@ public partial class SettingsWindow : Window
 		{
 			TileCycleListBox.ItemsSource = null;
 			TileCycleListBox.ItemsSource = _cycleItems;
+		}
+	}
+
+	/// <summary>勾选/取消任意一项立即持久化（循环范围即时生效）。</summary>
+	private void LayoutCycleItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (e.PropertyName == nameof(LayoutCycleItem.IsChecked))
+		{
+			PersistTileCycleSelection();
 		}
 	}
 
