@@ -354,16 +354,33 @@ public static class WindowTiler
 		}
 	}
 
+	/// <summary>内置"系统/厂商后台工具"黑名单（恒生效，避免干扰平铺）：输入法、UWP 宿主、设置、华硕等。</summary>
+	private static readonly string[] s_systemUtilityExes =
+	{
+		"textinputhost", "ctfmon", "sihost", "startmenuexperiencehost", "searchhost", "searchapp",
+		"shellexperiencehost", "runtimebroker", "backgroundtaskhost", "dllhost", "applicationframehost",
+		"systemsettings", "ashotplugctrl", "asmonitorcontrol", "armourycrateservice", "asusappservice",
+		"hhddevicediscovery", "igfxext", "igfxpers", "hkcmd"
+	};
+
 	/// <summary>
-/// 平铺对象：当前虚拟桌面上的可见窗口。只管理"exe 出现在任务栏槽位"的应用窗口（Dwalia 语义：
-/// 只处理真实驻留应用），同 exe 多窗口全收（两个终端都参与）；组间顺序 = 任务栏槽位顺序，
-/// 组内按句柄升序（≈先启动在前，先启动者为 Master）。
-/// 排除：无标题栏/工具窗/透明/遮蔽/无拥有者/无标题/本进程/排除名单/非任务栏应用的杂窗。
-/// </summary>
-	private static List<nint> GetTileTargets(HashSet<string> excludedExes, bool includeMinimized)
+	/// 平铺对象：当前虚拟桌面上的可见窗口。只管理"exe 出现在任务栏槽位"的应用窗口（Dwalia 语义：
+	/// 只处理真实驻留应用），同 exe 多窗口全收（两个终端都参与）；组间顺序 = 任务栏槽位顺序，
+	/// 组内按句柄升序（≈先启动在前，先启动者为 Master）。
+	/// 排除：无标题栏/工具窗/透明/遮蔽/无拥有者/无标题/本进程/系统工具黑名单/用户排除名单/非任务栏应用的杂窗。
+	/// </summary>
+	private static List<nint> GetTileTargets(HashSet<string> userExcludedExes, bool includeMinimized)
 	{
 		List<nint> result = new List<nint>();
 		uint selfPid = (uint)Environment.ProcessId;
+
+		// 黑名单 = 内置系统工具 + 用户配置的排除名单
+		HashSet<string> blockedExes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		blockedExes.UnionWith(s_systemUtilityExes);
+		if (userExcludedExes.Count > 0)
+		{
+			blockedExes.UnionWith(userExcludedExes);
+		}
 
 		// 槽位顺序 → exe 名顺序（分组排序基准 + 白名单：只收这些 exe 的窗口）
 		List<string> slotExeOrder = new List<string>();
@@ -437,22 +454,14 @@ public static class WindowTiler
 				{
 					continue;
 				}
-				if (excludedExes.Count > 0)
-				{
-					string? exe = ExeNameOfPid(pid);
-					if (exe != null && excludedExes.Contains(exe))
-					{
-						continue;
-					}
-				}
-				StringBuilder sb = new StringBuilder(128);
-				if (GetWindowText(h, sb, 128) <= 0)
+				string? exeKey = ExeNameOfPid(pid);
+				// 只收任务栏存在应用的窗口（Dwalia：只管理真实驻留应用的窗口），且不在系统工具/用户黑名单
+				if (exeKey == null || !slotExes.Contains(exeKey) || blockedExes.Contains(exeKey))
 				{
 					continue;
 				}
-				string? exeKey = ExeNameOfPid(pid);
-				// 只收任务栏存在应用的窗口（Dwalia：只管理真实驻留应用的窗口）——杂窗/后台窗一律不入布局
-				if (exeKey == null || !slotExes.Contains(exeKey))
+				StringBuilder sb = new StringBuilder(128);
+				if (GetWindowText(h, sb, 128) <= 0)
 				{
 					continue;
 				}
