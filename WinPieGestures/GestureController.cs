@@ -882,6 +882,18 @@ public class GestureController
 						}
 					}
 				}
+				if (targetAction == null)
+				{
+					// 仅"外甩取消"（释放时处于外甩状态且未选中任何动作）时执行自定义取消动作；
+					// 回到中心取消按钮松手仍为默认静默关闭。
+					ActionItem? cancelAction = ConfigManager.CurrentConfig?.CancelAction;
+					if (_lastEscapedState &&
+						ConfigManager.CurrentConfig?.EnableCancelAction == true &&
+						cancelAction != null && !string.IsNullOrEmpty(cancelAction.Type))
+					{
+						targetAction = cancelAction;
+					}
+				}
 				if (targetAction != null)
 				{
 					ActionExecutor.EnqueueAction(targetAction);
@@ -1019,6 +1031,18 @@ public class GestureController
 						{
 							targetAction = actionItem;
 						}
+					}
+				}
+				if (targetAction == null)
+				{
+					// 仅"外甩取消"（释放时处于外甩状态且未选中任何动作）时执行自定义取消动作；
+					// 回到中心取消按钮松手仍为默认静默关闭。
+					ActionItem? cancelAction = ConfigManager.CurrentConfig?.CancelAction;
+					if (_lastEscapedState &&
+						ConfigManager.CurrentConfig?.EnableCancelAction == true &&
+						cancelAction != null && !string.IsNullOrEmpty(cancelAction.Type))
+					{
+						targetAction = cancelAction;
 					}
 				}
 				if (targetAction != null)

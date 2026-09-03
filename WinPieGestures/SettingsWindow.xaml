@@ -766,6 +766,59 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                      <TextBlock Name="CancelActionTitleText" Text="外甩取消时执行的动作" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="CancelActionDescText" Text="外甩取消（未选中任何动作）时可执行一个自定义动作代替静默关闭；需先开启上方「顺势外甩取消」。回到中心取消仍为静默关闭，不受此影响。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
+                      <CheckBox Name="EnableCancelActionCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,8" Checked="EnableCancelActionCheckBox_Changed" Unchecked="EnableCancelActionCheckBox_Changed">
+                        <StackPanel Margin="6,0,0,0">
+                          <TextBlock Name="CancelActionEnableText" Text="外甩取消时执行自定义动作" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="关闭则外甩取消仍为静默关闭。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                      </CheckBox>
+                      <ContentControl Name="CancelActionEditorHost">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="90" />
+                          </Grid.ColumnDefinitions>
+                          <ComboBox Grid.Column="0" Height="30" FontSize="11" ItemsSource="{Binding ActionTypes}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding Type, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" />
+                          <Grid Grid.Column="1" Margin="4,0,0,0">
+                            <local:HotkeyRecorderBox Height="30" FontSize="11" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}" />
+                            <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="36" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" IsReadOnly="True" />
+                              <Button Grid.Column="1" Content="📁" Height="30" Width="34" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="GestureBrowse_Click" ToolTip="选择应用程序..." />
+                            </Grid>
+                            <Grid Visibility="{Binding IsFolderType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="36" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" />
+                              <Button Grid.Column="1" Content="📂" Height="30" Width="34" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="GestureBrowseFolder_Click" ToolTip="选择本地文件夹..." />
+                            </Grid>
+                            <ComboBox SelectedValuePath="Key" DisplayMemberPath="Value" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" SelectedValue="{Binding SelectedSystemPreset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Source={x:Static local:SlotViewModel.SystemPresets}}" Visibility="{Binding IsSystemType, Converter={StaticResource BoolToVis}}" />
+                            <Grid Visibility="{Binding IsCommandType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="112" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" />
+                              <ComboBox Grid.Column="1" Width="108" Margin="4,0,0,0" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="10" />
+                            </Grid>
+                            <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}" />
+                          </Grid>
+                          <TextBox Grid.Column="2" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（可选）" />
+                        </Grid>
+                      </ContentControl>
+                      <Button Name="TestCancelActionButton" Content="🧪 测试" Height="30" Padding="12,0" Margin="0,8,0,0" HorizontalAlignment="Left" Style="{StaticResource ModernButtonStyle}" Click="TestCancelAction_Click" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">

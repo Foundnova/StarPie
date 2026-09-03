@@ -1053,6 +1053,27 @@ public static class I18n
 			[LanguageCode.En] = "Gesture segment sensitivity:",
 			[LanguageCode.Ja] = "ジェスチャー感度："
 		};
+		dictionary["CancelActionTitleText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "外甩取消时执行的动作",
+			[LanguageCode.ZhTw] = "外甩取消時執行的動作",
+			[LanguageCode.En] = "Action on Outer-Escape Cancel",
+			[LanguageCode.Ja] = "外側スワイプキャンセル時の動作"
+		};
+		dictionary["CancelActionDescText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "仅当通过「外甩取消」（向外甩出且未选中任何动作）时执行这个自定义动作；回到中心取消按钮松手仍为默认静默关闭。",
+			[LanguageCode.ZhTw] = "僅當透過「外甩取消」（向外甩出且未選中任何動作）時執行這個自訂動作；回到中心取消按鈕鬆手仍為預設靜默關閉。",
+			[LanguageCode.En] = "Only when you cancel by flinging outward (nothing selected) does this custom action run; releasing over the center cancel button still just closes the menu silently.",
+			[LanguageCode.Ja] = "外側へフリックしてキャンセルした場合（何も選択していない）のみカスタムアクションを実行します。中央のキャンセルで離すと従来通りサイレントクローズします。"
+		};
+		dictionary["CancelActionEnableText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用自定义外甩取消动作",
+			[LanguageCode.ZhTw] = "啟用自訂外甩取消動作",
+			[LanguageCode.En] = "Enable custom outer-escape cancel action",
+			[LanguageCode.Ja] = "外側スワイプキャンセル時のカスタム動作を有効化"
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",

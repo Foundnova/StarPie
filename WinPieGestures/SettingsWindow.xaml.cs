@@ -420,6 +420,7 @@ public partial class SettingsWindow : Window
 			GestureSensitivityLabel.Text = $"{GestureSensitivitySlider.Value:0} px";
 		}
 		RefreshGestureMappings();
+		RefreshCancelActionEditor();
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -957,6 +958,18 @@ public partial class SettingsWindow : Window
 		if (GestureMappingTitleText != null)
 		{
 			GestureMappingTitleText.Text = I18n.T("GestureMappingTitleText");
+		}
+		if (CancelActionTitleText != null)
+		{
+			CancelActionTitleText.Text = I18n.T("CancelActionTitleText");
+		}
+		if (CancelActionDescText != null)
+		{
+			CancelActionDescText.Text = I18n.T("CancelActionDescText");
+		}
+		if (CancelActionEnableText != null)
+		{
+			CancelActionEnableText.Text = I18n.T("CancelActionEnableText");
 		}
 		if (TriggerPageSubheader != null)
 		{
@@ -3210,6 +3223,7 @@ public partial class SettingsWindow : Window
 			{
 				OuterEscapeDistancePanel.Visibility = Visibility.Visible;
 			}
+			UpdateCancelActionAvailability();
 			SyncUiToConfigAndSave();
 		}
 	}
@@ -3223,7 +3237,26 @@ public partial class SettingsWindow : Window
 			{
 				OuterEscapeDistancePanel.Visibility = Visibility.Collapsed;
 			}
+			UpdateCancelActionAvailability();
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	/// <summary>「外甩取消时执行的动作」依赖顺势外甩取消主开关：主开关关闭时整块禁用。</summary>
+	private void UpdateCancelActionAvailability()
+	{
+		bool master = ConfigManager.CurrentConfig?.EnableOuterEscapeCancel == true;
+		if (EnableCancelActionCheckBox != null)
+		{
+			EnableCancelActionCheckBox.IsEnabled = master;
+		}
+		if (CancelActionEditorHost != null)
+		{
+			CancelActionEditorHost.IsEnabled = master;
+		}
+		if (TestCancelActionButton != null)
+		{
+			TestCancelActionButton.IsEnabled = master;
 		}
 	}
 
@@ -7305,6 +7338,48 @@ public partial class SettingsWindow : Window
 		if (sender is FrameworkElement fe && fe.DataContext is GestureMappingViewModel vm)
 		{
 			ActionExecutor.Execute(vm.Mapping.Action);
+		}
+	}
+
+	// ==================== 取消后动作 ====================
+
+	private void RefreshCancelActionEditor()
+	{
+		if (ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (EnableCancelActionCheckBox != null)
+		{
+			EnableCancelActionCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableCancelAction;
+		}
+		if (CancelActionEditorHost != null && CancelActionEditorHost.DataContext == null)
+		{
+			GestureMappingViewModel vm = new GestureMappingViewModel(new GestureMapping
+			{
+				Pattern = "",
+				Action = ConfigManager.CurrentConfig.CancelAction ?? new ActionItem { Type = "Hotkey", Name = "取消动作", Parameter = "" }
+			});
+			CancelActionEditorHost.DataContext = vm;
+		}
+		UpdateCancelActionAvailability();
+	}
+
+	private void EnableCancelActionCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.EnableCancelAction = EnableCancelActionCheckBox.IsChecked == true;
+		SyncUiToConfigAndSave();
+	}
+
+	private void TestCancelAction_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig?.CancelAction != null)
+		{
+			ActionExecutor.Execute(ConfigManager.CurrentConfig.CancelAction);
 		}
 	}
 
