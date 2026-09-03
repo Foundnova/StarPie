@@ -325,47 +325,150 @@ public static class WindowTiler
 		}
 	}
 
-	/// <summary>平铺对象：当前虚拟桌面可见窗口（任务栏顺序）；排除无标题/隐藏/本进程/排除名单；按配置决定是否含最小化。</summary>
+	/// <summary>
+/// 平铺对象：当前虚拟桌面上的可见窗口。按进程 exe 分组全量枚举（同名/同 exe 的多窗口——如两个终端——全部参与，
+/// 不依赖任务栏槽位折叠）；组间顺序 = 任务栏槽位顺序，组内按句柄升序（≈先启动在前，先启动者为 Master）。
+/// 排除：无标题/隐藏/本进程/排除名单；是否含最小化按配置。
+/// </summary>
 	private static List<nint> GetTileTargets(HashSet<string> excludedExes, bool includeMinimized)
 	{
 		List<nint> result = new List<nint>();
 		uint selfPid = (uint)Environment.ProcessId;
-		foreach (nint h in WindowTaskbarHelper.GetTaskbarOrderedWindows())
+
+		// 槽位顺序 → exe 名顺序（分组排序基准）
+		List<string> slotExeOrder = new List<string>();
+		foreach (nint slot in WindowTaskbarHelper.GetTaskbarOrderedWindows())
 		{
-			if (h == IntPtr.Zero || !IsWindowVisible(h))
+			GetWindowThreadProcessId(slot, out uint pid);
+			string? exe = ExeNameOfPid(pid);
+			if (exe != null && !slotExeOrder.Contains(exe))
 			{
-				continue;
+				slotExeOrder.Add(exe);
 			}
-			if (!includeMinimized && IsIconic(h))
+		}
+
+		// 同 exe 分组：exe(lower) -> hwnds
+		Dictionary<string, List<nint>> groups = new Dictionary<string, List<nint>>(StringComparer.OrdinalIgnoreCase);
+		List<nint> noExe = new List<nint>();
+		foreach (nint h in EnumerateAllTopLevelWindows())
+		{
+			try
 			{
-				continue; // 最小化不参与（默认）
-			}
-			GetWindowThreadProcessId(h, out uint pid);
-			if (pid == selfPid)
-			{
-				continue; // 排除设置窗等自身窗口
-			}
-			StringBuilder sb = new StringBuilder(128);
-			if (GetWindowText(h, sb, 128) <= 0)
-			{
-				continue; // 无标题的后台窗口不参与
-			}
-			if (excludedExes.Count > 0)
-			{
-				string? exe = WindowTaskbarHelper.GetProcessImageNameByPid(pid);
-				if (exe != null && excludedExes.Contains(System.IO.Path.GetFileNameWithoutExtension(exe).ToLowerInvariant()))
+				if (!IsWindowVisible(h))
 				{
-					continue; // 命中排除名单
+					continue;
+				}
+				if (!includeMinimized && IsIconic(h))
+				{
+					continue;
+				}
+				if (!WindowTaskbarHelper.IsOnCurrentVirtualDesktop(h))
+				{
+					continue;
+				}
+				GetWindowThreadProcessId(h, out uint pid);
+				if (pid == selfPid)
+				{
+					continue;
+				}
+				if (excludedExes.Count > 0)
+				{
+					string? exe = ExeNameOfPid(pid);
+					if (exe != null && excludedExes.Contains(exe))
+					{
+						continue;
+					}
+				}
+				StringBuilder sb = new StringBuilder(128);
+				if (GetWindowText(h, sb, 128) <= 0)
+				{
+					continue;
+				}
+				string? exeKey = ExeNameOfPid(pid);
+				if (exeKey == null)
+				{
+					noExe.Add(h);
+				}
+				else if (!groups.TryGetValue(exeKey, out List<nint>? g))
+				{
+					g = new List<nint>();
+					groups[exeKey] = g;
+					g.Add(h);
+				}
+				else
+				{
+					g.Add(h);
 				}
 			}
-			result.Add(h);
+			catch
+			{
+			}
 		}
+		foreach (List<nint> g in groups.Values)
+		{
+			g.Sort(); // 组内句柄升序（先启动在前）
+		}
+		// 按槽位顺序输出组，再输出未出现在槽位的组（按其最小句柄排序），最后无 exe 的
+		HashSet<string> emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		foreach (string exe in slotExeOrder)
+		{
+			if (groups.TryGetValue(exe, out List<nint>? g))
+			{
+				result.AddRange(g);
+				emitted.Add(exe);
+			}
+		}
+		List<string> rest = groups.Keys.Where((string k) => !emitted.Contains(k)).OrderBy((string k) => groups[k][0]).ToList();
+		foreach (string exe in rest)
+		{
+			result.AddRange(groups[exe]);
+		}
+		noExe.Sort();
+		result.AddRange(noExe);
+
 		if (result.Count == 0)
 		{
-			// 兜底：任务栏快照拿不到时，直接枚举顶层窗口（当前桌面的可见普通窗口）
 			result.AddRange(EnumerateTopLevelWindows());
 		}
 		return result;
+	}
+
+	/// <summary>进程 exe 名（小写、无扩展名）；失败 null。轻量缓存避免重复 OpenProcess。</summary>
+	private static string? ExeNameOfPid(uint pid)
+	{
+		string key = pid.ToString();
+		if (s_exeNameCache.TryGetValue(key, out string? cached))
+		{
+			return cached;
+		}
+		string? exe = WindowTaskbarHelper.GetProcessImageNameByPid(pid);
+		string? lower = exe == null ? null : System.IO.Path.GetFileNameWithoutExtension(exe).ToLowerInvariant();
+		if (s_exeNameCache.Count > 256)
+		{
+			s_exeNameCache.Clear();
+		}
+		s_exeNameCache[key] = lower;
+		return lower;
+	}
+
+	/// <summary>EnumWindows 全量枚举顶层窗口（不过滤，便于分组；注意通过枚举回调收集）。</summary>
+	private static List<nint> EnumerateAllTopLevelWindows()
+	{
+		List<nint> buffer = new List<nint>();
+		List<nint> previous = s_enumBuffer;
+		s_enumBuffer = buffer;
+		try
+		{
+			EnumWindows(s_enumProc, IntPtr.Zero);
+		}
+		catch
+		{
+		}
+		finally
+		{
+			s_enumBuffer = previous;
+		}
+		return buffer;
 	}
 
 	private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
@@ -376,6 +479,8 @@ public static class WindowTiler
 	private static readonly EnumWindowsProc s_enumProc = EnumCallback;
 
 	private static List<nint> s_enumBuffer = new List<nint>();
+
+	private static readonly Dictionary<string, string?> s_exeNameCache = new Dictionary<string, string?>();
 
 	private static bool EnumCallback(nint hWnd, nint lParam)
 	{

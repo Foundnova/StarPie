@@ -427,6 +427,28 @@ public static class WindowTaskbarHelper
 		}
 	}
 
+	/// <summary>窗口是否在当前虚拟桌面（供平铺等全量枚举时过滤）。</summary>
+	public static bool IsOnCurrentVirtualDesktop(nint hWnd)
+	{
+		try
+		{
+			if (hWnd == IntPtr.Zero)
+			{
+				return false;
+			}
+			IVirtualDesktopManager? vdm = CreateVdm();
+			if (vdm == null)
+			{
+				return false;
+			}
+			return vdm.IsWindowOnCurrentVirtualDesktop(hWnd, out _) == 0;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	/// <summary>抗权限获取进程 exe 路径（OpenProcess+QueryFullProcessImageName）；失败返回 null。</summary>
 	public static string? GetProcessImageNameByPid(uint pid)
 	{
