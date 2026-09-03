@@ -397,6 +397,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			{
 				Action.Parameter = "2L";
 			}
+			if (value == "Tile" && (Action.SubActions == null || Action.SubActions.Count == 0))
+			{
+				// 平铺动作自带子菜单：7 布局 + 「恢复上次平铺」——放置即带还原入口
+				PopulateTileSubActions();
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
@@ -650,11 +655,6 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
-			Tag = "TileRestore",
-			DisplayText = I18n.T("ActionTypeTileRestoreShort")
-		},
-		new ActionTypeOption
-		{
 			Tag = "MoveMonitor",
 			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
 		},
@@ -706,11 +706,6 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Tag = "Tile",
 			DisplayText = I18n.T("ActionTypeTileShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "TileRestore",
-			DisplayText = I18n.T("ActionTypeTileRestoreShort")
 		},
 		new ActionTypeItem
 		{
