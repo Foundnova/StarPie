@@ -4,6 +4,39 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.6.2] - 2026-09-03 (手势区纯图标美化 & 指定浏览器精准调度 & 画布拖拽对调修复 & 核圆开关修复 & 控制台状态记忆)
+
+### 🎨 手势动作区画布渲染对齐外观形态预览 (Icon-Only Clean Canvas Aesthetics)
+1. **纯图标无文字极简美学**：
+   - 手势动作区实时画布（Tab 2）完全对齐轮盘外观与形态（Tab 1）的渲染策略与几何切削规范（ClassicRing, CleanSectors, Glassmorphism等）；
+   - 彻底移除了扇区内垂直堆叠的拥挤文字块，所有扇区与二级子动作扇区**统一居中呈现纯图标形态**，大幅释放扇区留白，视觉更干净、灵动、高级；
+   - 完美兼容 SVG 矢量轮廓、自定义位图图标与程序 Shell 原生提取图标的自适应缩放居中。
+
+### 🌐 网址直达指定浏览器精准调度修复 (Reliable Multi-Browser Dispatch)
+1. **多盘符与注册表精确检索**：
+   - 针对非 C 盘系统环境（如 G 盘安装）及未配置系统 PATH 环境变量的机器，新增 `FindBrowserExecutable` 检索器；
+   - 优先通过 Windows 注册表 `App Paths`（`HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths`）精准定位 Chrome、Edge、Firefox 绝对安装路径；
+   - 支持 Edge 专属协议 `microsoft-edge:` 零失败双保险唤起，彻底杜绝先前因找不到可执行文件而静默回退至默认浏览器的缺陷；
+   - 适当加宽配置面板中的浏览器下拉选单宽度，杜绝名称尾部被挤压遮挡。
+
+### 🔄 修复画布直接拖拽对调扇区与中心核圆位置 (Interactive Drag & Drop Swapping Fix)
+1. **隧道事件统一接管与拖拽判定**：
+   - 针对先前扇区子元素 `MouseLeftButtonDown` 标记 `Handled` 阻断父级容器捕获的问题，改用 WPF 顶级 `PreviewMouseDown`、`PreviewMouseMove` 与 `PreviewMouseUp` 隧道事件全局统一接管；
+   - 拖拽位移 > 10px 时立即激活拖拽对调引擎，将功能配置与级联子菜单瞬间互换；拖拽位移 ≤ 8px 时精准响应常规点击选中操作；
+   - 拖拽过程中显示提示文字与高光反馈，拖拽完成后底部显示 `🎯 已将 [动作A] 与 [动作B] 成功对调位置！`。
+
+### 🎯 修复中心核圆动作启用开关逻辑 (Center Core Enable Toggle Fix)
+1. **严格遵循启用开关状态**：
+   - 修正了鼠标/键盘钩子中对 `EnableCenterAction` 与 `EnableOuterEscapeCancel` 的条件分支，严格校验用户是否真正启用了「启用中心核圆动作」开关；
+   - 当开关处于关闭状态时，在中心死区内松开鼠标彻底保持静默，不再误触发中心核圆绑定的动作。
+
+### 📌 唤起控制台保留上次界面活动状态 (Preserve Last Console Tab State)
+1. **记忆活动标签页与界面状态**：
+   - 重构 `ShowSettings(int tabIndex = -1)` 传参逻辑，默认唤起（包括通过中心核圆拉起控制台、双击托盘图标等）时不再强行重置至 Tab 0；
+   - 完整保留用户上次关闭或隐藏设置窗口时的活动 Tab 页面与工作区状态，交互无缝流畅。
+
+---
+
 ## [v1.6.1] - 2026-09-03 (手势动作区双栏重构 & 画布直接拖拽对调位置 & 中心核圆死区动作 & 打开网址多浏览器支持 & 方案一键复制)
 
 ### 🚀 手势动作区全新双栏重构 (Dual-Column Canvas & Focus Editor Overhaul)

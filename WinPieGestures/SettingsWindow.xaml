@@ -534,7 +534,7 @@
         </StackPanel>
         <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5" Visibility="Collapsed">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.6.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.6.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -1878,7 +1878,7 @@
                           <Grid Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
-                              <ColumnDefinition Width="130" />
+                              <ColumnDefinition Width="145" />
                             </Grid.ColumnDefinitions>
                             <TextBox Name="FocusWebUrlTextBox" Height="30" FontSize="11.5" ToolTip="目标网址，如 https://github.com" TextChanged="FocusWebUrlTextBox_TextChanged" />
                             <ComboBox Name="FocusWebBrowserComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" Margin="6,0,0,0" SelectionChanged="FocusWebBrowserComboBox_SelectionChanged">
@@ -2028,7 +2028,7 @@
 
                 <!-- 画布视口容器 (支持平移、缩放与扇区/中心圆拖拽交互) -->
                 <Border Grid.Row="1" Background="{DynamicResource PreviewCanvasBackgroundBrush}" BorderBrush="{DynamicResource PreviewCanvasBorderBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,2,0,8">
-                  <Grid Name="MappingsPreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="MappingsPreviewViewport_MouseWheel" MouseDown="MappingsPreviewViewport_MouseDown" MouseMove="MappingsPreviewViewport_MouseMove" MouseUp="MappingsPreviewViewport_MouseUp">
+                  <Grid Name="MappingsPreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="MappingsPreviewViewport_MouseWheel" PreviewMouseDown="MappingsPreviewViewport_MouseDown" PreviewMouseMove="MappingsPreviewViewport_MouseMove" PreviewMouseUp="MappingsPreviewViewport_MouseUp">
                     <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
                     <Canvas Name="MappingsWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center">
                       <Canvas.RenderTransform>

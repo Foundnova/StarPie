@@ -163,6 +163,7 @@ public partial class SettingsWindow : Window
 	private bool _isUpdatingFocusUi = false;
 	private Point? _mappingsDragStartPos = null;
 	private int _dragSourceSlotIndex = -999; // -1: Center Core, >=0: Sector slot
+	private bool _isDraggingSlot = false;
 	private Point? _mappingsPanStartPoint = null;
 	private Point _mappingsPanStartTranslate = default;
 	private readonly List<System.Windows.Shapes.Path> _mappingsSectorPaths = new List<System.Windows.Shapes.Path>();
@@ -317,7 +318,7 @@ public partial class SettingsWindow : Window
 		ConfigManager.LoadConfig();
 		InitializeComponent();
 		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.1");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -847,7 +848,7 @@ public partial class SettingsWindow : Window
 		if (_notifyIcon != null)
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.1"))
+			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"))
 			{
 				Enabled = false,
 				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -1375,7 +1376,7 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	public void ShowSettings(int tabIndex = 0)
+	public void ShowSettings(int tabIndex = -1)
 	{
 		if (!((DispatcherObject)this).Dispatcher.CheckAccess())
 		{
@@ -1385,7 +1386,10 @@ public partial class SettingsWindow : Window
 			});
 			return;
 		}
-		SwitchToTab(tabIndex);
+		if (tabIndex >= 0)
+		{
+			SwitchToTab(tabIndex);
+		}
 		BeginAnimation(UIElement.OpacityProperty, null);
 		base.Opacity = 1.0;
 		if (base.Visibility != Visibility.Visible)
@@ -3128,7 +3132,8 @@ public partial class SettingsWindow : Window
 				Width = coreR * 2.0,
 				Height = coreR * 2.0,
 				RenderTransformOrigin = new Point(0.5, 0.5),
-				Cursor = System.Windows.Input.Cursors.Hand
+				Cursor = System.Windows.Input.Cursors.Hand,
+				IsHitTestVisible = false
 			};
 			bool isCenterSelected = (_selectedSlotIndex == -1);
 
@@ -3152,41 +3157,68 @@ public partial class SettingsWindow : Window
 			}
 			coreGrid.Children.Add(coreCircle);
 
-			ActionItem? centerItem = profile.CenterAction;
-			string centerIconKey = centerItem?.IconKey ?? (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey) ? ConfigManager.CurrentConfig.CoreCustomIconKey : "Settings");
-			string centerSvg = IconHelper.GetSvgPathByKey(centerIconKey);
-			if (!string.IsNullOrEmpty(centerSvg))
+			string? customCoreImage = ConfigManager.CurrentConfig.CoreCustomImagePath;
+			if (!string.IsNullOrEmpty(customCoreImage) && File.Exists(customCoreImage))
 			{
 				try
 				{
-					System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+					BitmapImage bitmapImage = new BitmapImage();
+					bitmapImage.BeginInit();
+					bitmapImage.UriSource = new Uri(customCoreImage, UriKind.Absolute);
+					bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+					bitmapImage.EndInit();
+					((Freezable)bitmapImage).Freeze();
+					ImageBrush imageBrush = new ImageBrush(bitmapImage)
 					{
-						Data = Geometry.Parse(centerSvg),
-						Fill = isCenterSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : textBrush,
-						Width = Math.Max(12.0, coreR * 0.75),
-						Height = Math.Max(12.0, coreR * 0.75),
-						Stretch = Stretch.Uniform,
+						Stretch = Stretch.UniformToFill,
+						AlignmentX = AlignmentX.Center,
+						AlignmentY = AlignmentY.Center
+					};
+					Ellipse imgEllipse = new Ellipse
+					{
+						Width = coreR * 1.8,
+						Height = coreR * 1.8,
+						Fill = imageBrush,
 						HorizontalAlignment = HorizontalAlignment.Center,
 						VerticalAlignment = VerticalAlignment.Center,
 						IsHitTestVisible = false
 					};
-					coreGrid.Children.Add(coreIconPath);
+					coreGrid.Children.Add(imgEllipse);
 				}
 				catch { }
 			}
-
-			coreGrid.MouseLeftButtonDown += (s, e) =>
+			else
 			{
-				e.Handled = true;
-				SelectCenterCore();
-			};
+				ActionItem? centerItem = profile.CenterAction;
+				string centerIconKey = centerItem?.IconKey ?? (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey) ? ConfigManager.CurrentConfig.CoreCustomIconKey : "Settings");
+				string centerSvg = IconHelper.GetSvgPathByKey(centerIconKey);
+				if (!string.IsNullOrEmpty(centerSvg))
+				{
+					try
+					{
+						System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+						{
+							Data = Geometry.Parse(centerSvg),
+							Fill = isCenterSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : textBrush,
+							Width = Math.Max(12.0, coreR * 0.75),
+							Height = Math.Max(12.0, coreR * 0.75),
+							Stretch = Stretch.Uniform,
+							HorizontalAlignment = HorizontalAlignment.Center,
+							VerticalAlignment = VerticalAlignment.Center,
+							IsHitTestVisible = false
+						};
+						coreGrid.Children.Add(coreIconPath);
+					}
+					catch { }
+				}
+			}
 
 			Canvas.SetLeft(coreGrid, centerX - coreR);
 			Canvas.SetTop(coreGrid, centerY - coreR);
 			Panel.SetZIndex(coreGrid, 10);
 			MappingsWheelPreviewCanvas.Children.Add(coreGrid);
 
-			// 2. Draw Sectors
+			// 2. Draw Sectors (Icon-Only, Clean Aesthetic Style matching Appearance tab)
 			string[] directions = sectorCount switch
 			{
 				4 => Directions4,
@@ -3217,7 +3249,8 @@ public partial class SettingsWindow : Window
 					Stroke = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : borderBrush,
 					StrokeThickness = isSectorSelected ? 2.4 : renderer.BorderThickness,
 					Tag = slotIdx,
-					Cursor = System.Windows.Input.Cursors.Hand
+					Cursor = System.Windows.Input.Cursors.Hand,
+					IsHitTestVisible = false
 				};
 
 				if (isSectorSelected)
@@ -3231,74 +3264,156 @@ public partial class SettingsWindow : Window
 					};
 				}
 
-				sectorPath.MouseLeftButtonDown += (s, e) =>
-				{
-					e.Handled = true;
-					SelectPrimarySlot(slotIdx);
-				};
-
 				Panel.SetZIndex(sectorPath, 1);
 				MappingsWheelPreviewCanvas.Children.Add(sectorPath);
 				_mappingsSectorPaths.Add(sectorPath);
 
 				ActionItem? action = (profile.Actions != null && slotIdx < profile.Actions.Count) ? profile.Actions[slotIdx] : null;
-				StackPanel stackPanel = new StackPanel
-				{
-					Orientation = System.Windows.Controls.Orientation.Vertical,
-					HorizontalAlignment = HorizontalAlignment.Center,
-					VerticalAlignment = VerticalAlignment.Center,
-					IsHitTestVisible = false
-				};
 
-				string actionName = action?.Name ?? (slotIdx < directions.Length ? directions[slotIdx] : $"槽 {slotIdx + 1}");
 				string iconKey = action?.IconKey ?? "";
-				string iconSvg = !string.IsNullOrEmpty(action?.CustomIconSvg) ? action.CustomIconSvg : IconHelper.GetSvgPathByKey(iconKey);
+				string iconSvg = "";
+				IconHelper.CustomIconItem? customIconItem = null;
+
+				if (!string.IsNullOrEmpty(action?.CustomIconSvg))
+				{
+					iconSvg = action.CustomIconSvg;
+				}
+				else if (!string.IsNullOrEmpty(action?.IconKey) && action.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, action.IconKey, StringComparison.OrdinalIgnoreCase));
+					if (customIconItem != null && customIconItem.IsSvg)
+					{
+						iconSvg = customIconItem.SvgData;
+					}
+				}
+				if (string.IsNullOrEmpty(iconSvg) && customIconItem == null)
+				{
+					if (!string.IsNullOrEmpty(action?.IconKey))
+					{
+						iconSvg = IconHelper.GetSvgPathByKey(action.IconKey);
+					}
+					else if (action != null)
+					{
+						iconSvg = action.Type switch
+						{
+							"WebUrl" or "Url" => IconHelper.GetSvgPathByKey("Browser") ?? IconHelper.GetSvgPathByKey("ShowDesktop"),
+							"Folder" or "OpenFolder" => IconHelper.GetSvgPathByKey("Folder"),
+							"System" when !string.IsNullOrEmpty(action.Parameter) => IconHelper.GetSvgPathByKey(action.Parameter),
+							_ => ""
+						};
+					}
+				}
+
+				Brush iconBrush = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : textBrush;
+				if (action != null && !string.IsNullOrWhiteSpace(action.CustomTextColor) && !isSectorSelected)
+				{
+					iconBrush = CreateBrushFromHexSafe(action.CustomTextColor, textBrush);
+				}
+
+				double baseIconSize = (action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0)
+					? action.CustomIconSize.Value
+					: ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
+				double sectorRatio = sectorCount switch { 4 => 1.25, 12 => 0.85, _ => 1.0 };
+				double iconSize = Math.Max(15.0, Math.Min(28.0, baseIconSize * 1.15 * sectorRatio * scaleFactor));
+
+				FrameworkElement? iconElement = null;
 
 				if (!string.IsNullOrEmpty(iconSvg))
 				{
 					try
 					{
-						System.Windows.Shapes.Path iconPath = new System.Windows.Shapes.Path
+						iconElement = new System.Windows.Shapes.Path
 						{
 							Data = Geometry.Parse(iconSvg),
-							Fill = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : textBrush,
-							Width = 14,
-							Height = 14,
+							Fill = iconBrush,
+							Width = iconSize,
+							Height = iconSize,
 							Stretch = Stretch.Uniform,
 							HorizontalAlignment = HorizontalAlignment.Center,
-							Margin = new Thickness(0, 0, 0, 1)
+							VerticalAlignment = VerticalAlignment.Center,
+							IsHitTestVisible = false
 						};
-						stackPanel.Children.Add(iconPath);
+					}
+					catch { }
+				}
+				else if (customIconItem != null && !customIconItem.IsSvg)
+				{
+					try
+					{
+						ImageSource imgSource = IconHelper.GetCustomImageSource(customIconItem.FilePath);
+						if (imgSource != null)
+						{
+							iconElement = new System.Windows.Controls.Image
+							{
+								Source = imgSource,
+								Width = iconSize,
+								Height = iconSize,
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+						}
+					}
+					catch { }
+				}
+				else if (action != null && action.Type == "Launch" && !string.IsNullOrEmpty(action.Parameter) && File.Exists(action.Parameter))
+				{
+					try
+					{
+						ImageSource? appIcon = IconHelper.GetIcon(action.Parameter);
+						if (appIcon != null)
+						{
+							iconElement = new System.Windows.Controls.Image
+							{
+								Source = appIcon,
+								Width = iconSize,
+								Height = iconSize,
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+						}
 					}
 					catch { }
 				}
 
-				TextBlock tb = new TextBlock
+				if (iconElement == null)
 				{
-					Text = actionName,
-					FontSize = 9.0,
-					FontWeight = isSectorSelected ? FontWeights.Bold : FontWeights.Normal,
-					Foreground = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : textBrush,
-					HorizontalAlignment = HorizontalAlignment.Center,
-					TextTrimming = TextTrimming.CharacterEllipsis,
-					MaxWidth = 48,
-					TextAlignment = TextAlignment.Center
-				};
-				stackPanel.Children.Add(tb);
+					try
+					{
+						string fallbackKey = (slotIdx < directions.Length) ? directions[slotIdx] : "Settings";
+						string fallbackSvg = IconHelper.GetSvgPathByKey(fallbackKey);
+						if (string.IsNullOrEmpty(fallbackSvg)) fallbackSvg = IconHelper.GetSvgPathByKey("Settings");
+						iconElement = new System.Windows.Shapes.Path
+						{
+							Data = Geometry.Parse(fallbackSvg),
+							Fill = iconBrush,
+							Width = iconSize,
+							Height = iconSize,
+							Stretch = Stretch.Uniform,
+							HorizontalAlignment = HorizontalAlignment.Center,
+							VerticalAlignment = VerticalAlignment.Center,
+							IsHitTestVisible = false
+						};
+					}
+					catch { }
+				}
 
-				stackPanel.Measure(new Size(100, 100));
-				double sw = stackPanel.DesiredSize.Width;
-				double sh = stackPanel.DesiredSize.Height;
-				Canvas.SetLeft(stackPanel, contentX - sw / 2.0);
-				Canvas.SetTop(stackPanel, contentY - sh / 2.0);
-				Panel.SetZIndex(stackPanel, 5);
-				MappingsWheelPreviewCanvas.Children.Add(stackPanel);
+				if (iconElement != null)
+				{
+					Canvas.SetLeft(iconElement, contentX - iconSize / 2.0);
+					Canvas.SetTop(iconElement, contentY - iconSize / 2.0);
+					Panel.SetZIndex(iconElement, 5);
+					MappingsWheelPreviewCanvas.Children.Add(iconElement);
+				}
 
-				// 3. Draw SubActions
+				// 3. Draw SubActions (Icons only, NO TEXT!)
 				if (action?.SubActions != null && action.SubActions.Count > 0 && (isTier2Mode || isSectorSelected))
 				{
 					double subInnerR = outerR + 4.0;
-					double subOuterR = subInnerR + 24.0;
+					double subOuterR = subInnerR + 22.0;
 					int subCount = action.SubActions.Count;
 					double subSweep = sweepAngle / subCount;
 
@@ -3326,7 +3441,8 @@ public partial class SettingsWindow : Window
 								? new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247)) 
 								: new SolidColorBrush(System.Windows.Media.Color.FromArgb(120, 168, 85, 247)),
 							StrokeThickness = isSubSelected ? 2.2 : 1.0,
-							Cursor = System.Windows.Input.Cursors.Hand
+							Cursor = System.Windows.Input.Cursors.Hand,
+							IsHitTestVisible = false
 						};
 
 						if (isSubSelected)
@@ -3340,36 +3456,49 @@ public partial class SettingsWindow : Window
 							};
 						}
 
-						subPath.MouseLeftButtonDown += (s, e) =>
-						{
-							e.Handled = true;
-							SelectSubAction(slotIdx, subIdx);
-						};
-
 						Panel.SetZIndex(subPath, 2);
 						MappingsWheelPreviewCanvas.Children.Add(subPath);
 						_mappingsSubSectorPaths.Add(subPath);
 						_mappingsSubSectorKeys.Add(Tuple.Create(slotIdx, subIdx));
 
 						ActionItem subItem = action.SubActions[j];
-						TextBlock subTb = new TextBlock
+						string subIconKey = subItem.IconKey ?? "";
+						string subSvg = !string.IsNullOrEmpty(subItem.CustomIconSvg) ? subItem.CustomIconSvg : IconHelper.GetSvgPathByKey(subIconKey);
+						if (string.IsNullOrEmpty(subSvg))
 						{
-							Text = string.IsNullOrEmpty(subItem.Name) ? $"{subIdx + 1}" : subItem.Name,
-							FontSize = 8.0,
-							FontWeight = isSubSelected ? FontWeights.Bold : FontWeights.Normal,
-							Foreground = isSubSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247)) : textBrush,
-							HorizontalAlignment = HorizontalAlignment.Center,
-							VerticalAlignment = VerticalAlignment.Center,
-							TextTrimming = TextTrimming.CharacterEllipsis,
-							MaxWidth = 36,
-							TextAlignment = TextAlignment.Center,
-							IsHitTestVisible = false
-						};
-						subTb.Measure(new Size(80, 80));
-						Canvas.SetLeft(subTb, subContentX - subTb.DesiredSize.Width / 2.0);
-						Canvas.SetTop(subTb, subContentY - subTb.DesiredSize.Height / 2.0);
-						Panel.SetZIndex(subTb, 6);
-						MappingsWheelPreviewCanvas.Children.Add(subTb);
+							subSvg = subItem.Type switch
+							{
+								"WebUrl" or "Url" => IconHelper.GetSvgPathByKey("Browser") ?? IconHelper.GetSvgPathByKey("ShowDesktop"),
+								"Folder" or "OpenFolder" => IconHelper.GetSvgPathByKey("Folder"),
+								"System" when !string.IsNullOrEmpty(subItem.Parameter) => IconHelper.GetSvgPathByKey(subItem.Parameter),
+								_ => ""
+							};
+						}
+
+						Brush subIconBrush = isSubSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247)) : textBrush;
+						double subIconSize = 11.0;
+						if (!string.IsNullOrEmpty(subSvg))
+						{
+							try
+							{
+								System.Windows.Shapes.Path subIconPath = new System.Windows.Shapes.Path
+								{
+									Data = Geometry.Parse(subSvg),
+									Fill = subIconBrush,
+									Width = subIconSize,
+									Height = subIconSize,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									VerticalAlignment = VerticalAlignment.Center,
+									IsHitTestVisible = false
+								};
+								Canvas.SetLeft(subIconPath, subContentX - subIconSize / 2.0);
+								Canvas.SetTop(subIconPath, subContentY - subIconSize / 2.0);
+								Panel.SetZIndex(subIconPath, 6);
+								MappingsWheelPreviewCanvas.Children.Add(subIconPath);
+							}
+							catch { }
+						}
 					}
 				}
 			}
@@ -3409,6 +3538,7 @@ public partial class SettingsWindow : Window
 			Point pos = e.GetPosition(MappingsWheelPreviewCanvas);
 			_mappingsDragStartPos = pos;
 			_dragSourceSlotIndex = -999;
+			_isDraggingSlot = false;
 
 			double dx = pos.X - 150.0;
 			double dy = pos.Y - 150.0;
@@ -3423,7 +3553,7 @@ public partial class SettingsWindow : Window
 			{
 				_dragSourceSlotIndex = -1;
 			}
-			else if (dist <= outerR)
+			else if (dist <= outerR + 4.0)
 			{
 				WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
 				int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
@@ -3433,6 +3563,35 @@ public partial class SettingsWindow : Window
 				int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
 				_dragSourceSlotIndex = slot;
 			}
+			else
+			{
+				bool isTier2Mode = (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked == true);
+				WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
+				if (isTier2Mode && dist <= outerR + 32.0)
+				{
+					int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
+					double angleDeg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+					if (angleDeg < 0) angleDeg += 360.0;
+					double sweep = 360.0 / sectorCount;
+					int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
+					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
+					{
+						int subCount = profile.Actions[slot].SubActions.Count;
+						double slotStartAngle = (double)slot * sweep - sweep / 2.0;
+						double relAngle = angleDeg - slotStartAngle;
+						while (relAngle < 0) relAngle += 360.0;
+						while (relAngle >= 360.0) relAngle -= 360.0;
+						double subSweep = sweep / subCount;
+						int subIdx = (int)Math.Floor(relAngle / subSweep);
+						if (subIdx >= 0 && subIdx < subCount)
+						{
+							_dragSourceSlotIndex = -100 - (slot * 100 + subIdx);
+						}
+					}
+				}
+			}
+
+			MappingsPreviewViewportContainer.CaptureMouse();
 		}
 		else if (e.ChangedButton == MouseButton.Right || e.ChangedButton == MouseButton.Middle)
 		{
@@ -3444,12 +3603,44 @@ public partial class SettingsWindow : Window
 
 	private void MappingsPreviewViewport_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 	{
-		if (_mappingsPanStartPoint.HasValue && MappingsPreviewViewportContainer.IsMouseCaptured)
+		if (_mappingsPanStartPoint.HasValue && MappingsPreviewViewportContainer.IsMouseCaptured && (e.RightButton == MouseButtonState.Pressed || e.MiddleButton == MouseButtonState.Pressed))
 		{
 			Point current = e.GetPosition(MappingsPreviewViewportContainer);
 			Vector delta = current - _mappingsPanStartPoint.Value;
 			MappingsPreviewTranslateTransform.X = _mappingsPanStartTranslate.X + delta.X;
 			MappingsPreviewTranslateTransform.Y = _mappingsPanStartTranslate.Y + delta.Y;
+			return;
+		}
+
+		if (_mappingsDragStartPos.HasValue && MappingsPreviewViewportContainer.IsMouseCaptured && e.LeftButton == MouseButtonState.Pressed && _dragSourceSlotIndex != -999)
+		{
+			Point currentPos = e.GetPosition(MappingsWheelPreviewCanvas);
+			double dragDist = (currentPos - _mappingsDragStartPos.Value).Length;
+			if (dragDist > 8.0 && !_isDraggingSlot)
+			{
+				_isDraggingSlot = true;
+			}
+
+			if (_isDraggingSlot)
+			{
+				MappingsPreviewViewportContainer.Cursor = System.Windows.Input.Cursors.Hand;
+				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+				string srcName = "";
+				if (_dragSourceSlotIndex == -1)
+				{
+					srcName = profile?.CenterAction?.Name ?? "中心核圆";
+				}
+				else if (_dragSourceSlotIndex >= 0 && profile != null && _dragSourceSlotIndex < profile.Actions.Count)
+				{
+					srcName = profile.Actions[_dragSourceSlotIndex].Name ?? $"扇区 {_dragSourceSlotIndex + 1}";
+				}
+
+				if (MappingsCurrentEditIndicator != null && !string.IsNullOrEmpty(srcName))
+				{
+					MappingsCurrentEditIndicator.Text = $"🔄 正在拖拽 [{srcName}]，释放到目标扇区以对调功能...";
+					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+				}
+			}
 		}
 	}
 
@@ -3461,11 +3652,14 @@ public partial class SettingsWindow : Window
 			_mappingsPanStartPoint = null;
 		}
 
+		MappingsPreviewViewportContainer.Cursor = System.Windows.Input.Cursors.Arrow;
+
 		if (e.ChangedButton == MouseButton.Left && _mappingsDragStartPos.HasValue && _dragSourceSlotIndex != -999)
 		{
 			Point upPos = e.GetPosition(MappingsWheelPreviewCanvas);
 			double dragDist = (upPos - _mappingsDragStartPos.Value).Length;
-			if (dragDist > 14.0)
+
+			if (_isDraggingSlot && dragDist > 10.0 && _dragSourceSlotIndex >= -1)
 			{
 				double dx = upPos.X - 150.0;
 				double dy = upPos.Y - 150.0;
@@ -3481,7 +3675,7 @@ public partial class SettingsWindow : Window
 				{
 					targetSlot = -1;
 				}
-				else if (dist <= outerR + 10.0)
+				else if (dist <= outerR + 15.0)
 				{
 					WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
 					int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
@@ -3533,12 +3727,38 @@ public partial class SettingsWindow : Window
 						if (MappingsCurrentEditIndicator != null)
 						{
 							MappingsCurrentEditIndicator.Text = $"🎯 已将 [{srcName}] 与 [{tgtName}] 成功对调位置！";
+							MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
 						}
 					}
 				}
+				else
+				{
+					RenderMappingsWheelPreview();
+				}
 			}
+			else
+			{
+				if (_dragSourceSlotIndex == -1)
+				{
+					SelectCenterCore();
+				}
+				else if (_dragSourceSlotIndex >= 0)
+				{
+					SelectPrimarySlot(_dragSourceSlotIndex);
+				}
+				else if (_dragSourceSlotIndex <= -100)
+				{
+					int raw = -_dragSourceSlotIndex - 100;
+					int slot = raw / 100;
+					int subIdx = raw % 100;
+					SelectSubAction(slot, subIdx);
+				}
+			}
+
 			_mappingsDragStartPos = null;
 			_dragSourceSlotIndex = -999;
+			_isDraggingSlot = false;
+			e.Handled = true;
 		}
 	}
 

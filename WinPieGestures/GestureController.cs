@@ -875,12 +875,9 @@ public class GestureController
 							}
 						}
 					}
-					else if (finalProfile != null && finalSector == -1 && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					else if (finalProfile != null && finalSector == -1 && finalProfile.EnableCenterAction && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
 					{
-						if (finalProfile.EnableCenterAction || ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
-						{
-							ActionExecutor.Execute(finalProfile.CenterAction);
-						}
+						ActionExecutor.Execute(finalProfile.CenterAction);
 					}
 				}
 			}, (DispatcherPriority)5, Array.Empty<object>());
@@ -1015,12 +1012,9 @@ public class GestureController
 							}
 						}
 					}
-					else if (finalProfile != null && finalSector == -1 && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					else if (finalProfile != null && finalSector == -1 && finalProfile.EnableCenterAction && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
 					{
-						if (finalProfile.EnableCenterAction || ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
-						{
-							ActionExecutor.Execute(finalProfile.CenterAction);
-						}
+						ActionExecutor.Execute(finalProfile.CenterAction);
 					}
 				}
 			}, (DispatcherPriority)5, Array.Empty<object>());
