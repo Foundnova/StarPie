@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Channels;
 using System.Windows;
 
 namespace WinPieGestures;
@@ -165,6 +167,61 @@ public static class ActionExecutor
 
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+	private static readonly Channel<ActionItem> s_actionChannel = Channel.CreateUnbounded<ActionItem>(new UnboundedChannelOptions
+	{
+		SingleReader = true,
+		SingleWriter = false
+	});
+
+	static ActionExecutor()
+	{
+		Thread worker = new Thread(ProcessActionQueue)
+		{
+			Name = "StarPie.ActionExecutor",
+			IsBackground = true,
+			Priority = ThreadPriority.AboveNormal
+		};
+		worker.Start();
+	}
+
+	public static void EnqueueAction(ActionItem action)
+	{
+		if (action != null)
+		{
+			s_actionChannel.Writer.TryWrite(action);
+		}
+	}
+
+	private static void ProcessActionQueue()
+	{
+		var reader = s_actionChannel.Reader;
+		while (true)
+		{
+			try
+			{
+				if (reader.WaitToReadAsync().AsTask().Result)
+				{
+					while (reader.TryRead(out ActionItem? action))
+					{
+						if (action != null)
+						{
+							try
+							{
+								Execute(action);
+							}
+							catch
+							{
+							}
+						}
+					}
+				}
+			}
+			catch
+			{
+			}
+		}
+	}
 
 	public static void Execute(ActionItem action)
 	{

@@ -416,7 +416,7 @@ public class GestureController
 			{
 				try
 				{
-					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					if (!_isGestureActive)
 					{
 						return;
 					}
@@ -425,13 +425,14 @@ public class GestureController
 						ApplyPendingHighlight();
 					}
 				}
-				catch
+				catch (Exception ex)
 				{
+					AppLogger.LogError("ShowRadialUI failed in LongPressTimerCallback", ex);
 					// 激活失败：恢复状态，保证拖拽等其它触发途径不受影响
 					_isWaitingForThreshold = true;
 					_isGestureActive = false;
 				}
-			}, (DispatcherPriority)6, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 		}
 		catch
 		{
@@ -458,13 +459,20 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				_mouseHook.ReplayTriggerClick(btn);
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 		else
 		{
 			if (!_isGestureActive)
 			{
+				// 安全兜底：如果等待状态已结束且手势未处于激活态（说明被提前取消或展示失败），补发重放物理按键，杜绝丢键
+				string btn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					_mouseHook.ReplayTriggerClick(btn);
+				}, DispatcherPriority.Normal, Array.Empty<object>());
+				e.Handled = true;
 				return;
 			}
 			var finalState = EndActiveGesture();
@@ -497,18 +505,9 @@ public class GestureController
 				}
 				if (targetAction != null)
 				{
-					ThreadPool.QueueUserWorkItem(delegate
-					{
-						try
-						{
-							ActionExecutor.Execute(targetAction);
-						}
-						catch
-						{
-						}
-					});
+					ActionExecutor.EnqueueAction(targetAction);
 				}
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 	}
@@ -600,13 +599,19 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				_keyboardHook?.ReplayKeyPress(vk);
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 		else
 		{
 			if (!_isGestureActive)
 			{
+				uint vk = ((triggerConfig.VkCode != 0) ? triggerConfig.VkCode : e.VkCode);
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					_keyboardHook?.ReplayKeyPress(vk);
+				}, DispatcherPriority.Normal, Array.Empty<object>());
+				e.Handled = true;
 				return;
 			}
 			var finalState = EndActiveGesture();
@@ -639,18 +644,9 @@ public class GestureController
 				}
 				if (targetAction != null)
 				{
-					ThreadPool.QueueUserWorkItem(delegate
-					{
-						try
-						{
-							ActionExecutor.Execute(targetAction);
-						}
-						catch
-						{
-						}
-					});
+					ActionExecutor.EnqueueAction(targetAction);
 				}
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 	}
@@ -692,15 +688,24 @@ public class GestureController
 				ProcessMove(initialPos);
 				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 				{
-					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					try
 					{
-						return;
+						if (!_isGestureActive)
+						{
+							return;
+						}
+						if (ShowRadialUI(center, profile, gestureVersion))
+						{
+							ApplyPendingHighlight();
+						}
 					}
-					if (ShowRadialUI(center, profile, gestureVersion))
+					catch (Exception ex)
 					{
-						ApplyPendingHighlight();
+						AppLogger.LogError("ShowRadialUI failed in Hook_OnMouseMove", ex);
+						_isWaitingForThreshold = true;
+						_isGestureActive = false;
 					}
-				}, (DispatcherPriority)7, Array.Empty<object>());
+				}, DispatcherPriority.Normal, Array.Empty<object>());
 			}
 		}
 		else if (_isGestureActive)
@@ -816,27 +821,21 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		// 构造过程可能同步读取缓存图标，必须在手势状态锁外执行。
 		RadialWindow newWindow = new RadialWindow(center, profile);
 		RadialWindow? previousWindow;
-		bool shouldPublish;
 		lock (_uiUpdateSync)
 		{
-			shouldPublish = _isGestureActive && gestureVersion == _gestureVersion;
-			previousWindow = shouldPublish ? _radialWindow : null;
-			if (shouldPublish)
+			if (!_isGestureActive)
 			{
-				_radialWindow = newWindow;
+				try
+				{
+					newWindow.Close();
+				}
+				catch
+				{
+				}
+				return false;
 			}
-		}
-
-		if (!shouldPublish)
-		{
-			try
-			{
-				newWindow.Close();
-			}
-			catch
-			{
-			}
-			return false;
+			previousWindow = _radialWindow;
+			_radialWindow = newWindow;
 		}
 
 		if (previousWindow != null)

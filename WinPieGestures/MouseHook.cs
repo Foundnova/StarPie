@@ -184,7 +184,7 @@ public class MouseHook
 	private static extern bool PostThreadMessage(uint idThread, uint msg, nuint wParam, nint lParam);
 
 	[DllImport("user32.dll")]
-	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
+	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, nuint dwExtraInfo);
 
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
@@ -440,7 +440,7 @@ public class MouseHook
 	public void ReplayTriggerClick(string? triggerButton = null)
 	{
 		string text = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-		uint extra = (uint)StarPieExtraInfo;
+		nuint extra = (nuint)StarPieExtraInfo;
 		switch (text)
 		{
 		case "MiddleButton":
