@@ -9974,6 +9974,169 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void CancelPresetDesktop_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "System";
+			vm.Parameter = "ShowDesktop";
+			vm.Name = "显示桌面 (Win+D)";
+			vm.Mapping.Action.IconKey = "ShowDesktop";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelPresetTaskView_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "System";
+			vm.Parameter = "TaskView";
+			vm.Name = "任务视图 (Win+Tab)";
+			vm.Mapping.Action.IconKey = "TaskView";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelPresetEsc_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "Hotkey";
+			vm.Parameter = "Escape";
+			vm.Name = "取消/返回 (Esc)";
+			vm.Mapping.Action.IconKey = "CloseWindow";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelPresetSnipping_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "Hotkey";
+			vm.Parameter = "LWin + LShiftKey + S";
+			vm.Name = "系统截屏";
+			vm.Mapping.Action.IconKey = "Snipping";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelPresetTile_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "Tile";
+			vm.Parameter = "2L";
+			vm.Name = "平铺: 左右对半";
+			vm.Mapping.Action.IconKey = "Tile";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelPresetSettings_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "System";
+			vm.Parameter = "OpenSettings";
+			vm.Name = "StarPie 控制台";
+			vm.Mapping.Action.IconKey = "Settings";
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CancelBuildHotkey_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			HotkeyBuilderDialog dlg = new HotkeyBuilderDialog(vm.Parameter);
+			dlg.Owner = this;
+			if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ResultHotkey))
+			{
+				vm.Parameter = dlg.ResultHotkey;
+				if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("快捷键"))
+				{
+					vm.Name = dlg.ResultHotkey;
+				}
+				vm.NotifyAllPropertiesChanged();
+				SyncUiToConfigAndSave();
+			}
+		}
+	}
+
+	private void CancelPickProgramFromLibrary_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			ProgramPickerWindow picker = new ProgramPickerWindow
+			{
+				Owner = this
+			};
+			if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+			{
+				vm.Parameter = picker.SelectedPath;
+				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				{
+					vm.Name = !string.IsNullOrEmpty(picker.SelectedName)
+						? picker.SelectedName
+						: System.IO.Path.GetFileNameWithoutExtension(picker.SelectedPath);
+				}
+				vm.NotifyAllPropertiesChanged();
+				SyncUiToConfigAndSave();
+			}
+		}
+	}
+
+	private void CancelCaptureRunningWindow_Click(object sender, RoutedEventArgs e)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			WindowPickerWindow winPicker = new WindowPickerWindow(WindowPickerMode.ExecutablePath)
+			{
+				Owner = this
+			};
+			if (winPicker.ShowDialog() == true && !string.IsNullOrEmpty(winPicker.SelectedPath))
+			{
+				vm.Parameter = winPicker.SelectedPath;
+				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				{
+					vm.Name = !string.IsNullOrEmpty(winPicker.SelectedTitle) 
+						? winPicker.SelectedTitle 
+						: (!string.IsNullOrEmpty(winPicker.SelectedProcessName) ? winPicker.SelectedProcessName : System.IO.Path.GetFileNameWithoutExtension(winPicker.SelectedPath));
+				}
+				vm.NotifyAllPropertiesChanged();
+				SyncUiToConfigAndSave();
+			}
+		}
+	}
+
+	private void CancelWebUrlPreset_GitHub(object sender, RoutedEventArgs e) => ApplyCancelWebUrl("https://github.com", "GitHub");
+	private void CancelWebUrlPreset_Bilibili(object sender, RoutedEventArgs e) => ApplyCancelWebUrl("https://www.bilibili.com", "Bilibili");
+	private void CancelWebUrlPreset_Bing(object sender, RoutedEventArgs e) => ApplyCancelWebUrl("https://www.bing.com", "Bing 搜索");
+	private void CancelWebUrlPreset_Google(object sender, RoutedEventArgs e) => ApplyCancelWebUrl("https://www.google.com", "Google");
+
+	private void ApplyCancelWebUrl(string url, string name)
+	{
+		if (CancelActionEditorHost?.DataContext is GestureMappingViewModel vm)
+		{
+			vm.Type = "WebUrl";
+			vm.Parameter = url;
+			if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("http") || vm.Name == "打开网址")
+			{
+				vm.Name = name;
+			}
+			vm.NotifyAllPropertiesChanged();
+			SyncUiToConfigAndSave();
+		}
+	}
+
 	// ==================== 平铺窗口 ====================
 
 	private void TilePresetSubs_Click(object sender, RoutedEventArgs e)

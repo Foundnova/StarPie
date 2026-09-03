@@ -53,7 +53,121 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		new ActionTypeOption { Tag = "L-D-L", DisplayText = "左→下→左" }
 	};
 
-	public List<ActionTypeItem> ActionTypes => SlotViewModel.LocalizedActionTypes;
+	public List<ActionTypeItem> ActionTypes => SlotViewModel.AggregatedActionTypes;
+
+	public List<ActionTypeItem> AggregatedActionTypes => SlotViewModel.AggregatedActionTypes;
+
+	public string AggregatedType
+	{
+		get
+		{
+			string t = Mapping.Action.Type ?? "Hotkey";
+			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
+			{
+				return "WindowManager";
+			}
+			return t;
+		}
+		set
+		{
+			if (!string.IsNullOrEmpty(value))
+			{
+				if (value == "WindowManager")
+				{
+					if (!IsWindowManagerType)
+					{
+						Type = "Tile";
+						if (string.IsNullOrEmpty(Mapping.Action.Parameter))
+						{
+							Mapping.Action.Parameter = "2L";
+						}
+					}
+				}
+				else
+				{
+					Type = value;
+				}
+				OnPropertyChanged(nameof(AggregatedType));
+				OnPropertyChanged(nameof(IsWindowManagerType));
+				NotifyAllPropertiesChanged();
+			}
+		}
+	}
+
+	public bool IsWindowManagerType => 
+		Type == "Tile" || Type == "ToggleTopmost" || Type == "MoveMonitor" || 
+		Type == "WindowOpacity" || Type == "SwitchWindow" || Type == "WindowManager";
+
+	public List<ActionTypeOption> WindowManagerSubModes => new List<ActionTypeOption>
+	{
+		new ActionTypeOption { Tag = "Tile", DisplayText = "平铺窗口排布" },
+		new ActionTypeOption { Tag = "TileCycle", DisplayText = "🔄 循环切换平铺" },
+		new ActionTypeOption { Tag = "TileRestore", DisplayText = "⏪ 还原平铺快照" },
+		new ActionTypeOption { Tag = "ToggleTopmost", DisplayText = "📌 窗口置顶 / 取消置顶" },
+		new ActionTypeOption { Tag = "MoveMonitor", DisplayText = "🖥️ 移动至下一显示器" },
+		new ActionTypeOption { Tag = "WindowOpacity", DisplayText = "👻 窗口半透明度" },
+		new ActionTypeOption { Tag = "SwitchWindow", DisplayText = "🔢 切换任务栏指定应用" }
+	};
+
+	public string WindowManagerSubMode
+	{
+		get
+		{
+			if (Type == "ToggleTopmost") return "ToggleTopmost";
+			if (Type == "MoveMonitor") return "MoveMonitor";
+			if (Type == "WindowOpacity") return "WindowOpacity";
+			if (Type == "SwitchWindow") return "SwitchWindow";
+			if (Type == "Tile")
+			{
+				if (Mapping.Action.Parameter == WindowTiler.CycleParam) return "TileCycle";
+				if (Mapping.Action.Parameter == WindowTiler.RestoreParam) return "TileRestore";
+				return "Tile";
+			}
+			return "Tile";
+		}
+		set
+		{
+			if (value == "ToggleTopmost") { Type = "ToggleTopmost"; Mapping.Action.Parameter = ""; }
+			else if (value == "MoveMonitor") { Type = "MoveMonitor"; Mapping.Action.Parameter = ""; }
+			else if (value == "WindowOpacity") { Type = "WindowOpacity"; if (string.IsNullOrEmpty(Mapping.Action.Parameter)) Mapping.Action.Parameter = "80"; }
+			else if (value == "SwitchWindow") { Type = "SwitchWindow"; if (string.IsNullOrEmpty(Mapping.Action.Parameter)) Mapping.Action.Parameter = "1"; }
+			else if (value == "TileCycle") { Type = "Tile"; Mapping.Action.Parameter = WindowTiler.CycleParam; }
+			else if (value == "TileRestore") { Type = "Tile"; Mapping.Action.Parameter = WindowTiler.RestoreParam; }
+			else if (value == "Tile") { Type = "Tile"; if (string.IsNullOrEmpty(Mapping.Action.Parameter) || Mapping.Action.Parameter.StartsWith("__")) Mapping.Action.Parameter = "2L"; }
+			OnPropertyChanged(nameof(WindowManagerSubMode));
+			OnPropertyChanged(nameof(IsTileSubMode));
+			OnPropertyChanged(nameof(IsOpacitySubMode));
+			OnPropertyChanged(nameof(IsSwitchWindowSubMode));
+			OnPropertyChanged(nameof(Parameter));
+		}
+	}
+
+	public bool IsTileSubMode => Type == "Tile" && Mapping.Action.Parameter != WindowTiler.CycleParam && Mapping.Action.Parameter != WindowTiler.RestoreParam;
+	public bool IsOpacitySubMode => Type == "WindowOpacity";
+	public bool IsSwitchWindowSubMode => Type == "SwitchWindow";
+
+	public void NotifyAllPropertiesChanged()
+	{
+		OnPropertyChanged(nameof(Type));
+		OnPropertyChanged(nameof(AggregatedType));
+		OnPropertyChanged(nameof(IsHotkeyType));
+		OnPropertyChanged(nameof(IsLaunchType));
+		OnPropertyChanged(nameof(IsWebUrlType));
+		OnPropertyChanged(nameof(IsFolderType));
+		OnPropertyChanged(nameof(IsSystemType));
+		OnPropertyChanged(nameof(IsCommandType));
+		OnPropertyChanged(nameof(IsSwitchWindowType));
+		OnPropertyChanged(nameof(IsTileType));
+		OnPropertyChanged(nameof(IsWindowManagerType));
+		OnPropertyChanged(nameof(WindowManagerSubMode));
+		OnPropertyChanged(nameof(IsTileSubMode));
+		OnPropertyChanged(nameof(IsOpacitySubMode));
+		OnPropertyChanged(nameof(IsSwitchWindowSubMode));
+		OnPropertyChanged(nameof(Parameter));
+		OnPropertyChanged(nameof(Name));
+		OnPropertyChanged(nameof(SelectedSystemPreset));
+		OnPropertyChanged(nameof(TileLayout));
+	}
 
 	public string Pattern
 	{
@@ -91,6 +205,8 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 	public bool IsHotkeyType => Type == "Hotkey";
 
 	public bool IsLaunchType => Type == "Launch" || Type == "App";
+
+	public bool IsWebUrlType => Type == "WebUrl" || Type == "Url";
 
 	public bool IsFolderType => Type == "Folder" || Type == "OpenFolder";
 
