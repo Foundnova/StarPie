@@ -53,6 +53,14 @@ public class SubSlotViewModel : INotifyPropertyChanged
 					Name = "打开文件夹";
 				}
 			}
+			if ((value == "WebUrl" || value == "Url") && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Globe";
+				if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+				{
+					Name = "打开网址";
+				}
+			}
 			if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作")))
 			{
 				Name = "切换窗口";
@@ -64,10 +72,39 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
+			OnPropertyChanged("IsWebUrlType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
 			OnPropertyChanged("IsSwitchWindowType");
+		}
+	}
+
+	public bool IsWebUrlType => Type == "WebUrl" || Type == "Url";
+
+	public string BrowserChoice
+	{
+		get => Action.BrowserChoice ?? "Default";
+		set
+		{
+			if (Action.BrowserChoice != value)
+			{
+				Action.BrowserChoice = value;
+				OnPropertyChanged("BrowserChoice");
+			}
+		}
+	}
+
+	public string BrowserPath
+	{
+		get => Action.BrowserPath ?? "";
+		set
+		{
+			if (Action.BrowserPath != value)
+			{
+				Action.BrowserPath = value;
+				OnPropertyChanged("BrowserPath");
+			}
 		}
 	}
 

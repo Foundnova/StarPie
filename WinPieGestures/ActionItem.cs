@@ -19,6 +19,12 @@ public class ActionItem
 	/// <summary>Terminal used to run a "Command" action: "cmd", "powershell", "wsl" or "direct".</summary>
 	public string CommandTerminal { get; set; } = "cmd";
 
+	/// <summary>用于 "WebUrl" 动作的目标浏览器："Default" (系统默认), "Chrome", "Edge", "Firefox", "Custom"</summary>
+	public string BrowserChoice { get; set; } = "Default";
+
+	/// <summary>自定义浏览器可执行文件完整路径（当 BrowserChoice 为 "Custom" 时使用）</summary>
+	public string BrowserPath { get; set; } = "";
+
 	/// <summary>独立排版模式覆盖："Inherit" (继承全局), "IconAndText", "IconOnly", "TextOnly"</summary>
 	public string? LayoutMode { get; set; } = "Inherit";
 

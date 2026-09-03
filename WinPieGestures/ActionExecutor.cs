@@ -194,6 +194,10 @@ public static class ActionExecutor
 			case "String":
 				SendTextInput(action.Parameter);
 				break;
+			case "WebUrl":
+			case "Url":
+				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
+				break;
 			case "System":
 				ExecuteSystem(action.Parameter);
 				break;
@@ -351,6 +355,88 @@ public static class ActionExecutor
 		{
 		}
 		return false;
+	}
+
+	private static void ExecuteWebUrl(string url, string? browserChoice, string? customBrowserPath)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+		{
+			return;
+		}
+		string target = url.Trim();
+		if (!target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+		    !target.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+		    !target.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase))
+		{
+			target = "https://" + target;
+		}
+
+		string browser = browserChoice?.Trim() ?? "Default";
+		AppLogger.LogInfo($"Executing WebUrl: URL='{target}', Browser='{browser}', CustomPath='{customBrowserPath}'");
+
+		try
+		{
+			if (browser.Equals("Chrome", StringComparison.OrdinalIgnoreCase))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "chrome.exe",
+					Arguments = target,
+					UseShellExecute = true
+				});
+			}
+			else if (browser.Equals("Edge", StringComparison.OrdinalIgnoreCase))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "msedge.exe",
+					Arguments = target,
+					UseShellExecute = true
+				});
+			}
+			else if (browser.Equals("Firefox", StringComparison.OrdinalIgnoreCase))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "firefox.exe",
+					Arguments = target,
+					UseShellExecute = true
+				});
+			}
+			else if (browser.Equals("Custom", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(customBrowserPath) && File.Exists(customBrowserPath))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = customBrowserPath,
+					Arguments = target,
+					UseShellExecute = true
+				});
+			}
+			else
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = target,
+					UseShellExecute = true
+				});
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to open WebUrl '{target}' with browser '{browser}'", ex);
+			try
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = target,
+					UseShellExecute = true
+				});
+			}
+			catch (Exception ex2)
+			{
+				MessageBox.Show("无法打开目标网址: " + ex2.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
+		}
 	}
 
 	private static void ExecuteFolder(string folderPath)
@@ -727,6 +813,16 @@ public static class ActionExecutor
 				ExecuteHotkey("Win+E");
 			}
 			break;
+		case "opensettings":
+		case "openstarpie":
+		case "starpie":
+		case "starpie控制台":
+		case "控制台":
+			Application.Current?.Dispatcher?.BeginInvoke((Action)delegate
+			{
+				App.MainSettingsWindow?.ShowSettings();
+			});
+			break;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -781,6 +877,9 @@ public static class ActionExecutor
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
 			break;
+		case "lockworkstation":
+		case "锁定屏幕":
+		case "锁屏":
 		case "lock":
 			LockWorkStation();
 			break;

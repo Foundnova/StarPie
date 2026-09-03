@@ -151,11 +151,11 @@ public class GestureController
 		}
 	}
 
-	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window) EndActiveGesture()
+	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window, bool IsEscaped) EndActiveGesture()
 	{
 		lock (_uiUpdateSync)
 		{
-			var result = (_selectedSectorIndex, _selectedSubSectorIndex, _activeProfile, _radialWindow);
+			var result = (_selectedSectorIndex, _selectedSubSectorIndex, _activeProfile, _radialWindow, _lastEscapedState);
 			_isGestureActive = false;
 			_isWaitingForThreshold = false;
 			_gestureVersion++;
@@ -849,26 +849,37 @@ public class GestureController
 			int finalSubSector = finalState.SubSector;
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
+			bool isEscaped = finalState.IsEscaped;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
-				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
+				if (!isEscaped)
 				{
-					ActionItem actionItem = finalProfile.Actions[finalSector];
-					if (actionItem != null)
+					if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 					{
-						if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
+						ActionItem actionItem = finalProfile.Actions[finalSector];
+						if (actionItem != null)
 						{
-							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
-							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
+							if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
+								if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
+								{
+									ActionExecutor.Execute(actionItem2);
+									return;
+								}
+							}
+							if (!string.IsNullOrEmpty(actionItem.Type))
+							{
+								ActionExecutor.Execute(actionItem);
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+					}
+					else if (finalProfile != null && finalSector == -1 && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					{
+						if (finalProfile.EnableCenterAction || ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
 						{
-							ActionExecutor.Execute(actionItem);
+							ActionExecutor.Execute(finalProfile.CenterAction);
 						}
 					}
 				}
@@ -978,26 +989,37 @@ public class GestureController
 			int finalSubSector = finalState.SubSector;
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
+			bool isEscaped = finalState.IsEscaped;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
-				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
+				if (!isEscaped)
 				{
-					ActionItem actionItem = finalProfile.Actions[finalSector];
-					if (actionItem != null)
+					if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 					{
-						if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
+						ActionItem actionItem = finalProfile.Actions[finalSector];
+						if (actionItem != null)
 						{
-							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
-							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
+							if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
+								if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
+								{
+									ActionExecutor.Execute(actionItem2);
+									return;
+								}
+							}
+							if (!string.IsNullOrEmpty(actionItem.Type))
+							{
+								ActionExecutor.Execute(actionItem);
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+					}
+					else if (finalProfile != null && finalSector == -1 && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					{
+						if (finalProfile.EnableCenterAction || ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
 						{
-							ActionExecutor.Execute(actionItem);
+							ActionExecutor.Execute(finalProfile.CenterAction);
 						}
 					}
 				}
