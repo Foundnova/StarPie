@@ -102,6 +102,9 @@ public static class WindowTiler
 	private static extern bool SetLayeredWindowAttributes(nint hWnd, uint crKey, byte bAlpha, uint dwFlags);
 
 	[DllImport("user32.dll")]
+	private static extern bool GetLayeredWindowAttributes(nint hWnd, out uint crKey, out byte bAlpha, out uint dwFlags);
+
+	[DllImport("user32.dll")]
 	private static extern bool EnumDisplayMonitors(nint hdc, nint lprcClip, EnumMonitorsProc lpfnEnum, nint dwData);
 
 	private delegate bool EnumMonitorsProc(nint hMonitor, nint hdcMonitor, ref RECT lprcMonitor, nint dwData);
@@ -117,6 +120,7 @@ public static class WindowTiler
 	private const uint WS_EX_LAYERED = 0x00080000;
 	private const int GWL_EXSTYLE = -20;
 	private const uint LWA_ALPHA = 0x00000002;
+	private const uint LWA_COLORKEY = 0x00000001;
 	private const uint SW_RESTORE_U = 9u;
 
 	// 上次平铺快照（供「恢复」与内存记忆）
@@ -383,7 +387,15 @@ public static class WindowTiler
 				{
 					continue;
 				}
-				if ((GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64() & WS_EX_TOOLWINDOW) != 0L)
+				long exstyle = GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64();
+				if ((exstyle & WS_EX_TOOLWINDOW) != 0L)
+				{
+					continue;
+				}
+				// 排除透明/半透明窗口（分层且 alpha<255 或 COLORKEY），避免"透明窗占位"
+				if ((exstyle & WS_EX_LAYERED) != 0L &&
+					GetLayeredWindowAttributes(h, out uint crKey, out byte alpha, out uint lwaFlags) &&
+					(((lwaFlags & LWA_ALPHA) != 0u && alpha < 255) || (lwaFlags & LWA_COLORKEY) != 0u))
 				{
 					continue;
 				}
