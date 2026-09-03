@@ -84,6 +84,12 @@ public static class WindowTiler
 	[DllImport("user32.dll")]
 	private static extern nint GetWindow(nint hWnd, uint uCmd);
 
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+	private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
+
+	[DllImport("dwmapi.dll")]
+	private static extern int DwmGetWindowAttribute(nint hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
 	[DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
 	private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
 
@@ -94,6 +100,9 @@ public static class WindowTiler
 	private const long WS_CAPTION = 0x00C00000L;
 	private const long WS_THICKFRAME = 0x00040000L;
 	private const long WS_EX_TOOLWINDOW = 0x00000080L;
+	private const long WS_CHILD = 0x40000000L;
+	private const long WS_DISABLED = 0x08000000L;
+	private const int DWMWA_CLOAKED = 14;
 
 	[DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
 	private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
@@ -387,6 +396,20 @@ public static class WindowTiler
 				{
 					continue;
 				}
+				// 学 Dwalia：WS_CHILD / WS_DISABLED / 工具窗 / 特殊类名 / DWM 遮蔽(CLOAKED) 一律不进布局
+				if ((style & WS_CHILD) != 0L || (style & WS_DISABLED) != 0L)
+				{
+					continue;
+				}
+				string winCls = GetClassNameSafe(h);
+				if (winCls == "Progman" || winCls == "WorkerW" || winCls == "Shell_TrayWnd" || winCls == "Shell_SecondaryTrayWnd" || winCls == "Windows.UI.Core.CoreWindow" || winCls == "ApplicationFrameWindow")
+				{
+					continue;
+				}
+				if (IsWindowCloaked(h))
+				{
+					continue;
+				}
 				long exstyle = GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64();
 				if ((exstyle & WS_EX_TOOLWINDOW) != 0L)
 				{
@@ -468,6 +491,32 @@ public static class WindowTiler
 			result.AddRange(EnumerateTopLevelWindows());
 		}
 		return result;
+	}
+
+	/// <summary>窗口是否被 DWM 遮蔽（虚拟桌面隐藏/最小化过渡等隐形态）——Dwalia 的 Cloaked 判定。</summary>
+	private static bool IsWindowCloaked(nint hWnd)
+	{
+		try
+		{
+			return DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int cloaked, 4) == 0 && cloaked != 0;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	private static string GetClassNameSafe(nint hWnd)
+	{
+		try
+		{
+			StringBuilder sb = new StringBuilder(256);
+			return GetClassName(hWnd, sb, 256) > 0 ? sb.ToString() : "";
+		}
+		catch
+		{
+			return "";
+		}
 	}
 
 	/// <summary>进程 exe 名（小写、无扩展名）；失败 null。轻量缓存避免重复 OpenProcess。</summary>
