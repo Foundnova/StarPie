@@ -421,7 +421,11 @@ public partial class SettingsWindow : Window
 		}
 		if (FocusActionTypeComboBox != null && FocusActionTypeComboBox.ItemsSource == null)
 		{
-			FocusActionTypeComboBox.ItemsSource = SlotViewModel.LocalizedActionTypes;
+			FocusActionTypeComboBox.ItemsSource = SlotViewModel.AggregatedActionTypes;
+		}
+		if (FocusTileLayoutComboBox != null && FocusTileLayoutComboBox.ItemsSource == null)
+		{
+			FocusTileLayoutComboBox.ItemsSource = SlotViewModel.StaticTileLayoutOptions;
 		}
 		if (FocusCommandTerminalComboBox != null && FocusCommandTerminalComboBox.ItemsSource == null)
 		{
@@ -2552,15 +2556,64 @@ public partial class SettingsWindow : Window
 
 			// Action Type & Panels
 			string type = !string.IsNullOrEmpty(item.Type) ? item.Type : "Hotkey";
-			if (FocusActionTypeComboBox != null) FocusActionTypeComboBox.SelectedValue = type;
+			bool isWindowManager = type == "Tile" || type == "ToggleTopmost" || type == "MoveMonitor" || type == "WindowOpacity" || type == "SwitchWindow";
+			if (FocusActionTypeComboBox != null)
+			{
+				FocusActionTypeComboBox.SelectedValue = isWindowManager ? "WindowManager" : type;
+			}
 
 			if (FocusHotkeyPanel != null) FocusHotkeyPanel.Visibility = type == "Hotkey" ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusLaunchPanel != null) FocusLaunchPanel.Visibility = (type == "Launch" || type == "App") ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusWebUrlPanel != null) FocusWebUrlPanel.Visibility = (type == "WebUrl" || type == "Url") ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusFolderPanel != null) FocusFolderPanel.Visibility = (type == "Folder" || type == "OpenFolder") ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusCommandPanel != null) FocusCommandPanel.Visibility = type == "Command" ? Visibility.Visible : Visibility.Collapsed;
-			if (FocusSwitchWindowPanel != null) FocusSwitchWindowPanel.Visibility = type == "SwitchWindow" ? Visibility.Visible : Visibility.Collapsed;
+			if (FocusWindowManagerPanel != null) FocusWindowManagerPanel.Visibility = isWindowManager ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusSystemPanel != null) FocusSystemPanel.Visibility = type == "System" ? Visibility.Visible : Visibility.Collapsed;
+
+			if (isWindowManager)
+			{
+				string subMode = type switch
+				{
+					"ToggleTopmost" => "ToggleTopmost",
+					"MoveMonitor" => "MoveMonitor",
+					"WindowOpacity" => "WindowOpacity",
+					"SwitchWindow" => "SwitchWindow",
+					_ => (item.Parameter == WindowTiler.CycleParam ? "TileCycle" : (item.Parameter == WindowTiler.CycleBackParam ? "TileCycleBack" : (item.Parameter == WindowTiler.RestoreParam ? "TileRestore" : "Tile")))
+				};
+
+				if (FocusWindowSubModeComboBox != null)
+				{
+					foreach (ComboBoxItem cbi in FocusWindowSubModeComboBox.Items)
+					{
+						if (string.Equals(cbi.Tag?.ToString(), subMode, StringComparison.OrdinalIgnoreCase))
+						{
+							FocusWindowSubModeComboBox.SelectedItem = cbi;
+							break;
+						}
+					}
+				}
+
+				UpdateWindowSubModeVisibility(subMode);
+
+				if (subMode == "Tile")
+				{
+					if (FocusTileLayoutComboBox != null)
+					{
+						FocusTileLayoutComboBox.SelectedValue = !string.IsNullOrEmpty(item.Parameter) && WindowTiler.IsValidLayout(item.Parameter) ? item.Parameter : "2L";
+					}
+				}
+				else if (subMode == "WindowOpacity")
+				{
+					int opacityVal = 80;
+					if (int.TryParse(item.Parameter, out int parsed)) opacityVal = Math.Clamp(parsed, 30, 100);
+					if (FocusWindowOpacitySlider != null) FocusWindowOpacitySlider.Value = opacityVal;
+					if (FocusWindowOpacityLabel != null) FocusWindowOpacityLabel.Text = opacityVal + "%";
+				}
+				else if (subMode == "SwitchWindow")
+				{
+					if (FocusWindowSwitchTextBox != null) FocusWindowSwitchTextBox.Text = item.Parameter ?? "1";
+				}
+			}
 
 			// Parameters
 			if (FocusHotkeyRecorder != null) FocusHotkeyRecorder.HotkeyText = item.Parameter ?? "";
@@ -2587,7 +2640,7 @@ public partial class SettingsWindow : Window
 			if (FocusFolderPathTextBox != null) FocusFolderPathTextBox.Text = item.Parameter ?? "";
 			if (FocusCommandTextBox != null) FocusCommandTextBox.Text = item.Parameter ?? "";
 			if (FocusCommandTerminalComboBox != null) FocusCommandTerminalComboBox.SelectedValue = item.CommandTerminal ?? "cmd";
-			if (FocusSwitchWindowTextBox != null) FocusSwitchWindowTextBox.Text = item.Parameter ?? "1";
+			if (FocusWindowSwitchTextBox != null) FocusWindowSwitchTextBox.Text = item.Parameter ?? "1";
 			if (FocusSystemPresetComboBox != null) FocusSystemPresetComboBox.SelectedValue = item.Parameter ?? "OpenSettings";
 		}
 		finally
@@ -2863,7 +2916,28 @@ public partial class SettingsWindow : Window
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null && FocusActionTypeComboBox.SelectedValue is string newType)
 		{
-			item.Type = newType;
+			if (newType == "WindowManager")
+			{
+				bool wasWindowType = item.Type == "Tile" || item.Type == "ToggleTopmost" || item.Type == "MoveMonitor" || item.Type == "WindowOpacity" || item.Type == "SwitchWindow";
+				if (!wasWindowType)
+				{
+					item.Type = "Tile";
+					item.Parameter = "2L";
+					if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区"))
+					{
+						item.Name = "平铺: " + WindowTiler.LayoutDisplayName("2L");
+					}
+					if (string.IsNullOrEmpty(item.IconKey))
+					{
+						item.IconKey = "Tile";
+					}
+				}
+			}
+			else
+			{
+				item.Type = newType;
+			}
+
 			if ((newType == "Folder" || newType == "OpenFolder") && string.IsNullOrEmpty(item.IconKey))
 			{
 				item.IconKey = "Folder";
@@ -2877,6 +2951,260 @@ public partial class SettingsWindow : Window
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
 		}
+	}
+
+	private void FocusWindowSubModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+
+		string subMode = (FocusWindowSubModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Tile";
+		switch (subMode)
+		{
+			case "Tile":
+				item.Type = "Tile";
+				string layout = FocusTileLayoutComboBox?.SelectedValue as string ?? "2L";
+				item.Parameter = layout;
+				item.Name = "平铺: " + WindowTiler.LayoutDisplayName(layout);
+				item.IconKey = "Tile";
+				break;
+			case "TileCycle":
+				item.Type = "Tile";
+				item.Parameter = WindowTiler.CycleParam;
+				item.Name = "循环切换平铺";
+				item.IconKey = "Tile";
+				break;
+			case "TileCycleBack":
+				item.Type = "Tile";
+				item.Parameter = WindowTiler.CycleBackParam;
+				item.Name = "反向循环平铺";
+				item.IconKey = "Tile";
+				break;
+			case "TileRestore":
+				item.Type = "Tile";
+				item.Parameter = WindowTiler.RestoreParam;
+				item.Name = I18n.T("TileRestoreAllLabel");
+				item.IconKey = "Tile";
+				break;
+			case "ToggleTopmost":
+				item.Type = "ToggleTopmost";
+				item.Parameter = "";
+				item.Name = I18n.T("ActionTypeTopmostShort");
+				item.IconKey = "Pin";
+				break;
+			case "MoveMonitor":
+				item.Type = "MoveMonitor";
+				item.Parameter = "";
+				item.Name = I18n.T("ActionTypeMoveMonitorShort");
+				item.IconKey = "Monitor";
+				break;
+			case "WindowOpacity":
+				item.Type = "WindowOpacity";
+				int op = (int)(FocusWindowOpacitySlider?.Value ?? 80);
+				item.Parameter = op.ToString();
+				item.Name = $"透明度: {op}%";
+				item.IconKey = "Eye";
+				break;
+			case "SwitchWindow":
+				item.Type = "SwitchWindow";
+				string nth = FocusWindowSwitchTextBox?.Text?.Trim() ?? "1";
+				item.Parameter = string.IsNullOrEmpty(nth) ? "1" : nth;
+				item.Name = $"切换应用 #{item.Parameter}";
+				item.IconKey = "Window";
+				break;
+		}
+
+		UpdateWindowSubModeVisibility(subMode);
+		if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void UpdateWindowSubModeVisibility(string subMode)
+	{
+		if (FocusWindowTileSubPanel != null) FocusWindowTileSubPanel.Visibility = subMode == "Tile" ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowCycleSubPanel != null) FocusWindowCycleSubPanel.Visibility = (subMode == "TileCycle" || subMode == "TileCycleBack") ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowRestoreSubPanel != null) FocusWindowRestoreSubPanel.Visibility = subMode == "TileRestore" ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowTopmostSubPanel != null) FocusWindowTopmostSubPanel.Visibility = subMode == "ToggleTopmost" ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowMoveMonitorSubPanel != null) FocusWindowMoveMonitorSubPanel.Visibility = subMode == "MoveMonitor" ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowOpacitySubPanel != null) FocusWindowOpacitySubPanel.Visibility = subMode == "WindowOpacity" ? Visibility.Visible : Visibility.Collapsed;
+		if (FocusWindowSwitchSubPanel != null) FocusWindowSwitchSubPanel.Visibility = subMode == "SwitchWindow" ? Visibility.Visible : Visibility.Collapsed;
+	}
+
+	private void FocusTileLayoutComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null || item.Type != "Tile") return;
+		if (FocusTileLayoutComboBox.SelectedValue is string layout && WindowTiler.IsValidLayout(layout))
+		{
+			item.Parameter = layout;
+			item.Name = "平铺: " + WindowTiler.LayoutDisplayName(layout);
+			if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void ApplyFocusTileLayout(string layout)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		item.Type = "Tile";
+		item.Parameter = layout;
+		item.Name = "平铺: " + WindowTiler.LayoutDisplayName(layout);
+		item.IconKey = "Tile";
+		if (FocusTileLayoutComboBox != null) FocusTileLayoutComboBox.SelectedValue = layout;
+		if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void FocusTilePreset_2L(object sender, RoutedEventArgs e) => ApplyFocusTileLayout("2L");
+	private void FocusTilePreset_2T(object sender, RoutedEventArgs e) => ApplyFocusTileLayout("2T");
+	private void FocusTilePreset_3L12(object sender, RoutedEventArgs e) => ApplyFocusTileLayout("3L12");
+	private void FocusTilePreset_4G(object sender, RoutedEventArgs e) => ApplyFocusTileLayout("4G");
+	private void FocusTilePreset_3R(object sender, RoutedEventArgs e) => ApplyFocusTileLayout("3R");
+
+	private void FocusPopulateTileSubActions_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		List<ActionItem> list = new List<ActionItem>();
+		foreach (string key in WindowTiler.LayoutKeys.Take(7))
+		{
+			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key), IconKey = "Tile" });
+		}
+		list.Add(new ActionItem { Type = "Tile", Parameter = WindowTiler.RestoreParam, Name = I18n.T("TileRestoreAllLabel"), IconKey = "Tile" });
+		item.SubActions = list;
+		RefreshFocusSubActionsChips();
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void FocusWindowOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingFocusUi) return;
+		int val = (int)e.NewValue;
+		if (FocusWindowOpacityLabel != null) FocusWindowOpacityLabel.Text = val + "%";
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item != null && item.Type == "WindowOpacity")
+		{
+			item.Parameter = val.ToString();
+			item.Name = $"透明度: {val}%";
+			if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void ApplyFocusOpacity(int opacity)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		item.Type = "WindowOpacity";
+		item.Parameter = opacity.ToString();
+		item.Name = $"透明度: {opacity}%";
+		item.IconKey = "Eye";
+		if (FocusWindowOpacitySlider != null) FocusWindowOpacitySlider.Value = opacity;
+		if (FocusWindowOpacityLabel != null) FocusWindowOpacityLabel.Text = opacity + "%";
+		if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void FocusOpacityPreset_70(object sender, RoutedEventArgs e) => ApplyFocusOpacity(70);
+	private void FocusOpacityPreset_80(object sender, RoutedEventArgs e) => ApplyFocusOpacity(80);
+	private void FocusOpacityPreset_90(object sender, RoutedEventArgs e) => ApplyFocusOpacity(90);
+	private void FocusOpacityPreset_100(object sender, RoutedEventArgs e) => ApplyFocusOpacity(100);
+
+	private void FocusWindowSwitchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item != null && item.Type == "SwitchWindow")
+		{
+			string nth = FocusWindowSwitchTextBox?.Text?.Trim() ?? "1";
+			item.Parameter = string.IsNullOrEmpty(nth) ? "1" : nth;
+			item.Name = $"切换应用 #{item.Parameter}";
+			if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void ApplyFocusSwitchSlot(int slot)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		item.Type = "SwitchWindow";
+		item.Parameter = slot.ToString();
+		item.Name = $"切换应用 #{slot}";
+		item.IconKey = "Window";
+		if (FocusWindowSwitchTextBox != null) FocusWindowSwitchTextBox.Text = slot.ToString();
+		if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void FocusSwitchPreset_1(object sender, RoutedEventArgs e) => ApplyFocusSwitchSlot(1);
+	private void FocusSwitchPreset_2(object sender, RoutedEventArgs e) => ApplyFocusSwitchSlot(2);
+	private void FocusSwitchPreset_3(object sender, RoutedEventArgs e) => ApplyFocusSwitchSlot(3);
+	private void FocusSwitchPreset_4(object sender, RoutedEventArgs e) => ApplyFocusSwitchSlot(4);
+
+	private void TileCaptureCurrentProcess_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			string proc = ActiveWindowHelper.GetActiveWindowProcessName();
+			if (!string.IsNullOrEmpty(proc) && proc != "unknown.exe")
+			{
+				if (proc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+				{
+					proc = proc.Substring(0, proc.Length - 4);
+				}
+				string current = TileExcludeProcessesTextBox?.Text?.Trim() ?? "";
+				var list = current.Split(new[] { ',', '，', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+					.Select(s => s.Trim().ToLowerInvariant())
+					.ToList();
+				string procLower = proc.ToLowerInvariant();
+				if (!list.Contains(procLower))
+				{
+					list.Add(procLower);
+					if (TileExcludeProcessesTextBox != null)
+					{
+						TileExcludeProcessesTextBox.Text = string.Join(",", list);
+					}
+				}
+			}
+		}
+		catch { }
+	}
+
+	private void TileCyclePresetClassic_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || _cycleItems == null)
+		{
+			return;
+		}
+		var classic = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "2L", "2T", "3L12", "4G" };
+		foreach (LayoutCycleItem item in _cycleItems)
+		{
+			item.IsChecked = classic.Contains(item.Key);
+		}
+		PersistTileCycleSelection();
 	}
 
 	private void FocusTestActionBtn_Click(object sender, RoutedEventArgs e)
@@ -3116,9 +3444,7 @@ public partial class SettingsWindow : Window
 
 	private void FocusSwitchWindowTextBox_TextChanged(object sender, TextChangedEventArgs e)
 	{
-		if (_isUpdatingFocusUi) return;
-		ActionItem? item = GetCurrentFocusActionItem();
-		if (item != null) { item.Parameter = FocusSwitchWindowTextBox.Text; ScheduleAutoSave(); }
+		FocusWindowSwitchTextBox_TextChanged(sender, e);
 	}
 
 	private void FocusSystemPresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

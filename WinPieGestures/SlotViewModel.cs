@@ -732,6 +732,17 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		}
 	};
 
+	public static List<ActionTypeItem> AggregatedActionTypes => new List<ActionTypeItem>
+	{
+		new ActionTypeItem { Tag = "Hotkey", DisplayText = I18n.T("ActionTypeHotkeyShort") },
+		new ActionTypeItem { Tag = "Launch", DisplayText = I18n.T("ActionTypeLaunchShort") },
+		new ActionTypeItem { Tag = "WebUrl", DisplayText = I18n.T("ActionTypeWebUrlShort") },
+		new ActionTypeItem { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
+		new ActionTypeItem { Tag = "Command", DisplayText = I18n.T("ActionTypeCommandShort") },
+		new ActionTypeItem { Tag = "WindowManager", DisplayText = "🪟 " + I18n.T("ActionTypeWindowManagerShort") },
+		new ActionTypeItem { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
+	};
+
 	public static List<ActionTypeItem> LocalizedActionTypes => new List<ActionTypeItem>
 	{
 		new ActionTypeItem
@@ -820,7 +831,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 	public bool IsTileType => Type == "Tile";
 
 	/// <summary>平铺布局下拉（key → 显示名）。</summary>
-	public List<ActionTypeOption> TileLayoutOptions
+	public static List<ActionTypeOption> StaticTileLayoutOptions
 	{
 		get
 		{
@@ -837,6 +848,8 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			return list;
 		}
 	}
+
+	public List<ActionTypeOption> TileLayoutOptions => StaticTileLayoutOptions;
 
 	/// <summary>一键预置子项：7 种布局 + 「恢复上次平铺」（级联子菜单 = 布局/还原选择器）。</summary>
 	public void PopulateTileSubActions()
