@@ -3168,24 +3168,27 @@ public partial class SettingsWindow : Window
 	{
 		try
 		{
-			string proc = ActiveWindowHelper.GetActiveWindowProcessName();
-			if (!string.IsNullOrEmpty(proc) && proc != "unknown.exe")
+			WindowPickerWindow picker = new WindowPickerWindow(WindowPickerMode.ProcessNameOnly)
 			{
-				if (proc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+				Owner = this
+			};
+			if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedProcessName))
+			{
+				string procLower = picker.SelectedProcessName.ToLowerInvariant();
+				if (!procLower.Equals("starpie", StringComparison.OrdinalIgnoreCase) &&
+					!procLower.Equals("winpiegestures", StringComparison.OrdinalIgnoreCase))
 				{
-					proc = proc.Substring(0, proc.Length - 4);
-				}
-				string current = TileExcludeProcessesTextBox?.Text?.Trim() ?? "";
-				var list = current.Split(new[] { ',', '，', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-					.Select(s => s.Trim().ToLowerInvariant())
-					.ToList();
-				string procLower = proc.ToLowerInvariant();
-				if (!list.Contains(procLower))
-				{
-					list.Add(procLower);
-					if (TileExcludeProcessesTextBox != null)
+					string current = TileExcludeProcessesTextBox?.Text?.Trim() ?? "";
+					var list = current.Split(new[] { ',', '，', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+						.Select(s => s.Trim().ToLowerInvariant())
+						.ToList();
+					if (!list.Contains(procLower))
 					{
-						TileExcludeProcessesTextBox.Text = string.Join(",", list);
+						list.Add(procLower);
+						if (TileExcludeProcessesTextBox != null)
+						{
+							TileExcludeProcessesTextBox.Text = string.Join(",", list);
+						}
 					}
 				}
 			}
@@ -3237,12 +3240,14 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private void FocusCaptureProcess_Click(object sender, RoutedEventArgs e)
+	private void FocusPickProgramFromLibrary_Click(object sender, RoutedEventArgs e)
 	{
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item == null) return;
-		ProgramPickerWindow programPicker = new ProgramPickerWindow();
-		programPicker.Owner = this;
+		ProgramPickerWindow programPicker = new ProgramPickerWindow
+		{
+			Owner = this
+		};
 		if (programPicker.ShowDialog() == true && !string.IsNullOrEmpty(programPicker.SelectedPath))
 		{
 			item.Parameter = programPicker.SelectedPath;
@@ -3260,6 +3265,34 @@ public partial class SettingsWindow : Window
 			ScheduleAutoSave();
 		}
 	}
+
+	private void FocusCaptureRunningWindow_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		WindowPickerWindow picker = new WindowPickerWindow(WindowPickerMode.ExecutablePath)
+		{
+			Owner = this
+		};
+		if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+		{
+			item.Parameter = picker.SelectedPath;
+			FocusLaunchPathTextBox.Text = picker.SelectedPath;
+			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
+			{
+				string autoName = !string.IsNullOrEmpty(picker.SelectedTitle)
+					? picker.SelectedTitle
+					: (!string.IsNullOrEmpty(picker.SelectedProcessName) ? picker.SelectedProcessName : System.IO.Path.GetFileNameWithoutExtension(picker.SelectedPath));
+				item.Name = autoName;
+				FocusActionNameTextBox.Text = autoName;
+			}
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusCaptureProcess_Click(object sender, RoutedEventArgs e) => FocusPickProgramFromLibrary_Click(sender, e);
 
 	private void FocusBrowseLaunchExe_Click(object sender, RoutedEventArgs e)
 	{

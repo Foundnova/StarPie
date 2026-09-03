@@ -1920,10 +1920,12 @@
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="Auto" />
                               <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBox Name="FocusLaunchPathTextBox" Height="30" FontSize="11.5" ToolTip="应用程序路径" TextChanged="FocusLaunchPathTextBox_TextChanged" />
-                            <Button Grid.Column="1" Content="🎯 捕捉当前进程" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="6,0,0,0" ToolTip="从运行中的窗口或已安装软件列表中选取" Click="FocusCaptureProcess_Click" />
-                            <Button Grid.Column="2" Content="📂 浏览..." Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="6,0,0,0" Click="FocusBrowseLaunchExe_Click" />
+                            <Button Grid.Column="1" Content="📦 软件库选择..." Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="6,0,0,0" ToolTip="从已安装的软件、微软商店与开始菜单中模糊搜索选取" Click="FocusPickProgramFromLibrary_Click" />
+                            <Button Grid.Column="2" Content="🎯 捕捉运行窗口..." Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="6,0,0,0" ToolTip="直接探测并捕捉桌面上正在运行的活跃窗口与程序执行路径" Click="FocusCaptureRunningWindow_Click" />
+                            <Button Grid.Column="3" Content="📂 浏览..." Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="6,0,0,0" ToolTip="手动浏览可执行文件或快捷方式" Click="FocusBrowseLaunchExe_Click" />
                           </Grid>
                           <Grid>
                             <Grid.ColumnDefinitions>
@@ -2444,7 +2446,7 @@
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
                       <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
-                      <Button Grid.Column="1" Content="🎯 捕捉窗口进程" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" ToolTip="捕捉当前活动窗口的进程名称并追加到排除名单中" Click="TileCaptureCurrentProcess_Click" />
+                      <Button Grid.Column="1" Content="🎯 捕捉排除进程..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" ToolTip="打开智能窗口捕捉器，选取桌面运行中的程序加入平铺排除名单（自动安全排除 StarPie 自身）" Click="TileCaptureCurrentProcess_Click" />
                     </Grid>
                     <Grid Margin="0,4,0,6">
                       <Grid.ColumnDefinitions>
