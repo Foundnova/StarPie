@@ -83,13 +83,11 @@ public class MouseHook
 
 	private const uint XBUTTON2 = 2u;
 
-	private LowLevelMouseProc _proc;
+	public const nint StarPieExtraInfo = 0x53544152;
+
+	private readonly LowLevelMouseProc _proc;
 
 	private nint _hookId = IntPtr.Zero;
-
-	private int _ignoreNextButtonDown;
-
-	private int _ignoreNextButtonUp;
 
 	private readonly object _lifecycleSync = new object();
 
@@ -104,12 +102,6 @@ public class MouseHook
 	private volatile bool _stopRequested;
 
 	private int _isPaused;
-
-	private System.Threading.Timer? _healthCheckTimer;
-
-	private POINT _lastSystemCursorPos;
-
-	private int _hookEventsCountSinceLastCheck;
 
 	public bool IsPaused
 	{
@@ -192,10 +184,7 @@ public class MouseHook
 	private static extern bool PostThreadMessage(uint idThread, uint msg, nuint wParam, nint lParam);
 
 	[DllImport("user32.dll")]
-	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, uint dwExtraInfo);
-
-	/// <summary>StarPie 自发注入鼠标事件的标记：钩子遇到该值直接放行，杜绝自身捕获与竞争。</summary>
-	internal const nint StarPieExtraInfo = 0x53544152;
+	private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, nuint dwExtraInfo);
 
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
@@ -243,13 +232,6 @@ public class MouseHook
 			{
 				throw new Exception("Failed to set low-level mouse hook.", startException);
 			}
-
-			_hookEventsCountSinceLastCheck = 0;
-			GetCursorPos(out _lastSystemCursorPos);
-			lock (_lifecycleSync)
-			{
-				_healthCheckTimer ??= new System.Threading.Timer(CheckHookHealth, null, 3000, 3000);
-			}
 		}
 		catch
 		{
@@ -260,18 +242,14 @@ public class MouseHook
 
 	public void Stop()
 	{
-		System.Threading.Timer? healthCheckTimer;
 		Thread? hookThread;
 		uint hookThreadId;
 		lock (_lifecycleSync)
 		{
 			_stopRequested = true;
-			healthCheckTimer = _healthCheckTimer;
-			_healthCheckTimer = null;
 			hookThread = _hookThread;
 			hookThreadId = _hookThreadId;
 		}
-		healthCheckTimer?.Dispose();
 
 		if (hookThreadId != 0)
 		{
@@ -280,7 +258,7 @@ public class MouseHook
 
 		if (hookThread != null && hookThread.ManagedThreadId != Environment.CurrentManagedThreadId)
 		{
-			hookThread.Join(TimeSpan.FromSeconds(2));
+			hookThread.Join(TimeSpan.FromMilliseconds(500));
 		}
 
 		lock (_lifecycleSync)
@@ -359,51 +337,6 @@ public class MouseHook
 		}
 	}
 
-	private void CheckHookHealth(object? state)
-	{
-		if (_hookId == IntPtr.Zero || !GetCursorPos(out var lpPoint))
-		{
-			return;
-		}
-		bool num = lpPoint.x != _lastSystemCursorPos.x || lpPoint.y != _lastSystemCursorPos.y;
-		_lastSystemCursorPos = lpPoint;
-		if (num)
-		{
-			if (Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0) != 0)
-			{
-				return;
-			}
-			Application current = Application.Current;
-			if (current == null)
-			{
-				return;
-			}
-			Dispatcher dispatcher = ((DispatcherObject)current).Dispatcher;
-			if (dispatcher == null)
-			{
-				return;
-			}
-			dispatcher.BeginInvoke((Delegate)(Action)delegate
-			{
-				try
-				{
-					AppLogger.LogWarn("MouseHook detected stalled events while cursor moved. Restarting hook...");
-					Stop();
-					Start();
-					AppLogger.LogInfo("MouseHook restarted successfully.");
-				}
-				catch (Exception ex)
-				{
-					AppLogger.LogError("Failed to restart MouseHook during health check", ex);
-				}
-			}, Array.Empty<object>());
-		}
-		else
-		{
-			Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0);
-		}
-	}
-
 	private nint SetHook(LowLevelMouseProc proc)
 	{
 		using Process process = Process.GetCurrentProcess();
@@ -417,20 +350,20 @@ public class MouseHook
 
 	private nint HookCallback(int nCode, nint wParam, nint lParam)
 	{
-		Interlocked.Increment(ref _hookEventsCountSinceLastCheck);
 		if (IsPaused)
 		{
 			return CallNextHookEx(_hookId, nCode, wParam, lParam);
 		}
 		if (nCode >= 0)
 		{
-			int num = (int)wParam;
 			MSLLHOOKSTRUCT mSLLHOOKSTRUCT = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-			// StarPie 自发模拟的鼠标事件直接快速放行，杜绝自身捕获与竞争
 			if (mSLLHOOKSTRUCT.dwExtraInfo == StarPieExtraInfo)
 			{
+				// StarPie 自发模拟的鼠标事件直接快速放行，杜绝自身捕获与竞争
 				return CallNextHookEx(_hookId, nCode, wParam, lParam);
 			}
+
+			int num = (int)wParam;
 			if (num == 512)
 			{
 				MouseEventArgs e = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
@@ -441,6 +374,7 @@ public class MouseHook
 				}
 				return CallNextHookEx(_hookId, nCode, wParam, lParam);
 			}
+
 			MouseEventArgs e2 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 			OnRawMouseEvent?.Invoke(this, e2);
 			string text = "";
@@ -487,10 +421,6 @@ public class MouseHook
 			bool flag3 = flag2 && text == text2;
 			if (num2)
 			{
-				if (Interlocked.Exchange(ref _ignoreNextButtonDown, 0) != 0)
-				{
-					return CallNextHookEx(_hookId, nCode, wParam, lParam);
-				}
 				MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnTriggerButtonDown?.Invoke(this, e4);
 				if (e4.Handled)
@@ -500,10 +430,6 @@ public class MouseHook
 			}
 			else if (flag3)
 			{
-				if (Interlocked.Exchange(ref _ignoreNextButtonUp, 0) != 0)
-				{
-					return CallNextHookEx(_hookId, nCode, wParam, lParam);
-				}
 				MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnTriggerButtonUp?.Invoke(this, e5);
 				if (e5.Handled)
@@ -518,25 +444,24 @@ public class MouseHook
 	public void ReplayTriggerClick(string? triggerButton = null)
 	{
 		string text = triggerButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-		Interlocked.Exchange(ref _ignoreNextButtonDown, 1);
-		Interlocked.Exchange(ref _ignoreNextButtonUp, 1);
+		nuint extra = (nuint)StarPieExtraInfo;
 		switch (text)
 		{
 		case "MiddleButton":
-			mouse_event(32u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
-			mouse_event(64u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
+			mouse_event(32u, 0u, 0u, 0u, extra);
+			mouse_event(64u, 0u, 0u, 0u, extra);
 			break;
 		case "XButton1":
-			mouse_event(128u, 0u, 0u, 1u, (uint)StarPieExtraInfo);
-			mouse_event(256u, 0u, 0u, 1u, (uint)StarPieExtraInfo);
+			mouse_event(128u, 0u, 0u, 1u, extra);
+			mouse_event(256u, 0u, 0u, 1u, extra);
 			break;
 		case "XButton2":
-			mouse_event(128u, 0u, 0u, 2u, (uint)StarPieExtraInfo);
-			mouse_event(256u, 0u, 0u, 2u, (uint)StarPieExtraInfo);
+			mouse_event(128u, 0u, 0u, 2u, extra);
+			mouse_event(256u, 0u, 0u, 2u, extra);
 			break;
 		default:
-			mouse_event(8u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
-			mouse_event(16u, 0u, 0u, 0u, (uint)StarPieExtraInfo);
+			mouse_event(8u, 0u, 0u, 0u, extra);
+			mouse_event(16u, 0u, 0u, 0u, extra);
 			break;
 		}
 	}

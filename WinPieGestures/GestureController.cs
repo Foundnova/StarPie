@@ -789,20 +789,23 @@ public class GestureController
 			{
 				try
 				{
-					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					if (!_isGestureActive)
 					{
 						return;
 					}
-					ShowRadialUI(startPoint, profile);
-					ApplyPendingHighlight();
+					if (ShowRadialUI(startPoint, profile, gestureVersion))
+					{
+						ApplyPendingHighlight();
+					}
 				}
-				catch
+				catch (Exception ex)
 				{
+					AppLogger.LogError("ShowRadialUI failed in LongPressTimerCallback", ex);
 					// 激活失败：恢复状态，保证拖拽等其它触发途径不受影响
 					_isWaitingForThreshold = true;
 					_isGestureActive = false;
 				}
-			}, (DispatcherPriority)6, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 		}
 		catch
 		{
@@ -835,13 +838,20 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				_mouseHook.ReplayTriggerClick(btn);
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 		else
 		{
 			if (!_isGestureActive)
 			{
+				// 安全兜底：如果等待状态已结束且手势未处于激活态（说明被提前取消或展示失败），补发重放物理按键，杜绝丢键
+				string btn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					_mouseHook.ReplayTriggerClick(btn);
+				}, DispatcherPriority.Normal, Array.Empty<object>());
+				e.Handled = true;
 				return;
 			}
 			var finalState = EndActiveGesture();
@@ -852,6 +862,7 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
+				ActionItem? targetAction = null;
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -862,17 +873,20 @@ public class GestureController
 							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
 							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								targetAction = actionItem2;
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+						if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
 						{
-							ActionExecutor.Execute(actionItem);
+							targetAction = actionItem;
 						}
 					}
 				}
-			}, (DispatcherPriority)5, Array.Empty<object>());
+				if (targetAction != null)
+				{
+					ActionExecutor.EnqueueAction(targetAction);
+				}
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 	}
@@ -964,13 +978,19 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				_keyboardHook?.ReplayKeyPress(vk);
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 		else
 		{
 			if (!_isGestureActive)
 			{
+				uint vk = ((triggerConfig.VkCode != 0) ? triggerConfig.VkCode : e.VkCode);
+				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
+				{
+					_keyboardHook?.ReplayKeyPress(vk);
+				}, DispatcherPriority.Normal, Array.Empty<object>());
+				e.Handled = true;
 				return;
 			}
 			var finalState = EndActiveGesture();
@@ -981,6 +1001,7 @@ public class GestureController
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
 				CloseGestureWindow(endedWindow);
+				ActionItem? targetAction = null;
 				if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
 				{
 					ActionItem actionItem = finalProfile.Actions[finalSector];
@@ -991,17 +1012,20 @@ public class GestureController
 							ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
 							if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
 							{
-								ActionExecutor.Execute(actionItem2);
-								return;
+								targetAction = actionItem2;
 							}
 						}
-						if (!string.IsNullOrEmpty(actionItem.Type))
+						if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
 						{
-							ActionExecutor.Execute(actionItem);
+							targetAction = actionItem;
 						}
 					}
 				}
-			}, (DispatcherPriority)5, Array.Empty<object>());
+				if (targetAction != null)
+				{
+					ActionExecutor.EnqueueAction(targetAction);
+				}
+			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
 		}
 	}
@@ -1067,13 +1091,24 @@ public class GestureController
 				ProcessMove(initialPos);
 				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 				{
-					if (!_isGestureActive || !IsCurrentGesture(gestureVersion))
+					try
 					{
-						return;
+						if (!_isGestureActive)
+						{
+							return;
+						}
+						if (ShowRadialUI(center, profile, gestureVersion))
+						{
+							ApplyPendingHighlight();
+						}
 					}
-					ShowRadialUI(center, profile);
-					ApplyPendingHighlight();
-				}, (DispatcherPriority)7, Array.Empty<object>());
+					catch (Exception ex)
+					{
+						AppLogger.LogError("ShowRadialUI failed in Hook_OnMouseMove", ex);
+						_isWaitingForThreshold = true;
+						_isGestureActive = false;
+					}
+				}, DispatcherPriority.Normal, Array.Empty<object>());
 			}
 		}
 		else if (_isGestureActive)
@@ -1175,48 +1210,89 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		QueueHighlightUpdate(num4, num5, flag, flag2, GetCurrentGestureVersion());
 	}
 
-	private void ShowRadialUI(Point center, WheelProfile profile)
+	private bool ShowRadialUI(Point center, WheelProfile profile, long gestureVersion)
 	{
-		// 后台 STA 预热任务栏槽位快照：大幅降低"切换窗口"图标加载/激活的首次开销（UIA 遍历较贵）
+		// 预加载的线程调度与 single-flight 统一由 WindowTaskbarHelper 管理。
 		try
 		{
-			System.Threading.Thread warm = new System.Threading.Thread(delegate ()
-			{
-				try
-				{
-					WindowTaskbarHelper.Prefetch();
-				}
-				catch
-				{
-				}
-			});
-			warm.IsBackground = true;
-			warm.SetApartmentState(ApartmentState.STA);
-			warm.Start();
+			WindowTaskbarHelper.Prefetch();
 		}
 		catch
 		{
 		}
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
+
+		// 构造过程可能同步读取缓存图标，必须在手势状态锁外执行。
+		RadialWindow newWindow = new RadialWindow(center, profile);
+		RadialWindow? previousWindow;
 		lock (_uiUpdateSync)
 		{
-			if (_radialWindow != null)
+			if (!_isGestureActive)
 			{
-				_radialWindow.Close();
+				try
+				{
+					newWindow.Close();
+				}
+				catch
+				{
+				}
+				return false;
 			}
-			_radialWindow = new RadialWindow(center, profile);
-			_radialWindow.Show();
+			previousWindow = _radialWindow;
+			_radialWindow = newWindow;
+		}
+
+		if (previousWindow != null)
+		{
+			try
+			{
+				previousWindow.Close();
+			}
+			catch
+			{
+			}
+		}
+
+		try
+		{
+			newWindow.Show();
+			return true;
+		}
+		catch
+		{
+			lock (_uiUpdateSync)
+			{
+				if (ReferenceEquals(_radialWindow, newWindow))
+				{
+					_radialWindow = null;
+				}
+			}
+			try
+			{
+				newWindow.Close();
+			}
+			catch
+			{
+			}
+			throw;
 		}
 	}
 
 	private void HideRadialUI()
 	{
+		RadialWindow? windowToClose;
 		lock (_uiUpdateSync)
 		{
-			if (_radialWindow != null)
+			windowToClose = _radialWindow;
+			_radialWindow = null;
+		}
+		if (windowToClose != null)
+		{
+			try
 			{
-				_radialWindow.Close();
-				_radialWindow = null;
+				windowToClose.Close();
+			}
+			catch
+			{
 			}
 		}
 	}
@@ -1232,9 +1308,7 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		{
 			if (ReferenceEquals(_radialWindow, gestureWindow))
 			{
-				gestureWindow.Close();
 				_radialWindow = null;
-				return;
 			}
 		}
 

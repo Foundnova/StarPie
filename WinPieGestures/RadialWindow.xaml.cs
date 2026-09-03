@@ -31,9 +31,34 @@ public partial class RadialWindow : Window
 	private const uint SWP_NOACTIVATE = 0x0010;
 	private const uint SWP_NOZORDER = 0x0004;
 	private const int WM_DPICHANGED = 0x02E0;
+	private const int GWL_EXSTYLE = -20;
+	private const nint WS_EX_NOACTIVATE = 0x08000000;
+	private const nint WS_EX_TOOLWINDOW = 0x00000080;
 
 	private double _wheelCanvasSize = 360.0;
 	private double _canvasCenter = 180.0;
+
+	[DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+	private static extern nint GetWindowLongPtr64(nint hWnd, int nIndex);
+
+	[DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+	private static extern nint GetWindowLong32(nint hWnd, int nIndex);
+
+	private static nint GetWindowLongPtr(nint hWnd, int nIndex)
+	{
+		return (IntPtr.Size == 8) ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLong32(hWnd, nIndex);
+	}
+
+	[DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+	private static extern nint SetWindowLongPtr64(nint hWnd, int nIndex, nint dwNewLong);
+
+	[DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+	private static extern nint SetWindowLong32(nint hWnd, int nIndex, nint dwNewLong);
+
+	private static nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong)
+	{
+		return (IntPtr.Size == 8) ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong) : SetWindowLong32(hWnd, nIndex, dwNewLong);
+	}
 
 	[DllImport("user32.dll")]
 	public static extern nint MonitorFromPoint(POINT pt, uint dwFlags);
@@ -119,6 +144,9 @@ public partial class RadialWindow : Window
 		if (PresentationSource.FromVisual(this) is HwndSource source)
 		{
 			source.AddHook(WndProc);
+			nint handle = source.Handle;
+			nint exStyle = GetWindowLongPtr(handle, GWL_EXSTYLE);
+			SetWindowLongPtr(handle, GWL_EXSTYLE, exStyle | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
 		}
 		PositionWindowOnTargetMonitor();
 	}
@@ -131,6 +159,27 @@ public partial class RadialWindow : Window
 			handled = true;
 		}
 		return IntPtr.Zero;
+	}
+
+	protected override void OnClosed(EventArgs e)
+	{
+		try
+		{
+			if (PresentationSource.FromVisual(this) is HwndSource source)
+			{
+				source.RemoveHook(WndProc);
+			}
+			WheelCanvas?.Children.Clear();
+			_sectorPaths?.Clear();
+			_contentPanels?.Clear();
+			_sectorTransforms?.Clear();
+			_containerTransforms?.Clear();
+			_subTierCache?.Clear();
+		}
+		catch
+		{
+		}
+		base.OnClosed(e);
 	}
 
 	private sealed class SubTierVisuals
