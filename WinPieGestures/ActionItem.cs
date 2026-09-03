@@ -25,6 +25,12 @@ public class ActionItem
 	/// <summary>自定义浏览器可执行文件完整路径（当 BrowserChoice 为 "Custom" 时使用）</summary>
 	public string BrowserPath { get; set; } = "";
 
+	/// <summary>继承图标的本地程序路径（解耦执行动作与视觉图标，如快捷键继承 QQ.exe 图标）</summary>
+	public string? InheritAppIconPath { get; set; } = "";
+
+	/// <summary>是否以普通桌面用户常规权限启动（通过 Shell 令牌降权，解决高权限下外部文件无法拖入目标软件的问题）</summary>
+	public bool RunAsStandardUser { get; set; } = false;
+
 	/// <summary>独立排版模式覆盖："Inherit" (继承全局), "IconAndText", "IconOnly", "TextOnly"</summary>
 	public string? LayoutMode { get; set; } = "Inherit";
 

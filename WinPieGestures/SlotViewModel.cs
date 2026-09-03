@@ -431,6 +431,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("IsCommandType");
 			OnPropertyChanged("IsSwitchWindowType");
 			OnPropertyChanged("IsTileType");
+			OnPropertyChanged("IsOcrType");
 		}
 	}
 
@@ -659,6 +660,8 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsSystemType => Type == "System";
 
+	public bool IsOcrType => Type == "Ocr" || Type == "ScreenOcr";
+
 	public int SubActionCount => Action.SubActions?.Count ?? 0;
 
 	public string SubActionButtonText
@@ -739,6 +742,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		new ActionTypeItem { Tag = "WebUrl", DisplayText = I18n.T("ActionTypeWebUrlShort") },
 		new ActionTypeItem { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
 		new ActionTypeItem { Tag = "Command", DisplayText = I18n.T("ActionTypeCommandShort") },
+		new ActionTypeItem { Tag = "Ocr", DisplayText = "📝 " + I18n.T("ActionTypeOcrShort") },
 		new ActionTypeItem { Tag = "WindowManager", DisplayText = "🪟 " + I18n.T("ActionTypeWindowManagerShort") },
 		new ActionTypeItem { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
 	};
@@ -799,6 +803,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "Ocr",
+			DisplayText = "📝 " + I18n.T("ActionTypeOcrShort")
 		}
 	};
 
@@ -984,6 +993,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		OnPropertyChanged(nameof(IsFolderType));
 		OnPropertyChanged(nameof(IsSystemType));
 		OnPropertyChanged(nameof(IsCommandType));
+		OnPropertyChanged(nameof(IsOcrType));
 		OnPropertyChanged(nameof(CommandTerminal));
 		OnPropertyChanged(nameof(Terminals));
 		OnPropertyChanged(nameof(TestButtonText));
