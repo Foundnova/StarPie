@@ -405,6 +405,23 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			{
 				NthWindowIndex = "1";
 			}
+			if (value == "Tile" && (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作")))
+			{
+				Name = I18n.T("ActionTypeTileShort");
+			}
+			if (value == "Tile" && string.IsNullOrWhiteSpace(Action.Parameter))
+			{
+				Action.Parameter = "2L";
+			}
+			if (value == "Tile" && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Tile"; // 默认使用平铺四宫格 logo
+			}
+			if (value == "Tile" && (Action.SubActions == null || Action.SubActions.Count == 0))
+			{
+				// 平铺动作自带子菜单：7 布局 + 「恢复上次平铺」——放置即带还原入口
+				PopulateTileSubActions();
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
@@ -413,6 +430,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
 			OnPropertyChanged("IsSwitchWindowType");
+			OnPropertyChanged("IsTileType");
 		}
 	}
 
@@ -689,6 +707,26 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "Tile",
+			DisplayText = I18n.T("ActionTypeTileShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "MoveMonitor",
+			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "ToggleTopmost",
+			DisplayText = I18n.T("ActionTypeTopmostShort")
+		},
+		new ActionTypeOption
+		{
+			Tag = "WindowOpacity",
+			DisplayText = I18n.T("ActionTypeOpacityShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -728,6 +766,26 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeItem
 		{
+			Tag = "Tile",
+			DisplayText = I18n.T("ActionTypeTileShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "MoveMonitor",
+			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "ToggleTopmost",
+			DisplayText = I18n.T("ActionTypeTopmostShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "WindowOpacity",
+			DisplayText = I18n.T("ActionTypeOpacityShort")
+		},
+		new ActionTypeItem
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -758,6 +816,57 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 	public bool IsCommandType => Type == "Command";
 
 	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	public bool IsTileType => Type == "Tile";
+
+	/// <summary>平铺布局下拉（key → 显示名）。</summary>
+	public List<ActionTypeOption> TileLayoutOptions
+	{
+		get
+		{
+			List<ActionTypeOption> list = new List<ActionTypeOption>
+			{
+				new ActionTypeOption { Tag = WindowTiler.CycleParam, DisplayText = "🔄 " + I18n.T("TileCycleLabel") },
+				new ActionTypeOption { Tag = WindowTiler.CycleBackParam, DisplayText = "⬅️ " + I18n.T("TileCycleBackLabel") },
+				new ActionTypeOption { Tag = WindowTiler.RestoreParam, DisplayText = "⏪ " + I18n.T("TileRestoreAllLabel") }
+			};
+			foreach (string key in WindowTiler.LayoutKeys)
+			{
+				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });
+			}
+			return list;
+		}
+	}
+
+	/// <summary>一键预置子项：7 种布局 + 「恢复上次平铺」（级联子菜单 = 布局/还原选择器）。</summary>
+	public void PopulateTileSubActions()
+	{
+		List<ActionItem> list = new List<ActionItem>();
+		foreach (string key in WindowTiler.LayoutKeys)
+		{
+			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key), IconKey = "Tile" });
+		}
+		list.Add(new ActionItem { Type = "Tile", Parameter = WindowTiler.RestoreParam, Name = I18n.T("TileRestoreAllLabel"), IconKey = "Tile" });
+		Action.SubActions = list;
+		NotifySubActionsChanged();
+	}
+
+	/// <summary>平铺布局（写入 Parameter）。</summary>
+	public string TileLayout
+	{
+		get
+		{
+			return Action.Parameter ?? "";
+		}
+		set
+		{
+			if (Action.Parameter != value)
+			{
+				Action.Parameter = value;
+				OnPropertyChanged("TileLayout");
+			}
+		}
+	}
 
 	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
 	public string NthWindowIndex

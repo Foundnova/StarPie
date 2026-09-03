@@ -468,6 +468,16 @@ public partial class SettingsWindow : Window
 			GestureSensitivityLabel.Text = $"{GestureSensitivitySlider.Value:0} px";
 		}
 		RefreshGestureMappings();
+		RefreshCancelActionEditor();
+		if (TileExcludeProcessesTextBox != null)
+		{
+			TileExcludeProcessesTextBox.Text = ConfigManager.CurrentConfig.TileExcludeProcesses ?? "";
+		}
+		RefreshTileCycleList();
+		if (TileIncludeMinimizedCheckBox != null)
+		{
+			TileIncludeMinimizedCheckBox.IsChecked = ConfigManager.CurrentConfig.TileIncludeMinimized;
+		}
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -1023,6 +1033,38 @@ public partial class SettingsWindow : Window
 		if (GestureMappingTitleText != null)
 		{
 			GestureMappingTitleText.Text = I18n.T("GestureMappingTitleText");
+		}
+		if (TileGlobalTitleText != null)
+		{
+			TileGlobalTitleText.Text = I18n.T("TileGlobalTitleText");
+		}
+		if (TileGlobalDescText != null)
+		{
+			TileGlobalDescText.Text = I18n.T("TileGlobalDescText");
+		}
+		if (TileMinimizeText != null)
+		{
+			TileMinimizeText.Text = I18n.T("TileMinimizeText");
+		}
+		if (TileExcludeText != null)
+		{
+			TileExcludeText.Text = I18n.T("TileExcludeText");
+		}
+		if (TileCycleRangeText != null)
+		{
+			TileCycleRangeText.Text = I18n.T("TileCycleRangeText");
+		}
+		if (CancelActionTitleText != null)
+		{
+			CancelActionTitleText.Text = I18n.T("CancelActionTitleText");
+		}
+		if (CancelActionDescText != null)
+		{
+			CancelActionDescText.Text = I18n.T("CancelActionDescText");
+		}
+		if (CancelActionEnableText != null)
+		{
+			CancelActionEnableText.Text = I18n.T("CancelActionEnableText");
 		}
 		if (TriggerPageSubheader != null)
 		{
@@ -1763,7 +1805,6 @@ public partial class SettingsWindow : Window
 	private void Window_Closing(object sender, CancelEventArgs e)
 	{
 		SyncUiToConfigAndSave();
-		MemoryOptimizer.TrimMemory();
 		if (_isClosingFromTray)
 		{
 			DisposeSlotViewModels();
@@ -1776,7 +1817,6 @@ public partial class SettingsWindow : Window
 			{
 				Hide();
 				base.Opacity = 1.0;
-				MemoryOptimizer.TrimMemory();
 			};
 			BeginAnimation(UIElement.OpacityProperty, doubleAnimation);
 			_notifyIcon.ShowBalloonTip(2000, "WinPieGestures", "应用已最小化至系统托盘，将在后台继续运行鼠标笔势监视。", ToolTipIcon.Info);
@@ -4901,6 +4941,7 @@ public partial class SettingsWindow : Window
 			{
 				OuterEscapeDistancePanel.Visibility = Visibility.Visible;
 			}
+			UpdateCancelActionAvailability();
 			SyncUiToConfigAndSave();
 		}
 	}
@@ -4914,7 +4955,26 @@ public partial class SettingsWindow : Window
 			{
 				OuterEscapeDistancePanel.Visibility = Visibility.Collapsed;
 			}
+			UpdateCancelActionAvailability();
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	/// <summary>「外甩取消时执行的动作」依赖顺势外甩取消主开关：主开关关闭时整块禁用。</summary>
+	private void UpdateCancelActionAvailability()
+	{
+		bool master = ConfigManager.CurrentConfig?.EnableOuterEscapeCancel == true;
+		if (EnableCancelActionCheckBox != null)
+		{
+			EnableCancelActionCheckBox.IsEnabled = master;
+		}
+		if (CancelActionEditorHost != null)
+		{
+			CancelActionEditorHost.IsEnabled = master;
+		}
+		if (TestCancelActionButton != null)
+		{
+			TestCancelActionButton.IsEnabled = master;
 		}
 	}
 
@@ -9290,6 +9350,247 @@ public partial class SettingsWindow : Window
 		{
 			ActionExecutor.Execute(vm.Mapping.Action);
 		}
+	}
+
+	// ==================== 取消后动作 ====================
+
+	private void RefreshCancelActionEditor()
+	{
+		if (ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (EnableCancelActionCheckBox != null)
+		{
+			EnableCancelActionCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableCancelAction;
+		}
+		if (CancelActionEditorHost != null && CancelActionEditorHost.DataContext == null)
+		{
+			GestureMappingViewModel vm = new GestureMappingViewModel(new GestureMapping
+			{
+				Pattern = "",
+				Action = ConfigManager.CurrentConfig.CancelAction ?? new ActionItem { Type = "Hotkey", Name = "取消动作", Parameter = "" }
+			});
+			CancelActionEditorHost.DataContext = vm;
+		}
+		UpdateCancelActionAvailability();
+	}
+
+	private void EnableCancelActionCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.EnableCancelAction = EnableCancelActionCheckBox.IsChecked == true;
+		SyncUiToConfigAndSave();
+	}
+
+	private void TestCancelAction_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig?.CancelAction != null)
+		{
+			ActionExecutor.Execute(ConfigManager.CurrentConfig.CancelAction);
+		}
+	}
+
+	// ==================== 平铺窗口 ====================
+
+	private void TilePresetSubs_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (sender is FrameworkElement fe && fe.DataContext is SlotViewModel vm)
+		{
+			vm.PopulateTileSubActions();
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void TileIncludeMinimizedCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileIncludeMinimized = TileIncludeMinimizedCheckBox.IsChecked == true;
+		SyncUiToConfigAndSave();
+	}
+
+	private void TileExcludeProcessesTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileExcludeProcesses = TileExcludeProcessesTextBox.Text ?? "";
+		SyncUiToConfigAndSave();
+	}
+
+	// ==================== 循环布局选择器 ====================
+
+	private sealed class LayoutCycleItem : INotifyPropertyChanged
+	{
+		public string Key { get; }
+		public string Display { get; }
+		private bool _isChecked;
+
+		public bool IsChecked
+		{
+			get
+			{
+				return _isChecked;
+			}
+			set
+			{
+				if (_isChecked != value)
+				{
+					_isChecked = value;
+					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+				}
+			}
+		}
+
+		public LayoutCycleItem(string key, string display, bool isChecked)
+		{
+			Key = key;
+			Display = display;
+			_isChecked = isChecked;
+		}
+
+		public event PropertyChangedEventHandler? PropertyChanged;
+	}
+
+	private List<LayoutCycleItem> _cycleItems = new List<LayoutCycleItem>();
+
+	private void RefreshTileCycleList()
+	{
+		List<string> cfg = new List<string>();
+		string? raw = ConfigManager.CurrentConfig?.TileCycleLayouts;
+		if (!string.IsNullOrWhiteSpace(raw))
+		{
+			foreach (string t in raw.Split(new[] { ',', ';', '，', '；', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+			{
+				string k = t.Trim();
+				if (WindowTiler.IsValidLayout(k) && !cfg.Contains(k))
+				{
+					cfg.Add(k);
+				}
+			}
+		}
+		List<LayoutCycleItem> items = new List<LayoutCycleItem>();
+		foreach (string key in cfg)
+		{
+			LayoutCycleItem item = new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), true);
+			item.PropertyChanged += LayoutCycleItem_PropertyChanged;
+			items.Add(item);
+		}
+		foreach (string key in WindowTiler.LayoutKeys)
+		{
+			if (!cfg.Contains(key))
+			{
+				LayoutCycleItem item = new LayoutCycleItem(key, WindowTiler.LayoutDisplayName(key), false);
+				item.PropertyChanged += LayoutCycleItem_PropertyChanged;
+				items.Add(item);
+			}
+		}
+		_cycleItems = items;
+		if (TileCycleListBox != null)
+		{
+			TileCycleListBox.ItemsSource = null;
+			TileCycleListBox.ItemsSource = _cycleItems;
+		}
+	}
+
+	/// <summary>勾选/取消任意一项立即持久化（循环范围即时生效）。</summary>
+	private void LayoutCycleItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (e.PropertyName == nameof(LayoutCycleItem.IsChecked))
+		{
+			PersistTileCycleSelection();
+		}
+	}
+
+	private void PersistTileCycleSelection()
+	{
+		ConfigManager.CurrentConfig.TileCycleLayouts = string.Join(",", _cycleItems.Where((LayoutCycleItem i) => i.IsChecked).Select((LayoutCycleItem i) => i.Key));
+		SyncUiToConfigAndSave();
+	}
+
+	private void TileCycleUp_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || TileCycleListBox?.SelectedItem is not LayoutCycleItem sel)
+		{
+			return;
+		}
+		int idx = _cycleItems.IndexOf(sel);
+		if (idx > 0)
+		{
+			LayoutCycleItem tmp = _cycleItems[idx - 1];
+			_cycleItems[idx - 1] = sel;
+			_cycleItems[idx] = tmp;
+			RefreshTileCycleItemsOnly();
+			TileCycleListBox.SelectedItem = sel;
+			PersistTileCycleSelection();
+		}
+	}
+
+	private void TileCycleDown_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || TileCycleListBox?.SelectedItem is not LayoutCycleItem sel)
+		{
+			return;
+		}
+		int idx = _cycleItems.IndexOf(sel);
+		if (idx >= 0 && idx < _cycleItems.Count - 1)
+		{
+			LayoutCycleItem tmp = _cycleItems[idx + 1];
+			_cycleItems[idx + 1] = sel;
+			_cycleItems[idx] = tmp;
+			RefreshTileCycleItemsOnly();
+			TileCycleListBox.SelectedItem = sel;
+			PersistTileCycleSelection();
+		}
+	}
+
+	private void RefreshTileCycleItemsOnly()
+	{
+		List<LayoutCycleItem> snapshot = new List<LayoutCycleItem>(_cycleItems);
+		TileCycleListBox.ItemsSource = null;
+		TileCycleListBox.ItemsSource = snapshot;
+		_cycleItems = snapshot;
+	}
+
+	private void TileCycleAll_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		foreach (LayoutCycleItem item in _cycleItems)
+		{
+			item.IsChecked = true;
+		}
+		PersistTileCycleSelection();
+	}
+
+	private void TileCycleNone_Click(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		foreach (LayoutCycleItem item in _cycleItems)
+		{
+			item.IsChecked = false;
+		}
+		PersistTileCycleSelection();
 	}
 
 	private void GestureBrowse_Click(object sender, RoutedEventArgs e)

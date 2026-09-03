@@ -729,6 +729,7 @@
                                   <ComboBox Grid.Column="1" Width="108" Margin="4,0,0,0" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="10" />
                                 </Grid>
                                 <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}" ToolTip="任务栏第 N 个应用（同 Win+N 槽位语义）" />
+                                <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                               </Grid>
                               <TextBox Grid.Column="3" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（显示自定义，可留空）" />
                               <Button Grid.Column="4" Content="测试" Height="30" Margin="4,0,0,0" Padding="4,0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TestGesture_Click" />
@@ -794,6 +795,67 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                      <TextBlock Name="CancelActionTitleText" Text="外甩取消时执行的动作" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="CancelActionDescText" Text="外甩取消（未选中任何动作）时可执行一个自定义动作代替静默关闭；需先开启上方「顺势外甩取消」。回到中心取消仍为静默关闭，不受此影响。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
+                      <CheckBox Name="EnableCancelActionCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,8" Checked="EnableCancelActionCheckBox_Changed" Unchecked="EnableCancelActionCheckBox_Changed">
+                        <StackPanel Margin="6,0,0,0">
+                          <TextBlock Name="CancelActionEnableText" Text="外甩取消时执行自定义动作" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="关闭则外甩取消仍为静默关闭。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                      </CheckBox>
+                      <ContentControl Name="CancelActionEditorHost">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="90" />
+                          </Grid.ColumnDefinitions>
+                          <ComboBox Grid.Column="0" Height="30" FontSize="11" ItemsSource="{Binding ActionTypes}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding Type, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" />
+                          <Grid Grid.Column="1" Margin="4,0,0,0">
+                            <local:HotkeyRecorderBox Height="30" FontSize="11" HotkeyText="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsHotkeyType, Converter={StaticResource BoolToVis}}" />
+                            <Grid Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="36" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" IsReadOnly="True" />
+                              <Button Grid.Column="1" Content="📁" Height="30" Width="34" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="GestureBrowse_Click" ToolTip="选择应用程序..." />
+                            </Grid>
+                            <Grid Visibility="{Binding IsFolderType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="36" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" />
+                              <Button Grid.Column="1" Content="📂" Height="30" Width="34" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="GestureBrowseFolder_Click" ToolTip="选择本地文件夹..." />
+                            </Grid>
+                            <ComboBox SelectedValuePath="Key" DisplayMemberPath="Value" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" SelectedValue="{Binding SelectedSystemPreset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Source={x:Static local:SlotViewModel.SystemPresets}}" Visibility="{Binding IsSystemType, Converter={StaticResource BoolToVis}}" />
+                            <Grid Visibility="{Binding IsCommandType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="112" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Text="{Binding Parameter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" />
+                              <ComboBox Grid.Column="1" Width="108" Margin="4,0,0,0" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="10" />
+                            </Grid>
+                            <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}" />
+                              <Grid Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="*" />
+                                  <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" ToolTip="平铺布局预设（含循环切换）" />
+                                <Button Grid.Column="1" Content="⇅" Height="30" Width="32" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="TilePresetSubs_Click" ToolTip="一键生成子布局与「恢复上次平铺」：级联菜单即布局/还原选择器" />
+                              </Grid>
+                          </Grid>
+                          <TextBox Grid.Column="2" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（可选）" />
+                        </Grid>
+                      </ContentControl>
+                      <Button Name="TestCancelActionButton" Content="🧪 测试" Height="30" Padding="12,0" Margin="0,8,0,0" HorizontalAlignment="Left" Style="{StaticResource ModernButtonStyle}" Click="TestCancelAction_Click" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -2241,6 +2303,7 @@
                                   <Grid Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}">
                                     <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏第 N 个应用（顺序同任务栏/Win+N 槽位，稳定）；图标与切换目标一致；固定未运行的槽位无法启动，托盘驻留不计入" />
                                   </Grid>
+                                  <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                                 </Grid>
 
                                 <TextBox Grid.Column="4" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />
@@ -2258,6 +2321,45 @@
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                  </StackPanel>
+                </Border>
+
+                <!-- 平铺窗口全局设置 -->
+                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                  <UIElement.Effect>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                  </UIElement.Effect>
+                  <StackPanel>
+                    <TextBlock Name="TileGlobalTitleText" Text="平铺窗口设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
+                    <CheckBox Name="TileIncludeMinimizedCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,10" Checked="TileIncludeMinimizedCheckBox_Changed" Unchecked="TileIncludeMinimizedCheckBox_Changed">
+                      <StackPanel Margin="6,0,0,0">
+                        <TextBlock Name="TileMinimizeText" Text="包含最小化窗口（还原后参与平铺）" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="默认关闭：最小化窗口不参与，仅排布可见窗口。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                      </StackPanel>
+                    </CheckBox>
+                    <TextBlock Name="TileExcludeText" Text="平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                    <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
+                    <TextBlock Name="TileCycleRangeText" Text="循环切换布局（勾选参与项，▲▼ 调顺序；不勾任何项=全部参与）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,6" />
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="42" />
+                      </Grid.ColumnDefinitions>
+                      <ListBox Name="TileCycleListBox" Height="168" SelectionMode="Single" BorderThickness="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Display}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                        <Button Content="▲" Height="28" Width="36" Padding="0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TileCycleUp_Click" ToolTip="上移" />
+                        <Button Content="▼" Height="28" Width="36" Padding="0" FontSize="11" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleDown_Click" ToolTip="下移" />
+                        <Button Content="全" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,6,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleAll_Click" ToolTip="全部参与循环" />
+                        <Button Content="空" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleNone_Click" ToolTip="清空（等效全部参与）" />
+                      </StackPanel>
+                    </Grid>
                   </StackPanel>
                 </Border>
               </StackPanel>

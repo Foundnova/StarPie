@@ -32,6 +32,20 @@ public class AppConfig
 	/// <summary>手势段灵敏度：最小段长（像素）。越大越难把中途小拐弯误识别为方向段。</summary>
 	public double GestureSegmentSensitivity { get; set; } = 16.0;
 
+	/// <summary>取消（回到轮盘中心松手且未选中任何动作）后执行的自定义动作；默认关闭=仅关面板不执行。</summary>
+	public bool EnableCancelAction { get; set; }
+
+	public ActionItem CancelAction { get; set; } = new ActionItem { Type = "Hotkey", Name = "取消动作", Parameter = "" };
+
+	/// <summary>平铺排除名单：进程 exe 名（不含扩展名），逗号/分号分隔。</summary>
+	public string TileExcludeProcesses { get; set; } = "";
+
+	/// <summary>平铺是否包含最小化窗口（true=还原后参与平铺）。</summary>
+	public bool TileIncludeMinimized { get; set; }
+
+	/// <summary>平铺"循环切换"参与范围：布局 key 逗号分隔（空=全部布局参与循环）。</summary>
+	public string TileCycleLayouts { get; set; } = "";
+
 	public string AnimationSpeed { get; set; } = "Balanced";
 
 	public double CustomAnimationDurationMs { get; set; } = 80.0;

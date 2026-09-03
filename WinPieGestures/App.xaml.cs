@@ -34,8 +34,53 @@ public partial class App : Application
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool SetForegroundWindow(nint hWnd);
 
+	[StructLayout(LayoutKind.Sequential)]
+	private struct PROCESS_POWER_THROTTLING_STATE
+	{
+		public uint Version;
+		public uint ControlMask;
+		public uint StateMask;
+	}
+
+	private const int ProcessPowerThrottling = 4;
+	private const uint PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
+	private const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern bool SetProcessInformation(
+		nint hProcess,
+		int processInformationClass,
+		ref PROCESS_POWER_THROTTLING_STATE processInformation,
+		uint processInformationSize);
+
+	private static void DisablePowerThrottling()
+	{
+		try
+		{
+			if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+			{
+				PROCESS_POWER_THROTTLING_STATE state = new PROCESS_POWER_THROTTLING_STATE
+				{
+					Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+					ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+					StateMask = 0
+				};
+				SetProcessInformation(
+					Process.GetCurrentProcess().Handle,
+					ProcessPowerThrottling,
+					ref state,
+					(uint)Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>());
+				Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Normal;
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	protected override void OnStartup(StartupEventArgs e)
 	{
+		DisablePowerThrottling();
 		try
 		{
 			SetCurrentProcessExplicitAppUserModelID(AppId);
@@ -85,7 +130,7 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
-		AppLogger.LogInfo($"=== StarPie v1.5.8 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
+		AppLogger.LogInfo($"=== StarPie v1.6.0 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try
@@ -105,7 +150,6 @@ public partial class App : Application
 			{
 				MainSettingsWindow.Show();
 			}
-			MemoryOptimizer.TrimMemory(force: true);
 		}
 		catch (Exception ex)
 		{
@@ -173,6 +217,14 @@ public partial class App : Application
 			return;
 		}
 		AppLogger.LogInfo("=== StarPie Exiting ===");
+		// 退出前自动还原所有窗口到首次平铺前的样式
+		try
+		{
+			WindowTiler.RestoreLastLayout();
+		}
+		catch
+		{
+		}
 		try
 		{
 			_waitHandleRegistration?.Unregister(null);
