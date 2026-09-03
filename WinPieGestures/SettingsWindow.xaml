@@ -2331,8 +2331,8 @@
                                   <ColumnDefinition Width="86" />
                                   <ColumnDefinition Width="132" MinWidth="132" />
                                   <ColumnDefinition Width="136" MinWidth="136" />
-                                  <ColumnDefinition Width="*" />
-                                  <ColumnDefinition Width="68" />
+                                  <ColumnDefinition Width="*" MinWidth="200" />
+                                  <ColumnDefinition Width="Auto" />
                                   <ColumnDefinition Width="Auto" />
                                   <ColumnDefinition Width="Auto" />
                                   <ColumnDefinition Width="58" />
@@ -2407,7 +2407,7 @@
                                   <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                                 </Grid>
 
-                                <TextBox Grid.Column="4" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />
+                                <TextBox Grid.Column="4" Width="68" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}" />
                                 <Button Grid.Column="5" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="0,0,6,0" ToolTip="配置该扇区的二级级联子动作菜单" Content="{Binding SubActionButtonText}" Click="ManageSubActions_Click" />
 
                                 <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
