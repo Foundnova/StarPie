@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -21,6 +21,55 @@ public class KeyboardHook : IDisposable
 		public nint dwExtraInfo;
 	}
 
+	[StructLayout(LayoutKind.Sequential)]
+	private struct POINT
+	{
+		public int x;
+
+		public int y;
+	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct MSG
+	{
+		public nint hwnd;
+		public uint message;
+		public nuint wParam;
+		public nint lParam;
+		public uint time;
+		public POINT pt;
+		public uint lPrivate;
+	}
+
+	private struct KEYBDINPUT
+	{
+		public ushort wVk;
+
+		public ushort wScan;
+
+		public uint dwFlags;
+
+		public uint time;
+
+		public nint dwExtraInfo;
+	}
+
+	[StructLayout(LayoutKind.Explicit)]
+	private struct InputUnion
+	{
+		[FieldOffset(0)]
+		public KEYBDINPUT ki;
+	}
+
+	private struct INPUT
+	{
+		public uint type;
+
+		public InputUnion U;
+	}
+
+	public const nint StarPieExtraInfo = 0x53544152;
+
 	private delegate nint LowLevelKeyboardProc(int nCode, nint wParam, nint lParam);
 
 	private const int WH_KEYBOARD_LL = 13;
@@ -33,23 +82,39 @@ public class KeyboardHook : IDisposable
 
 	private const int WM_SYSKEYUP = 261;
 
+	private const uint WM_QUIT = 18u;
+
+	private const uint PM_NOREMOVE = 0u;
+
 	private const uint KEYEVENTF_EXTENDEDKEY = 1u;
 
 	private const uint KEYEVENTF_KEYUP = 2u;
 
-	private LowLevelKeyboardProc _proc;
+	private const uint INPUT_KEYBOARD = 1u;
+
+	private readonly LowLevelKeyboardProc _proc;
 
 	private nint _hookId = IntPtr.Zero;
 
-	private bool _ignoreNextKeyDown;
+	private readonly object _lifecycleSync = new object();
 
-	private bool _ignoreNextKeyUp;
+	private Thread? _hookThread;
 
-	private System.Threading.Timer? _healthCheckTimer;
+	private uint _hookThreadId;
 
-	private int _hookEventsCountSinceLastCheck;
+	private ManualResetEventSlim? _hookReady;
 
-	public bool IsPaused { get; set; }
+	private Exception? _hookStartException;
+
+	private volatile bool _stopRequested;
+
+	private int _isPaused;
+
+	public bool IsPaused
+	{
+		get => Volatile.Read(ref _isPaused) != 0;
+		set => Volatile.Write(ref _isPaused, value ? 1 : 0);
+	}
 
 	public event EventHandler<GlobalKeyEventArgs>? OnKeyDown;
 
@@ -70,8 +135,32 @@ public class KeyboardHook : IDisposable
 	[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 	private static extern nint GetModuleHandle(string lpModuleName);
 
+	[DllImport("kernel32.dll")]
+	private static extern uint GetCurrentThreadId();
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool PeekMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern int GetMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
 	[DllImport("user32.dll")]
-	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nuint dwExtraInfo);
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool TranslateMessage(ref MSG lpMsg);
+
+	[DllImport("user32.dll")]
+	private static extern nint DispatchMessage(ref MSG lpMsg);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool PostThreadMessage(uint idThread, uint msg, nuint wParam, nint lParam);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+	[DllImport("user32.dll")]
+	private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
 	[DllImport("user32.dll")]
 	private static extern short GetAsyncKeyState(int nVirtKey);
@@ -83,35 +172,142 @@ public class KeyboardHook : IDisposable
 
 	public void Start()
 	{
-		if (_hookId == IntPtr.Zero)
+		ManualResetEventSlim ready;
+		lock (_lifecycleSync)
 		{
-			_hookId = SetHook(_proc);
-			if (_hookId == IntPtr.Zero)
+			if (_hookThread != null && _hookThread.IsAlive)
 			{
-				throw new Exception("Failed to set low-level keyboard hook.");
+				return;
 			}
-			_hookEventsCountSinceLastCheck = 0;
-			_healthCheckTimer = new System.Threading.Timer(CheckHookHealth, null, 5000, 5000);
+			_stopRequested = false;
+			_hookStartException = null;
+			ready = new ManualResetEventSlim(initialState: false);
+			_hookReady = ready;
+			_hookThread = new Thread(HookThreadMain)
+			{
+				IsBackground = true,
+				Name = "StarPie.KeyboardHook",
+				Priority = ThreadPriority.AboveNormal
+			};
+			_hookThread.Start();
+		}
+
+		try
+		{
+			if (!ready.Wait(TimeSpan.FromSeconds(5)))
+			{
+				throw new TimeoutException("Timed out while starting the low-level keyboard hook.");
+			}
+			Exception? startException;
+			lock (_lifecycleSync)
+			{
+				startException = _hookStartException;
+			}
+			if (startException != null)
+			{
+				throw new Exception("Failed to set low-level keyboard hook.", startException);
+			}
+		}
+		catch
+		{
+			Stop();
+			throw;
 		}
 	}
 
 	public void Stop()
 	{
-		if (_healthCheckTimer != null)
+		Thread? hookThread;
+		uint hookThreadId;
+		lock (_lifecycleSync)
 		{
-			_healthCheckTimer.Dispose();
-			_healthCheckTimer = null;
+			_stopRequested = true;
+			hookThread = _hookThread;
+			hookThreadId = _hookThreadId;
 		}
-		if (_hookId != IntPtr.Zero)
+
+		if (hookThreadId != 0)
 		{
-			UnhookWindowsHookEx(_hookId);
-			_hookId = IntPtr.Zero;
+			PostThreadMessage(hookThreadId, WM_QUIT, 0u, IntPtr.Zero);
+		}
+
+		if (hookThread != null && hookThread.ManagedThreadId != Environment.CurrentManagedThreadId)
+		{
+			hookThread.Join(TimeSpan.FromMilliseconds(500));
+		}
+
+		lock (_lifecycleSync)
+		{
+			if (_hookThread == hookThread && (hookThread == null || !hookThread.IsAlive))
+			{
+				_hookThread = null;
+				_hookThreadId = 0;
+				_hookReady?.Dispose();
+				_hookReady = null;
+				_hookId = IntPtr.Zero;
+			}
 		}
 	}
 
-	private void CheckHookHealth(object? state)
+	private void HookThreadMain()
 	{
-		Interlocked.Exchange(ref _hookEventsCountSinceLastCheck, 0);
+		nint hookId = IntPtr.Zero;
+		uint threadId = GetCurrentThreadId();
+		lock (_lifecycleSync)
+		{
+			_hookThreadId = threadId;
+		}
+
+		try
+		{
+			PeekMessage(out MSG _, IntPtr.Zero, 0u, 0u, PM_NOREMOVE);
+			hookId = SetHook(_proc);
+			if (hookId == IntPtr.Zero)
+			{
+				throw new InvalidOperationException("SetWindowsHookEx returned a null keyboard hook handle.");
+			}
+			lock (_lifecycleSync)
+			{
+				_hookId = hookId;
+			}
+			_hookReady?.Set();
+
+			MSG message;
+			while (!_stopRequested)
+			{
+				int result = GetMessage(out message, IntPtr.Zero, 0u, 0u);
+				if (result <= 0)
+				{
+					break;
+				}
+				TranslateMessage(ref message);
+				DispatchMessage(ref message);
+			}
+		}
+		catch (Exception ex)
+		{
+			lock (_lifecycleSync)
+			{
+				_hookStartException = ex;
+			}
+			_hookReady?.Set();
+		}
+		finally
+		{
+			if (hookId != IntPtr.Zero)
+			{
+				UnhookWindowsHookEx(hookId);
+			}
+			lock (_lifecycleSync)
+			{
+				if (_hookId == hookId)
+				{
+					_hookId = IntPtr.Zero;
+				}
+				_hookThreadId = 0;
+			}
+			_hookReady?.Set();
+		}
 	}
 
 	private nint SetHook(LowLevelKeyboardProc proc)
@@ -127,69 +323,52 @@ public class KeyboardHook : IDisposable
 
 	public static ModifierKeys GetCurrentModifiers()
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0011: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0013: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0024: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0026: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0027: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0039: Unknown result type (might be due to invalid IL or missing references)
-		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0059: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005d: Unknown result type (might be due to invalid IL or missing references)
-		ModifierKeys val = (ModifierKeys)0;
+		ModifierKeys val = ModifierKeys.None;
 		if ((GetAsyncKeyState(17) & 0x8000) != 0)
 		{
-			val = (ModifierKeys)((int)val | 2);
+			val |= ModifierKeys.Control;
 		}
 		if ((GetAsyncKeyState(16) & 0x8000) != 0)
 		{
-			val = (ModifierKeys)((int)val | 4);
+			val |= ModifierKeys.Shift;
 		}
 		if ((GetAsyncKeyState(18) & 0x8000) != 0)
 		{
-			val = (ModifierKeys)((int)val | 1);
+			val |= ModifierKeys.Alt;
 		}
 		if ((GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0)
 		{
-			val = (ModifierKeys)((int)val | 8);
+			val |= ModifierKeys.Windows;
 		}
 		return val;
 	}
 
 	private nint HookCallback(int nCode, nint wParam, nint lParam)
 	{
-		//IL_0039: Unknown result type (might be due to invalid IL or missing references)
-		//IL_003e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0040: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0089: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e0: Unknown result type (might be due to invalid IL or missing references)
-		Interlocked.Increment(ref _hookEventsCountSinceLastCheck);
 		if (IsPaused)
 		{
 			return CallNextHookEx(_hookId, nCode, wParam, lParam);
 		}
 		if (nCode >= 0)
 		{
+			KBDLLHOOKSTRUCT kbd = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+			if (kbd.dwExtraInfo == StarPieExtraInfo)
+			{
+				// StarPie 自发模拟的按键直接快速放行，杜绝自身捕获与竞争
+				return CallNextHookEx(_hookId, nCode, wParam, lParam);
+			}
+
 			int num = (int)wParam;
-			uint vkCode = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam).vkCode;
+			uint vkCode = kbd.vkCode;
 			ModifierKeys currentModifiers = GetCurrentModifiers();
 			GlobalKeyEventArgs e = new GlobalKeyEventArgs(vkCode, currentModifiers);
 			OnRawKeyEvent?.Invoke(this, e);
+
 			switch (num)
 			{
-			case 256:
-			case 260:
+			case WM_KEYDOWN:
+			case WM_SYSKEYDOWN:
 			{
-				if (_ignoreNextKeyDown)
-				{
-					_ignoreNextKeyDown = false;
-					return CallNextHookEx(_hookId, nCode, wParam, lParam);
-				}
 				GlobalKeyEventArgs e3 = new GlobalKeyEventArgs(vkCode, currentModifiers);
 				OnKeyDown?.Invoke(this, e3);
 				if (e3.Handled)
@@ -198,14 +377,9 @@ public class KeyboardHook : IDisposable
 				}
 				break;
 			}
-			case 257:
-			case 261:
+			case WM_KEYUP:
+			case WM_SYSKEYUP:
 			{
-				if (_ignoreNextKeyUp)
-				{
-					_ignoreNextKeyUp = false;
-					return CallNextHookEx(_hookId, nCode, wParam, lParam);
-				}
 				GlobalKeyEventArgs e2 = new GlobalKeyEventArgs(vkCode, currentModifiers);
 				OnKeyUp?.Invoke(this, e2);
 				if (e2.Handled)
@@ -221,13 +395,51 @@ public class KeyboardHook : IDisposable
 
 	public void ReplayKeyPress(uint vkCode)
 	{
-		if (vkCode != 0)
+		if (vkCode == 0) return;
+
+		ushort scan = (ushort)MapVirtualKey(vkCode, 0u);
+		INPUT down = new INPUT
 		{
-			_ignoreNextKeyDown = true;
-			_ignoreNextKeyUp = true;
-			keybd_event((byte)vkCode, 0, 0u, UIntPtr.Zero);
-			keybd_event((byte)vkCode, 0, 2u, UIntPtr.Zero);
+			type = INPUT_KEYBOARD,
+			U = new InputUnion
+			{
+				ki = new KEYBDINPUT
+				{
+					wVk = (ushort)vkCode,
+					wScan = scan,
+					dwFlags = 0u,
+					time = 0u,
+					dwExtraInfo = StarPieExtraInfo
+				}
+			}
+		};
+		INPUT up = new INPUT
+		{
+			type = INPUT_KEYBOARD,
+			U = new InputUnion
+			{
+				ki = new KEYBDINPUT
+				{
+					wVk = (ushort)vkCode,
+					wScan = scan,
+					dwFlags = KEYEVENTF_KEYUP,
+					time = 0u,
+					dwExtraInfo = StarPieExtraInfo
+				}
+			}
+		};
+
+		if (vkCode == 33 || vkCode == 34 || vkCode == 35 || vkCode == 36 ||
+		    vkCode == 37 || vkCode == 38 || vkCode == 39 || vkCode == 40 ||
+		    vkCode == 44 || vkCode == 45 || vkCode == 46 ||
+		    vkCode == 91 || vkCode == 92 || vkCode == 111 ||
+		    (vkCode >= 166 && vkCode <= 179))
+		{
+			down.U.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
+			up.U.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
 		}
+
+		SendInput(2u, new INPUT[] { down, up }, Marshal.SizeOf(typeof(INPUT)));
 	}
 
 	public void Dispose()

@@ -175,6 +175,18 @@ public static class WindowTaskbarHelper
 	[DllImport("user32.dll")]
 	private static extern bool DestroyIcon(nint hIcon);
 
+	private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern nint OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern bool QueryFullProcessImageName(nint hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CloseHandle(nint hObject);
+
 	// ---- 当前虚拟桌面过滤（Win10+；不可用则跳过）----
 	[ComImport, Guid("a5cd92ff-29be-454c-8d04-d82879fb3f1b")]
 	private class VirtualDesktopManager
@@ -191,7 +203,6 @@ public static class WindowTaskbarHelper
 		int MoveWindowToDesktop(nint topLevelWindow, ref Guid desktopId);
 	}
 
-	private static readonly IVirtualDesktopManager? s_vdm = CreateVdm();
 
 	private static IVirtualDesktopManager? CreateVdm()
 	{
@@ -213,6 +224,11 @@ public static class WindowTaskbarHelper
 	/// 过滤：可见、无 owner、非 WS_EX_TOOLWINDOW、排除 StarPie 自身、与所属显示器工作区相交（防离屏"托盘驻留"窗口）、当前虚拟桌面。
 	/// </summary>
 	public static List<nint> GetTaskbarWindows()
+	{
+		return GetTaskbarWindows(CreateVdm());
+	}
+
+	private static List<nint> GetTaskbarWindows(IVirtualDesktopManager? virtualDesktopManager)
 	{
 		List<nint> list = new List<nint>();
 		uint selfPid = SelfPid;
@@ -255,10 +271,10 @@ public static class WindowTaskbarHelper
 						}
 					}
 				}
-				if (s_vdm != null)
+				if (virtualDesktopManager != null)
 				{
 					int onCurrent = 0;
-					if (s_vdm.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0 && onCurrent == 0)
+					if (virtualDesktopManager.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0 && onCurrent == 0)
 					{
 						return true;
 					}
@@ -444,37 +460,67 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。
-	/// 非阻塞：若另一线程（后台预热/激活）正在计算，直接返回当前快照，绝不阻塞 UI/钩子线程。</summary>
+	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存）。
+	/// 非阻塞刷新：已有线程计算时立即返回旧快照，UI 与动作线程不等待 UIA/COM 扫描。</summary>
 	public static List<nint> GetTaskbarOrderedWindows()
 	{
-		if (Monitor.TryEnter(s_snapshotLock, TimeSpan.Zero))
+		DateTime now = DateTime.UtcNow;
+		lock (s_snapshotLock)
 		{
-			try
+			if (s_snapshot != null && (now - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
 			{
-				if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+				return s_snapshot;
+			}
+		}
+
+		if (!System.Threading.Monitor.TryEnter(s_refreshLock))
+		{
+			lock (s_snapshotLock)
+			{
+				return s_snapshot ?? new List<nint>();
+			}
+		}
+
+		try
+		{
+			now = DateTime.UtcNow;
+			lock (s_snapshotLock)
+			{
+				if (s_snapshot != null && (now - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
 				{
 					return s_snapshot;
 				}
+			}
+
+			lock (s_procDescCache)
+			{
 				s_procDescCache.Clear();
+			}
+			lock (s_iconCache)
+			{
 				s_iconCache.Clear();
-				s_snapshot = ComputeOrderedWindows();
+			}
+
+			// COM 对象在本次刷新调用所在的线程中创建、使用，不再由任意首次调用者静态初始化并跨 Apartment 共享。
+			IVirtualDesktopManager? virtualDesktopManager = CreateVdm();
+			List<nint> computed = ComputeOrderedWindows(virtualDesktopManager);
+			lock (s_snapshotLock)
+			{
+				s_snapshot = computed;
 				s_snapshotAt = DateTime.UtcNow;
 				return s_snapshot;
 			}
-			finally
-			{
-				Monitor.Exit(s_snapshotLock);
-			}
 		}
-		// 计算进行中：用当前快照（可能过期/为空 → 图标回退默认），不等待
-		return s_snapshot ?? new List<nint>();
+		finally
+		{
+			System.Threading.Monitor.Exit(s_refreshLock);
+		}
 	}
 
 	/// <summary>实际计算：只保留能对应到任务栏按钮的窗口（鬼窗口丢弃）；同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定）。</summary>
-	private static List<nint> ComputeOrderedWindows()
+	private static List<nint> ComputeOrderedWindows(IVirtualDesktopManager? virtualDesktopManager)
 	{
-		List<nint> candidates = GetTaskbarWindows();
+		List<nint> candidates = GetTaskbarWindows(virtualDesktopManager);
 		if (candidates.Count == 0)
 		{
 			return candidates;
@@ -567,6 +613,7 @@ public static class WindowTaskbarHelper
 	private static string? ProcessDescriptionOf(nint hWnd)
 	{
 		GetWindowThreadProcessId(hWnd, out uint pid);
+		if (pid == 0) return null;
 		lock (s_procDescCache)
 		{
 			if (s_procDescCache.TryGetValue(pid, out string? desc))
@@ -577,15 +624,30 @@ public static class WindowTaskbarHelper
 		string? computed = null;
 		try
 		{
-			using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+			nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+			if (hProcess != IntPtr.Zero)
 			{
-				string? exe = proc?.MainModule?.FileName;
-				if (!string.IsNullOrEmpty(exe))
+				try
 				{
-					System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
-					computed = !string.IsNullOrEmpty(fvi.FileDescription)
-						? fvi.FileDescription
-						: System.IO.Path.GetFileNameWithoutExtension(exe);
+					uint size = 1024;
+					StringBuilder sb = new StringBuilder((int)size);
+					if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+					{
+						string exePath = sb.ToString();
+						try
+						{
+							var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath);
+							computed = !string.IsNullOrEmpty(fvi.FileDescription) ? fvi.FileDescription : System.IO.Path.GetFileNameWithoutExtension(exePath);
+						}
+						catch
+						{
+							computed = System.IO.Path.GetFileNameWithoutExtension(exePath);
+						}
+					}
+				}
+				finally
+				{
+					CloseHandle(hProcess);
 				}
 			}
 		}
@@ -605,16 +667,43 @@ public static class WindowTaskbarHelper
 
 	// ---- 手势级快照缓存（一次手势内：所有槽位图标 + 激活共用一次枚举/UIA/进程读取）----
 	private static readonly object s_snapshotLock = new object();
+	private static readonly object s_refreshLock = new object();
 	private static List<nint>? s_snapshot;
 	private static DateTime s_snapshotAt;
+	private static int s_prefetchRunning;
 	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
 	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
 	private const double SNAPSHOT_TTL_MS = 2500.0;
 
-	/// <summary>后台预热任务栏槽位快照（供下一次手势首帧直接命中缓存）。</summary>
+	/// <summary>在线程池 MTA 中调度一次任务栏快照预热；重复请求合并为一个后台刷新。</summary>
 	public static void Prefetch()
 	{
-		GetTaskbarOrderedWindows();
+		if (System.Threading.Interlocked.CompareExchange(ref s_prefetchRunning, 1, 0) != 0)
+		{
+			return;
+		}
+		try
+		{
+			System.Threading.ThreadPool.QueueUserWorkItem(delegate
+			{
+				try
+				{
+					GetTaskbarOrderedWindows();
+				}
+				catch
+				{
+				}
+				finally
+				{
+					System.Threading.Volatile.Write(ref s_prefetchRunning, 0);
+				}
+			});
+		}
+		catch
+		{
+			System.Threading.Volatile.Write(ref s_prefetchRunning, 0);
+			throw;
+		}
 	}
 
 	/// <summary>
@@ -762,14 +851,14 @@ public static class WindowTaskbarHelper
 	{
 		try
 		{
-			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——目标窗口假死时不阻塞轮盘渲染
+			// WM_GETICON 用 SendMessageTimeout（带 SMTO_ABORTIFHUNG）——超时缩短至 25ms，目标窗口假死时不阻塞轮盘渲染
 			nint hIcon = IntPtr.Zero;
 			nint result = IntPtr.Zero;
-			if (SendMessageTimeout(hWnd, WM_GETICON, (nint)1, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
+			if (SendMessageTimeout(hWnd, WM_GETICON, (nint)1, IntPtr.Zero, SMTO_ABORTIFHUNG, 25u, out result) != IntPtr.Zero && result != IntPtr.Zero)
 			{
 				hIcon = result;
 			}
-			if (hIcon == IntPtr.Zero && SendMessageTimeout(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 200u, out result) != IntPtr.Zero && result != IntPtr.Zero)
+			if (hIcon == IntPtr.Zero && SendMessageTimeout(hWnd, WM_GETICON, IntPtr.Zero, IntPtr.Zero, SMTO_ABORTIFHUNG, 25u, out result) != IntPtr.Zero && result != IntPtr.Zero)
 			{
 				hIcon = result;
 			}
@@ -788,24 +877,40 @@ public static class WindowTaskbarHelper
 
 			// 进程 exe 图标兜底
 			GetWindowThreadProcessId(hWnd, out uint pid);
-			try
+			if (pid != 0)
 			{
-				using (System.Diagnostics.Process proc = System.Diagnostics.Process.GetProcessById((int)pid))
+				try
 				{
-					string? exe = proc?.MainModule?.FileName;
-					if (!string.IsNullOrEmpty(exe) && ExtractIconEx(exe, 0, out nint big, out _, 1) > 0 && big != IntPtr.Zero)
+					nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+					if (hProcess != IntPtr.Zero)
 					{
-						BitmapSource? bmp = ToBitmapSource(big);
-						DestroyIcon(big);
-						if (bmp != null)
+						try
 						{
-							return bmp;
+							uint size = 1024;
+							StringBuilder sb = new StringBuilder((int)size);
+							if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+							{
+								string exe = sb.ToString();
+								if (!string.IsNullOrEmpty(exe) && ExtractIconEx(exe, 0, out nint big, out _, 1) > 0 && big != IntPtr.Zero)
+								{
+									BitmapSource? bmp = ToBitmapSource(big);
+									DestroyIcon(big);
+									if (bmp != null)
+									{
+										return bmp;
+									}
+								}
+							}
+						}
+						finally
+						{
+							CloseHandle(hProcess);
 						}
 					}
 				}
-			}
-			catch
-			{
+				catch
+				{
+				}
 			}
 			return null;
 		}

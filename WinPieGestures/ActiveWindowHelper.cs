@@ -1,16 +1,29 @@
-﻿using System;
-using System.Diagnostics;
+using System;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace WinPieGestures;
 
 public static class ActiveWindowHelper
 {
+	private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
 
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern nint OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+	[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+	private static extern bool QueryFullProcessImageName(nint hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CloseHandle(nint hObject);
 
 	public static string GetActiveWindowProcessName()
 	{
@@ -26,15 +39,33 @@ public static class ActiveWindowHelper
 			{
 				return "unknown.exe";
 			}
-			using Process process = Process.GetProcessById((int)lpdwProcessId);
-			string processName = process.ProcessName;
-			if (string.IsNullOrEmpty(processName))
+
+			nint hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, lpdwProcessId);
+			if (hProcess != IntPtr.Zero)
 			{
-				return "unknown.exe";
+				try
+				{
+					uint size = 1024;
+					StringBuilder sb = new StringBuilder((int)size);
+					if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
+					{
+						string fullPath = sb.ToString();
+						string fileName = Path.GetFileName(fullPath);
+						if (!string.IsNullOrEmpty(fileName))
+						{
+							return fileName.ToLowerInvariant();
+						}
+					}
+				}
+				finally
+				{
+					CloseHandle(hProcess);
+				}
 			}
-			return processName.ToLower() + ".exe";
+
+			return "unknown.exe";
 		}
-		catch (Exception)
+		catch
 		{
 			return "unknown.exe";
 		}
