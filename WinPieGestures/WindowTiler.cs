@@ -81,8 +81,19 @@ public static class WindowTiler
 	[DllImport("user32.dll")]
 	private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
+	[DllImport("user32.dll")]
+	private static extern nint GetWindow(nint hWnd, uint uCmd);
+
 	[DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
 	private static extern nint GetWindowLongPtr(nint hWnd, int nIndex);
+
+	private const int GWL_STYLE = -16;
+	private const uint GW_OWNER = 4;
+
+	// WS_CAPTION = WS_BORDER|WS_DLGFRAME；WS_THICKFRAME 可调整；WS_EX_TOOLWINDOW 工具窗（不进任务栏）
+	private const long WS_CAPTION = 0x00C00000L;
+	private const long WS_THICKFRAME = 0x00040000L;
+	private const long WS_EX_TOOLWINDOW = 0x00000080L;
 
 	[DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
 	private static extern nint SetWindowLongPtr(nint hWnd, int nIndex, nint dwNewLong);
@@ -363,6 +374,20 @@ public static class WindowTiler
 					continue;
 				}
 				if (!WindowTaskbarHelper.IsOnCurrentVirtualDesktop(h))
+				{
+					continue;
+				}
+				// 只收"标准应用窗口"：有标题栏、可调整、非工具窗、无拥有者（丢弃不进任务栏的后台/工具/对话框）
+				long style = GetWindowLongPtr(h, GWL_STYLE).ToInt64();
+				if ((style & WS_CAPTION) == 0L || (style & WS_THICKFRAME) == 0L)
+				{
+					continue;
+				}
+				if ((GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64() & WS_EX_TOOLWINDOW) != 0L)
+				{
+					continue;
+				}
+				if (GetWindow(h, GW_OWNER) != IntPtr.Zero)
 				{
 					continue;
 				}
