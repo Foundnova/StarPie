@@ -189,7 +189,6 @@ public static class WindowTaskbarHelper
 		int MoveWindowToDesktop(nint topLevelWindow, ref Guid desktopId);
 	}
 
-	private static readonly IVirtualDesktopManager? s_vdm = CreateVdm();
 
 	private static IVirtualDesktopManager? CreateVdm()
 	{
@@ -211,6 +210,11 @@ public static class WindowTaskbarHelper
 	/// 过滤：可见、无 owner、非 WS_EX_TOOLWINDOW、排除 StarPie 自身、与所属显示器工作区相交（防离屏"托盘驻留"窗口）、当前虚拟桌面。
 	/// </summary>
 	public static List<nint> GetTaskbarWindows()
+	{
+		return GetTaskbarWindows(CreateVdm());
+	}
+
+	private static List<nint> GetTaskbarWindows(IVirtualDesktopManager? virtualDesktopManager)
 	{
 		List<nint> list = new List<nint>();
 		uint selfPid = SelfPid;
@@ -253,10 +257,10 @@ public static class WindowTaskbarHelper
 						}
 					}
 				}
-				if (s_vdm != null)
+				if (virtualDesktopManager != null)
 				{
 					int onCurrent = 0;
-					if (s_vdm.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0 && onCurrent == 0)
+					if (virtualDesktopManager.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0 && onCurrent == 0)
 					{
 						return true;
 					}
@@ -430,27 +434,67 @@ public static class WindowTaskbarHelper
 		return false;
 	}
 
-	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存：手势内只算一次）。</summary>
+	/// <summary>候选运行窗口，按任务栏可见顺序排列（带 TTL 快照缓存）。
+	/// 非阻塞刷新：已有线程计算时立即返回旧快照，UI 与动作线程不等待 UIA/COM 扫描。</summary>
 	public static List<nint> GetTaskbarOrderedWindows()
 	{
+		DateTime now = DateTime.UtcNow;
 		lock (s_snapshotLock)
 		{
-			if (s_snapshot != null && (DateTime.UtcNow - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+			if (s_snapshot != null && (now - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
 			{
 				return s_snapshot;
 			}
-			s_procDescCache.Clear();
-			s_iconCache.Clear();
-			s_snapshot = ComputeOrderedWindows();
-			s_snapshotAt = DateTime.UtcNow;
-			return s_snapshot;
+		}
+
+		if (!System.Threading.Monitor.TryEnter(s_refreshLock))
+		{
+			lock (s_snapshotLock)
+			{
+				return s_snapshot ?? new List<nint>();
+			}
+		}
+
+		try
+		{
+			now = DateTime.UtcNow;
+			lock (s_snapshotLock)
+			{
+				if (s_snapshot != null && (now - s_snapshotAt).TotalMilliseconds < SNAPSHOT_TTL_MS)
+				{
+					return s_snapshot;
+				}
+			}
+
+			lock (s_procDescCache)
+			{
+				s_procDescCache.Clear();
+			}
+			lock (s_iconCache)
+			{
+				s_iconCache.Clear();
+			}
+
+			// COM 对象在本次刷新调用所在的线程中创建、使用，不再由任意首次调用者静态初始化并跨 Apartment 共享。
+			IVirtualDesktopManager? virtualDesktopManager = CreateVdm();
+			List<nint> computed = ComputeOrderedWindows(virtualDesktopManager);
+			lock (s_snapshotLock)
+			{
+				s_snapshot = computed;
+				s_snapshotAt = DateTime.UtcNow;
+				return s_snapshot;
+			}
+		}
+		finally
+		{
+			System.Threading.Monitor.Exit(s_refreshLock);
 		}
 	}
 
 	/// <summary>实际计算：只保留能对应到任务栏按钮的窗口（鬼窗口丢弃）；同进程多窗口聚合到同一按钮槽位、组内按句柄升序（稳定）。</summary>
-	private static List<nint> ComputeOrderedWindows()
+	private static List<nint> ComputeOrderedWindows(IVirtualDesktopManager? virtualDesktopManager)
 	{
-		List<nint> candidates = GetTaskbarWindows();
+		List<nint> candidates = GetTaskbarWindows(virtualDesktopManager);
 		if (candidates.Count == 0)
 		{
 			return candidates;
@@ -597,16 +641,43 @@ public static class WindowTaskbarHelper
 
 	// ---- 手势级快照缓存（一次手势内：所有槽位图标 + 激活共用一次枚举/UIA/进程读取）----
 	private static readonly object s_snapshotLock = new object();
+	private static readonly object s_refreshLock = new object();
 	private static List<nint>? s_snapshot;
 	private static DateTime s_snapshotAt;
+	private static int s_prefetchRunning;
 	private static readonly Dictionary<uint, string> s_procDescCache = new Dictionary<uint, string>();
 	private static readonly Dictionary<nint, BitmapSource> s_iconCache = new Dictionary<nint, BitmapSource>();
 	private const double SNAPSHOT_TTL_MS = 1500.0;
 
-	/// <summary>后台预热任务栏槽位快照（供下一次手势首帧直接命中缓存）。</summary>
+	/// <summary>在线程池 MTA 中调度一次任务栏快照预热；重复请求合并为一个后台刷新。</summary>
 	public static void Prefetch()
 	{
-		GetTaskbarOrderedWindows();
+		if (System.Threading.Interlocked.CompareExchange(ref s_prefetchRunning, 1, 0) != 0)
+		{
+			return;
+		}
+		try
+		{
+			System.Threading.ThreadPool.QueueUserWorkItem(delegate
+			{
+				try
+				{
+					GetTaskbarOrderedWindows();
+				}
+				catch
+				{
+				}
+				finally
+				{
+					System.Threading.Volatile.Write(ref s_prefetchRunning, 0);
+				}
+			});
+		}
+		catch
+		{
+			System.Threading.Volatile.Write(ref s_prefetchRunning, 0);
+			throw;
+		}
 	}
 
 	/// <summary>
