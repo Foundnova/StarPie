@@ -436,6 +436,7 @@ public partial class SettingsWindow : Window
 			FocusSystemPresetComboBox.ItemsSource = SlotViewModel.SystemPresetList;
 		}
 		UpdateTriggerBadgeDisplay();
+		UpdateLinkSubActionsButtonUi();
 		HookRawInputForSensorAndRecorder();
 
 		// Threshold & Outer Escape
@@ -2409,6 +2410,21 @@ public partial class SettingsWindow : Window
 
 	private void FocusPrevSlotBtn_Click(object sender, RoutedEventArgs e)
 	{
+		if (_selectedSubActionIndex.HasValue && _selectedSlotIndex >= 0)
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+			if (profile != null && _selectedSlotIndex < profile.Actions.Count)
+			{
+				int subCount = profile.Actions[_selectedSlotIndex].SubActions?.Count ?? 0;
+				if (subCount > 0)
+				{
+					int nextSub = (_selectedSubActionIndex.Value - 1 + subCount) % subCount;
+					SelectSubAction(_selectedSlotIndex, nextSub);
+					return;
+				}
+			}
+		}
+
 		int count = _selectedProfile?.SectorCount ?? 8;
 		if (_selectedSlotIndex == -1)
 		{
@@ -2426,6 +2442,21 @@ public partial class SettingsWindow : Window
 
 	private void FocusNextSlotBtn_Click(object sender, RoutedEventArgs e)
 	{
+		if (_selectedSubActionIndex.HasValue && _selectedSlotIndex >= 0)
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+			if (profile != null && _selectedSlotIndex < profile.Actions.Count)
+			{
+				int subCount = profile.Actions[_selectedSlotIndex].SubActions?.Count ?? 0;
+				if (subCount > 0)
+				{
+					int nextSub = (_selectedSubActionIndex.Value + 1) % subCount;
+					SelectSubAction(_selectedSlotIndex, nextSub);
+					return;
+				}
+			}
+		}
+
 		int count = _selectedProfile?.SectorCount ?? 8;
 		if (_selectedSlotIndex == -1)
 		{
@@ -4000,13 +4031,15 @@ public partial class SettingsWindow : Window
 			{
 				bool isTier2Mode = (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked == true);
 				WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
-				if (isTier2Mode && dist <= outerR + 32.0)
+				int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
+				double angleDeg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+				if (angleDeg < 0) angleDeg += 360.0;
+				double sweep = 360.0 / sectorCount;
+				int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
+
+				bool isSubVisible = isTier2Mode || (_selectedSlotIndex == slot);
+				if (isSubVisible && dist <= outerR + 40.0)
 				{
-					int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
-					double angleDeg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
-					if (angleDeg < 0) angleDeg += 360.0;
-					double sweep = 360.0 / sectorCount;
-					int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
 					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
 					{
 						int subCount = profile.Actions[slot].SubActions.Count;
@@ -4016,7 +4049,8 @@ public partial class SettingsWindow : Window
 						while (relAngle >= 360.0) relAngle -= 360.0;
 						double subSweep = sweep / subCount;
 						int subIdx = (int)Math.Floor(relAngle / subSweep);
-						if (subIdx >= 0 && subIdx < subCount)
+						if (subIdx >= subCount) subIdx = subCount - 1;
+						if (subIdx >= 0)
 						{
 							_dragSourceSlotIndex = -100 - (slot * 100 + subIdx);
 						}
@@ -4067,10 +4101,23 @@ public partial class SettingsWindow : Window
 				{
 					srcName = profile.Actions[_dragSourceSlotIndex].Name ?? $"扇区 {_dragSourceSlotIndex + 1}";
 				}
+				else if (_dragSourceSlotIndex <= -100 && profile != null && profile.Actions != null)
+				{
+					int raw = -_dragSourceSlotIndex - 100;
+					int slot = raw / 100;
+					int subIdx = raw % 100;
+					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && subIdx < profile.Actions[slot].SubActions.Count)
+					{
+						srcName = profile.Actions[slot].SubActions[subIdx].Name ?? $"子动作 {subIdx + 1}";
+					}
+				}
 
 				if (MappingsCurrentEditIndicator != null && !string.IsNullOrEmpty(srcName))
 				{
-					MappingsCurrentEditIndicator.Text = $"🔄 正在拖拽 [{srcName}]，释放到目标扇区以对调功能...";
+					string tip = (_dragSourceSlotIndex <= -100) 
+						? "释放到目标二级子扇区以对调子动作顺序..." 
+						: "释放到目标扇区以对调功能...";
+					MappingsCurrentEditIndicator.Text = $"🔄 正在拖拽 [{srcName}]，{tip}";
 					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
 				}
 			}
@@ -4092,7 +4139,7 @@ public partial class SettingsWindow : Window
 			Point upPos = e.GetPosition(MappingsWheelPreviewCanvas);
 			double dragDist = (upPos - _mappingsDragStartPos.Value).Length;
 
-			if (_isDraggingSlot && dragDist > 10.0 && _dragSourceSlotIndex >= -1)
+			if (_isDraggingSlot && dragDist > 10.0)
 			{
 				double dx = upPos.X - 150.0;
 				double dy = upPos.Y - 150.0;
@@ -4103,70 +4150,201 @@ public partial class SettingsWindow : Window
 				double coreR = Math.Max(10.0, (ConfigManager.CurrentConfig?.CoreRadius ?? 25.0) * scaleFactor);
 				double outerR = Math.Max(30.0, (ConfigManager.CurrentConfig?.WheelRadius ?? 100.0) * scaleFactor);
 
-				int targetSlot = -999;
-				if (dist <= coreR)
+				WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+				if (profile != null && profile.Actions != null)
 				{
-					targetSlot = -1;
-				}
-				else if (dist <= outerR + 15.0)
-				{
-					WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
 					int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
 					double angleDeg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
 					if (angleDeg < 0) angleDeg += 360.0;
 					double sweep = 360.0 / sectorCount;
-					targetSlot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
-				}
 
-				if (targetSlot != -999 && targetSlot != _dragSourceSlotIndex)
-				{
-					WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
-					if (profile != null && profile.Actions != null)
+					if (_dragSourceSlotIndex <= -100)
 					{
-						string srcName = "";
-						string tgtName = "";
+						// === 二级子动作拖拽换位 ===
+						int raw = -_dragSourceSlotIndex - 100;
+						int srcSlot = raw / 100;
+						int srcSubIdx = raw % 100;
 
-						if (_dragSourceSlotIndex == -1)
+						if (srcSlot >= 0 && srcSlot < profile.Actions.Count && 
+							profile.Actions[srcSlot].SubActions != null && 
+							srcSubIdx < profile.Actions[srcSlot].SubActions.Count)
 						{
-							srcName = profile.CenterAction?.Name ?? "中心核圆";
-							tgtName = (targetSlot >= 0 && targetSlot < profile.Actions.Count) ? profile.Actions[targetSlot].Name : $"槽 {targetSlot + 1}";
-							ActionItem temp = profile.CenterAction ?? new ActionItem { Name = "StarPie控制台", Type = "System", Parameter = "OpenSettings", IconKey = "Settings" };
-							profile.CenterAction = profile.Actions[targetSlot];
-							profile.Actions[targetSlot] = temp;
-							SelectPrimarySlot(targetSlot);
+							int targetSlot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
+							if (targetSlot >= 0 && targetSlot < profile.Actions.Count)
+							{
+								var srcList = profile.Actions[srcSlot].SubActions;
+								var tgtAction = profile.Actions[targetSlot];
+
+								if (tgtAction.SubActions != null && tgtAction.SubActions.Count > 0)
+								{
+									int tgtSubCount = tgtAction.SubActions.Count;
+									double slotStartAngle = (double)targetSlot * sweep - sweep / 2.0;
+									double relAngle = angleDeg - slotStartAngle;
+									while (relAngle < 0) relAngle += 360.0;
+									while (relAngle >= 360.0) relAngle -= 360.0;
+									double subSweep = sweep / tgtSubCount;
+									int targetSubIdx = (int)Math.Floor(relAngle / subSweep);
+									if (targetSubIdx >= tgtSubCount) targetSubIdx = tgtSubCount - 1;
+
+									if (targetSlot == srcSlot)
+									{
+										if (targetSubIdx != srcSubIdx)
+										{
+											ActionItem srcItem = srcList[srcSubIdx];
+											ActionItem tgtItem = srcList[targetSubIdx];
+											srcList[srcSubIdx] = tgtItem;
+											srcList[targetSubIdx] = srcItem;
+
+											SelectSubAction(srcSlot, targetSubIdx);
+											RefreshSlots();
+											RenderMappingsWheelPreview();
+											ScheduleAutoSave();
+
+											if (MappingsCurrentEditIndicator != null)
+											{
+												MappingsCurrentEditIndicator.Text = $"🎯 已对调二级动作顺序：[{srcItem.Name}] ↔ [{tgtItem.Name}]！";
+												MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+											}
+											return;
+										}
+									}
+									else
+									{
+										ActionItem srcItem = srcList[srcSubIdx];
+										ActionItem tgtItem = tgtAction.SubActions[targetSubIdx];
+										srcList[srcSubIdx] = tgtItem;
+										tgtAction.SubActions[targetSubIdx] = srcItem;
+
+										SelectSubAction(targetSlot, targetSubIdx);
+										RefreshSlots();
+										RenderMappingsWheelPreview();
+										ScheduleAutoSave();
+
+										if (MappingsCurrentEditIndicator != null)
+										{
+											MappingsCurrentEditIndicator.Text = $"🎯 已跨扇区对调二级动作：[{srcItem.Name}] ↔ [{tgtItem.Name}]！";
+											MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+										}
+										return;
+									}
+								}
+								else if (targetSlot != srcSlot)
+								{
+									ActionItem srcItem = srcList[srcSubIdx];
+									srcList.RemoveAt(srcSubIdx);
+									if (tgtAction.SubActions == null) tgtAction.SubActions = new List<ActionItem>();
+									tgtAction.SubActions.Add(srcItem);
+
+									SelectSubAction(targetSlot, tgtAction.SubActions.Count - 1);
+									RefreshSlots();
+									RenderMappingsWheelPreview();
+									ScheduleAutoSave();
+
+									if (MappingsCurrentEditIndicator != null)
+									{
+										MappingsCurrentEditIndicator.Text = $"🎯 已将二级动作 [{srcItem.Name}] 移动至目标扇区！";
+										MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+									}
+									return;
+								}
+							}
 						}
-						else if (targetSlot == -1)
+
+						RenderMappingsWheelPreview();
+						return;
+					}
+					else if (_dragSourceSlotIndex >= -1)
+					{
+						// === 一级主扇区 / 中心核圆拖拽换位 ===
+						int targetSlot = -999;
+						if (dist <= coreR)
 						{
-							srcName = (_dragSourceSlotIndex >= 0 && _dragSourceSlotIndex < profile.Actions.Count) ? profile.Actions[_dragSourceSlotIndex].Name : $"槽 {_dragSourceSlotIndex + 1}";
-							tgtName = profile.CenterAction?.Name ?? "中心核圆";
-							ActionItem temp = profile.CenterAction ?? new ActionItem { Name = "StarPie控制台", Type = "System", Parameter = "OpenSettings", IconKey = "Settings" };
-							profile.CenterAction = profile.Actions[_dragSourceSlotIndex];
-							profile.Actions[_dragSourceSlotIndex] = temp;
-							SelectCenterCore();
+							targetSlot = -1;
+						}
+						else if (dist <= outerR + 15.0)
+						{
+							targetSlot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
+						}
+
+						if (targetSlot != -999 && targetSlot != _dragSourceSlotIndex)
+						{
+							bool linkSubActions = ConfigManager.CurrentConfig?.LinkSubActionsWhenDragging ?? true;
+							string srcName = "";
+							string tgtName = "";
+
+							if (_dragSourceSlotIndex == -1)
+							{
+								srcName = profile.CenterAction?.Name ?? "中心核圆";
+								tgtName = (targetSlot >= 0 && targetSlot < profile.Actions.Count) ? profile.Actions[targetSlot].Name : $"槽 {targetSlot + 1}";
+
+								var tgtSub = profile.Actions[targetSlot].SubActions;
+								ActionItem temp = profile.CenterAction ?? new ActionItem { Name = "StarPie控制台", Type = "System", Parameter = "OpenSettings", IconKey = "Settings" };
+								profile.CenterAction = profile.Actions[targetSlot];
+								profile.Actions[targetSlot] = temp;
+
+								if (!linkSubActions)
+								{
+									profile.Actions[targetSlot].SubActions = tgtSub;
+									if (profile.CenterAction != null) profile.CenterAction.SubActions = null;
+								}
+
+								SelectPrimarySlot(targetSlot);
+							}
+							else if (targetSlot == -1)
+							{
+								srcName = (_dragSourceSlotIndex >= 0 && _dragSourceSlotIndex < profile.Actions.Count) ? profile.Actions[_dragSourceSlotIndex].Name : $"槽 {_dragSourceSlotIndex + 1}";
+								tgtName = profile.CenterAction?.Name ?? "中心核圆";
+
+								var srcSub = profile.Actions[_dragSourceSlotIndex].SubActions;
+								ActionItem temp = profile.CenterAction ?? new ActionItem { Name = "StarPie控制台", Type = "System", Parameter = "OpenSettings", IconKey = "Settings" };
+								profile.CenterAction = profile.Actions[_dragSourceSlotIndex];
+								profile.Actions[_dragSourceSlotIndex] = temp;
+
+								if (!linkSubActions)
+								{
+									profile.Actions[_dragSourceSlotIndex].SubActions = srcSub;
+									if (profile.CenterAction != null) profile.CenterAction.SubActions = null;
+								}
+
+								SelectCenterCore();
+							}
+							else
+							{
+								srcName = (_dragSourceSlotIndex >= 0 && _dragSourceSlotIndex < profile.Actions.Count) ? profile.Actions[_dragSourceSlotIndex].Name : $"槽 {_dragSourceSlotIndex + 1}";
+								tgtName = (targetSlot >= 0 && targetSlot < profile.Actions.Count) ? profile.Actions[targetSlot].Name : $"槽 {targetSlot + 1}";
+
+								var srcSub = profile.Actions[_dragSourceSlotIndex].SubActions;
+								var tgtSub = profile.Actions[targetSlot].SubActions;
+
+								ActionItem temp = profile.Actions[_dragSourceSlotIndex];
+								profile.Actions[_dragSourceSlotIndex] = profile.Actions[targetSlot];
+								profile.Actions[targetSlot] = temp;
+
+								if (!linkSubActions)
+								{
+									profile.Actions[_dragSourceSlotIndex].SubActions = srcSub;
+									profile.Actions[targetSlot].SubActions = tgtSub;
+								}
+
+								SelectPrimarySlot(targetSlot);
+							}
+
+							RefreshSlots();
+							RenderMappingsWheelPreview();
+							ScheduleAutoSave();
+
+							if (MappingsCurrentEditIndicator != null)
+							{
+								string linkNote = (!linkSubActions) ? "（保持各自二级子菜单不变）" : "";
+								MappingsCurrentEditIndicator.Text = $"🎯 已将 [{srcName}] 与 [{tgtName}] 成功对调位置{linkNote}！";
+								MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+							}
 						}
 						else
 						{
-							srcName = (_dragSourceSlotIndex >= 0 && _dragSourceSlotIndex < profile.Actions.Count) ? profile.Actions[_dragSourceSlotIndex].Name : $"槽 {_dragSourceSlotIndex + 1}";
-							tgtName = (targetSlot >= 0 && targetSlot < profile.Actions.Count) ? profile.Actions[targetSlot].Name : $"槽 {targetSlot + 1}";
-							ActionItem temp = profile.Actions[_dragSourceSlotIndex];
-							profile.Actions[_dragSourceSlotIndex] = profile.Actions[targetSlot];
-							profile.Actions[targetSlot] = temp;
-							SelectPrimarySlot(targetSlot);
-						}
-
-						RefreshSlots();
-						RenderMappingsWheelPreview();
-						ScheduleAutoSave();
-						if (MappingsCurrentEditIndicator != null)
-						{
-							MappingsCurrentEditIndicator.Text = $"🎯 已将 [{srcName}] 与 [{tgtName}] 成功对调位置！";
-							MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+							RenderMappingsWheelPreview();
 						}
 					}
-				}
-				else
-				{
-					RenderMappingsWheelPreview();
 				}
 			}
 			else
@@ -4233,6 +4411,49 @@ public partial class SettingsWindow : Window
 	private void MappingsZoomLabel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 	{
 		MappingsResetViewBtn_Click(sender, e);
+	}
+
+	private void UpdateLinkSubActionsButtonUi()
+	{
+		if (MappingsLinkSubActionsBtn == null || ConfigManager.CurrentConfig == null) return;
+		bool isLinked = ConfigManager.CurrentConfig.LinkSubActionsWhenDragging;
+		if (MappingsLinkSubActionsIcon != null)
+		{
+			MappingsLinkSubActionsIcon.Text = isLinked ? "🔗" : "⛓️‍💥";
+		}
+		if (MappingsLinkSubActionsText != null)
+		{
+			MappingsLinkSubActionsText.Text = isLinked ? "一二级链接: 开启" : "一二级链接: 关闭";
+			MappingsLinkSubActionsText.Foreground = (Brush)(TryFindResource(isLinked ? "AccentPrimaryBrush" : "TextSecondaryBrush") 
+				?? (isLinked ? Brushes.SkyBlue : Brushes.Gray));
+		}
+		MappingsLinkSubActionsBtn.Background = isLinked
+			? new SolidColorBrush(System.Windows.Media.Color.FromArgb(35, 56, 189, 248))
+			: (Brush)(TryFindResource("InputBackgroundBrush") ?? Brushes.Transparent);
+		MappingsLinkSubActionsBtn.BorderBrush = isLinked
+			? (Brush)(TryFindResource("AccentPrimaryBrush") ?? Brushes.SkyBlue)
+			: (Brush)(TryFindResource("CardBorderBrush") ?? Brushes.Gray);
+		MappingsLinkSubActionsBtn.ToolTip = isLinked
+			? "当前状态：【已开启链接】\n拖拽一级扇区时，将连同其绑定的二级子轮盘一起对调换位。\n点击可切换为关闭（解绑独立）。"
+			: "当前状态：【已关闭链接】\n拖拽一级扇区时，仅对调一级主功能，保留各方位现存的二级子菜单。\n点击可切换为开启（联动带走）。";
+	}
+
+	private void MappingsLinkSubActionsBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null) return;
+		ConfigManager.CurrentConfig.LinkSubActionsWhenDragging = !ConfigManager.CurrentConfig.LinkSubActionsWhenDragging;
+		UpdateLinkSubActionsButtonUi();
+		ScheduleAutoSave();
+		if (MappingsCurrentEditIndicator != null)
+		{
+			bool isLinked = ConfigManager.CurrentConfig.LinkSubActionsWhenDragging;
+			MappingsCurrentEditIndicator.Text = isLinked 
+				? "🔗 一二级联动已开启：拖拽一级扇区将连同其二级子轮盘一块换位" 
+				: "⛓️‍💥 一二级联动已解绑：拖拽一级扇区将仅对调主动作，原二级子轮盘保留在原方位";
+			MappingsCurrentEditIndicator.Foreground = isLinked 
+				? (Brush)FindResource("AccentPrimaryBrush") 
+				: (Brush)FindResource("TextSecondaryBrush");
+		}
 	}
 
 	#endregion
