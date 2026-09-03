@@ -577,6 +577,13 @@ public static class I18n
 			[LanguageCode.En] = "Open Folder",
 			[LanguageCode.Ja] = "フォルダー"
 		};
+		dictionary["ActionTypeWebUrlShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "打开网址",
+			[LanguageCode.ZhTw] = "開啟網址",
+			[LanguageCode.En] = "Open URL",
+			[LanguageCode.Ja] = "URLを開く"
+		};
 		dictionary["ActionTypeSystemShort"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "系统控制",

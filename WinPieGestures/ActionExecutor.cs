@@ -269,6 +269,10 @@ public static class ActionExecutor
 			case "String":
 				SendTextInput(action.Parameter);
 				break;
+			case "WebUrl":
+			case "Url":
+				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
+				break;
 			case "System":
 				ExecuteSystem(action.Parameter);
 				break;
@@ -426,6 +430,173 @@ public static class ActionExecutor
 		{
 		}
 		return false;
+	}
+
+	public static string? FindBrowserExecutable(string browserName)
+	{
+		string exeName = browserName.ToLowerInvariant() switch
+		{
+			"chrome" => "chrome.exe",
+			"edge" => "msedge.exe",
+			"firefox" => "firefox.exe",
+			_ => browserName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? browserName : (browserName + ".exe")
+		};
+
+		try
+		{
+			string subKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + exeName;
+			using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(subKey))
+			{
+				if (key?.GetValue(null) is string hklmPath && File.Exists(hklmPath))
+				{
+					return hklmPath;
+				}
+			}
+			using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(subKey))
+			{
+				if (key?.GetValue(null) is string hkcuPath && File.Exists(hkcuPath))
+				{
+					return hkcuPath;
+				}
+			}
+		}
+		catch
+		{
+		}
+
+		try
+		{
+			string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+			string progFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+			string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+			List<string> candidatePaths = new List<string>();
+			if (browserName.Equals("Chrome", StringComparison.OrdinalIgnoreCase))
+			{
+				candidatePaths.Add(Path.Combine(progFiles, @"Google\Chrome\Application\chrome.exe"));
+				candidatePaths.Add(Path.Combine(progFilesX86, @"Google\Chrome\Application\chrome.exe"));
+				candidatePaths.Add(Path.Combine(localAppData, @"Google\Chrome\Application\chrome.exe"));
+			}
+			else if (browserName.Equals("Edge", StringComparison.OrdinalIgnoreCase))
+			{
+				candidatePaths.Add(Path.Combine(progFilesX86, @"Microsoft\Edge\Application\msedge.exe"));
+				candidatePaths.Add(Path.Combine(progFiles, @"Microsoft\Edge\Application\msedge.exe"));
+			}
+			else if (browserName.Equals("Firefox", StringComparison.OrdinalIgnoreCase))
+			{
+				candidatePaths.Add(Path.Combine(progFiles, @"Mozilla Firefox\firefox.exe"));
+				candidatePaths.Add(Path.Combine(progFilesX86, @"Mozilla Firefox\firefox.exe"));
+			}
+
+			foreach (string path in candidatePaths)
+			{
+				if (File.Exists(path))
+				{
+					return path;
+				}
+			}
+		}
+		catch
+		{
+		}
+
+		return null;
+	}
+
+	private static void ExecuteWebUrl(string url, string? browserChoice, string? customBrowserPath)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+		{
+			return;
+		}
+		string target = url.Trim();
+		if (!target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+		    !target.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+		    !target.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase))
+		{
+			target = "https://" + target;
+		}
+
+		string browser = browserChoice?.Trim() ?? "Default";
+		AppLogger.LogInfo($"Executing WebUrl: URL='{target}', Browser='{browser}', CustomPath='{customBrowserPath}'");
+
+		try
+		{
+			if (browser.Equals("Chrome", StringComparison.OrdinalIgnoreCase))
+			{
+				string? chromeExe = FindBrowserExecutable("Chrome");
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = !string.IsNullOrEmpty(chromeExe) ? chromeExe : "chrome.exe",
+					Arguments = $"\"{target}\"",
+					UseShellExecute = true
+				});
+			}
+			else if (browser.Equals("Edge", StringComparison.OrdinalIgnoreCase))
+			{
+				string? edgeExe = FindBrowserExecutable("Edge");
+				if (!string.IsNullOrEmpty(edgeExe))
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = edgeExe,
+						Arguments = $"\"{target}\"",
+						UseShellExecute = true
+					});
+				}
+				else
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "microsoft-edge:" + target,
+						UseShellExecute = true
+					});
+				}
+			}
+			else if (browser.Equals("Firefox", StringComparison.OrdinalIgnoreCase))
+			{
+				string? firefoxExe = FindBrowserExecutable("Firefox");
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = !string.IsNullOrEmpty(firefoxExe) ? firefoxExe : "firefox.exe",
+					Arguments = $"\"{target}\"",
+					UseShellExecute = true
+				});
+			}
+			else if (browser.Equals("Custom", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(customBrowserPath) && File.Exists(customBrowserPath))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = customBrowserPath,
+					Arguments = $"\"{target}\"",
+					UseShellExecute = true
+				});
+			}
+			else
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = target,
+					UseShellExecute = true
+				});
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to open WebUrl '{target}' with browser '{browser}'", ex);
+			try
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = target,
+					UseShellExecute = true
+				});
+			}
+			catch (Exception ex2)
+			{
+				MessageBox.Show("无法打开目标网址: " + ex2.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
+		}
 	}
 
 	private static void ExecuteFolder(string folderPath)
@@ -831,6 +1002,16 @@ public static class ActionExecutor
 				ExecuteHotkey("Win+E");
 			}
 			break;
+		case "opensettings":
+		case "openstarpie":
+		case "starpie":
+		case "starpie控制台":
+		case "控制台":
+			Application.Current?.Dispatcher?.BeginInvoke((Action)delegate
+			{
+				App.MainSettingsWindow?.ShowSettings();
+			});
+			break;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -885,6 +1066,9 @@ public static class ActionExecutor
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
 			break;
+		case "lockworkstation":
+		case "锁定屏幕":
+		case "锁屏":
 		case "lock":
 			LockWorkStation();
 			break;

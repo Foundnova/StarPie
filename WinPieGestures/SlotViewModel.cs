@@ -132,6 +132,14 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new SystemPresetItem
 		{
+			Key = "OpenSettings",
+			Category = "系统工具",
+			DisplayName = "StarPie 控制台 (StarPie Settings)",
+			DefaultName = "StarPie控制台",
+			DefaultIconKey = "Settings"
+		},
+		new SystemPresetItem
+		{
 			Key = "Settings",
 			Category = "系统工具",
 			DisplayName = "Windows 设置 (Settings / Win+I)",
@@ -381,6 +389,14 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 					Name = I18n.T("ActionTypeFolderShort");
 				}
 			}
+			if ((value == "WebUrl" || value == "Url") && string.IsNullOrEmpty(IconKey))
+			{
+				IconKey = "Globe";
+				if (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作"))
+				{
+					Name = I18n.T("ActionTypeWebUrlShort");
+				}
+			}
 			if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作")))
 			{
 				Name = I18n.T("ActionTypeSwitchWindowShort");
@@ -409,6 +425,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
+			OnPropertyChanged("IsWebUrlType");
 			OnPropertyChanged("IsFolderType");
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
@@ -416,6 +433,37 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("IsTileType");
 		}
 	}
+
+	public bool IsWebUrlType => Type == "WebUrl" || Type == "Url";
+
+	public string BrowserChoice
+	{
+		get => Action.BrowserChoice ?? "Default";
+		set
+		{
+			if (Action.BrowserChoice != value)
+			{
+				Action.BrowserChoice = value;
+				OnPropertyChanged("BrowserChoice");
+				OnPropertyChanged("IsCustomBrowser");
+			}
+		}
+	}
+
+	public string BrowserPath
+	{
+		get => Action.BrowserPath ?? "";
+		set
+		{
+			if (Action.BrowserPath != value)
+			{
+				Action.BrowserPath = value;
+				OnPropertyChanged("BrowserPath");
+			}
+		}
+	}
+
+	public bool IsCustomBrowser => string.Equals(BrowserChoice, "Custom", StringComparison.OrdinalIgnoreCase);
 
 	public string Parameter
 	{
@@ -639,6 +687,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "WebUrl",
+			DisplayText = I18n.T("ActionTypeWebUrlShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "Folder",
 			DisplayText = I18n.T("ActionTypeFolderShort")
 		},
@@ -690,6 +743,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Tag = "Launch",
 			DisplayText = I18n.T("ActionTypeLaunchShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "WebUrl",
+			DisplayText = I18n.T("ActionTypeWebUrlShort")
 		},
 		new ActionTypeItem
 		{
