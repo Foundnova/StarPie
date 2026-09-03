@@ -785,6 +785,23 @@ public static class WindowTiler
 			return AutoGridCells(n); // AutoGrid：按数量自适应行列
 		}
 		List<double[]> fixedCells = new List<double[]>();
+		// 固定网格布局：窗口数等于名义格数时用其标准形状；否则回退"恰好覆盖 N 的无空格网格"，
+		// 避免窗口少时出现空位（先算窗口数，再定布局）。
+		int nominal = key switch
+		{
+			"2L" => 2,
+			"2T" => 2,
+			"3L12" => 3,
+			"3R21" => 3,
+			"3R" => 3,
+			"4G" => 4,
+			"6G" => 6,
+			_ => 0
+		};
+		if (nominal > 0 && n != nominal)
+		{
+			return ExactGridCells(n);
+		}
 		switch (key)
 		{
 		case "2L":
@@ -839,6 +856,38 @@ public static class WindowTiler
 		for (int i = 0; i < n; i++)
 		{
 			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
+		}
+		return cells;
+	}
+
+	/// <summary>恰好覆盖 n 个窗口的无空格网格（行列数取 n 最接近平方的因子分解）。</summary>
+	private static List<double[]> ExactGridCells(int n)
+	{
+		List<double[]> cells = new List<double[]>();
+		if (n <= 0)
+		{
+			return cells;
+		}
+		if (n == 1)
+		{
+			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
+			return cells;
+		}
+		int cols = (int)Math.Ceiling(Math.Sqrt(n));
+		while (cols > 1 && n % cols != 0)
+		{
+			cols--;
+		}
+		if (n % cols != 0)
+		{
+			cols = 1;
+		}
+		int rows = n / cols;
+		for (int i = 0; i < n; i++)
+		{
+			int r = i / cols;
+			int c = i % cols;
+			cells.Add(new[] { (double)c / cols, (double)r / rows, (double)(c + 1) / cols, (double)(r + 1) / rows });
 		}
 		return cells;
 	}
