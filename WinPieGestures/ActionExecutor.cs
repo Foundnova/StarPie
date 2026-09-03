@@ -250,6 +250,9 @@ public static class ActionExecutor
 			case "SwitchWindow":
 				ExecuteSwitchWindow(action.Parameter);
 				break;
+			case "Tile":
+				WindowTiler.ExecuteTile(action.Parameter);
+				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);

@@ -389,6 +389,14 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			{
 				NthWindowIndex = "1";
 			}
+			if (value == "Tile" && (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作")))
+			{
+				Name = I18n.T("ActionTypeTileShort");
+			}
+			if (value == "Tile" && string.IsNullOrWhiteSpace(Action.Parameter))
+			{
+				Action.Parameter = "2L";
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
@@ -396,6 +404,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("IsSystemType");
 			OnPropertyChanged("IsCommandType");
 			OnPropertyChanged("IsSwitchWindowType");
+			OnPropertyChanged("IsTileType");
 		}
 	}
 
@@ -636,6 +645,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "Tile",
+			DisplayText = I18n.T("ActionTypeTileShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -670,6 +684,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeItem
 		{
+			Tag = "Tile",
+			DisplayText = I18n.T("ActionTypeTileShort")
+		},
+		new ActionTypeItem
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -700,6 +719,39 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 	public bool IsCommandType => Type == "Command";
 
 	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	public bool IsTileType => Type == "Tile";
+
+	/// <summary>平铺布局下拉（key → 显示名）。</summary>
+	public List<ActionTypeOption> TileLayoutOptions
+	{
+		get
+		{
+			List<ActionTypeOption> list = new List<ActionTypeOption>();
+			foreach (string key in WindowTiler.LayoutKeys)
+			{
+				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });
+			}
+			return list;
+		}
+	}
+
+	/// <summary>平铺布局（写入 Parameter）。</summary>
+	public string TileLayout
+	{
+		get
+		{
+			return Action.Parameter ?? "";
+		}
+		set
+		{
+			if (Action.Parameter != value)
+			{
+				Action.Parameter = value;
+				OnPropertyChanged("TileLayout");
+			}
+		}
+	}
 
 	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
 	public string NthWindowIndex

@@ -1074,6 +1074,62 @@ public static class I18n
 			[LanguageCode.En] = "Enable custom outer-escape cancel action",
 			[LanguageCode.Ja] = "外側スワイプキャンセル時のカスタム動作を有効化"
 		};
+		dictionary["ActionTypeTileShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "平铺窗口",
+			[LanguageCode.ZhTw] = "平鋪視窗",
+			[LanguageCode.En] = "Tile Windows",
+			[LanguageCode.Ja] = "ウィンドウを並べる"
+		};
+		dictionary["TileLayout2L"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左右对半",
+			[LanguageCode.ZhTw] = "左右對半",
+			[LanguageCode.En] = "Left-Right",
+			[LanguageCode.Ja] = "左右分割"
+		};
+		dictionary["TileLayout2T"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "上下对半",
+			[LanguageCode.ZhTw] = "上下對半",
+			[LanguageCode.En] = "Top-Bottom",
+			[LanguageCode.Ja] = "上下分割"
+		};
+		dictionary["TileLayout3L12"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "左大列 + 右上/右下",
+			[LanguageCode.ZhTw] = "左大列 + 右上/右下",
+			[LanguageCode.En] = "Big Left + Right Two",
+			[LanguageCode.Ja] = "左大＋右二"
+		};
+		dictionary["TileLayout3R21"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "右大列 + 左上/左下",
+			[LanguageCode.ZhTw] = "右大列 + 左上/左下",
+			[LanguageCode.En] = "Big Right + Left Two",
+			[LanguageCode.Ja] = "右大＋左二"
+		};
+		dictionary["TileLayout3R"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "三等分竖列",
+			[LanguageCode.ZhTw] = "三等分豎列",
+			[LanguageCode.En] = "Three Columns",
+			[LanguageCode.Ja] = "3等分列"
+		};
+		dictionary["TileLayout4G"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "四宫格 2×2",
+			[LanguageCode.ZhTw] = "四宮格 2×2",
+			[LanguageCode.En] = "2×2 Grid",
+			[LanguageCode.Ja] = "2×2 グリッド"
+		};
+		dictionary["TileLayout6G"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "六宫格 3×2",
+			[LanguageCode.ZhTw] = "六宮格 3×2",
+			[LanguageCode.En] = "3×2 Grid",
+			[LanguageCode.Ja] = "3×2 グリッド"
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",

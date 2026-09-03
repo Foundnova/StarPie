@@ -83,6 +83,7 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 				OnPropertyChanged(nameof(IsSystemType));
 				OnPropertyChanged(nameof(IsCommandType));
 				OnPropertyChanged(nameof(IsSwitchWindowType));
+				OnPropertyChanged(nameof(IsTileType));
 			}
 		}
 	}
@@ -98,6 +99,39 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 	public bool IsCommandType => Type == "Command";
 
 	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	public bool IsTileType => Type == "Tile";
+
+	/// <summary>平铺布局下拉（key → 显示名）。</summary>
+	public List<ActionTypeOption> TileLayoutOptions
+	{
+		get
+		{
+			List<ActionTypeOption> list = new List<ActionTypeOption>();
+			foreach (string key in WindowTiler.LayoutKeys)
+			{
+				list.Add(new ActionTypeOption { Tag = key, DisplayText = WindowTiler.LayoutDisplayName(key) });
+			}
+			return list;
+		}
+	}
+
+	/// <summary>平铺布局（写入 Parameter）。</summary>
+	public string TileLayout
+	{
+		get
+		{
+			return Mapping.Action.Parameter ?? "";
+		}
+		set
+		{
+			if (Mapping.Action.Parameter != value)
+			{
+				Mapping.Action.Parameter = value;
+				OnPropertyChanged(nameof(TileLayout));
+			}
+		}
+	}
 
 	/// <summary>命令动作的终端选项。</summary>
 	public List<ActionTypeItem> Terminals => SlotViewModel.LocalizedTerminals;
