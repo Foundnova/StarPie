@@ -780,7 +780,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		}
 	}
 
-	/// <summary>一键预置 7 个子布局（主动作=级联，子项=各布局的平铺）。</summary>
+	/// <summary>一键预置子项：7 种布局 + 「恢复上次平铺」（级联子菜单 = 布局/还原选择器）。</summary>
 	public void PopulateTileSubActions()
 	{
 		List<ActionItem> list = new List<ActionItem>();
@@ -788,6 +788,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			list.Add(new ActionItem { Type = "Tile", Parameter = key, Name = WindowTiler.LayoutDisplayName(key) });
 		}
+		list.Add(new ActionItem { Type = "Tile", Parameter = WindowTiler.RestoreParam, Name = I18n.T("TileRestoreAllLabel") });
 		Action.SubActions = list;
 		NotifySubActionsChanged();
 	}

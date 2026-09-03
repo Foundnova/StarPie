@@ -819,7 +819,7 @@
                                   <ColumnDefinition Width="34" />
                                 </Grid.ColumnDefinitions>
                                 <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" ToolTip="平铺布局预设（含循环切换）" />
-                                <Button Grid.Column="1" Content="⇅" Height="30" Width="32" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="TilePresetSubs_Click" ToolTip="一键生成 7 个子布局：级联菜单即布局选择器" />
+                                <Button Grid.Column="1" Content="⇅" Height="30" Width="32" Margin="4,0,0,0" Padding="0" FontSize="12" Style="{StaticResource ModernButtonStyle}" Click="TilePresetSubs_Click" ToolTip="一键生成子布局与「恢复上次平铺」：级联菜单即布局/还原选择器" />
                               </Grid>
                           </Grid>
                           <TextBox Grid.Column="2" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（可选）" />
