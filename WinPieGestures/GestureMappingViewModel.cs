@@ -158,6 +158,11 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		OnPropertyChanged(nameof(IsCommandType));
 		OnPropertyChanged(nameof(IsSwitchWindowType));
 		OnPropertyChanged(nameof(IsTileType));
+		OnPropertyChanged(nameof(IsOcrType));
+		OnPropertyChanged(nameof(CanInheritAppIcon));
+		OnPropertyChanged(nameof(InheritAppIconPath));
+		OnPropertyChanged(nameof(HasInheritedAppIcon));
+		OnPropertyChanged(nameof(RunAsStandardUser));
 		OnPropertyChanged(nameof(IsWindowManagerType));
 		OnPropertyChanged(nameof(WindowManagerSubMode));
 		OnPropertyChanged(nameof(IsTileSubMode));
@@ -217,6 +222,33 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 	public bool IsSwitchWindowType => Type == "SwitchWindow";
 
 	public bool IsTileType => Type == "Tile";
+
+	public bool IsOcrType => Type == "Ocr" || Type == "ScreenOcr";
+
+	public bool CanInheritAppIcon => Type != "Launch" && Type != "App";
+
+	public string? InheritAppIconPath
+	{
+		get => Mapping.Action.InheritAppIconPath;
+		set
+		{
+			Mapping.Action.InheritAppIconPath = value;
+			OnPropertyChanged(nameof(InheritAppIconPath));
+			OnPropertyChanged(nameof(HasInheritedAppIcon));
+		}
+	}
+
+	public bool HasInheritedAppIcon => !string.IsNullOrWhiteSpace(InheritAppIconPath);
+
+	public bool RunAsStandardUser
+	{
+		get => Mapping.Action.RunAsStandardUser;
+		set
+		{
+			Mapping.Action.RunAsStandardUser = value;
+			OnPropertyChanged(nameof(RunAsStandardUser));
+		}
+	}
 
 	/// <summary>平铺布局下拉（key → 显示名）。</summary>
 	public List<ActionTypeOption> TileLayoutOptions

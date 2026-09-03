@@ -163,7 +163,23 @@
         <!-- Main Key Selector Card -->
         <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
-            <TextBlock Text="2. 主按键选择 (Main Key)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" />
+            <Grid Margin="0,0,0,6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="2. 主按键选择 (Main Key)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="💡 可输入关键字快速过滤" Grid.Column="1" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+            </Grid>
+            <!-- 检索输入框 -->
+            <Grid Margin="0,0,0,6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Name="MainKeySearchBox" Height="28" VerticalContentAlignment="Center" Padding="6,2" FontSize="11.5" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource InputBorderBrush}" TextChanged="MainKeySearchBox_TextChanged" ToolTip="输入按键关键字（如 Pause、F5、Tab、A、Enter 等）即时过滤检索" />
+              <Button Name="MainKeyClearSearchBtn" Grid.Column="1" Content="✕" ToolTip="清空筛选" Width="28" Height="28" Margin="4,0,0,0" Style="{StaticResource DlgBtnStyle}" Padding="0" Click="MainKeyClearSearchBtn_Click" Visibility="Collapsed" />
+            </Grid>
             <ComboBox Name="MainKeyComboBox" Height="30" SelectionChanged="OnComboChanged">
               <ComboBoxItem Content="(无主键 / 仅修饰键组合，如 Shift+Alt)" Tag="" />
               <ComboBoxItem Content="Tab (切换焦点/窗口)" Tag="Tab" />
@@ -230,6 +246,7 @@
               <ComboBoxItem Content="8" Tag="8" />
               <ComboBoxItem Content="9" Tag="9" />
               <ComboBoxItem Content="PrintScreen (截屏)" Tag="PrintScreen" />
+              <ComboBoxItem Content="Pause / Break (暂停)" Tag="Pause" />
               <ComboBoxItem Content="CapsLock (大小写)" Tag="CapsLock" />
               <ComboBoxItem Content="Num0" Tag="Num0" />
               <ComboBoxItem Content="Num1" Tag="Num1" />

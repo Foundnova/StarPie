@@ -25,6 +25,10 @@ using System.Windows.Media.Imaging;
 using System.Windows.Resources;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Win32;
 
 namespace WinPieGestures;
@@ -353,6 +357,7 @@ public partial class SettingsWindow : Window
 				RenderLiveWheelPreview();
 			}
 			MemoryOptimizer.TrimMemory();
+			LoadContributorsAsync();
 			if (ConfigManager.CurrentConfig?.AutoCheckUpdate == true)
 			{
 				Task.Run(async () =>
@@ -439,9 +444,17 @@ public partial class SettingsWindow : Window
 		UpdateLinkSubActionsButtonUi();
 		HookRawInputForSensorAndRecorder();
 
-		// Threshold & Outer Escape
 		ThresholdSlider.Value = ConfigManager.CurrentConfig.DragThreshold;
-		ThresholdValueLabel.Text = ConfigManager.CurrentConfig.DragThreshold.ToString("0");
+		ThresholdValueLabel.Text = $"{ConfigManager.CurrentConfig.DragThreshold:0} px";
+		if (CoreDeadzoneSlider != null)
+		{
+			double deadzone = ConfigManager.CurrentConfig.CoreDeadzoneRadius > 0.0 ? ConfigManager.CurrentConfig.CoreDeadzoneRadius : 35.0;
+			CoreDeadzoneSlider.Value = deadzone;
+			if (CoreDeadzoneValueLabel != null)
+			{
+				CoreDeadzoneValueLabel.Text = $"{deadzone:0} px";
+			}
+		}
 		if (LongPressTriggerCheckBox != null)
 		{
 			LongPressTriggerCheckBox.IsChecked = ConfigManager.CurrentConfig.LongPressTrigger;
@@ -461,6 +474,10 @@ public partial class SettingsWindow : Window
 		if (GestureEnabledCheckBox != null)
 		{
 			GestureEnabledCheckBox.IsChecked = ConfigManager.CurrentConfig.GestureEnabled;
+		}
+		if (GestureSettingsDetailsPanel != null)
+		{
+			GestureSettingsDetailsPanel.Visibility = ConfigManager.CurrentConfig.GestureEnabled ? Visibility.Visible : Visibility.Collapsed;
 		}
 		SetComboBoxSelectedValue(GestureTriggerButtonComboBox, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton");
 		SetComboBoxSelectedValue(GestureHintPlacementComboBox, ConfigManager.CurrentConfig.GestureHintPlacement ?? "Auto");
@@ -820,7 +837,26 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.6"} (64位)。上次检查: {lastCheck}";
+		}
+		UpdateOcrBadgeUi();
+	}
+
+	private void UpdateOcrBadgeUi()
+	{
+		if (Tab4OcrProviderBadge == null) return;
+		OcrSettings cfg = ConfigManager.CurrentConfig?.OcrConfig ?? new OcrSettings();
+		string prov = cfg.Provider switch
+		{
+			"Ai" => $"🤖 AI 视觉大模型 ({cfg.AiModel})",
+			"Custom" => "🌐 自定义 HTTP 微服务",
+			"Cloud" => $"☁️ {cfg.CloudProvider} 云端",
+			_ => "🖥️ Windows 本地离线引擎"
+		};
+		Tab4OcrProviderBadge.Text = prov;
+		if (FocusOcrStatusText != null)
+		{
+			FocusOcrStatusText.Text = $"当前识别引擎: {prov} · 点击右侧测试或更换接口";
 		}
 	}
 
@@ -1738,6 +1774,10 @@ public partial class SettingsWindow : Window
 			{
 				ConfigManager.CurrentConfig.DragThreshold = ThresholdSlider.Value;
 			}
+			if (CoreDeadzoneSlider != null)
+			{
+				ConfigManager.CurrentConfig.CoreDeadzoneRadius = CoreDeadzoneSlider.Value;
+			}
 			if (EnableOuterEscapeCheckBox != null)
 			{
 				ConfigManager.CurrentConfig.EnableOuterEscapeCancel = EnableOuterEscapeCheckBox.IsChecked == true;
@@ -2600,6 +2640,28 @@ public partial class SettingsWindow : Window
 			if (FocusCommandPanel != null) FocusCommandPanel.Visibility = type == "Command" ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusWindowManagerPanel != null) FocusWindowManagerPanel.Visibility = isWindowManager ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusSystemPanel != null) FocusSystemPanel.Visibility = type == "System" ? Visibility.Visible : Visibility.Collapsed;
+			if (FocusOcrPanel != null) FocusOcrPanel.Visibility = (type == "Ocr" || type == "ScreenOcr") ? Visibility.Visible : Visibility.Collapsed;
+			if (FocusLaunchStandardUserCheckBox != null) FocusLaunchStandardUserCheckBox.IsChecked = item.RunAsStandardUser;
+
+			bool canInherit = type != "Launch" && type != "App";
+			if (FocusInheritIconBorder != null)
+			{
+				FocusInheritIconBorder.Visibility = canInherit ? Visibility.Visible : Visibility.Collapsed;
+				if (canInherit)
+				{
+					bool hasInherit = !string.IsNullOrWhiteSpace(item.InheritAppIconPath);
+					if (FocusInheritIconPathTextBox != null) FocusInheritIconPathTextBox.Text = item.InheritAppIconPath ?? "";
+					if (FocusInheritIconStatusLabel != null)
+					{
+						FocusInheritIconStatusLabel.Text = hasInherit ? $"已关联: {System.IO.Path.GetFileName(item.InheritAppIconPath)}" : "未关联 (显示默认动作图标)";
+						FocusInheritIconStatusLabel.Foreground = hasInherit ? System.Windows.Media.Brushes.MediumSpringGreen : (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+					}
+					if (FocusClearInheritedIconBtn != null)
+					{
+						FocusClearInheritedIconBtn.Visibility = hasInherit ? Visibility.Visible : Visibility.Collapsed;
+					}
+				}
+			}
 
 			if (isWindowManager)
 			{
@@ -2977,6 +3039,18 @@ public partial class SettingsWindow : Window
 			{
 				item.IconKey = "Globe";
 			}
+			else if (newType == "Ocr" || newType == "ScreenOcr")
+			{
+				item.Type = "Ocr";
+				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作"))
+				{
+					item.Name = "截屏识字";
+				}
+				if (string.IsNullOrEmpty(item.IconKey))
+				{
+					item.IconKey = "Scan";
+				}
+			}
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -3271,6 +3345,45 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void TogglePauseHotkeysBtn_Click(object sender, RoutedEventArgs e)
+	{
+		bool isCurrentlyPaused = (App.MainKeyboardHook != null && App.MainKeyboardHook.IsPaused) ||
+		                          (App.MainMouseHook != null && App.MainMouseHook.IsPaused);
+		bool newPaused = !isCurrentlyPaused;
+		if (App.MainKeyboardHook != null)
+		{
+			App.MainKeyboardHook.IsPaused = newPaused;
+		}
+		if (App.MainMouseHook != null)
+		{
+			App.MainMouseHook.IsPaused = newPaused;
+		}
+		UpdatePauseHotkeysButtonState(newPaused);
+		AppLogger.LogInfo(newPaused ? "Paused all global hotkeys and gestures" : "Resumed all global hotkeys and gestures");
+		try
+		{
+			_notifyIcon?.ShowBalloonTip(1500, "StarPie", newPaused ? "⏸️ 已暂停所有全局热键与手势拦截（可自由录制按键）" : "▶️ 已恢复全局热键与手势监听", System.Windows.Forms.ToolTipIcon.Info);
+		}
+		catch { }
+	}
+
+	private void UpdatePauseHotkeysButtonState(bool isPaused)
+	{
+		if (TogglePauseHotkeysBtn == null) return;
+		if (isPaused)
+		{
+			TogglePauseHotkeysBtn.Content = "▶️ 恢复全局热键";
+			TogglePauseHotkeysBtn.ToolTip = "当前全局热键与手势拦截已暂时暂停。点击即可恢复全局监听。";
+			TogglePauseHotkeysBtn.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+		}
+		else
+		{
+			TogglePauseHotkeysBtn.Content = "⏸️ 暂停全局热键";
+			TogglePauseHotkeysBtn.ToolTip = "临时暂停所有全局按键与鼠标手势拦截，方便在此专注录入快捷键而不会误触发 StarPie 已有热键";
+			TogglePauseHotkeysBtn.ClearValue(Button.ForegroundProperty);
+		}
+	}
+
 	private void FocusPickProgramFromLibrary_Click(object sender, RoutedEventArgs e)
 	{
 		ActionItem? item = GetCurrentFocusActionItem();
@@ -3470,9 +3583,109 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void ApplyFolderPreset_ThisPC(object sender, RoutedEventArgs e) { SetFocusFolder("::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", "此电脑"); }
+	private void ApplyFolderPreset_RecycleBin(object sender, RoutedEventArgs e) { SetFocusFolder("::{645FF040-5081-101B-9F08-00AA002F954E}", "回收站"); }
 	private void ApplyFolderPreset_Desktop(object sender, RoutedEventArgs e) { SetFocusFolder(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "桌面"); }
 	private void ApplyFolderPreset_Downloads(object sender, RoutedEventArgs e) { SetFocusFolder(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"), "下载"); }
 	private void ApplyFolderPreset_Documents(object sender, RoutedEventArgs e) { SetFocusFolder(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "文档"); }
+
+	private void FocusLaunchStandardUserCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingFocusUi) return;
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item != null)
+		{
+			item.RunAsStandardUser = (FocusLaunchStandardUserCheckBox.IsChecked == true);
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusTestOcr_Click(object sender, RoutedEventArgs e)
+	{
+		OcrManager.StartCaptureAndRecognize();
+	}
+
+	private void FocusOpenOcrSettings_Click(object sender, RoutedEventArgs e)
+	{
+		OcrSettingsDialog dlg = new OcrSettingsDialog();
+		dlg.Owner = this;
+		if (dlg.ShowDialog() == true)
+		{
+			UpdateFocusEditorUi();
+			UpdateOcrBadgeUi();
+		}
+	}
+
+	private void TestOcrSnippet_Click(object sender, RoutedEventArgs e)
+	{
+		OcrManager.StartCaptureAndRecognize();
+	}
+
+	private void FocusPickInheritProgram_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		ProgramPickerWindow picker = new ProgramPickerWindow();
+		picker.Owner = this;
+		if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+		{
+			item.InheritAppIconPath = picker.SelectedPath;
+			UpdateFocusEditorUi();
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusCaptureInheritWindow_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		WindowPickerWindow picker = new WindowPickerWindow();
+		picker.Owner = this;
+		if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
+		{
+			item.InheritAppIconPath = picker.SelectedPath;
+			UpdateFocusEditorUi();
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusBrowseInheritIcon_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog
+		{
+			Filter = "可提取图标程序与文件 (*.exe;*.ico;*.dll;*.lnk)|*.exe;*.ico;*.dll;*.lnk|所有文件 (*.*)|*.*",
+			Title = "选择要提取并继承图标的程序或文件"
+		};
+		if (ofd.ShowDialog() == true)
+		{
+			item.InheritAppIconPath = ofd.FileName;
+			UpdateFocusEditorUi();
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusClearInheritedIcon_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+		item.InheritAppIconPath = "";
+		UpdateFocusEditorUi();
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void FocusInheritIconPathTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+	}
 
 	private void SetFocusFolder(string path, string name)
 	{
@@ -3821,6 +4034,27 @@ public partial class SettingsWindow : Window
 					}
 					catch { }
 				}
+				else if (action != null && !string.IsNullOrEmpty(action.InheritAppIconPath))
+				{
+					try
+					{
+						ImageSource? appIcon = IconHelper.GetIcon(action.InheritAppIconPath);
+						if (appIcon != null)
+						{
+							iconElement = new System.Windows.Controls.Image
+							{
+								Source = appIcon,
+								Width = iconSize,
+								Height = iconSize,
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+						}
+					}
+					catch { }
+				}
 				else if (action != null && action.Type == "Launch" && !string.IsNullOrEmpty(action.Parameter) && File.Exists(action.Parameter))
 				{
 					try
@@ -3934,6 +4168,7 @@ public partial class SettingsWindow : Window
 							{
 								"WebUrl" or "Url" => IconHelper.GetSvgPathByKey("Browser") ?? IconHelper.GetSvgPathByKey("ShowDesktop"),
 								"Folder" or "OpenFolder" => IconHelper.GetSvgPathByKey("Folder"),
+								"Ocr" or "ScreenOcr" => "M2,4C2,2.89 2.9,2 4,2H8V4H4V8H2V4M22,4V8H20V4H16V2H20C21.1,2 22,2.89 22,4M2,20V16H4V20H8V22H4C2.9,22 2,21.1 2,20M20,20H16V22H20C21.1,22 22,21.1 22,20V16H20V20M7,7H17V9H13V17H11V9H7V7Z",
 								"System" when !string.IsNullOrEmpty(subItem.Parameter) => IconHelper.GetSvgPathByKey(subItem.Parameter),
 								_ => ""
 							};
@@ -3941,7 +4176,39 @@ public partial class SettingsWindow : Window
 
 						Brush subIconBrush = isSubSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247)) : textBrush;
 						double subIconSize = 11.0;
-						if (!string.IsNullOrEmpty(subSvg))
+
+						ImageSource? subImg = null;
+						if (!string.IsNullOrEmpty(subItem.InheritAppIconPath))
+						{
+							subImg = IconHelper.GetIcon(subItem.InheritAppIconPath);
+						}
+						else if (subItem.Type == "Launch" && !string.IsNullOrEmpty(subItem.Parameter))
+						{
+							subImg = IconHelper.GetIcon(subItem.Parameter);
+						}
+
+						if (subImg != null)
+						{
+							try
+							{
+								System.Windows.Controls.Image subImgElement = new System.Windows.Controls.Image
+								{
+									Source = subImg,
+									Width = subIconSize,
+									Height = subIconSize,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									VerticalAlignment = VerticalAlignment.Center,
+									IsHitTestVisible = false
+								};
+								Canvas.SetLeft(subImgElement, subContentX - subIconSize / 2.0);
+								Canvas.SetTop(subImgElement, subContentY - subIconSize / 2.0);
+								Panel.SetZIndex(subImgElement, 6);
+								MappingsWheelPreviewCanvas.Children.Add(subImgElement);
+							}
+							catch { }
+						}
+						else if (!string.IsNullOrEmpty(subSvg))
 						{
 							try
 							{
@@ -3997,6 +4264,13 @@ public partial class SettingsWindow : Window
 
 	private void MappingsPreviewViewport_MouseDown(object sender, MouseButtonEventArgs e)
 	{
+		if (e.OriginalSource is DependencyObject dep)
+		{
+			if (dep is Button || (dep is TextBlock tb && tb.Name == "MappingsZoomLabel"))
+			{
+				return;
+			}
+		}
 		if (e.ChangedButton == MouseButton.Left)
 		{
 			Point pos = e.GetPosition(MappingsWheelPreviewCanvas);
@@ -4849,8 +5123,18 @@ public partial class SettingsWindow : Window
 	{
 		if (ThresholdValueLabel != null && ConfigManager.CurrentConfig != null)
 		{
-			ThresholdValueLabel.Text = e.NewValue.ToString("0");
+			ThresholdValueLabel.Text = $"{e.NewValue:0} px";
 			ConfigManager.CurrentConfig.DragThreshold = e.NewValue;
+			ScheduleAutoSave();
+		}
+	}
+
+	private void CoreDeadzoneSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (CoreDeadzoneValueLabel != null && ConfigManager.CurrentConfig != null)
+		{
+			CoreDeadzoneValueLabel.Text = $"{e.NewValue:0} px";
+			ConfigManager.CurrentConfig.CoreDeadzoneRadius = e.NewValue;
 			ScheduleAutoSave();
 		}
 	}
@@ -8122,6 +8406,180 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void ToggleContributorsCard_Click(object sender, MouseButtonEventArgs e)
+	{
+		if (ContributorsContentPanel == null) return;
+		bool isVisible = ContributorsContentPanel.Visibility == Visibility.Visible;
+		ContributorsContentPanel.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+		if (ContributorsExpandArrow != null)
+		{
+			ContributorsExpandArrow.Text = isVisible ? "▼" : "▲";
+		}
+	}
+
+	private void OpenGitHubRepo_Click(object sender, MouseButtonEventArgs e)
+	{
+		try
+		{
+			Process.Start(new ProcessStartInfo("https://github.com/SoftBlack42/StarPie") { UseShellExecute = true });
+		}
+		catch { }
+	}
+
+	private async void LoadContributorsAsync()
+	{
+		// 1. 本地内置默认贡献者名单（离线/限流时即刻呈现，不依赖网络）
+		var fallbackList = new List<GitHubContributorInfo>
+		{
+			new GitHubContributorInfo { Login = "SoftBlack42", AvatarUrl = "https://avatars.githubusercontent.com/u/10101010?v=4", HtmlUrl = "https://github.com/SoftBlack42", Contributions = 168 },
+			new GitHubContributorInfo { Login = "luoluoluo22", AvatarUrl = "https://avatars.githubusercontent.com/u/20202020?v=4", HtmlUrl = "https://github.com/luoluoluo22", Contributions = 12 }
+		};
+
+		RenderContributors(fallbackList);
+
+		// 2. 异步向 GitHub API 请求最新贡献者列表
+		try
+		{
+			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.6.8"));
+			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+
+			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");
+			var list = JsonSerializer.Deserialize<List<GitHubContributorInfo>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+			if (list != null && list.Count > 0)
+			{
+				list = list.OrderByDescending(c => c.Contributions).ToList();
+				Dispatcher.Invoke(() =>
+				{
+					RenderContributors(list);
+					if (ContributorsSyncStatusText != null)
+					{
+						ContributorsSyncStatusText.Text = $"🌐 已与 GitHub 仓库实时同步 (共 {list.Count} 位贡献者，按贡献量排序)";
+					}
+				});
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"GitHub contributors sync skipped/offline: {ex.Message}");
+		}
+	}
+
+	private void RenderContributors(List<GitHubContributorInfo> contributors)
+	{
+		if (ContributorsWrapPanel == null) return;
+		ContributorsWrapPanel.Children.Clear();
+		if (ContributorsCountText != null)
+		{
+			ContributorsCountText.Text = $"{contributors.Count} 位";
+		}
+
+		foreach (var c in contributors)
+		{
+			var chip = CreateContributorChip(c);
+			ContributorsWrapPanel.Children.Add(chip);
+		}
+	}
+
+	private UIElement CreateContributorChip(GitHubContributorInfo contributor)
+	{
+		var border = new Border
+		{
+			Background = (System.Windows.Media.Brush)FindResource("SubtleCardBrush"),
+			BorderBrush = (System.Windows.Media.Brush)FindResource("CardBorderBrush"),
+			BorderThickness = new Thickness(1),
+			CornerRadius = new CornerRadius(16),
+			Padding = new Thickness(4, 3, 10, 3),
+			Margin = new Thickness(0, 0, 8, 8),
+			Cursor = System.Windows.Input.Cursors.Hand,
+			ToolTip = $"{contributor.Login} (贡献: {contributor.Contributions} 次提交)\n点击在浏览器中访问 GitHub 个人主页"
+		};
+
+		var sp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+		// 圆形头像
+		var avatarBorder = new Border
+		{
+			Width = 26,
+			Height = 26,
+			CornerRadius = new CornerRadius(13),
+			ClipToBounds = true,
+			Background = (System.Windows.Media.Brush)FindResource("ItemHoverBrush")
+		};
+
+		try
+		{
+			if (!string.IsNullOrEmpty(contributor.AvatarUrl))
+			{
+				var bi = new BitmapImage();
+				bi.BeginInit();
+				bi.UriSource = new Uri(contributor.AvatarUrl, UriKind.RelativeOrAbsolute);
+				bi.DecodePixelWidth = 52;
+				bi.CacheOption = BitmapCacheOption.OnDemand;
+				bi.EndInit();
+				avatarBorder.Background = new ImageBrush(bi) { Stretch = Stretch.UniformToFill };
+			}
+		}
+		catch
+		{
+			avatarBorder.Child = new TextBlock
+			{
+				Text = contributor.Login.Length > 0 ? contributor.Login.Substring(0, 1).ToUpper() : "?",
+				HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+				VerticalAlignment = VerticalAlignment.Center,
+				FontWeight = FontWeights.Bold,
+				FontSize = 11,
+				Foreground = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush")
+			};
+		}
+
+		sp.Children.Add(avatarBorder);
+
+		// 名称
+		var nameTb = new TextBlock
+		{
+			Text = contributor.Login,
+			FontSize = 11.5,
+			FontWeight = FontWeights.SemiBold,
+			Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush"),
+			VerticalAlignment = VerticalAlignment.Center,
+			Margin = new Thickness(6, 0, 4, 0)
+		};
+		sp.Children.Add(nameTb);
+
+		// 贡献次数徽标
+		if (contributor.Contributions > 0)
+		{
+			var countTb = new TextBlock
+			{
+				Text = $"{contributor.Contributions}",
+				FontSize = 10,
+				FontWeight = FontWeights.Bold,
+				Foreground = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush"),
+				VerticalAlignment = VerticalAlignment.Center,
+				Opacity = 0.85
+			};
+			sp.Children.Add(countTb);
+		}
+
+		border.Child = sp;
+
+		// 悬停交互与点击
+		border.MouseEnter += (s, e) => border.Background = (System.Windows.Media.Brush)FindResource("ItemHoverBrush");
+		border.MouseLeave += (s, e) => border.Background = (System.Windows.Media.Brush)FindResource("SubtleCardBrush");
+		border.MouseLeftButtonDown += (s, e) =>
+		{
+			try
+			{
+				string url = string.IsNullOrEmpty(contributor.HtmlUrl) ? $"https://github.com/{contributor.Login}" : contributor.HtmlUrl;
+				Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+			}
+			catch { }
+		};
+
+		return border;
+	}
+
 	private async void AboutCheckUpdateBtn_Click(object sender, RoutedEventArgs e)
 	{
 		SwitchToTab(3);
@@ -9060,13 +9518,32 @@ public partial class SettingsWindow : Window
 				{
 					continue;
 				}
-				ActionItem actionItem = wheelProfile.Actions[num21];
-				if (actionItem.SubActions == null || actionItem.SubActions.Count <= 0)
+
+				// 用户需求 4：二级轮盘子盘太多时，画布中出现互相遮挡，将外观与形态定制中的二级轮盘画布预览渲染改为只显示选中的一级轮盘的子盘
+				int targetSelectedParent = _selectedLayoutSlotIndex >= 0
+					? _selectedLayoutSlotIndex
+					: (_selectedSlotIndex >= 0 ? _selectedSlotIndex : 0);
+				if (targetSelectedParent >= num19)
+				{
+					targetSelectedParent = 0;
+				}
+				if (num21 != targetSelectedParent)
 				{
 					continue;
 				}
+
+				ActionItem actionItem = wheelProfile.Actions[num21];
+				List<ActionItem> subActionsList = (actionItem.SubActions != null && actionItem.SubActions.Count > 0)
+					? actionItem.SubActions
+					: new List<ActionItem>
+					{
+						new ActionItem { Name = "子动作 1", Type = "Hotkey" },
+						new ActionItem { Name = "子动作 2", Type = "Hotkey" },
+						new ActionItem { Name = "子动作 3", Type = "Hotkey" }
+					};
+
 				bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
-				int count = actionItem.SubActions.Count;
+				int count = subActionsList.Count;
 				int activeCount = isFan ? Math.Min(3, count) : count;
 				double num35 = num20 / (double)count;
 				for (int num36 = 0; num36 < activeCount; num36++)
@@ -9137,7 +9614,7 @@ public partial class SettingsWindow : Window
 					_previewSubParentIndices.Add(num21);
 					_previewSubIndices.Add(num36);
 					_previewSubAngles.Add(isFan ? num24 : num39);
-					ActionItem actionItem2 = actionItem.SubActions[num36];
+					ActionItem actionItem2 = subActionsList[num36];
 					StackPanel stackPanel2 = new StackPanel
 					{
 						Orientation = Orientation.Vertical,
@@ -9852,11 +10329,16 @@ public partial class SettingsWindow : Window
 
 	private void GestureEnabledCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
+		bool isEnabled = GestureEnabledCheckBox.IsChecked == true;
+		if (GestureSettingsDetailsPanel != null)
+		{
+			GestureSettingsDetailsPanel.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
 		}
-		ConfigManager.CurrentConfig.GestureEnabled = GestureEnabledCheckBox.IsChecked == true;
+		ConfigManager.CurrentConfig.GestureEnabled = isEnabled;
 		SyncUiToConfigAndSave();
 	}
 
@@ -10521,4 +11003,19 @@ public partial class SettingsWindow : Window
 			PreviewZoomLabel.Text = $"{pct}%";
 		}
 	}
+}
+
+public class GitHubContributorInfo
+{
+	[JsonPropertyName("login")]
+	public string Login { get; set; } = string.Empty;
+
+	[JsonPropertyName("avatar_url")]
+	public string AvatarUrl { get; set; } = string.Empty;
+
+	[JsonPropertyName("html_url")]
+	public string HtmlUrl { get; set; } = string.Empty;
+
+	[JsonPropertyName("contributions")]
+	public int Contributions { get; set; }
 }

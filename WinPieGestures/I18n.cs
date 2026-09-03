@@ -563,6 +563,13 @@ public static class I18n
 			[LanguageCode.En] = "Hotkey",
 			[LanguageCode.Ja] = "ショートカット"
 		};
+		dictionary["ActionTypeOcrShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "截屏识字 (OCR)",
+			[LanguageCode.ZhTw] = "截圖識字 (OCR)",
+			[LanguageCode.En] = "Screen OCR",
+			[LanguageCode.Ja] = "画面OCR"
+		};
 		dictionary["ActionTypeLaunchShort"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "启动程序",

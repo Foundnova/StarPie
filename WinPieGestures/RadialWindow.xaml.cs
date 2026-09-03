@@ -13,6 +13,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
@@ -28,12 +29,25 @@ public partial class RadialWindow : Window
 	}
 
 	private const uint MONITOR_DEFAULTTONEAREST = 2;
+	private const uint SWP_NOSIZE = 0x0001;
 	private const uint SWP_NOACTIVATE = 0x0010;
 	private const uint SWP_NOZORDER = 0x0004;
 	private const int WM_DPICHANGED = 0x02E0;
 	private const int GWL_EXSTYLE = -20;
 	private const nint WS_EX_NOACTIVATE = 0x08000000;
 	private const nint WS_EX_TOOLWINDOW = 0x00000080;
+
+	[StructLayout(LayoutKind.Sequential)]
+	public struct RECT
+	{
+		public int Left;
+		public int Top;
+		public int Right;
+		public int Bottom;
+	}
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
 
 	private double _wheelCanvasSize = 360.0;
 	private double _canvasCenter = 180.0;
@@ -124,42 +138,78 @@ public partial class RadialWindow : Window
 
 		/// <summary>以物理像素将窗口居中到 _centerPoint 所在显示器（PerMonitorV2 混合 DPI 副屏定位）。</summary>
 		private void PositionWindowOnTargetMonitor()
-	{
-		nint handle = new WindowInteropHelper(this).Handle;
-		if (handle == IntPtr.Zero)
 		{
-			return;
+			nint handle = new WindowInteropHelper(this).Handle;
+			if (handle == IntPtr.Zero)
+			{
+				return;
+			}
+			ScreenContext screenCtx = ScreenHelper.GetScreenContextAtPoint(_centerPoint);
+			double scaleX = screenCtx.DpiScale.DpiScaleX;
+			double scaleY = screenCtx.DpiScale.DpiScaleY;
+			int physicalWidth = (int)Math.Round(_wheelCanvasSize * scaleX);
+			int physicalHeight = (int)Math.Round(_wheelCanvasSize * scaleY);
+			int physicalLeft = (int)Math.Round(_centerPoint.X - physicalWidth / 2.0);
+			int physicalTop = (int)Math.Round(_centerPoint.Y - physicalHeight / 2.0);
+			SetWindowPos(handle, IntPtr.Zero, physicalLeft, physicalTop, physicalWidth, physicalHeight, SWP_NOACTIVATE | SWP_NOZORDER);
 		}
-		var (scaleX, scaleY) = GetMonitorDpiScale(_centerPoint);
-		int physicalWidth = (int)Math.Round(_wheelCanvasSize * scaleX);
-		int physicalHeight = (int)Math.Round(_wheelCanvasSize * scaleY);
-		int physicalLeft = (int)Math.Round(_centerPoint.X - physicalWidth / 2.0);
-		int physicalTop = (int)Math.Round(_centerPoint.Y - physicalHeight / 2.0);
-		SetWindowPos(handle, IntPtr.Zero, physicalLeft, physicalTop, physicalWidth, physicalHeight, SWP_NOACTIVATE | SWP_NOZORDER);
-	}
 
-	protected override void OnSourceInitialized(EventArgs e)
-	{
-		base.OnSourceInitialized(e);
-		if (PresentationSource.FromVisual(this) is HwndSource source)
+		/// <summary>
+		/// 纯物理像素校正：实测窗口当前物理中心与目标点 _centerPoint 的物理偏差，SetWindowPos 直接修正。
+		/// 全程零 DPI 换算，天然免疫跨屏 DPI 缩放造成的漂移（dotnet/wpf#3105）。
+		/// </summary>
+		private void CenterOnPhysically(double targetX, double targetY)
 		{
-			source.AddHook(WndProc);
-			nint handle = source.Handle;
-			nint exStyle = GetWindowLongPtr(handle, GWL_EXSTYLE);
-			SetWindowLongPtr(handle, GWL_EXSTYLE, exStyle | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
+			try
+			{
+				nint handle = new WindowInteropHelper(this).Handle;
+				if (handle == IntPtr.Zero || !GetWindowRect(handle, out RECT rect))
+				{
+					return;
+				}
+				double currentCenterX = (rect.Left + rect.Right) / 2.0;
+				double currentCenterY = (rect.Top + rect.Bottom) / 2.0;
+				double deltaX = targetX - currentCenterX;
+				double deltaY = targetY - currentCenterY;
+				if (Math.Abs(deltaX) < 1.0 && Math.Abs(deltaY) < 1.0)
+				{
+					return;
+				}
+				int targetLeft = (int)Math.Round(rect.Left + deltaX);
+				int targetTop = (int)Math.Round(rect.Top + deltaY);
+				SetWindowPos(handle, IntPtr.Zero, targetLeft, targetTop, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+			}
+			catch
+			{
+			}
 		}
-		PositionWindowOnTargetMonitor();
-	}
 
-	private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
-	{
-		if (msg == WM_DPICHANGED)
+		protected override void OnSourceInitialized(EventArgs e)
 		{
+			base.OnSourceInitialized(e);
+			if (PresentationSource.FromVisual(this) is HwndSource source)
+			{
+				source.AddHook(WndProc);
+				nint handle = source.Handle;
+				nint exStyle = GetWindowLongPtr(handle, GWL_EXSTYLE);
+				SetWindowLongPtr(handle, GWL_EXSTYLE, exStyle | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
+			}
 			PositionWindowOnTargetMonitor();
-			handled = true;
 		}
-		return IntPtr.Zero;
-	}
+
+		private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+		{
+			if (msg == WM_DPICHANGED)
+			{
+				PositionWindowOnTargetMonitor();
+				Dispatcher.BeginInvoke(new Action(() =>
+				{
+					CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+				}), DispatcherPriority.Render);
+				handled = true;
+			}
+			return IntPtr.Zero;
+		}
 
 	protected override void OnClosed(EventArgs e)
 	{
@@ -440,6 +490,10 @@ public partial class RadialWindow : Window
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 
 		PositionWindowOnTargetMonitor();
+		Dispatcher.BeginInvoke(new Action(() =>
+		{
+			CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+		}), DispatcherPriority.Render);
 		CoreEllipse.Fill = _coreBgBrush;
 		CoreEllipse.Stroke = _coreBorderBrush;
 		string text = ConfigManager.CurrentConfig.CoreBgImagePath ?? "";
@@ -855,6 +909,22 @@ public partial class RadialWindow : Window
 						}
 					}
 				}
+				if (frameworkElement2 == null && !string.IsNullOrEmpty(currentAction?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(currentAction.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement2 = new Image
+						{
+							Source = icon,
+							Width = num11 + 4.0,
+							Height = num11 + 4.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
+					}
+				}
 				if (frameworkElement2 == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))
 				{
 					BitmapSource icon = IconHelper.GetIcon(text4);
@@ -956,6 +1026,9 @@ public partial class RadialWindow : Window
 		case "Folder":
 		case "OpenFolder":
 			return IconHelper.GetSvgPathByKey("Folder");
+		case "Ocr":
+		case "ScreenOcr":
+			return "M2,4C2,2.89 2.9,2 4,2H8V4H4V8H2V4M22,4V8H20V4H16V2H20C21.1,2 22,2.89 22,4M2,20V16H4V20H8V22H4C2.9,22 2,21.1 2,20M20,20H16V22H20C21.1,22 22,21.1 22,20V16H20V20M7,7H17V9H13V17H11V9H7V7Z";
 		case "Hotkey":
 			return "M19,15H5V5H19M19,3H5C3.89,3 3,3.89 3,5V15C3,16.1 3.89,17 5,17H19C20.1,17 21,16.1 21,15V5C21,3.89 20.1,3 19,3M2,18H22V20H2V18Z";
 		case "Command":
@@ -1304,6 +1377,22 @@ public partial class RadialWindow : Window
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
+					}
+				}
+				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement = new Image
+						{
+							Source = icon,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
 					}
 				}
 				if (frameworkElement == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))
@@ -2218,6 +2307,22 @@ public partial class RadialWindow : Window
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
+					}
+				}
+				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement = new Image
+						{
+							Source = icon,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
 					}
 				}
 				if (frameworkElement == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))

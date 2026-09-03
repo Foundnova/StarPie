@@ -9,11 +9,19 @@ public partial class HotkeyBuilderDialog : Window
 {
 	public string ResultHotkey { get; private set; } = string.Empty;
 	private bool _isInternalUpdating = true;
+	private readonly List<ComboBoxItem> _allKeyItems = new List<ComboBoxItem>();
 
 	public HotkeyBuilderDialog(string initialHotkey)
 	{
 		_isInternalUpdating = true;
 		InitializeComponent();
+		foreach (var item in MainKeyComboBox.Items)
+		{
+			if (item is ComboBoxItem cbi)
+			{
+				_allKeyItems.Add(cbi);
+			}
+		}
 		_isInternalUpdating = false;
 		AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 		InitializeFromHotkey(initialHotkey);
@@ -212,6 +220,66 @@ public partial class HotkeyBuilderDialog : Window
 		}
 		DialogResult = true;
 		Close();
+	}
+
+	private void MainKeySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		string query = MainKeySearchBox?.Text?.Trim() ?? "";
+		if (MainKeyClearSearchBtn != null)
+		{
+			MainKeyClearSearchBtn.Visibility = string.IsNullOrEmpty(query) ? Visibility.Collapsed : Visibility.Visible;
+		}
+
+		if (MainKeyComboBox == null || _allKeyItems.Count == 0) return;
+
+		var currentSelected = MainKeyComboBox.SelectedItem as ComboBoxItem;
+		_isInternalUpdating = true;
+		try
+		{
+			MainKeyComboBox.Items.Clear();
+			ComboBoxItem? firstMatch = null;
+			foreach (var item in _allKeyItems)
+			{
+				string content = item.Content?.ToString() ?? "";
+				string tag = item.Tag?.ToString() ?? "";
+				if (string.IsNullOrEmpty(query) ||
+				    content.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+				    tag.Contains(query, StringComparison.OrdinalIgnoreCase))
+				{
+					MainKeyComboBox.Items.Add(item);
+					if (firstMatch == null && !string.IsNullOrEmpty(tag))
+					{
+						firstMatch = item;
+					}
+				}
+			}
+
+			if (currentSelected != null && MainKeyComboBox.Items.Contains(currentSelected))
+			{
+				MainKeyComboBox.SelectedItem = currentSelected;
+			}
+			else if (firstMatch != null && !string.IsNullOrEmpty(query))
+			{
+				MainKeyComboBox.SelectedItem = firstMatch;
+			}
+			else if (MainKeyComboBox.Items.Count > 0)
+			{
+				MainKeyComboBox.SelectedIndex = 0;
+			}
+		}
+		finally
+		{
+			_isInternalUpdating = false;
+		}
+		BuildFromControls();
+	}
+
+	private void MainKeyClearSearchBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (MainKeySearchBox != null)
+		{
+			MainKeySearchBox.Text = string.Empty;
+		}
 	}
 
 	private void CancelButton_Click(object sender, RoutedEventArgs e)

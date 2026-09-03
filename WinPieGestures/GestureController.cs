@@ -1167,7 +1167,9 @@ public class GestureController
 		int num4 = -1;
 		int num5 = -1;
 		bool flag = false;
-		double num6 = Math.Min(ConfigManager.CurrentConfig.CoreRadius, ConfigManager.CurrentConfig.DragThreshold * 0.6);
+		double num6 = (ConfigManager.CurrentConfig.CoreDeadzoneRadius > 0.0)
+			? ConfigManager.CurrentConfig.CoreDeadzoneRadius
+			: Math.Min(ConfigManager.CurrentConfig.CoreRadius, ConfigManager.CurrentConfig.DragThreshold * 0.6);
 		if (num6 <= 0.0)
 		{
 			num6 = 15.0;
@@ -1204,14 +1206,36 @@ public class GestureController
 				}
 				double num13 = 360.0 / (double)num12;
 				num4 = (int)Math.Floor((num11 + num13 / 2.0) / num13) % num12;
+
+				bool isFan = ConfigManager.CurrentConfig.SubmenuStyle == "Fan";
+
+				// 蜂窝扇二级轮盘防抖与扇区保持锁定 (Hysteresis & Parent Sector Lock)
+				if (enableMultiTier && isFan && _lastShowSubTier && _selectedSectorIndex >= 0 && _selectedSectorIndex < (_activeProfile?.Actions.Count ?? 0))
+				{
+					double parentCenterAngle = (double)_selectedSectorIndex * num13;
+					double angleDiff = Math.Abs(NormalizeAngleDeg(num11 - parentCenterAngle));
+					double exitDist = Math.Max(25.0, num7 - 22.0);
+
+					// 在蜂窝扇已激活状态下，若光标距离未明显缩回内圈且处于展开扇面内（±num13 * 0.90），
+					// 锁定当前主扇区，彻底杜绝划向两侧子扇区时因极角越界而切回一级轮盘或跳变扇区
+					if (num3 >= exitDist && angleDiff <= num13 * 0.90)
+					{
+						num4 = _selectedSectorIndex;
+					}
+				}
+
 				if (enableMultiTier && _activeProfile != null && num4 >= 0 && num4 < _activeProfile.Actions.Count)
 				{
 					ActionItem actionItem = _activeProfile.Actions[num4];
 					if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
 					{
-if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
+						if (isFan)
 						{
-							if (num3 >= num7)
+							double fanTriggerDist = (_lastShowSubTier && _selectedSectorIndex == num4)
+								? Math.Max(25.0, num7 - 22.0)
+								: num7;
+
+							if (num3 >= fanTriggerDist)
 							{
 								flag2 = true;
 								num5 = HitTestFanSubs(currentPoint, _startPoint, num4, actionItem.SubActions.Count);
@@ -1410,7 +1434,13 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 			
 			double itemAngle = Math.Atan2(py, px);
 			double diff = Math.Abs(NormalizeAngleRad(mouseAngle - itemAngle));
-			
+
+			// 防抖与当前子扇区粘滞保持：若当前项正是上一帧选中的子扇区，给予微量阻尼偏置，杜绝边缘处高频抖动跳变
+			if (_selectedSubSectorIndex == j)
+			{
+				diff -= 0.08; // 约 4.5 度的防抖偏置
+			}
+
 			if (diff < bestAngleDiff)
 			{
 				bestAngleDiff = diff;
@@ -1428,4 +1458,10 @@ if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan")
 		return angle;
 	}
 
+	private static double NormalizeAngleDeg(double angle)
+	{
+		while (angle > 180.0) angle -= 360.0;
+		while (angle < -180.0) angle += 360.0;
+		return angle;
+	}
 }

@@ -94,6 +94,11 @@
                       <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏第 N 个应用（顺序同任务栏/Win+N 槽位，稳定）；图标与切换目标一致；固定未运行的槽位无法启动，托盘驻留不计入"/>
                     </Grid>
                     <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设"/>
+                    <Grid Visibility="{Binding IsOcrType, Converter={StaticResource BoolToVis}}">
+                      <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Height="30" Padding="8,0">
+                        <TextBlock Text="✂️ Windows 本地 / 智能 OCR 截屏识字" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                      </Border>
+                    </Grid>
                   </Grid>
                   <TextBox Grid.Column="5" Margin="0,0,6,0" Height="30" FontSize="10.5" ToolTip="启动参数 (可选)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" />
                   <Button Grid.Column="6" Content="测试" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="0,0,6,0" Padding="0" ToolTip="测试执行此子动作" Click="SubTest_Click" />

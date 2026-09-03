@@ -235,11 +235,15 @@ public static class ActionExecutor
 			switch (action.Type.Trim())
 			{
 			case "Launch":
-				ExecuteLaunch(action.Parameter, action.Arguments);
+				ExecuteLaunch(action.Parameter, action.Arguments, action.RunAsStandardUser);
 				break;
 			case "Folder":
 			case "OpenFolder":
 				ExecuteFolder(action.Parameter);
+				break;
+			case "Ocr":
+			case "ScreenOcr":
+				OcrManager.StartCaptureAndRecognize();
 				break;
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
@@ -609,6 +613,16 @@ public static class ActionExecutor
 		AppLogger.LogInfo($"Executing OpenFolder: '{text}'");
 		try
 		{
+			if (text.StartsWith("::{", StringComparison.OrdinalIgnoreCase) || text.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "explorer.exe",
+					Arguments = text,
+					UseShellExecute = true
+				});
+				return;
+			}
 			if (Directory.Exists(text))
 			{
 				Process.Start(new ProcessStartInfo
@@ -643,14 +657,14 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteLaunch(string path, string arguments)
+	private static void ExecuteLaunch(string path, string arguments, bool runAsStandardUser = false)
 	{
 		if (string.IsNullOrWhiteSpace(path))
 		{
 			return;
 		}
 		string text = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
-		AppLogger.LogInfo($"Executing Launch: Path='{text}', Args='{arguments}'");
+		AppLogger.LogInfo($"Executing Launch: Path='{text}', Args='{arguments}', StandardUser={runAsStandardUser}");
 		if (text.StartsWith("shell:AppsFolder", StringComparison.OrdinalIgnoreCase) || (text.Contains("!") && !text.Contains(":\\") && !text.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
 		{
 			string arguments2 = (text.StartsWith("shell:AppsFolder", StringComparison.OrdinalIgnoreCase) ? text : ("shell:AppsFolder\\" + text));
@@ -671,6 +685,30 @@ public static class ActionExecutor
 		}
 		else
 		{
+			if (runAsStandardUser)
+			{
+				try
+				{
+					Type? shellType = Type.GetTypeFromProgID("Shell.Application");
+					if (shellType != null)
+					{
+						dynamic shell = Activator.CreateInstance(shellType);
+						string workDir = "";
+						if (File.Exists(text))
+						{
+							workDir = Path.GetDirectoryName(text) ?? "";
+						}
+						shell.ShellExecute(text, arguments ?? "", workDir, "open", 1);
+						AppLogger.LogInfo($"Launched '{text}' with Shell standard user integrity via Shell.Application");
+						return;
+					}
+				}
+				catch (Exception exShell)
+				{
+					AppLogger.LogInfo($"Shell.Application launch failed for '{text}', falling back to Process.Start: {exShell.Message}");
+				}
+			}
+
 			string exeName = Path.GetFileNameWithoutExtension(text).ToLowerInvariant();
 			bool isShellOrSpecial = exeName == "explorer" || exeName == "cmd" || exeName == "powershell" || exeName == "wsl" || exeName == "calc" || exeName == "calculator" || exeName == "calculatorapp";
 			if (!isShellOrSpecial && string.IsNullOrWhiteSpace(arguments) && TryToggleProcessWindow(text))

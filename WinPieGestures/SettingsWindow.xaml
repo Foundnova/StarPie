@@ -534,7 +534,7 @@
         </StackPanel>
         <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5" Visibility="Collapsed">
           <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.6.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            <TextBlock Name="SidebarVersionText" Text="v1.6.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
           </Border>
           <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
         </StackPanel>
@@ -618,16 +618,65 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="SensitivityTitleText" Text="手势触发灵敏度" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Name="SensitivityDescText" Text="按住鼠标右键移动超过指定像素距离后呼出手势轮盘。距离越小越灵敏，过小可能造成右键微抖动误触。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" />
-                  <Grid Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="*" />
-                      <ColumnDefinition Width="60" />
-                    </Grid.ColumnDefinitions>
-                    <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
-                    <TextBlock Name="ThresholdValueLabel" Grid.Column="1" Text="25" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="14" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  <TextBlock Name="SensitivityTitleText" Text="手势与中心核圆触发灵敏度" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="SensitivityDescText" Text="在此微调一级轮盘呼出的位移阈值，以及中心核心圆的有效判定半径范围。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" />
+                  
+                  <!-- 1. 一级轮盘拖动触发距离 -->
+                  <Grid Margin="0,0,0,4">
+                    <TextBlock Text="一级轮盘呼出触发位移 (Drag Threshold):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Name="ThresholdValueLabel" Text="25 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
+                  <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
+                  <TextBlock Text="按住触发键移动超过此距离后呼出手势轮盘。距离越小越灵敏，过小可能造成按键微抖误触。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,14" />
+
+                  <!-- 2. 核心圆死区唤醒灵敏度 -->
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                      <Grid Margin="0,0,0,4">
+                        <TextBlock Text="🎯 核心圆唤醒与死区灵敏度 (Core Deadzone Radius):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Name="CoreDeadzoneValueLabel" Text="35 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+                      <Slider Name="CoreDeadzoneSlider" Minimum="10" Maximum="100" Value="35" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreDeadzoneSlider_ValueChanged" />
+                      <TextBlock Text="调节呼出轮盘后光标停留在中心核心圆触发核心动作或静默取消的有效半径。数值较小时轻划即可命中扇区，数值较大时中心判定区更宽容，更易触发中心核圆动作或防手抖取消。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                  <CheckBox Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed" />
+                  <TextBlock Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。在动作配置中点击各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0" />
+
+                  <StackPanel Name="SubmenuStylePanel" Margin="0,12,0,0">
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                          <TextBlock Text="二级菜单样式 (Submenu Style)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
+                          <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)" IsSelected="True" />
+                          <ComboBoxItem Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇 (Honeycomb Fan)" />
+                        </ComboBox>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                  <StackPanel Name="SubWheelTriggerDistancePanel" Margin="0,10,0,0">
+                    <Grid Margin="0,0,0,4">
+                      <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离 (Trigger Distance):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="SubWheelTriggerDistanceValueText" Text="95 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                    </Grid>
+                    <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
+                    <TextBlock Name="SubWheelTriggerDistDesc" Text="调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                  </StackPanel>
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
@@ -643,7 +692,10 @@
                       <TextBlock Name="GestureEnableDescText" Text="手势触发键将不再弹出轮盘，仅用于绘制手势；其它触发键照常弹轮盘。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                   </CheckBox>
-                  <Grid Margin="0,2,0,10">
+                  
+                  <!-- 鼠标手势详细配置面板 (未启用时折叠收纳，提升美观度) -->
+                  <StackPanel Name="GestureSettingsDetailsPanel" Visibility="Collapsed">
+                    <Grid Margin="0,2,0,10">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto" />
                       <ColumnDefinition Width="*" />
@@ -742,7 +794,8 @@
                     </StackPanel>
                   </Border>
                 </StackPanel>
-              </Border>
+              </StackPanel>
+            </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
@@ -2003,9 +2056,11 @@
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <local:HotkeyRecorderBox x:Name="FocusHotkeyRecorder" Height="32" FontSize="12" />
-                            <Button Grid.Column="1" Content="⚙️ 拼装组合" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" Click="FocusHotkeyBuilder_Click" />
+                            <Button Name="TogglePauseHotkeysBtn" Grid.Column="1" Content="⏸️ 暂停全局热键" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" ToolTip="临时暂停所有全局按键与鼠标手势拦截，方便在此专注录入快捷键而不会误触发 StarPie 已有热键" Click="TogglePauseHotkeysBtn_Click" />
+                            <Button Grid.Column="2" Content="⚙️ 拼装组合" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" Click="FocusHotkeyBuilder_Click" />
                           </Grid>
                         </StackPanel>
 
@@ -2031,6 +2086,12 @@
                             <TextBlock Text="启动参数:" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0" />
                             <TextBox Name="FocusLaunchArgsTextBox" Grid.Column="1" Height="28" FontSize="11" ToolTip="启动命令行参数 (可选)" TextChanged="FocusLaunchArgsTextBox_TextChanged" />
                           </Grid>
+                          <CheckBox Name="FocusLaunchStandardUserCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,6,0,0" Checked="FocusLaunchStandardUserCheckBox_Changed" Unchecked="FocusLaunchStandardUserCheckBox_Changed">
+                            <StackPanel Margin="6,0,0,0">
+                              <TextBlock Text="🛡️ 以常规普通权限启动 (解决高权限下外部文件无法拖入目标软件的问题)" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
+                              <TextBlock Text="当 StarPie 以管理员权限运行时，通过 Windows Shell 降权启动目标程序，恢复文件拖拽交互支持。" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                            </StackPanel>
+                          </CheckBox>
                         </StackPanel>
 
                         <!-- 3. 打开网址面板 (WebUrl) -->
@@ -2082,6 +2143,8 @@
                           <!-- 文件夹预设 -->
                           <WrapPanel>
                             <TextBlock Text="常用目录:" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <Button Content="💻 此电脑" Style="{StaticResource ModernButtonStyle}" Height="22" Padding="6,0" Margin="0,0,4,2" FontSize="10" Click="ApplyFolderPreset_ThisPC" ToolTip="直接打开系统「此电脑」命名空间" />
+                            <Button Content="🗑️ 回收站" Style="{StaticResource ModernButtonStyle}" Height="22" Padding="6,0" Margin="0,0,4,2" FontSize="10" Click="ApplyFolderPreset_RecycleBin" ToolTip="直接打开系统「回收站」命名空间" />
                             <Button Content="🖥️ 桌面" Style="{StaticResource ModernButtonStyle}" Height="22" Padding="6,0" Margin="0,0,4,2" FontSize="10" Click="ApplyFolderPreset_Desktop" />
                             <Button Content="📥 下载" Style="{StaticResource ModernButtonStyle}" Height="22" Padding="6,0" Margin="0,0,4,2" FontSize="10" Click="ApplyFolderPreset_Downloads" />
                             <Button Content="📄 文档" Style="{StaticResource ModernButtonStyle}" Height="22" Padding="6,0" Margin="0,0,4,2" FontSize="10" Click="ApplyFolderPreset_Documents" />
@@ -2217,6 +2280,54 @@
                         <StackPanel Name="FocusSystemPanel" Visibility="Collapsed">
                           <ComboBox Name="FocusSystemPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="30" SelectedValuePath="Key" DisplayMemberPath="DisplayName" SelectionChanged="FocusSystemPresetComboBox_SelectionChanged" />
                         </StackPanel>
+
+                        <!-- 8. 屏幕截屏文字识别 (OCR) 面板 -->
+                        <StackPanel Name="FocusOcrPanel" Visibility="Collapsed">
+                          <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10,6" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="✂️" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Name="FocusOcrStatusText" Text="默认调用 Windows 本地原生 OCR 离线引擎 (0延迟 · 隐私安全)" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                              </StackPanel>
+                            </Border>
+                            <Button Grid.Column="1" Content="✂️ 立即测试截屏" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" Click="FocusTestOcr_Click" ToolTip="立即启动全屏框选测试 OCR 识别效果" />
+                            <Button Grid.Column="2" Content="⚙️ 接口配置" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" Click="FocusOpenOcrSettings_Click" ToolTip="配置 OCR 引擎（本地引擎 / AI 视觉大模型 / 自定义 HTTP）" />
+                          </Grid>
+                        </StackPanel>
+
+                        <!-- 关联外部程序图标 (解耦执行与外观 Issue #11) -->
+                        <Border Name="FocusInheritIconBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,10,0,0" Visibility="Collapsed">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🏷️ 关联外部程序图标 (解耦执行与外观):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                                <TextBlock Name="FocusInheritIconStatusLabel" Text="未关联 (显示默认动作图标)" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              </StackPanel>
+                              <Button Name="FocusClearInheritedIconBtn" Grid.Column="1" Content="✕ 清除关联" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="6,0" FontSize="10.5" Click="FocusClearInheritedIcon_Click" ToolTip="清除关联的外部程序图标，恢复默认矢量图标" Visibility="Collapsed" />
+                            </Grid>
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <TextBox Name="FocusInheritIconPathTextBox" Height="28" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" IsReadOnly="True" ToolTip="关联提取图标的外部程序或快捷方式路径" TextChanged="FocusInheritIconPathTextBox_TextChanged" />
+                              <Button Grid.Column="1" Content="📦 软件库..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="6,0,0,0" Click="FocusPickInheritProgram_Click" ToolTip="从已安装软件与微软商店应用中选取官方高清图标" />
+                              <Button Grid.Column="2" Content="🎯 捕捉窗口..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="6,0,0,0" Click="FocusCaptureInheritWindow_Click" ToolTip="直接捕捉桌面上运行中的软件并继承其图标" />
+                              <Button Grid.Column="3" Content="📂 浏览..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="6,0,0,0" Click="FocusBrowseInheritIcon_Click" ToolTip="手动浏览提取 .exe / .ico / .lnk 图标" />
+                            </Grid>
+                          </StackPanel>
+                        </Border>
                       </StackPanel>
                     </Border>
 
@@ -2294,19 +2405,24 @@
 
                 <!-- 画布视口容器 (支持平移、缩放与扇区/中心圆拖拽交互) -->
                 <Border Grid.Row="1" Background="{DynamicResource PreviewCanvasBackgroundBrush}" BorderBrush="{DynamicResource PreviewCanvasBorderBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,2,0,8">
-                  <Grid Name="MappingsPreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="MappingsPreviewViewport_MouseWheel" PreviewMouseDown="MappingsPreviewViewport_MouseDown" PreviewMouseMove="MappingsPreviewViewport_MouseMove" PreviewMouseUp="MappingsPreviewViewport_MouseUp">
-                    <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
-                    <Canvas Name="MappingsWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center">
-                      <Canvas.RenderTransform>
-                        <TransformGroup>
-                          <ScaleTransform x:Name="MappingsPreviewScaleTransform" ScaleX="1.0" ScaleY="1.0" CenterX="150" CenterY="150" />
-                          <TranslateTransform x:Name="MappingsPreviewTranslateTransform" X="0" Y="0" />
-                        </TransformGroup>
-                      </Canvas.RenderTransform>
-                    </Canvas>
+                  <Grid>
+                    <Grid Name="MappingsPreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="MappingsPreviewViewport_MouseWheel" PreviewMouseDown="MappingsPreviewViewport_MouseDown" PreviewMouseMove="MappingsPreviewViewport_MouseMove" PreviewMouseUp="MappingsPreviewViewport_MouseUp">
+                      <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+                      <Canvas Name="MappingsWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Canvas.RenderTransform>
+                          <TransformGroup>
+                            <ScaleTransform x:Name="MappingsPreviewScaleTransform" ScaleX="1.0" ScaleY="1.0" CenterX="150" CenterY="150" />
+                            <TranslateTransform x:Name="MappingsPreviewTranslateTransform" X="0" Y="0" />
+                          </TransformGroup>
+                        </Canvas.RenderTransform>
+                      </Canvas>
+                    </Grid>
                     
-                    <!-- 悬浮工具栏 -->
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="3,2">
+                    <!-- 悬浮工具栏 (放在 ViewportContainer 之上同级，避免被 Viewport 的 Preview 事件劫持) -->
+                    <Border Name="MappingsZoomToolbarBorder" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="3,2">
+                      <Border.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.12" />
+                      </Border.Effect>
                       <StackPanel Orientation="Horizontal">
                         <Button Name="MappingsZoomOutBtn" Content="➖" ToolTip="缩小视图" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="MappingsZoomOutBtn_Click" />
                         <TextBlock Name="MappingsZoomLabel" Text="100%" Width="36" TextAlignment="Center" VerticalAlignment="Center" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand" ToolTip="点击复位为 100%" MouseLeftButtonDown="MappingsZoomLabel_MouseLeftButtonDown" />
@@ -2317,7 +2433,7 @@
                     </Border>
 
                     <!-- 左下角当前编辑状态标签 -->
-                    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6,0,0,6" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6,0,0,6" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" IsHitTestVisible="False">
                       <TextBlock Name="MappingsCurrentEditIndicator" Text="🎯 正在编辑: 扇区 1 [向上]" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
                     </Border>
                   </Grid>
@@ -2360,40 +2476,6 @@
                       <RadioButton Name="SectorCount4Radio" GroupName="SectorCountGroup" Content="4 键十字方位" Margin="0,0,24,0" Checked="SectorCountRadio_Checked" />
                       <RadioButton Name="SectorCount8Radio" GroupName="SectorCountGroup" Content="8 键全向方位 (推荐)" Margin="0,0,24,0" IsChecked="True" Checked="SectorCountRadio_Checked" />
                       <RadioButton Name="SectorCount12Radio" GroupName="SectorCountGroup" Content="12 键钟表方位" Checked="SectorCountRadio_Checked" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
-                  <StackPanel>
-                    <TextBlock Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
-                    <CheckBox Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed" />
-                    <TextBlock Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。点击下方各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0" />
-
-                    <StackPanel Name="SubmenuStylePanel" Margin="0,12,0,0">
-                      <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
-                        <Grid>
-                          <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="220" />
-                          </Grid.ColumnDefinitions>
-                          <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                            <TextBlock Text="二级菜单样式 (Submenu Style)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock Text="外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <ComboBox Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
-                            <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)" IsSelected="True" />
-                            <ComboBoxItem Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇 (Honeycomb Fan)" />
-                          </ComboBox>
-                        </Grid>
-                      </Border>
-                    </StackPanel>
-                    <StackPanel Name="SubWheelTriggerDistancePanel" Margin="0,10,0,0">
-                      <Grid Margin="0,0,0,4">
-                        <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离 (Trigger Distance):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Name="SubWheelTriggerDistanceValueText" Text="95 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
-                      </Grid>
-                      <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
-                      <TextBlock Name="SubWheelTriggerDistDesc" Text="调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -2589,10 +2671,57 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
-          <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Name="AdvancedPageHeader" Text="高级系统与运维备份" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-            <TextBlock Name="AdvancedPageSubheader" Text="管理界面语言、Windows 开机自启、管理员提权与配置文件的导入/导出备份。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
-          </StackPanel>
+          <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+              <TextBlock Name="AdvancedPageHeader" Text="高级系统与运维备份" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+              <TextBlock Name="AdvancedPageSubheader" Text="管理界面语言、Windows 开机自启、管理员提权与配置文件的导入/导出备份。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <!-- 🤝 贡献者致谢可折叠卡片 (与 GitHub 仓库实时同步) -->
+            <Border Name="ContributorsCardBorder" Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" VerticalAlignment="Center" SnapsToDevicePixels="True">
+              <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="1" Color="#000000" Opacity="0.04" />
+              </Border.Effect>
+              <StackPanel>
+                <!-- 头部栏 (点击展开/折叠) -->
+                <Grid Cursor="Hand" MouseLeftButtonDown="ToggleContributorsCard_Click" Background="Transparent">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="🤝" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Name="ContributorsHeaderTitle" Text="开源贡献者致谢" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <Border Name="ContributorsCountBadge" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="6,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Name="ContributorsCountText" Text="Syncing..." FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Name="ContributorsExpandArrow" Grid.Column="2" Text="▼" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="10,0,2,0" />
+                </Grid>
+
+                <!-- 折叠展开的贡献者列表区 -->
+                <StackPanel Name="ContributorsContentPanel" Margin="0,8,0,0" Visibility="Collapsed">
+                  <TextBlock Text="感谢以下贡献者为 StarPie (星盘) 开源项目付出的智慧与贡献：" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                  <ScrollViewer MaxHeight="180" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <WrapPanel Name="ContributorsWrapPanel" MaxWidth="380">
+                      <!-- 动态填充圆形头像与用户名徽标 -->
+                    </WrapPanel>
+                  </ScrollViewer>
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,5,0,0">
+                    <Grid>
+                      <TextBlock Name="ContributorsSyncStatusText" Text="🌐 数据已与 GitHub 实时同步 (按贡献量排序)" FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="⭐ 访问 GitHub 仓库" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Cursor="Hand" HorizontalAlignment="Right" VerticalAlignment="Center" MouseLeftButtonDown="OpenGitHubRepo_Click" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </Grid>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="0,0,10,0">
               <!-- Card 0: 系统在线更新与版本管理 -->
@@ -2615,7 +2744,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.5 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.8 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <Button Name="CheckUpdateNowBtn" Grid.Column="1" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
                   </Grid>
@@ -2802,6 +2931,33 @@
                   </ComboBox>
                 </Grid>
               </Border>
+
+              <!-- Card: OCR 截屏识字与智能接口设置 -->
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="📝" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
+                      <TextBlock Text="OCR 截屏文字识别与智能接口配置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <Border Background="#258B5CF6" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Name="Tab4OcrProviderBadge" Text="Windows 本地离线引擎" FontSize="10.5" FontWeight="SemiBold" Foreground="#A855F7" />
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="管理原生离线识别引擎、多模态 AI 视觉模型 (OpenAI / 硅基流动 / Ollama) 与私有化 HTTP 接口端点与凭证。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="✂️ 截屏测试" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Margin="0,0,8,0" Click="FocusTestOcr_Click" ToolTip="立即启动全屏框选测试当前 OCR 识别配置" />
+                    <Button Content="⚙️ 配置接口与模型..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Click="FocusOpenOcrSettings_Click" ToolTip="打开 OCR 识别引擎与 API 参数设置弹窗" />
+                  </StackPanel>
+                </Grid>
+              </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
@@ -2944,7 +3100,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.6.5" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.6.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -2960,11 +3116,12 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.5.8 Win10 计算器呼出修复 &amp; PrintScreen 独立截屏热键 &amp; 启动资源管理器修复 &amp; 系统运行日志" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🧮 【Win10 计算器唤起修复】：重构系统计算器调用，适配 Win10/Win11 协议唤起（ms-calculator:），解决单例 UWP 无法打开问题；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 📸 【PrintScreen 独立按键触发】：修复单个 PrintScreen 按键误转为文本输入的 Bug，支持 VK_SNAPSHOT 扩展扫描码直接模拟；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 📂 【启动 explorer.exe 修复】：排除 explorer 进程窗口误拦截，支持启动资源管理器与打开自定义目录；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 📋 【系统运行日志与诊断】：新增高性能异步运行日志系统（AppLogger），支持查看今日日志与打开日志目录，方便故障排查。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.6.8 画布缩放修复 &amp; 快捷键检索与临时暂停 &amp; 贡献者致谢 &amp; 蜂窝扇防掉帧迟滞保持 &amp; 手势折叠收纳" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🎯 【动作画布缩放工具栏修复】：重构 Viewport 层次结构，消除鼠标隧道事件劫持，彻底修复放大/缩小/复位按钮点击失效；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⌨️ 【主键检索与临时暂停全局热键】：拼装器补充 Pause 按键并新增即时搜索过滤；录制框旁增设「⏸️ 暂停全局热键」按钮，录键免冲突；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🤝 【开源贡献者致谢卡片】：系统集成右上角新增现代化折叠致谢卡片，支持 GitHub 仓库贡献者异步同步与圆形头像主页跳转；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🍯 【蜂窝扇二级轮盘防抖与迟滞保持】：引入主扇区角度展开锁定（±0.9θ）与出入双阈值半径迟滞，杜绝两侧子扇区划动跌落或跳变；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🗂️ 【鼠标手势折叠收纳】：关闭手势模式时自动折叠收纳详细配置面板，大幅减少界面空间占用，整体视觉更轻盈整洁。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -2973,6 +3130,40 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.6.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="画布缩放修复 &amp; 快捷键搜索与暂停 &amp; 贡献者致谢 &amp; 蜂窝扇迟滞保持 &amp; 手势折叠收纳" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="修复实时画布缩放工具栏点击；拼装器增加 Pause 按键与即时过滤，录入旁增设临时暂停按钮；右上角新增 GitHub 贡献者致谢折叠卡片；优化蜂窝扇极角展开保持与迟滞容差手感；鼠标手势关闭时自动收纳配置。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-04" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.6.7" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="原生 OCR 修复 &amp; 多屏多分辨率唤起对齐 &amp; 核心圆死区滑块 &amp; 二级单扇区聚焦预览" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="修复原生 OCR 异常与语言包感知；引入 ScreenHelper 彻底解决跨屏混合 DPI 轮盘唤起漂移；多级轮盘设置迁入 Tab 3 释放动作区空间并增加核心圆死区灵敏度滑块；二级轮盘外观预览改为单扇区展开消除遮挡。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-03" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>
