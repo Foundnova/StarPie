@@ -121,6 +121,9 @@ public static class WindowTiler
 	/// <summary>轮换模式标记：参数为 Cycle 时循环切换布局。</summary>
 	public const string CycleParam = "Cycle";
 
+	/// <summary>还原标记：参数为 Restore 时还原所有窗口到平铺前。</summary>
+	public const string RestoreParam = "Restore";
+
 	public static bool IsValidLayout(string key)
 	{
 		return LayoutKeys.Contains(key);
@@ -147,6 +150,11 @@ public static class WindowTiler
 		try
 		{
 			string key = string.IsNullOrWhiteSpace(layoutKey) ? "2L" : layoutKey.Trim();
+			if (string.Equals(key, RestoreParam, StringComparison.OrdinalIgnoreCase))
+			{
+				RestoreLastLayout();
+				return;
+			}
 			if (string.Equals(key, CycleParam, StringComparison.OrdinalIgnoreCase))
 			{
 				key = LayoutKeys[s_cycleIndex % LayoutKeys.Count];

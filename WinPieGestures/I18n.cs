@@ -1193,6 +1193,13 @@ public static class I18n
 			[LanguageCode.En] = "Tiling exclusion list (process exe names, comma-separated, e.g. notepad,spotify):",
 			[LanguageCode.Ja] = "並べる対象外のプロセス（exe名、カンマ区切り例 notepad,spotify）："
 		};
+		dictionary["TileRestoreAllLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "还原所有窗口（回到平铺前）",
+			[LanguageCode.ZhTw] = "還原所有視窗（回到平鋪前）",
+			[LanguageCode.En] = "Restore all windows (pre-tile state)",
+			[LanguageCode.Ja] = "すべてのウィンドウを元に戻す（並べる前の状態）"
+		};
 		dictionary["GestureMappingTitleText"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "手势图样映射",
