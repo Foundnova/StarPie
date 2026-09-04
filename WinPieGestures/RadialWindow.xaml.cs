@@ -339,6 +339,73 @@ public partial class RadialWindow : Window
 
 	private Effect? _defaultCoreCustomImageEffect;
 
+	public Point ActualPhysicalCenter { get; private set; }
+
+	private static Point ComputeClampedPhysicalCenter(Point centerPoint, double canvasSize)
+	{
+		string policy = ConfigManager.CurrentConfig?.EdgeOverflowPolicy ?? "ClampShift";
+		if (policy == "None")
+		{
+			return centerPoint;
+		}
+
+		ScreenContext screenCtx = ScreenHelper.GetScreenContextAtPoint(centerPoint);
+		double scaleX = screenCtx.DpiScale.DpiScaleX;
+		double scaleY = screenCtx.DpiScale.DpiScaleY;
+		int physicalWidth = (int)Math.Round(canvasSize * scaleX);
+		int physicalHeight = (int)Math.Round(canvasSize * scaleY);
+		int physicalLeft = (int)Math.Round(centerPoint.X - physicalWidth / 2.0);
+		int physicalTop = (int)Math.Round(centerPoint.Y - physicalHeight / 2.0);
+
+		double marginDip = (ConfigManager.CurrentConfig?.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0;
+		double marginX = marginDip * scaleX;
+		double marginY = marginDip * scaleY;
+
+		if (policy == "ClampShift")
+		{
+			double safeLeft = screenCtx.PhysicalWorkArea.Left + marginX;
+			double safeRight = screenCtx.PhysicalWorkArea.Right - marginX;
+			double safeTop = screenCtx.PhysicalWorkArea.Top + marginY;
+			double safeBottom = screenCtx.PhysicalWorkArea.Bottom - marginY;
+
+			double clampedX = physicalLeft;
+			double clampedY = physicalTop;
+
+			if (clampedX < safeLeft) clampedX = safeLeft;
+			if (clampedX + physicalWidth > safeRight) clampedX = safeRight - physicalWidth;
+
+			if (clampedY < safeTop) clampedY = safeTop;
+			if (clampedY + physicalHeight > safeBottom) clampedY = safeBottom - physicalHeight;
+
+			if (safeRight < safeLeft || physicalWidth > screenCtx.PhysicalWorkArea.Width)
+			{
+				clampedX = (screenCtx.PhysicalWorkArea.Left + screenCtx.PhysicalWorkArea.Right - physicalWidth) / 2.0;
+			}
+			if (safeBottom < safeTop || physicalHeight > screenCtx.PhysicalWorkArea.Height)
+			{
+				clampedY = (screenCtx.PhysicalWorkArea.Top + screenCtx.PhysicalWorkArea.Bottom - physicalHeight) / 2.0;
+			}
+
+			return new Point(clampedX + physicalWidth / 2.0, clampedY + physicalHeight / 2.0);
+		}
+		else if (policy == "ScreenCenter")
+		{
+			bool overflows = physicalLeft < (screenCtx.PhysicalWorkArea.Left + marginX)
+						  || (physicalLeft + physicalWidth) > (screenCtx.PhysicalWorkArea.Right - marginX)
+						  || physicalTop < (screenCtx.PhysicalWorkArea.Top + marginY)
+						  || (physicalTop + physicalHeight) > (screenCtx.PhysicalWorkArea.Bottom - marginY);
+
+			if (overflows)
+			{
+				double centerX = (screenCtx.PhysicalWorkArea.Left + screenCtx.PhysicalWorkArea.Right) / 2.0;
+				double centerY = (screenCtx.PhysicalWorkArea.Top + screenCtx.PhysicalWorkArea.Bottom) / 2.0;
+				return new Point(centerX, centerY);
+			}
+		}
+
+		return centerPoint;
+	}
+
 	public RadialWindow(Point centerPoint, WheelProfile profile)
 	{
 		//IL_00d0: Unknown result type (might be due to invalid IL or missing references)
@@ -375,6 +442,9 @@ public partial class RadialWindow : Window
 		double maxEffectiveR = enableMultiTier ? Math.Max(wheelRadius, subMaxR + 25.0) : wheelRadius;
 		_wheelCanvasSize = maxEffectiveR * 2.0 + 40.0;
 		_canvasCenter = _wheelCanvasSize / 2.0;
+
+		_centerPoint = ComputeClampedPhysicalCenter(centerPoint, _wheelCanvasSize);
+		ActualPhysicalCenter = _centerPoint;
 
 		base.Width = _wheelCanvasSize;
 		base.Height = _wheelCanvasSize;
@@ -962,11 +1032,9 @@ public partial class RadialWindow : Window
 						};
 					}
 				}
-				if (frameworkElement2 != null)
-				{
-					stackPanel.Children.Add(frameworkElement2);
-				}
 			}
+
+			TextBlock? textElement = null;
 			if (shouldShowText && !string.IsNullOrEmpty(text2))
 			{
 				double baseFontSize = (currentAction != null && currentAction.CustomFontSize.HasValue && currentAction.CustomFontSize.Value > 0.0)
@@ -991,7 +1059,7 @@ public partial class RadialWindow : Window
 				string sectorFont = (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.CustomFontFamily))
 					? currentAction.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-				TextBlock element = new TextBlock
+				textElement = new TextBlock
 				{
 					Text = text2,
 					Foreground = sectorTextColorBrush,
@@ -1003,12 +1071,52 @@ public partial class RadialWindow : Window
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					MaxWidth = maxWidth,
 					MaxHeight = 34.0,
-					Margin = new Thickness(0.0, 1.0, 0.0, 0.0),
 					Effect = (Effect)base.Resources["TextShadow"]
 				};
-				TextOptions.SetTextFormattingMode((DependencyObject)(object)element, (TextFormattingMode)1);
-				TextOptions.SetTextRenderingMode((DependencyObject)(object)element, TextRenderingMode.ClearType);
-				stackPanel.Children.Add(element);
+				TextOptions.SetTextFormattingMode((DependencyObject)(object)textElement, (TextFormattingMode)1);
+				TextOptions.SetTextRenderingMode((DependencyObject)(object)textElement, TextRenderingMode.ClearType);
+			}
+
+			string placement = (!string.IsNullOrWhiteSpace(currentAction?.CustomTextPlacement))
+				? currentAction.CustomTextPlacement
+				: (ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+			double offX = (currentAction != null && currentAction.CustomTextOffsetX.HasValue)
+				? currentAction.CustomTextOffsetX.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetX;
+			double offY = (currentAction != null && currentAction.CustomTextOffsetY.HasValue)
+				? currentAction.CustomTextOffsetY.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetY;
+
+			if (textElement != null && (Math.Abs(offX) > 0.001 || Math.Abs(offY) > 0.001))
+			{
+				textElement.RenderTransform = new TranslateTransform(offX, offY);
+			}
+
+			if (placement == "Above")
+			{
+				if (textElement != null)
+				{
+					textElement.Margin = new Thickness(0.0, 0.0, 0.0, (frameworkElement2 != null) ? 1.0 : 0.0);
+					stackPanel.Children.Add(textElement);
+				}
+				if (frameworkElement2 != null)
+				{
+					frameworkElement2.Margin = new Thickness(0.0, 0.0, 0.0, 0.0);
+					stackPanel.Children.Add(frameworkElement2);
+				}
+			}
+			else
+			{
+				if (frameworkElement2 != null)
+				{
+					frameworkElement2.Margin = new Thickness(0.0, 0.0, 0.0, (textElement != null) ? 2.0 : 0.0);
+					stackPanel.Children.Add(frameworkElement2);
+				}
+				if (textElement != null)
+				{
+					textElement.Margin = new Thickness(0.0, 1.0, 0.0, 0.0);
+					stackPanel.Children.Add(textElement);
+				}
 			}
 			Canvas.SetLeft(grid, num7 - grid.Width / 2.0);
 			Canvas.SetTop(grid, num8 - grid.Height / 2.0);
@@ -1432,11 +1540,9 @@ public partial class RadialWindow : Window
 						};
 					}
 				}
-				if (frameworkElement != null)
-				{
-					stackPanel.Children.Add(frameworkElement);
-				}
 			}
+
+			TextBlock? subTextElement = null;
 			if (subShouldShowText && !string.IsNullOrEmpty(text2))
 			{
 				double subFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
@@ -1445,7 +1551,7 @@ public partial class RadialWindow : Window
 				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-				TextBlock element = new TextBlock
+				subTextElement = new TextBlock
 				{
 					Text = text2,
 					Foreground = subTextColor,
@@ -1457,12 +1563,52 @@ public partial class RadialWindow : Window
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					MaxWidth = num16 - 4.0,
 					MaxHeight = 28.0,
-					Margin = new Thickness(0.0, 1.0, 0.0, 0.0),
 					Effect = (Effect)base.Resources["TextShadow"]
 				};
-				TextOptions.SetTextFormattingMode((DependencyObject)(object)element, (TextFormattingMode)1);
-				TextOptions.SetTextRenderingMode((DependencyObject)(object)element, TextRenderingMode.ClearType);
-				stackPanel.Children.Add(element);
+				TextOptions.SetTextFormattingMode((DependencyObject)(object)subTextElement, (TextFormattingMode)1);
+				TextOptions.SetTextRenderingMode((DependencyObject)(object)subTextElement, TextRenderingMode.ClearType);
+			}
+
+			string subPlacement = (!string.IsNullOrWhiteSpace(actionItem2?.CustomTextPlacement))
+				? actionItem2.CustomTextPlacement
+				: (ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+			double subOffX = (actionItem2 != null && actionItem2.CustomTextOffsetX.HasValue)
+				? actionItem2.CustomTextOffsetX.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetX;
+			double subOffY = (actionItem2 != null && actionItem2.CustomTextOffsetY.HasValue)
+				? actionItem2.CustomTextOffsetY.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetY;
+
+			if (subTextElement != null && (Math.Abs(subOffX) > 0.001 || Math.Abs(subOffY) > 0.001))
+			{
+				subTextElement.RenderTransform = new TranslateTransform(subOffX, subOffY);
+			}
+
+			if (subPlacement == "Above")
+			{
+				if (subTextElement != null)
+				{
+					subTextElement.Margin = new Thickness(0.0, 0.0, 0.0, (frameworkElement != null) ? 1.0 : 0.0);
+					stackPanel.Children.Add(subTextElement);
+				}
+				if (frameworkElement != null)
+				{
+					frameworkElement.Margin = new Thickness(0.0, 0.0, 0.0, 0.0);
+					stackPanel.Children.Add(frameworkElement);
+				}
+			}
+			else
+			{
+				if (frameworkElement != null)
+				{
+					frameworkElement.Margin = new Thickness(0.0, 0.0, 0.0, (subTextElement != null) ? 2.0 : 0.0);
+					stackPanel.Children.Add(frameworkElement);
+				}
+				if (subTextElement != null)
+				{
+					subTextElement.Margin = new Thickness(0.0, 1.0, 0.0, 0.0);
+					stackPanel.Children.Add(subTextElement);
+				}
 			}
 			Canvas.SetLeft(grid, num14 - grid.Width / 2.0);
 			Canvas.SetTop(grid, num15 - grid.Height / 2.0);
@@ -2362,12 +2508,9 @@ public partial class RadialWindow : Window
 						};
 					}
 				}
-				if (frameworkElement != null)
-				{
-					stackPanel.Children.Add(frameworkElement);
-				}
 			}
 
+			TextBlock? textBlock = null;
 			if (subShouldShowText && !string.IsNullOrEmpty(text2))
 			{
 				double subFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
@@ -2376,7 +2519,7 @@ public partial class RadialWindow : Window
 				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-				TextBlock textBlock = new TextBlock
+				textBlock = new TextBlock
 				{
 					Text = text2,
 					Foreground = subTextColor,
@@ -2387,14 +2530,54 @@ public partial class RadialWindow : Window
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					MaxWidth = containerW - 4.0,
-					MaxHeight = 26.0,
-					Margin = new Thickness(0.0, 1.0, 0.0, 0.0)
+					MaxHeight = 26.0
 				};
 				if (base.Resources.Contains("TextShadow"))
 				{
 					textBlock.Effect = (Effect)base.Resources["TextShadow"];
 				}
-				stackPanel.Children.Add(textBlock);
+			}
+
+			string honeyPlacement = (!string.IsNullOrWhiteSpace(actionItem2?.CustomTextPlacement))
+				? actionItem2.CustomTextPlacement
+				: (ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+			double honeyOffX = (actionItem2 != null && actionItem2.CustomTextOffsetX.HasValue)
+				? actionItem2.CustomTextOffsetX.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetX;
+			double honeyOffY = (actionItem2 != null && actionItem2.CustomTextOffsetY.HasValue)
+				? actionItem2.CustomTextOffsetY.Value
+				: ConfigManager.CurrentConfig.SectorTextOffsetY;
+
+			if (textBlock != null && (Math.Abs(honeyOffX) > 0.001 || Math.Abs(honeyOffY) > 0.001))
+			{
+				textBlock.RenderTransform = new TranslateTransform(honeyOffX, honeyOffY);
+			}
+
+			if (honeyPlacement == "Above")
+			{
+				if (textBlock != null)
+				{
+					textBlock.Margin = new Thickness(0.0, 0.0, 0.0, (frameworkElement != null) ? 1.0 : 0.0);
+					stackPanel.Children.Add(textBlock);
+				}
+				if (frameworkElement != null)
+				{
+					frameworkElement.Margin = new Thickness(0.0, 0.0, 0.0, 0.0);
+					stackPanel.Children.Add(frameworkElement);
+				}
+			}
+			else
+			{
+				if (frameworkElement != null)
+				{
+					frameworkElement.Margin = new Thickness(0.0, 0.0, 0.0, (textBlock != null) ? 2.0 : 0.0);
+					stackPanel.Children.Add(frameworkElement);
+				}
+				if (textBlock != null)
+				{
+					textBlock.Margin = new Thickness(0.0, 1.0, 0.0, 0.0);
+					stackPanel.Children.Add(textBlock);
+				}
 			}
 
 			Canvas.SetLeft(grid, px - grid.Width / 2.0);

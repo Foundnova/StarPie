@@ -107,6 +107,10 @@ public class GestureController
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool GetCursorPos(out POINT lpPoint);
 
+	[DllImport("user32.dll")]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool SetCursorPos(int X, int Y);
+
 	public GestureController(MouseHook mouseHook, KeyboardHook? keyboardHook = null)
 	{
 		_mouseHook = mouseHook;
@@ -1319,6 +1323,21 @@ public class GestureController
 		try
 		{
 			newWindow.Show();
+
+			// 屏幕边缘防溢出校准：如果窗口由于贴边或居中策略调整了物理中心，同步校正手势起点与光标位置
+			Point actualCenter = newWindow.ActualPhysicalCenter;
+			if (Math.Abs(actualCenter.X - _startPoint.X) > 1.0 || Math.Abs(actualCenter.Y - _startPoint.Y) > 1.0)
+			{
+				_startPoint = actualCenter;
+				var (newDpiX, newDpiY) = RadialWindow.GetMonitorDpiScale(_startPoint);
+				if (newDpiX > 0.0 && newDpiY > 0.0)
+				{
+					_currentDpiScaleX = newDpiX;
+					_currentDpiScaleY = newDpiY;
+				}
+				SetCursorPos((int)Math.Round(actualCenter.X), (int)Math.Round(actualCenter.Y));
+			}
+
 			return true;
 		}
 		catch

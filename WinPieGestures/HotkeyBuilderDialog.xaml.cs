@@ -225,6 +225,10 @@ public partial class HotkeyBuilderDialog : Window
 	private void MainKeySearchBox_TextChanged(object sender, TextChangedEventArgs e)
 	{
 		string query = MainKeySearchBox?.Text?.Trim() ?? "";
+		if (MainKeySearchPlaceholder != null)
+		{
+			MainKeySearchPlaceholder.Visibility = string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (MainKeyClearSearchBtn != null)
 		{
 			MainKeyClearSearchBtn.Visibility = string.IsNullOrEmpty(query) ? Visibility.Collapsed : Visibility.Visible;

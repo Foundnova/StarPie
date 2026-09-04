@@ -131,6 +131,10 @@
         </Setter>
       </Style>
       <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource FlatComboBoxStyle}" />
+      <Style TargetType="{x:Type CheckBox}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+      </Style>
       <Style x:Key="ModernButtonStyle" TargetType="{x:Type Button}">
         <Setter Property="Background" Value="{DynamicResource ButtonDefaultBgBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource ButtonDefaultBorderBrush}" />

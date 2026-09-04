@@ -46,6 +46,15 @@ public class ActionItem
 	/// <summary>独立文字字号覆盖：null 或 <=0 表示继承全局</summary>
 	public double? CustomFontSize { get; set; } = null;
 
+	/// <summary>独立文字相对位置覆盖：null 或 "Inherit" 表示继承全局，"Below", "Above"</summary>
+	public string? CustomTextPlacement { get; set; } = "Inherit";
+
+	/// <summary>独立文字水平偏移覆盖：null 表示继承全局</summary>
+	public double? CustomTextOffsetX { get; set; } = null;
+
+	/// <summary>独立文字垂直偏移覆盖：null 表示继承全局</summary>
+	public double? CustomTextOffsetY { get; set; } = null;
+
 	public List<ActionItem> SubActions { get; set; } = new List<ActionItem>();
 
 	public override string ToString()

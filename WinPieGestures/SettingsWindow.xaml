@@ -1079,6 +1079,46 @@
                   </Border>
                 </StackPanel>
               </Border>
+              <!-- 屏幕边缘呼出防溢出设置 -->
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Name="EdgeOverflowTitleText" Text="屏幕边缘呼出防溢出 (Edge Collision Avoidance)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="EdgeOverflowDescText" Text="当在屏幕四周边缘（顶部、底部或两侧）呼出轮盘时，自动检测显示器工作区边界，防止轮盘扇区被屏幕边缘截断。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
+
+                  <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="220" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                      <TextBlock Text="防溢出处理策略 (Policy):" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Text="智能贴边：自动推入屏幕并保持安全边距；屏幕中心：直接在当前显示器正中展现。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox Name="EdgeOverflowPolicyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="EdgeOverflowPolicyComboBox_SelectionChanged">
+                      <ComboBoxItem Tag="ClampShift" Content="🛡️ 智能贴边防溢出 (推荐)" IsSelected="True" />
+                      <ComboBoxItem Tag="ScreenCenter" Content="🎯 屏幕物理正中心呼出" />
+                      <ComboBoxItem Tag="None" Content="🚫 原生跟随光标 (允许溢出)" />
+                    </ComboBox>
+                  </Grid>
+
+                  <StackPanel Name="EdgeSafeMarginPanel">
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                      <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Text="边缘安全间距 (Safe Margin):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="EdgeSafeMarginValueText" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="EdgeSafeMarginSlider" Minimum="8" Maximum="48" SmallChange="2" LargeChange="4" Value="16" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginSlider_ValueChanged" />
+                        <TextBlock Text="调节轮盘外圈边缘距离屏幕物理边界的保留间距。保持一定距离可彻底避免扇区与文字超出视口。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
@@ -1708,6 +1748,45 @@
                       <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="11.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
+
+                    <!-- 文字相对位置与偏移微调 (支持归位复位) -->
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,2,0,0">
+                      <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Name="SectorTextPlacementTitleText" Text="文字相对位置 (Text Position):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <Button Name="ResetTextOffsetBtn" Grid.Column="1" Content="🔄 位置归位" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="8,0" FontSize="11" ToolTip="一键将文字相对位置与水平/垂直偏移恢复为默认" Click="ResetTextOffsetBtn_Click" />
+                        </Grid>
+                        <ComboBox Name="SectorTextPlacementComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="SectorTextPlacementComboBox_SelectionChanged">
+                          <ComboBoxItem Content="⬇️ 图标下方 (Below - 默认)" Tag="Below" IsSelected="True" />
+                          <ComboBoxItem Content="⬆️ 图标上方 (Above)" Tag="Above" />
+                        </ComboBox>
+
+                        <Grid Margin="0,2,0,4">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="48" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="水平 X:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <Slider Name="SectorTextOffsetXSlider" Grid.Column="1" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorTextOffsetSlider_ValueChanged" />
+                          <TextBlock Name="SectorTextOffsetXLabel" Grid.Column="2" Text="0 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                        <Grid Margin="0,2,0,4">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="48" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="垂直 Y:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <Slider Name="SectorTextOffsetYSlider" Grid.Column="1" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorTextOffsetSlider_ValueChanged" />
+                          <TextBlock Name="SectorTextOffsetYLabel" Grid.Column="2" Text="0 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
@@ -2668,56 +2747,80 @@
                   </StackPanel>
                 </Border>
 
-                <!-- 平铺窗口全局设置 -->
-                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+                <!-- 平铺窗口全局设置 (可折叠收纳) -->
+                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" Margin="0,0,0,14">
                   <UIElement.Effect>
                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                   </UIElement.Effect>
                   <StackPanel>
-                    <TextBlock Name="TileGlobalTitleText" Text="平铺窗口设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
-                    <CheckBox Name="TileIncludeMinimizedCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,10" Checked="TileIncludeMinimizedCheckBox_Changed" Unchecked="TileIncludeMinimizedCheckBox_Changed">
-                      <StackPanel Margin="6,0,0,0">
-                        <TextBlock Name="TileMinimizeText" Text="包含最小化窗口（还原后参与平铺）" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="默认关闭：最小化窗口不参与，仅排布可见窗口。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
-                      </StackPanel>
-                    </CheckBox>
-                    <TextBlock Name="TileExcludeText" Text="平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
-                    <Grid Margin="0,0,0,10">
+                    <!-- 头部栏 (点击展开/折叠) -->
+                    <Grid Cursor="Hand" MouseLeftButtonDown="ToggleTileSettingsCard_Click" Background="Transparent">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
-                      <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
-                      <Button Grid.Column="1" Content="🎯 捕捉排除进程..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" ToolTip="打开智能窗口捕捉器，选取桌面运行中的程序加入平铺排除名单（自动安全排除 StarPie 自身）" Click="TileCaptureCurrentProcess_Click" />
-                    </Grid>
-                    <Grid Margin="0,4,0,6">
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Name="TileCycleRangeText" Text="循环切换布局（勾选参与项，▲▼ 调顺序；不勾任何项=全部参与）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                      <Button Grid.Column="1" Content="✨ 经典常用 (4项)" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="6,0" FontSize="10.5" ToolTip="一键勾选 2L、2T、3L12、4G 四种高频排布" Click="TileCyclePresetClassic_Click" />
-                    </Grid>
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="42" />
-                      </Grid.ColumnDefinitions>
-                      <ListBox Name="TileCycleListBox" Height="168" SelectionMode="Single" BorderThickness="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <ListBox.ItemTemplate>
-                          <DataTemplate>
-                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Display}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                          </DataTemplate>
-                        </ListBox.ItemTemplate>
-                      </ListBox>
-                      <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                        <Button Content="▲" Height="28" Width="36" Padding="0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TileCycleUp_Click" ToolTip="上移" />
-                        <Button Content="▼" Height="28" Width="36" Padding="0" FontSize="11" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleDown_Click" ToolTip="下移" />
-                        <Button Content="全" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,6,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleAll_Click" ToolTip="全部参与循环" />
-                        <Button Content="空" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleNone_Click" ToolTip="清空（等效全部参与）" />
+                      <StackPanel VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                          <TextBlock Name="TileGlobalTitleText" Text="🪟 平铺窗口高级设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <Border Name="TileSettingsStatusBadge" Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Name="TileSettingsStatusText" Text="已收纳 (点击展开)" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为（包含最小化窗口、排除名单与多布局循环切换）。" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
                       </StackPanel>
+                      <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                          <TextBlock Name="TileSettingsToggleLabel" Text="展开配置" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Name="TileSettingsExpandArrow" Text="▼" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                        </StackPanel>
+                      </Border>
                     </Grid>
+
+                    <!-- 折叠收纳的详细配置面板 (默认收起折叠) -->
+                    <StackPanel Name="TileSettingsContentPanel" Margin="0,14,0,0" Visibility="Collapsed">
+                      <CheckBox Name="TileIncludeMinimizedCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="TileIncludeMinimizedCheckBox_Changed" Unchecked="TileIncludeMinimizedCheckBox_Changed">
+                        <StackPanel Margin="6,0,0,0">
+                          <TextBlock Name="TileMinimizeText" Text="包含最小化窗口（还原后参与平铺）" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="默认关闭：最小化窗口不参与，仅排布可见窗口。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                      </CheckBox>
+                      <TextBlock Name="TileExcludeText" Text="平铺排除名单（进程 exe 名，逗号分隔，如 notepad,spotify）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                      <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
+                        <Button Grid.Column="1" Content="🎯 捕捉排除进程..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" ToolTip="打开智能窗口捕捉器，选取桌面运行中的程序加入平铺排除名单（自动安全排除 StarPie 自身）" Click="TileCaptureCurrentProcess_Click" />
+                      </Grid>
+                      <Grid Margin="0,4,0,6">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Name="TileCycleRangeText" Text="循环切换布局（勾选参与项，▲▼ 调顺序；不勾任何项=全部参与）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="✨ 经典常用 (4项)" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="6,0" FontSize="10.5" ToolTip="一键勾选 2L、2T、3L12、4G 四种高频排布" Click="TileCyclePresetClassic_Click" />
+                      </Grid>
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="42" />
+                        </Grid.ColumnDefinitions>
+                        <ListBox Name="TileCycleListBox" Height="168" SelectionMode="Single" BorderThickness="0" Background="Transparent" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                          <ListBox.ItemTemplate>
+                            <DataTemplate>
+                              <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Display}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            </DataTemplate>
+                          </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                          <Button Content="▲" Height="28" Width="36" Padding="0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TileCycleUp_Click" ToolTip="上移" />
+                          <Button Content="▼" Height="28" Width="36" Padding="0" FontSize="11" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleDown_Click" ToolTip="下移" />
+                          <Button Content="全" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,6,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleAll_Click" ToolTip="全部参与循环" />
+                          <Button Content="空" Height="26" Width="36" Padding="0" FontSize="10" Margin="0,4,0,0" Style="{StaticResource ModernButtonStyle}" Click="TileCycleNone_Click" ToolTip="清空（等效全部参与）" />
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -2772,8 +2875,11 @@
                   </ScrollViewer>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,5,0,0">
                     <Grid>
-                      <TextBlock Name="ContributorsSyncStatusText" Text="🌐 数据已与 GitHub 实时同步 (按贡献量排序)" FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
-                      <TextBlock Text="⭐ 访问 GitHub 仓库" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Cursor="Hand" HorizontalAlignment="Right" VerticalAlignment="Center" MouseLeftButtonDown="OpenGitHubRepo_Click" />
+                      <TextBlock Name="ContributorsSyncStatusText" Text="🌐 本地收录名单 (检查更新时可联网刷新)" FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="🔄 刷新" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand" Margin="0,0,10,0" VerticalAlignment="Center" MouseLeftButtonDown="RefreshContributors_Click" ToolTip="向 GitHub API 请求最新贡献者数据" />
+                        <TextBlock Text="★ 访问 GitHub 仓库" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Cursor="Hand" VerticalAlignment="Center" MouseLeftButtonDown="OpenGitHubRepo_Click" />
+                      </StackPanel>
                     </Grid>
                   </Border>
                 </StackPanel>

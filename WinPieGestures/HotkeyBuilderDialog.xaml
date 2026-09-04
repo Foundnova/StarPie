@@ -87,6 +87,25 @@
           </Setter.Value>
         </Setter>
       </Style>
+      <Style TargetType="{x:Type CheckBox}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+      </Style>
+      <Style TargetType="{x:Type ComboBoxItem}">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="Cursor" Value="Hand" />
+      </Style>
+      <Style TargetType="{x:Type TextBox}">
+        <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}" />
+      </Style>
     </ResourceDictionary>
   </Window.Resources>
 
@@ -177,10 +196,11 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <TextBox Name="MainKeySearchBox" Height="28" VerticalContentAlignment="Center" Padding="6,2" FontSize="11.5" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource InputBorderBrush}" TextChanged="MainKeySearchBox_TextChanged" ToolTip="输入按键关键字（如 Pause、F5、Tab、A、Enter 等）即时过滤检索" />
+              <TextBox Name="MainKeySearchBox" Height="28" VerticalContentAlignment="Center" Padding="6,2" FontSize="11.5" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource InputBorderBrush}" CaretBrush="{DynamicResource TextPrimaryBrush}" TextChanged="MainKeySearchBox_TextChanged" ToolTip="输入按键关键字（如 Pause、F5、Tab、A、Enter 等）即时过滤检索" />
+              <TextBlock Name="MainKeySearchPlaceholder" Text="🔍 输入按键名称检索过滤 (如 Pause, Tab, F5, A...)" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="8,0,0,0" IsHitTestVisible="False" />
               <Button Name="MainKeyClearSearchBtn" Grid.Column="1" Content="✕" ToolTip="清空筛选" Width="28" Height="28" Margin="4,0,0,0" Style="{StaticResource DlgBtnStyle}" Padding="0" Click="MainKeyClearSearchBtn_Click" Visibility="Collapsed" />
             </Grid>
-            <ComboBox Name="MainKeyComboBox" Height="30" SelectionChanged="OnComboChanged">
+            <ComboBox Name="MainKeyComboBox" Style="{DynamicResource FlatComboBoxStyle}" Height="30" SelectionChanged="OnComboChanged">
               <ComboBoxItem Content="(无主键 / 仅修饰键组合，如 Shift+Alt)" Tag="" />
               <ComboBoxItem Content="Tab (切换焦点/窗口)" Tag="Tab" />
               <ComboBoxItem Content="Delete (删除)" Tag="Delete" />

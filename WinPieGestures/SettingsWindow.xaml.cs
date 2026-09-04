@@ -368,7 +368,7 @@ public partial class SettingsWindow : Window
 				RenderLiveWheelPreview();
 			}
 			MemoryOptimizer.TrimMemory();
-			LoadContributorsAsync();
+			LoadContributorsOffline();
 			if (ConfigManager.CurrentConfig?.AutoCheckUpdate == true)
 			{
 				Task.Run(async () =>
@@ -563,6 +563,7 @@ public partial class SettingsWindow : Window
 		{
 			TileIncludeMinimizedCheckBox.IsChecked = ConfigManager.CurrentConfig.TileIncludeMinimized;
 		}
+		SetTileSettingsExpanded(ConfigManager.CurrentConfig.TileSettingsExpanded);
 		if (EnableOuterEscapeCheckBox != null)
 		{
 			EnableOuterEscapeCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableOuterEscapeCancel;
@@ -862,6 +863,17 @@ public partial class SettingsWindow : Window
 			IsolationBlacklistRadio.IsChecked = !isWhitelist;
 		}
 		RefreshProcessListUI();
+
+		// Edge Collision Avoidance
+		SetComboBoxSelectedValue(EdgeOverflowPolicyComboBox, ConfigManager.CurrentConfig.EdgeOverflowPolicy ?? "ClampShift");
+		if (EdgeSafeMarginSlider != null)
+		{
+			EdgeSafeMarginSlider.Value = ConfigManager.CurrentConfig.EdgeSafeMargin > 0 ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0;
+		}
+		if (EdgeSafeMarginValueText != null)
+		{
+			EdgeSafeMarginValueText.Text = $"{EdgeSafeMarginSlider?.Value ?? 16.0:0} px";
+		}
 
 		// AutoStart
 		AutoStartCheckBox.IsChecked = ConfigManager.IsAutoStartEnabled();
@@ -6575,6 +6587,26 @@ public partial class SettingsWindow : Window
 						SectorFontSizeLabel.Text = $"{fsz:0.0} px";
 					}
 				}
+				if (SectorTextPlacementComboBox != null)
+				{
+					SetComboBoxSelectedValue(SectorTextPlacementComboBox, ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+				}
+				if (SectorTextOffsetXSlider != null)
+				{
+					SectorTextOffsetXSlider.Value = ConfigManager.CurrentConfig.SectorTextOffsetX;
+					if (SectorTextOffsetXLabel != null)
+					{
+						SectorTextOffsetXLabel.Text = $"{ConfigManager.CurrentConfig.SectorTextOffsetX:+0;-0;0} px";
+					}
+				}
+				if (SectorTextOffsetYSlider != null)
+				{
+					SectorTextOffsetYSlider.Value = ConfigManager.CurrentConfig.SectorTextOffsetY;
+					if (SectorTextOffsetYLabel != null)
+					{
+						SectorTextOffsetYLabel.Text = $"{ConfigManager.CurrentConfig.SectorTextOffsetY:+0;-0;0} px";
+					}
+				}
 			}
 			else
 			{
@@ -6630,6 +6662,29 @@ public partial class SettingsWindow : Window
 					if (SectorFontSizeLabel != null)
 					{
 						SectorFontSizeLabel.Text = $"{fsz:0.0} px";
+					}
+				}
+				if (SectorTextPlacementComboBox != null)
+				{
+					string placement = (!string.IsNullOrWhiteSpace(action?.CustomTextPlacement)) ? action.CustomTextPlacement : (ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+					SetComboBoxSelectedValue(SectorTextPlacementComboBox, placement);
+				}
+				if (SectorTextOffsetXSlider != null)
+				{
+					double offX = (action != null && action.CustomTextOffsetX.HasValue) ? action.CustomTextOffsetX.Value : ConfigManager.CurrentConfig.SectorTextOffsetX;
+					SectorTextOffsetXSlider.Value = offX;
+					if (SectorTextOffsetXLabel != null)
+					{
+						SectorTextOffsetXLabel.Text = $"{offX:+0;-0;0} px";
+					}
+				}
+				if (SectorTextOffsetYSlider != null)
+				{
+					double offY = (action != null && action.CustomTextOffsetY.HasValue) ? action.CustomTextOffsetY.Value : ConfigManager.CurrentConfig.SectorTextOffsetY;
+					SectorTextOffsetYSlider.Value = offY;
+					if (SectorTextOffsetYLabel != null)
+					{
+						SectorTextOffsetYLabel.Text = $"{offY:+0;-0;0} px";
 					}
 				}
 			}
@@ -7064,6 +7119,131 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void SectorTextPlacementComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || SectorTextPlacementComboBox == null) return;
+		string placement = (SectorTextPlacementComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Below";
+		if (_selectedLayoutSlotIndex < 0)
+		{
+			ConfigManager.CurrentConfig.SectorTextPlacement = placement;
+		}
+		else
+		{
+			ActionItem? action = GetCurrentEditingAction();
+			if (action != null)
+			{
+				action.CustomTextPlacement = placement;
+			}
+		}
+		if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
+	private void SectorTextOffsetSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		double offX = SectorTextOffsetXSlider?.Value ?? 0.0;
+		double offY = SectorTextOffsetYSlider?.Value ?? 0.0;
+		if (SectorTextOffsetXLabel != null)
+		{
+			SectorTextOffsetXLabel.Text = $"{offX:+0;-0;0} px";
+		}
+		if (SectorTextOffsetYLabel != null)
+		{
+			SectorTextOffsetYLabel.Text = $"{offY:+0;-0;0} px";
+		}
+		if (_selectedLayoutSlotIndex < 0)
+		{
+			ConfigManager.CurrentConfig.SectorTextOffsetX = offX;
+			ConfigManager.CurrentConfig.SectorTextOffsetY = offY;
+		}
+		else
+		{
+			ActionItem? action = GetCurrentEditingAction();
+			if (action != null)
+			{
+				action.CustomTextOffsetX = offX;
+				action.CustomTextOffsetY = offY;
+			}
+		}
+		if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
+	private void ResetTextOffsetBtn_Click(object sender, RoutedEventArgs e)
+	{
+		_isUpdatingUi = true;
+		try
+		{
+			if (SectorTextPlacementComboBox != null)
+			{
+				SetComboBoxSelectedValue(SectorTextPlacementComboBox, "Below");
+			}
+			if (SectorTextOffsetXSlider != null)
+			{
+				SectorTextOffsetXSlider.Value = 0;
+			}
+			if (SectorTextOffsetYSlider != null)
+			{
+				SectorTextOffsetYSlider.Value = 0;
+			}
+			if (SectorTextOffsetXLabel != null) SectorTextOffsetXLabel.Text = "0 px";
+			if (SectorTextOffsetYLabel != null) SectorTextOffsetYLabel.Text = "0 px";
+
+			if (_selectedLayoutSlotIndex < 0)
+			{
+				ConfigManager.CurrentConfig.SectorTextPlacement = "Below";
+				ConfigManager.CurrentConfig.SectorTextOffsetX = 0;
+				ConfigManager.CurrentConfig.SectorTextOffsetY = 0;
+			}
+			else
+			{
+				ActionItem? action = GetCurrentEditingAction();
+				if (action != null)
+				{
+					action.CustomTextPlacement = null;
+					action.CustomTextOffsetX = null;
+					action.CustomTextOffsetY = null;
+				}
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+		if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
+	private void EdgeOverflowPolicyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || EdgeOverflowPolicyComboBox == null) return;
+		string policy = (EdgeOverflowPolicyComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ClampShift";
+		ConfigManager.CurrentConfig.EdgeOverflowPolicy = policy;
+		ScheduleAutoSave();
+	}
+
+	private void EdgeSafeMarginSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		double val = EdgeSafeMarginSlider?.Value ?? 16.0;
+		if (EdgeSafeMarginValueText != null)
+		{
+			EdgeSafeMarginValueText.Text = $"{val:0} px";
+		}
+		ConfigManager.CurrentConfig.EdgeSafeMargin = val;
+		ScheduleAutoSave();
+	}
+
 	private void ResetDimensionsButton_Click(object sender, RoutedEventArgs e)
 	{
 		_isUpdatingUi = true;
@@ -7090,6 +7270,14 @@ public partial class SettingsWindow : Window
 			ConfigManager.CurrentConfig.SectorCornerRadius = 4.0;
 			ConfigManager.CurrentConfig.SectorIconSize = 20.0;
 			ConfigManager.CurrentConfig.SectorFontSize = 10.5;
+			ConfigManager.CurrentConfig.SectorTextPlacement = "Below";
+			ConfigManager.CurrentConfig.SectorTextOffsetX = 0.0;
+			ConfigManager.CurrentConfig.SectorTextOffsetY = 0.0;
+			if (SectorTextPlacementComboBox != null) SetComboBoxSelectedValue(SectorTextPlacementComboBox, "Below");
+			if (SectorTextOffsetXSlider != null) SectorTextOffsetXSlider.Value = 0;
+			if (SectorTextOffsetYSlider != null) SectorTextOffsetYSlider.Value = 0;
+			if (SectorTextOffsetXLabel != null) SectorTextOffsetXLabel.Text = "0 px";
+			if (SectorTextOffsetYLabel != null) SectorTextOffsetYLabel.Text = "0 px";
 		}
 		finally
 		{
@@ -8348,6 +8536,9 @@ public partial class SettingsWindow : Window
 			string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghproxy";
 			string customProxy = ConfigManager.CurrentConfig?.CustomProxyUrl ?? "";
 
+			// 仅在检查应用更新时同步一次 GitHub 贡献者名单，平时默认离线
+			_ = SyncContributorsFromGitHubAsync();
+
 			ReleaseInfo? rel = await UpdateManager.Instance.CheckForUpdateAsync(channel, proxy, customProxy);
 
 			if (ConfigManager.CurrentConfig != null)
@@ -8632,18 +8823,39 @@ public partial class SettingsWindow : Window
 		catch { }
 	}
 
-	private async void LoadContributorsAsync()
+	private static List<GitHubContributorInfo> GetDefaultContributors()
 	{
-		// 1. 本地内置默认贡献者名单（离线/限流时即刻呈现，不依赖网络）
-		var fallbackList = new List<GitHubContributorInfo>
+		return new List<GitHubContributorInfo>
 		{
-			new GitHubContributorInfo { Login = "SoftBlack42", AvatarUrl = "https://avatars.githubusercontent.com/u/10101010?v=4", HtmlUrl = "https://github.com/SoftBlack42", Contributions = 168 },
-			new GitHubContributorInfo { Login = "luoluoluo22", AvatarUrl = "https://avatars.githubusercontent.com/u/20202020?v=4", HtmlUrl = "https://github.com/luoluoluo22", Contributions = 12 }
+			new GitHubContributorInfo { Login = "Sunse666", AvatarUrl = "https://avatars.githubusercontent.com/u/108920194?v=4", HtmlUrl = "https://github.com/Sunse666", Contributions = 79 },
+			new GitHubContributorInfo { Login = "SoftBlack42", AvatarUrl = "https://avatars.githubusercontent.com/u/10101010?v=4", HtmlUrl = "https://github.com/SoftBlack42", Contributions = 35 },
+			new GitHubContributorInfo { Login = "IQ-Director", AvatarUrl = "https://avatars.githubusercontent.com/u/148705602?v=4", HtmlUrl = "https://github.com/IQ-Director", Contributions = 3 },
+			new GitHubContributorInfo { Login = "Zsdhak1", AvatarUrl = "https://avatars.githubusercontent.com/u/119934371?v=4", HtmlUrl = "https://github.com/Zsdhak1", Contributions = 3 },
+			new GitHubContributorInfo { Login = "ACbye", AvatarUrl = "https://avatars.githubusercontent.com/u/49258204?v=4", HtmlUrl = "https://github.com/ACbye", Contributions = 1 },
+			new GitHubContributorInfo { Login = "AkiraYim", AvatarUrl = "https://avatars.githubusercontent.com/u/163013897?v=4", HtmlUrl = "https://github.com/AkiraYim", Contributions = 1 }
 		};
+	}
 
-		RenderContributors(fallbackList);
+	private void LoadContributorsOffline()
+	{
+		RenderContributors(GetDefaultContributors());
+		if (ContributorsSyncStatusText != null)
+		{
+			ContributorsSyncStatusText.Text = "🌐 本地收录名单 (检查更新时可联网刷新)";
+		}
+	}
 
-		// 2. 异步向 GitHub API 请求最新贡献者列表
+	private async void RefreshContributors_Click(object sender, MouseButtonEventArgs e)
+	{
+		if (ContributorsSyncStatusText != null)
+		{
+			ContributorsSyncStatusText.Text = "⏳ 正在向 GitHub 请求最新贡献者名单...";
+		}
+		await SyncContributorsFromGitHubAsync();
+	}
+
+	private async Task SyncContributorsFromGitHubAsync()
+	{
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
@@ -8668,6 +8880,13 @@ public partial class SettingsWindow : Window
 		catch (Exception ex)
 		{
 			AppLogger.LogWarn($"GitHub contributors sync skipped/offline: {ex.Message}");
+			Dispatcher.Invoke(() =>
+			{
+				if (ContributorsSyncStatusText != null)
+				{
+					ContributorsSyncStatusText.Text = "🌐 本地收录名单 (网络离线或 API 限流)";
+				}
+			});
 		}
 	}
 
@@ -9572,6 +9791,7 @@ public partial class SettingsWindow : Window
 					sectorPreviewTextBrush = CreateBrushFromHexSafe(action.CustomTextColor, _previewTextBrush);
 				}
 
+				UIElement? iconElement = null;
 				if (shouldShowIcon)
 				{
 					double baseIconSize = (action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0)
@@ -9588,17 +9808,15 @@ public partial class SettingsWindow : Window
 					{
 						try
 						{
-							System.Windows.Shapes.Path element = new System.Windows.Shapes.Path
+							iconElement = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse(text11),
 								Fill = sectorPreviewTextBrush,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
+								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
-							stackPanel.Children.Add(element);
 						}
 						catch
 						{
@@ -9609,16 +9827,14 @@ public partial class SettingsWindow : Window
 						ImageSource customImageSource = IconHelper.GetCustomImageSource(customIconItem2.FilePath);
 						if (customImageSource != null)
 						{
-							System.Windows.Controls.Image element2 = new System.Windows.Controls.Image
+							iconElement = new System.Windows.Controls.Image
 							{
 								Source = customImageSource,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
+								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
-							stackPanel.Children.Add(element2);
 						}
 					}
 					else if (text9 == "Launch" && !string.IsNullOrEmpty(text10))
@@ -9626,39 +9842,37 @@ public partial class SettingsWindow : Window
 						BitmapSource icon = IconHelper.GetIcon(text10);
 						if (icon != null)
 						{
-							System.Windows.Controls.Image element3 = new System.Windows.Controls.Image
+							iconElement = new System.Windows.Controls.Image
 							{
 								Source = icon,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
+								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
-							stackPanel.Children.Add(element3);
 						}
 					}
 					else
 					{
 						try
 						{
-							System.Windows.Shapes.Path element4 = new System.Windows.Shapes.Path
+							iconElement = new System.Windows.Shapes.Path
 							{
 								Data = Geometry.Parse("M19,15H5V5H19M19,3H5C3.89,3 3,3.89 3,5V15C3,16.1 3.89,17 5,17H19C20.1,17 21,16.1 21,15V5C21,3.89 20.1,3 19,3M2,18H22V20H2V18Z"),
 								Fill = sectorPreviewTextBrush,
 								Width = num30,
 								Height = num30,
 								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-								Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 1 : 0)
+								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
-							stackPanel.Children.Add(element4);
 						}
 						catch
 						{
 						}
 					}
 				}
+
+				TextBlock? textElement = null;
 				if (shouldShowText && !string.IsNullOrEmpty(text8))
 				{
 					double baseFontSize = (action != null && action.CustomFontSize.HasValue && action.CustomFontSize.Value > 0.0)
@@ -9680,7 +9894,7 @@ public partial class SettingsWindow : Window
 					string sectorFont = (action != null && !string.IsNullOrWhiteSpace(action.CustomFontFamily))
 						? action.CustomFontFamily
 						: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-					TextBlock element5 = new TextBlock
+					textElement = new TextBlock
 					{
 						Text = text8,
 						FontSize = Math.Max(6.0, val2),
@@ -9692,7 +9906,49 @@ public partial class SettingsWindow : Window
 						TextTrimming = TextTrimming.CharacterEllipsis,
 						MaxWidth = maxWidth
 					};
-					stackPanel.Children.Add(element5);
+				}
+
+				string textPlacement = (!string.IsNullOrWhiteSpace(action?.CustomTextPlacement))
+					? action.CustomTextPlacement
+					: (ConfigManager.CurrentConfig.SectorTextPlacement ?? "Below");
+				double textOffX = (action != null && action.CustomTextOffsetX.HasValue)
+					? action.CustomTextOffsetX.Value
+					: ConfigManager.CurrentConfig.SectorTextOffsetX;
+				double textOffY = (action != null && action.CustomTextOffsetY.HasValue)
+					? action.CustomTextOffsetY.Value
+					: ConfigManager.CurrentConfig.SectorTextOffsetY;
+
+				if (textElement != null && (Math.Abs(textOffX) > 0.001 || Math.Abs(textOffY) > 0.001))
+				{
+					textElement.RenderTransform = new TranslateTransform(textOffX * num7, textOffY * num7);
+				}
+
+				if (textPlacement == "Above")
+				{
+					if (textElement != null)
+					{
+						textElement.Margin = new Thickness(0.0, 0.0, 0.0, (iconElement != null) ? 1 : 0);
+						stackPanel.Children.Add(textElement);
+					}
+					if (iconElement != null)
+					{
+						stackPanel.Children.Add(iconElement);
+					}
+				}
+				else
+				{
+					if (iconElement != null)
+					{
+						if (iconElement is FrameworkElement fe)
+						{
+							fe.Margin = new Thickness(0.0, 0.0, 0.0, (textElement != null) ? 1 : 0);
+						}
+						stackPanel.Children.Add(iconElement);
+					}
+					if (textElement != null)
+					{
+						stackPanel.Children.Add(textElement);
+					}
 				}
 				double num33 = num19 switch
 				{
@@ -10841,6 +11097,35 @@ public partial class SettingsWindow : Window
 		{
 			vm.PopulateTileSubActions();
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void ToggleTileSettingsCard_Click(object sender, MouseButtonEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null) return;
+		bool isExpanded = !ConfigManager.CurrentConfig.TileSettingsExpanded;
+		ConfigManager.CurrentConfig.TileSettingsExpanded = isExpanded;
+		SetTileSettingsExpanded(isExpanded);
+		SyncUiToConfigAndSave();
+	}
+
+	private void SetTileSettingsExpanded(bool isExpanded)
+	{
+		if (TileSettingsContentPanel != null)
+		{
+			TileSettingsContentPanel.Visibility = isExpanded ? Visibility.Visible : Visibility.Collapsed;
+		}
+		if (TileSettingsStatusText != null)
+		{
+			TileSettingsStatusText.Text = isExpanded ? "已展开" : "已收纳 (点击展开)";
+		}
+		if (TileSettingsToggleLabel != null)
+		{
+			TileSettingsToggleLabel.Text = isExpanded ? "收起配置" : "展开配置";
+		}
+		if (TileSettingsExpandArrow != null)
+		{
+			TileSettingsExpandArrow.Text = isExpanded ? "▲" : "▼";
 		}
 	}
 

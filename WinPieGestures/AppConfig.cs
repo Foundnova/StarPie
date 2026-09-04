@@ -127,6 +127,12 @@ public class AppConfig
 
 	public string IconLayoutMode { get; set; } = "IconAndText";
 
+	public string SectorTextPlacement { get; set; } = "Below";
+
+	public double SectorTextOffsetX { get; set; } = 0.0;
+
+	public double SectorTextOffsetY { get; set; } = 0.0;
+
 	public string WheelFontFamily { get; set; } = "Microsoft YaHei UI, Segoe UI";
 
 	public double SectorIconSize { get; set; } = 20.0;
@@ -224,6 +230,15 @@ public class AppConfig
 	public string LastCheckUpdateTime { get; set; } = "";
 
 	public string IgnoredVersion { get; set; } = "";
+
+	/// <summary>平铺窗口高级设置卡片是否展开（默认收起折叠）</summary>
+	public bool TileSettingsExpanded { get; set; } = false;
+
+	/// <summary>屏幕边缘呼出防溢出策略："ClampShift" (智能贴边安全防溢出 - 默认), "ScreenCenter" (屏幕中心呼出), "None" (原生不处理)</summary>
+	public string EdgeOverflowPolicy { get; set; } = "ClampShift";
+
+	/// <summary>屏幕边缘呼出安全边距 (像素)</summary>
+	public double EdgeSafeMargin { get; set; } = 16.0;
 
 	/// <summary>OCR 截屏文字识别引擎全局配置</summary>
 	public OcrSettings OcrConfig { get; set; } = new OcrSettings();
