@@ -234,8 +234,8 @@ public class AppConfig
 	/// <summary>平铺窗口高级设置卡片是否展开（默认收起折叠）</summary>
 	public bool TileSettingsExpanded { get; set; } = false;
 
-	/// <summary>是否启用屏幕边缘呼出智能防溢出与光标自动对齐（默认开启）</summary>
-	public bool EnableEdgeCollisionAvoidance { get; set; } = true;
+	/// <summary>是否启用屏幕边缘呼出智能防溢出与光标自动对齐（默认关闭）</summary>
+	public bool EnableEdgeCollisionAvoidance { get; set; } = false;
 
 	/// <summary>屏幕边缘呼出防溢出策略："ClampShift" (智能贴边安全防溢出 - 默认), "ScreenCenter" (屏幕中心呼出), "None" (原生不处理)</summary>
 	public string EdgeOverflowPolicy { get; set; } = "ClampShift";

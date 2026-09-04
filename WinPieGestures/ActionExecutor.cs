@@ -131,6 +131,9 @@ public static class ActionExecutor
 	[DllImport("user32.dll")]
 	private static extern bool LockWorkStation();
 
+	[DllImport("shell32.dll", CharSet = CharSet.Auto)]
+	private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);
+
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
 
@@ -279,6 +282,9 @@ public static class ActionExecutor
 				break;
 			case "System":
 				ExecuteSystem(action.Parameter);
+				break;
+			case "ShellTool":
+				ExecuteShellTool(action.Parameter);
 				break;
 			}
 		}
@@ -601,6 +607,382 @@ public static class ActionExecutor
 				MessageBox.Show("无法打开目标网址: " + ex2.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Warning);
 			}
 		}
+	}
+
+	public static void ExecuteShellTool(string verb)
+	{
+		if (string.IsNullOrWhiteSpace(verb)) return;
+		AppLogger.LogInfo($"Executing ShellTool verb: '{verb}'");
+
+		string v = verb.Trim();
+		switch (v)
+		{
+			case "Windows.CopyAsPath":
+			case "copy_path":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count > 0)
+				{
+					System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, selected));
+				}
+				else if (!string.IsNullOrEmpty(folder))
+				{
+					System.Windows.Clipboard.SetText(folder);
+				}
+				break;
+			}
+			case "StarPie.Builtin.ScreenOCR":
+			case "builtin_ocr":
+			case "Ocr":
+			case "ScreenOcr":
+			{
+				OcrManager.StartCaptureAndRecognize();
+				break;
+			}
+			case "Windows.RunAs":
+			case "run_as_admin":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string targetExe = selected.FirstOrDefault(s => s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+															    s.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+															    s.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
+															    s.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase)) ?? "";
+				if (!string.IsNullOrEmpty(targetExe))
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = targetExe,
+						Verb = "runas",
+						UseShellExecute = true,
+						WorkingDirectory = Path.GetDirectoryName(targetExe) ?? folder
+					});
+				}
+				else
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "cmd.exe",
+						Verb = "runas",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "Windows.TaskManager":
+			case "task_manager":
+			{
+				Process.Start(new ProcessStartInfo("taskmgr.exe") { UseShellExecute = true });
+				break;
+			}
+			case "Windows.SnippingTool":
+			case "snipping_tool":
+			{
+				try
+				{
+					Process.Start(new ProcessStartInfo("ms-screenclip:") { UseShellExecute = true });
+				}
+				catch
+				{
+					ExecuteHotkey("Win+Shift+S");
+				}
+				break;
+			}
+			case "Windows.NewFolder":
+			case "new_folder":
+			{
+				ExecuteHotkey("Ctrl+Shift+N");
+				break;
+			}
+			case "Windows.Properties":
+			case "file_properties":
+			{
+				ExecuteHotkey("Alt+Enter");
+				break;
+			}
+			case "Windows.Lock":
+			case "lock_screen":
+			{
+				LockWorkStation();
+				break;
+			}
+			case "Windows.EmptyRecycleBin":
+			case "empty_recycle_bin":
+			{
+				SHEmptyRecycleBin(IntPtr.Zero, null, 7u);
+				break;
+			}
+			case "VSCode.Open":
+			case "vscode_open":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count > 0)
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "code",
+						Arguments = string.Join(" ", selected.Select(s => $"\"{s}\"")),
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				else
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "code",
+						Arguments = $"\"{folder}\"",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "Git.BashHere":
+			case "git_bash_here":
+			{
+				var (folder, _) = GetActiveExplorerContext();
+				string[] possibleGitPaths = new[]
+				{
+					@"C:\Program Files\Git\git-bash.exe",
+					@"C:\Program Files (x86)\Git\git-bash.exe",
+					Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\Git\git-bash.exe")
+				};
+				string gitExe = possibleGitPaths.FirstOrDefault(File.Exists) ?? "git-bash.exe";
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = gitExe,
+					Arguments = $"--cd=\"{folder}\"",
+					UseShellExecute = true,
+					WorkingDirectory = folder
+				});
+				break;
+			}
+			case "Windows.Terminal":
+			case "windows_terminal":
+			{
+				var (folder, _) = GetActiveExplorerContext();
+				try
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "wt.exe",
+						Arguments = $"-d \"{folder}\"",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = "powershell.exe",
+						Arguments = $"-NoExit -Command \"Set-Location '{folder}'\"",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "Windows.CmdHere":
+			case "cmd_here":
+			{
+				var (folder, _) = GetActiveExplorerContext();
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "cmd.exe",
+					Arguments = $"/K cd /d \"{folder}\"",
+					UseShellExecute = true,
+					WorkingDirectory = folder
+				});
+				break;
+			}
+			case "Windows.PowerShellHere":
+			case "powershell_here":
+			{
+				var (folder, _) = GetActiveExplorerContext();
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = "powershell.exe",
+					Arguments = $"-NoExit -Command \"Set-Location '{folder}'\"",
+					UseShellExecute = true,
+					WorkingDirectory = folder
+				});
+				break;
+			}
+			case "7-Zip.ExtractHere":
+			case "7z_extract_here":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string sevenZipExe = Find7ZipExecutable();
+				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
+				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(sevenZipExe))
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = sevenZipExe,
+						Arguments = $"x \"{targetArchive}\" -o\"{folder}\" -y",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "7-Zip.ExtractToFolder":
+			case "7z_extract_folder":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string sevenZipExe = Find7ZipExecutable();
+				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
+				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(sevenZipExe))
+				{
+					string outFolder = Path.Combine(folder, Path.GetFileNameWithoutExtension(targetArchive));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = sevenZipExe,
+						Arguments = $"x \"{targetArchive}\" -o\"{outFolder}\" -y",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "Bandizip.AutoExtract":
+			case "bandizip_extract":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string bzExe = FindBandizipExecutable();
+				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
+				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(bzExe))
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = bzExe,
+						Arguments = $"x -y -o:\"{folder}\" \"{targetArchive}\"",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			case "WinRAR.ExtractHere":
+			case "winrar_extract":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string winrarExe = FindWinRarExecutable();
+				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
+				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(winrarExe))
+				{
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = winrarExe,
+						Arguments = $"x -ibck -y \"{targetArchive}\" \"{folder}\\\"",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				break;
+			}
+			default:
+				AppLogger.LogWarn($"Unknown ShellTool verb: '{verb}'");
+				break;
+		}
+	}
+
+	private static (string folder, List<string> selectedPaths) GetActiveExplorerContext()
+	{
+		string folder = "";
+		List<string> selected = new List<string>();
+		try
+		{
+			nint fgHwnd = GetForegroundWindow();
+			Type? shellType = Type.GetTypeFromProgID("Shell.Application");
+			if (shellType != null)
+			{
+				dynamic? shell = Activator.CreateInstance(shellType);
+				if (shell != null)
+				{
+					dynamic windows = shell.Windows();
+					int count = windows.Count;
+					for (int i = 0; i < count; i++)
+					{
+						try
+						{
+							dynamic item = windows.Item(i);
+							if (item == null) continue;
+							long hwnd = item.HWND;
+							if ((nint)hwnd == fgHwnd)
+							{
+								dynamic doc = item.Document;
+								if (doc != null)
+								{
+									folder = doc.Folder?.Self?.Path ?? "";
+									dynamic sel = doc.SelectedItems();
+									if (sel != null)
+									{
+										int selCount = sel.Count;
+										for (int j = 0; j < selCount; j++)
+										{
+											string p = sel.Item(j)?.Path ?? "";
+											if (!string.IsNullOrEmpty(p)) selected.Add(p);
+										}
+									}
+								}
+								break;
+							}
+						}
+						catch { }
+					}
+				}
+			}
+		}
+		catch { }
+
+		if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+		{
+			folder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+		}
+		return (folder, selected);
+	}
+
+	private static bool IsArchive(string path)
+	{
+		if (string.IsNullOrEmpty(path)) return false;
+		string ext = Path.GetExtension(path).ToLowerInvariant();
+		return ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz" || ext == ".bz2" || ext == ".xz" || ext == ".iso";
+	}
+
+	private static string Find7ZipExecutable()
+	{
+		string[] paths = new[]
+		{
+			@"C:\Program Files\7-Zip\7zG.exe",
+			@"C:\Program Files\7-Zip\7z.exe",
+			@"C:\Program Files (x86)\7-Zip\7zG.exe",
+			@"C:\Program Files (x86)\7-Zip\7z.exe"
+		};
+		return paths.FirstOrDefault(File.Exists) ?? "7zG.exe";
+	}
+
+	private static string FindBandizipExecutable()
+	{
+		string[] paths = new[]
+		{
+			@"C:\Program Files\Bandizip\Bandizip.exe",
+			@"C:\Program Files\Bandizip\bz.exe",
+			@"C:\Program Files (x86)\Bandizip\Bandizip.exe"
+		};
+		return paths.FirstOrDefault(File.Exists) ?? "Bandizip.exe";
+	}
+
+	private static string FindWinRarExecutable()
+	{
+		string[] paths = new[]
+		{
+			@"C:\Program Files\WinRAR\WinRAR.exe",
+			@"C:\Program Files (x86)\WinRAR\WinRAR.exe"
+		};
+		return paths.FirstOrDefault(File.Exists) ?? "WinRAR.exe";
 	}
 
 	private static void ExecuteFolder(string folderPath)

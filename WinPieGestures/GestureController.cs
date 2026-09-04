@@ -1336,6 +1336,7 @@ public class GestureController
 					_currentDpiScaleY = newDpiY;
 				}
 				SetCursorPos((int)Math.Round(actualCenter.X), (int)Math.Round(actualCenter.Y));
+				ProcessMove(actualCenter);
 			}
 
 			return true;

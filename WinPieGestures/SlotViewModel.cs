@@ -422,6 +422,21 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 				// 平铺动作自带子菜单：7 布局 + 「恢复上次平铺」——放置即带还原入口
 				PopulateTileSubActions();
 			}
+			if (value == "ShellTool")
+			{
+				if (string.IsNullOrEmpty(IconKey))
+				{
+					IconKey = "Copy";
+				}
+				if (string.IsNullOrEmpty(Name) || Name.StartsWith("快捷动作") || Name.StartsWith("动作"))
+				{
+					Name = "复制文件/文件夹路径";
+				}
+				if (string.IsNullOrEmpty(Action.Parameter))
+				{
+					Action.Parameter = "Windows.CopyAsPath";
+				}
+			}
 			OnPropertyChanged("Type");
 			OnPropertyChanged("IsHotkeyType");
 			OnPropertyChanged("IsLaunchType");
@@ -432,6 +447,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			OnPropertyChanged("IsSwitchWindowType");
 			OnPropertyChanged("IsTileType");
 			OnPropertyChanged("IsOcrType");
+			OnPropertyChanged("IsShellToolType");
 		}
 	}
 
@@ -662,6 +678,8 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsOcrType => Type == "Ocr" || Type == "ScreenOcr";
 
+	public bool IsShellToolType => Type == "ShellTool";
+
 	public int SubActionCount => Action.SubActions?.Count ?? 0;
 
 	public string SubActionButtonText
@@ -730,6 +748,11 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		},
 		new ActionTypeOption
 		{
+			Tag = "ShellTool",
+			DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort")
+		},
+		new ActionTypeOption
+		{
 			Tag = "System",
 			DisplayText = I18n.T("ActionTypeSystemShort")
 		}
@@ -737,14 +760,15 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 
 	public static List<ActionTypeItem> AggregatedActionTypes => new List<ActionTypeItem>
 	{
-		new ActionTypeItem { Tag = "Hotkey", DisplayText = I18n.T("ActionTypeHotkeyShort") },
-		new ActionTypeItem { Tag = "Launch", DisplayText = I18n.T("ActionTypeLaunchShort") },
-		new ActionTypeItem { Tag = "WebUrl", DisplayText = I18n.T("ActionTypeWebUrlShort") },
-		new ActionTypeItem { Tag = "Folder", DisplayText = I18n.T("ActionTypeFolderShort") },
-		new ActionTypeItem { Tag = "Command", DisplayText = I18n.T("ActionTypeCommandShort") },
+		new ActionTypeItem { Tag = "Hotkey", DisplayText = "⌨️ " + I18n.T("ActionTypeHotkeyShort") },
+		new ActionTypeItem { Tag = "Launch", DisplayText = "🚀 " + I18n.T("ActionTypeLaunchShort") },
+		new ActionTypeItem { Tag = "WebUrl", DisplayText = "🌐 " + I18n.T("ActionTypeWebUrlShort") },
+		new ActionTypeItem { Tag = "Folder", DisplayText = "📁 " + I18n.T("ActionTypeFolderShort") },
+		new ActionTypeItem { Tag = "Command", DisplayText = "💻 " + I18n.T("ActionTypeCommandShort") },
 		new ActionTypeItem { Tag = "Ocr", DisplayText = "📝 " + I18n.T("ActionTypeOcrShort") },
 		new ActionTypeItem { Tag = "WindowManager", DisplayText = "🪟 " + I18n.T("ActionTypeWindowManagerShort") },
-		new ActionTypeItem { Tag = "System", DisplayText = I18n.T("ActionTypeSystemShort") }
+		new ActionTypeItem { Tag = "ShellTool", DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort") },
+		new ActionTypeItem { Tag = "System", DisplayText = "⚙️ " + I18n.T("ActionTypeSystemShort") }
 	};
 
 	public static List<ActionTypeItem> LocalizedActionTypes => new List<ActionTypeItem>
@@ -752,62 +776,67 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		new ActionTypeItem
 		{
 			Tag = "Hotkey",
-			DisplayText = I18n.T("ActionTypeHotkeyShort")
+			DisplayText = "⌨️ " + I18n.T("ActionTypeHotkeyShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "Launch",
-			DisplayText = I18n.T("ActionTypeLaunchShort")
+			DisplayText = "🚀 " + I18n.T("ActionTypeLaunchShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "WebUrl",
-			DisplayText = I18n.T("ActionTypeWebUrlShort")
+			DisplayText = "🌐 " + I18n.T("ActionTypeWebUrlShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "Folder",
-			DisplayText = I18n.T("ActionTypeFolderShort")
+			DisplayText = "📁 " + I18n.T("ActionTypeFolderShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "Command",
-			DisplayText = I18n.T("ActionTypeCommandShort")
+			DisplayText = "💻 " + I18n.T("ActionTypeCommandShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "SwitchWindow",
-			DisplayText = I18n.T("ActionTypeSwitchWindowShort")
+			DisplayText = "🔢 " + I18n.T("ActionTypeSwitchWindowShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "Tile",
-			DisplayText = I18n.T("ActionTypeTileShort")
+			DisplayText = "🔲 " + I18n.T("ActionTypeTileShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "MoveMonitor",
-			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
+			DisplayText = "🖥️ " + I18n.T("ActionTypeMoveMonitorShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "ToggleTopmost",
-			DisplayText = I18n.T("ActionTypeTopmostShort")
+			DisplayText = "📌 " + I18n.T("ActionTypeTopmostShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "WindowOpacity",
-			DisplayText = I18n.T("ActionTypeOpacityShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "System",
-			DisplayText = I18n.T("ActionTypeSystemShort")
+			DisplayText = "👁️ " + I18n.T("ActionTypeOpacityShort")
 		},
 		new ActionTypeItem
 		{
 			Tag = "Ocr",
 			DisplayText = "📝 " + I18n.T("ActionTypeOcrShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "ShellTool",
+			DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort")
+		},
+		new ActionTypeItem
+		{
+			Tag = "System",
+			DisplayText = "⚙️ " + I18n.T("ActionTypeSystemShort")
 		}
 	};
 
@@ -994,6 +1023,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		OnPropertyChanged(nameof(IsSystemType));
 		OnPropertyChanged(nameof(IsCommandType));
 		OnPropertyChanged(nameof(IsOcrType));
+		OnPropertyChanged(nameof(IsShellToolType));
 		OnPropertyChanged(nameof(CommandTerminal));
 		OnPropertyChanged(nameof(Terminals));
 		OnPropertyChanged(nameof(TestButtonText));

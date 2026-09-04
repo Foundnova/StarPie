@@ -57,6 +57,41 @@ public class ActionItem
 
 	public List<ActionItem> SubActions { get; set; } = new List<ActionItem>();
 
+	public ActionItem Clone()
+	{
+		ActionItem clone = new ActionItem
+		{
+			Type = this.Type,
+			Name = this.Name,
+			Parameter = this.Parameter,
+			Arguments = this.Arguments,
+			IconKey = this.IconKey,
+			CustomIconSvg = this.CustomIconSvg,
+			CommandTerminal = this.CommandTerminal,
+			BrowserChoice = this.BrowserChoice,
+			BrowserPath = this.BrowserPath,
+			InheritAppIconPath = this.InheritAppIconPath,
+			RunAsStandardUser = this.RunAsStandardUser,
+			LayoutMode = this.LayoutMode,
+			CustomTextColor = this.CustomTextColor,
+			CustomFontFamily = this.CustomFontFamily,
+			CustomIconSize = this.CustomIconSize,
+			CustomFontSize = this.CustomFontSize,
+			CustomTextPlacement = this.CustomTextPlacement,
+			CustomTextOffsetX = this.CustomTextOffsetX,
+			CustomTextOffsetY = this.CustomTextOffsetY,
+			SubActions = new List<ActionItem>()
+		};
+		if (this.SubActions != null)
+		{
+			foreach (var sub in this.SubActions)
+			{
+				clone.SubActions.Add(sub.Clone());
+			}
+		}
+		return clone;
+	}
+
 	public override string ToString()
 	{
 		return Name;

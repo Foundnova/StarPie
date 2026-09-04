@@ -598,6 +598,13 @@ public static class I18n
 			[LanguageCode.En] = "System",
 			[LanguageCode.Ja] = "システム"
 		};
+		dictionary["ActionTypeShellToolShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "系统与右键工具",
+			[LanguageCode.ZhTw] = "系統與右鍵工具",
+			[LanguageCode.En] = "Shell & System Tools",
+			[LanguageCode.Ja] = "シェル・右クリックツール"
+		};
 		dictionary["ActionTypeCommandShort"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "运行命令",
@@ -695,6 +702,13 @@ public static class I18n
 			[LanguageCode.ZhTw] = "\ud83d\uddd1\ufe0f 刪除當前配置",
 			[LanguageCode.En] = "\ud83d\uddd1\ufe0f Delete Profile",
 			[LanguageCode.Ja] = "\ud83d\uddd1\ufe0f 設定を削除"
+		};
+		dictionary["BtnDuplicateProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📑 复制方案",
+			[LanguageCode.ZhTw] = "📑 複製方案",
+			[LanguageCode.En] = "📑 Duplicate Profile",
+			[LanguageCode.Ja] = "📑 設定を複製"
 		};
 		dictionary["SectorCountOptionTitle"] = new Dictionary<LanguageCode, string>
 		{
@@ -2368,6 +2382,251 @@ public static class I18n
 			[LanguageCode.ZhTw] = "StarPie - 現代化滑鼠輪盤手勢",
 			[LanguageCode.En] = "StarPie - Modern Mouse Radial Gestures",
 			[LanguageCode.Ja] = "StarPie - 次世代マウスラジアルジェスチャー"
+		};
+		dictionary["UpdateSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "软件更新与版本管理 (Software Updates)",
+			[LanguageCode.ZhTw] = "軟體更新與版本管理 (Software Updates)",
+			[LanguageCode.En] = "Software Updates & Version Control",
+			[LanguageCode.Ja] = "ソフトウェア更新とバージョン管理"
+		};
+		dictionary["UpdateStatusLatest"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "已是最新版本",
+			[LanguageCode.ZhTw] = "已是最新版本",
+			[LanguageCode.En] = "Up to Date",
+			[LanguageCode.Ja] = "最新バージョンです"
+		};
+		dictionary["UpdateStatusNewVersion"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "发现新版本",
+			[LanguageCode.ZhTw] = "發現新版本",
+			[LanguageCode.En] = "Update Available",
+			[LanguageCode.Ja] = "新しいバージョンがあります"
+		};
+		dictionary["BtnCheckUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 立即检查更新",
+			[LanguageCode.ZhTw] = "🔄 立即檢查更新",
+			[LanguageCode.En] = "🔄 Check Updates",
+			[LanguageCode.Ja] = "🔄 更新を確認"
+		};
+		dictionary["BtnCheckingUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⏳ 正在检查...",
+			[LanguageCode.ZhTw] = "⏳ 正在檢查...",
+			[LanguageCode.En] = "⏳ Checking...",
+			[LanguageCode.Ja] = "⏳ 確認中..."
+		};
+		dictionary["UpdateSilentCheckTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "开机静默检查更新",
+			[LanguageCode.ZhTw] = "開機靜默檢查更新",
+			[LanguageCode.En] = "Silent Check on Startup",
+			[LanguageCode.Ja] = "起動時のサイレント更新確認"
+		};
+		dictionary["UpdateSilentCheckDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "程序启动后在后台静默查询 GitHub Releases",
+			[LanguageCode.ZhTw] = "程式啟動後在後台靜默查詢 GitHub Releases",
+			[LanguageCode.En] = "Silently query GitHub Releases in the background after launch",
+			[LanguageCode.Ja] = "起動後にバックグラウンドで GitHub Releases をサイレント確認"
+		};
+		dictionary["UpdateChannelTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "更新推送通道",
+			[LanguageCode.ZhTw] = "更新推送通道",
+			[LanguageCode.En] = "Update Channel",
+			[LanguageCode.Ja] = "更新チャンネル"
+		};
+		dictionary["UpdateChannelDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "选择稳定版或尝鲜版",
+			[LanguageCode.ZhTw] = "選擇穩定版或嘗鮮版",
+			[LanguageCode.En] = "Select Stable or Preview releases",
+			[LanguageCode.Ja] = "安定版またはプレビュー版を選択"
+		};
+		dictionary["UpdateChannelStable"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌟 正式稳定版",
+			[LanguageCode.ZhTw] = "🌟 正式穩定版",
+			[LanguageCode.En] = "🌟 Stable Release",
+			[LanguageCode.Ja] = "🌟 安定版"
+		};
+		dictionary["UpdateChannelBeta"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🚀 尝鲜测试版",
+			[LanguageCode.ZhTw] = "🚀 嘗鮮測試版",
+			[LanguageCode.En] = "🚀 Preview / Beta",
+			[LanguageCode.Ja] = "🚀 プレビュー版"
+		};
+		dictionary["UpdateProxyTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "GitHub 下载加速镜像源",
+			[LanguageCode.ZhTw] = "GitHub 下載加速鏡像源",
+			[LanguageCode.En] = "GitHub Download Mirror",
+			[LanguageCode.Ja] = "GitHub ダウンロードミラー"
+		};
+		dictionary["UpdateProxyDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "解决国内访问 GitHub Releases 丢包或限速问题，自动加速代理下载",
+			[LanguageCode.ZhTw] = "解決訪問 GitHub Releases 封包遺失或限速問題，自動加速代理下載",
+			[LanguageCode.En] = "Accelerate GitHub Releases download and mitigate connection issues",
+			[LanguageCode.Ja] = "GitHub Releases への接続を高速化し、プロキシ経由でダウンロード"
+		};
+		dictionary["UpdateProxyDirect"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 官方直连 (GitHub Official)",
+			[LanguageCode.ZhTw] = "🌐 官方直連 (GitHub Official)",
+			[LanguageCode.En] = "🌐 Official Direct (GitHub)",
+			[LanguageCode.Ja] = "🌐 公式ダイレクト (GitHub)"
+		};
+		dictionary["UpdateProxyGhproxy"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 镜像源 1 (ghproxy.net 推荐)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 1 (ghproxy.net 推薦)",
+			[LanguageCode.En] = "⚡ Mirror 1 (ghproxy.net Recommended)",
+			[LanguageCode.Ja] = "⚡ ミラー 1 (ghproxy.net 推奨)"
+		};
+		dictionary["UpdateProxyMoeyy"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 镜像源 2 (github.moeyy.xyz)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 2 (github.moeyy.xyz)",
+			[LanguageCode.En] = "⚡ Mirror 2 (github.moeyy.xyz)",
+			[LanguageCode.Ja] = "⚡ ミラー 2 (github.moeyy.xyz)"
+		};
+		dictionary["UpdateProxyAkams"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 镜像源 3 (github.akams.cn)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 3 (github.akams.cn)",
+			[LanguageCode.En] = "⚡ Mirror 3 (github.akams.cn)",
+			[LanguageCode.Ja] = "⚡ ミラー 3 (github.akams.cn)"
+		};
+		dictionary["ContributorsHeader"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "开源贡献者致谢",
+			[LanguageCode.ZhTw] = "開源貢獻者致謝",
+			[LanguageCode.En] = "Contributors & Thanks",
+			[LanguageCode.Ja] = "コントリビューターへの感謝"
+		};
+		dictionary["ContributorsIntro"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "感谢以下贡献者为 StarPie (星盘) 开源项目付出的智慧与贡献：",
+			[LanguageCode.ZhTw] = "感謝以下貢獻者為 StarPie (星盤) 開源項目付出的智慧與貢獻：",
+			[LanguageCode.En] = "Thank you to all contributors who empower StarPie open-source project:",
+			[LanguageCode.Ja] = "StarPie オープンソースプロジェクトに貢献してくださった皆様に感謝いたします:"
+		};
+		dictionary["ContributorsSyncLocal"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 本地收录名单 (检查更新时可联网刷新)",
+			[LanguageCode.ZhTw] = "🌐 本地收錄名單 (檢查更新時可連網重新整理)",
+			[LanguageCode.En] = "🌐 Local roster (refreshed when checking updates)",
+			[LanguageCode.Ja] = "🌐 ローカル収録名簿 (更新確認時にオンライン更新)"
+		};
+		dictionary["ContributorsRefresh"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 刷新",
+			[LanguageCode.ZhTw] = "🔄 重新整理",
+			[LanguageCode.En] = "🔄 Refresh",
+			[LanguageCode.Ja] = "🔄 更新"
+		};
+		dictionary["ContributorsRepo"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "★ 访问 GitHub 仓库",
+			[LanguageCode.ZhTw] = "★ 造訪 GitHub 倉庫",
+			[LanguageCode.En] = "★ Visit GitHub Repo",
+			[LanguageCode.Ja] = "★ GitHub リポジトリへ"
+		};
+		dictionary["OcrCardTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "OCR 截屏文字识别与智能接口配置",
+			[LanguageCode.ZhTw] = "OCR 截圖文字辨識與智慧介面配置",
+			[LanguageCode.En] = "OCR Text Recognition & AI Model Setup",
+			[LanguageCode.Ja] = "OCR 画面文字認識と AI モデル設定"
+		};
+		dictionary["OcrCardDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "管理原生离线识别引擎、多模态 AI 视觉模型 (OpenAI / 硅基流动 / Ollama) 与私有化 HTTP 接口端点与凭证。",
+			[LanguageCode.ZhTw] = "管理原生離線辨識引擎、多模態 AI 視覺模型 (OpenAI / 矽基流動 / Ollama) 與私有化 HTTP 介面端點與憑證。",
+			[LanguageCode.En] = "Manage native offline OCR engines, multimodal AI visual models, and custom HTTP endpoints.",
+			[LanguageCode.Ja] = "ネイティブオフラインOCRエンジン、マルチモーダルAI、およびカスタムHTTPエンドポイントを管理。"
+		};
+		dictionary["OcrBadgeLocalEngine"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "Windows 本地离线引擎",
+			[LanguageCode.ZhTw] = "Windows 本地離線引擎",
+			[LanguageCode.En] = "Windows Local OCR",
+			[LanguageCode.Ja] = "Windows ローカルOCR"
+		};
+		dictionary["BtnTestOcr"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✂️ 截屏测试",
+			[LanguageCode.ZhTw] = "✂️ 截圖測試",
+			[LanguageCode.En] = "✂️ Test Snipping",
+			[LanguageCode.Ja] = "✂️ 認識テスト"
+		};
+		dictionary["BtnConfigOcr"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚙️ 配置接口与模型...",
+			[LanguageCode.ZhTw] = "⚙️ 配置介面與模型...",
+			[LanguageCode.En] = "⚙️ Setup Engine & API...",
+			[LanguageCode.Ja] = "⚙️ エンジンとAPI設定..."
+		};
+		dictionary["AutoStartAsAdminTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "以管理员身份开机自启 (推荐)",
+			[LanguageCode.ZhTw] = "以系統管理員身分開機自啟 (推薦)",
+			[LanguageCode.En] = "Run as Administrator on Startup (Recommended)",
+			[LanguageCode.Ja] = "管理者として自動起動 (推奨)"
+		};
+		dictionary["AutoStartAsAdminDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "通过 Windows 任务计划程序实现最高权限静默自启，无需每次弹出 UAC 提示，可对所有高权限应用生效。",
+			[LanguageCode.ZhTw] = "透過 Windows 工作排程器實現最高權限靜默自啟，無需每次跳出 UAC 提示，可對所有高權限應用程式生效。",
+			[LanguageCode.En] = "Launch silently with elevated privileges via Windows Task Scheduler without UAC prompts, working across all admin apps.",
+			[LanguageCode.Ja] = "Windows タスクスケジューラ経由でUACプロンプトなしに昇格起動し、管理者権限アプリでも確実に機能します。"
+		};
+		dictionary["CoreGlobalActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "全局动作",
+			[LanguageCode.ZhTw] = "全域動作",
+			[LanguageCode.En] = "Global Actions",
+			[LanguageCode.Ja] = "グローバルアクション"
+		};
+		dictionary["CoreSectorActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "{0} 键动作",
+			[LanguageCode.ZhTw] = "{0} 鍵動作",
+			[LanguageCode.En] = "{0}-Slot Actions",
+			[LanguageCode.Ja] = "{0}キー動作"
+		};
+		dictionary["DimensionsCardTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘几何尺寸与间距",
+			[LanguageCode.ZhTw] = "輪盤幾何尺寸與間距",
+			[LanguageCode.En] = "Radial Geometry & Spacing",
+			[LanguageCode.Ja] = "ラジアルの幾何学的寸法と間隔"
+		};
+		dictionary["VisualThemeCardTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "切削形态与主题配色",
+			[LanguageCode.ZhTw] = "切削形態與主題配色",
+			[LanguageCode.En] = "Cutout Shapes & Color Themes",
+			[LanguageCode.Ja] = "カット形状とカラーテーマ"
+		};
+		dictionary["ClickSectorHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 点击任意扇区可直接选中并在左侧微调该扇区的独立文字/图标排版",
+			[LanguageCode.ZhTw] = "💡 點選任一扇區可直接選取並在左側微調該扇區的獨立文字/圖示排版",
+			[LanguageCode.En] = "💡 Click any sector to select and customize its independent font/icon layout",
+			[LanguageCode.Ja] = "💡 セクターをクリックして、フォントやアイコンの個別レイアウトを微調整できます"
+		};
+		dictionary["PreviewPanHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "按住 Ctrl + 鼠标拖动可平移画布",
+			[LanguageCode.ZhTw] = "按住 Ctrl + 滑鼠拖曳可平移畫布",
+			[LanguageCode.En] = "Hold Ctrl + Drag to pan canvas",
+			[LanguageCode.Ja] = "Ctrl + ドラッグでキャンバスをパン"
 		};
 		Translations = dictionary;
 	}

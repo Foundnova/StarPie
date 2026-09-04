@@ -164,6 +164,8 @@ public partial class SettingsWindow : Window
 	// Tab 2 Mappings Focus Editor & Canvas Interactivity
 	private int _selectedSlotIndex = 0; // -1: Center Core, 0..11: Sector slot
 	private int? _selectedSubActionIndex = null; // null: Primary slot / Center Core; 0..3: Secondary subaction
+	private List<ActionItem>? _lastSubActionsBackup = null;
+	private int _lastSubActionsBackupSlotIndex = -1;
 	private bool _isUpdatingFocusUi = false;
 	private Point? _mappingsDragStartPos = null;
 	private int _dragSourceSlotIndex = -999; // -1: Center Core, >=0: Sector slot
@@ -325,6 +327,13 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		ConfigManager.LoadConfig();
 		InitializeComponent();
+		try
+		{
+			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
+		}
+		catch
+		{
+		}
 		InitializeTrayIcon();
 		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2");
 		if (SidebarVersionText != null)
@@ -495,6 +504,7 @@ public partial class SettingsWindow : Window
 			MappingsProfileComboBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
 			MappingsProfileComboBox.SelectedItem = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
 		}
+		UpdateProfileToolbarButtonStates();
 		if (FocusActionTypeComboBox != null && FocusActionTypeComboBox.ItemsSource == null)
 		{
 			FocusActionTypeComboBox.ItemsSource = SlotViewModel.AggregatedActionTypes;
@@ -750,6 +760,10 @@ public partial class SettingsWindow : Window
 		{
 			ShowSelectedActionTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowSelectedActionText;
 		}
+		if (CoreTextOptionsPanel != null)
+		{
+			CoreTextOptionsPanel.Visibility = ConfigManager.CurrentConfig.ShowSelectedActionText ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (CoreFontFamilyComboBox != null)
 		{
 			PopulateCoreFontFamilies();
@@ -827,6 +841,10 @@ public partial class SettingsWindow : Window
 
 		// Center Core Icon
 		ShowCoreIconCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowCoreIcon;
+		if (CoreIconConfigPanel != null)
+		{
+			CoreIconConfigPanel.Visibility = ConfigManager.CurrentConfig.ShowCoreIcon ? Visibility.Visible : Visibility.Collapsed;
+		}
 		SetComboBoxSelectedValue(CoreIconTypeComboBox, ConfigManager.CurrentConfig.CoreIconType ?? "Exit");
 		CoreImagePathTextBox.Text = ConfigManager.CurrentConfig.CoreCustomImagePath ?? "";
 		double coreScale = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
@@ -939,7 +957,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.6"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 	}
@@ -969,21 +987,41 @@ public partial class SettingsWindow : Window
 	private void InitializeTrayIcon()
 	{
 		Icon icon = null;
+		System.Drawing.Size smallSize = System.Windows.Forms.SystemInformation.SmallIconSize;
+		if (smallSize.Width <= 0 || smallSize.Height <= 0) smallSize = new System.Drawing.Size(16, 16);
+
+		// 1. First priority: Load dedicated ultra-sharp circular wheel tray icon from pack resources
 		try
 		{
-			string text = Environment.ProcessPath;
-			if (string.IsNullOrEmpty(text))
+			StreamResourceInfo resourceStream = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/tray_icon.ico"));
+			if (resourceStream != null)
 			{
-				text = Process.GetCurrentProcess().MainModule?.FileName;
-			}
-			if (!string.IsNullOrEmpty(text) && File.Exists(text))
-			{
-				icon = System.Drawing.Icon.ExtractAssociatedIcon(text);
+				using Stream stream = resourceStream.Stream;
+				icon = new Icon(stream, smallSize);
 			}
 		}
 		catch
 		{
 		}
+
+		// 2. Secondary priority: Load tray_icon.ico from file on disk
+		if (icon == null)
+		{
+			try
+			{
+				string trayPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tray_icon.ico");
+				if (File.Exists(trayPath))
+				{
+					using var fs = File.OpenRead(trayPath);
+					icon = new Icon(fs, smallSize);
+				}
+			}
+			catch
+			{
+			}
+		}
+
+		// 3. Third priority: Load app_icon.ico with exact smallSize matching native DPI
 		if (icon == null)
 		{
 			try
@@ -992,13 +1030,15 @@ public partial class SettingsWindow : Window
 				if (resourceStream != null)
 				{
 					using Stream stream = resourceStream.Stream;
-					icon = new Icon(stream);
+					icon = new Icon(stream, smallSize);
 				}
 			}
 			catch
 			{
 			}
 		}
+
+		// 4. Fourth priority: app_icon.ico on disk
 		if (icon == null)
 		{
 			try
@@ -1006,13 +1046,35 @@ public partial class SettingsWindow : Window
 				string text2 = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app_icon.ico");
 				if (File.Exists(text2))
 				{
-					icon = new Icon(text2);
+					using var fs = File.OpenRead(text2);
+					icon = new Icon(fs, smallSize);
 				}
 			}
 			catch
 			{
 			}
 		}
+
+		// 5. Fallback: Process associated icon
+		if (icon == null)
+		{
+			try
+			{
+				string text = Environment.ProcessPath;
+				if (string.IsNullOrEmpty(text))
+				{
+					text = Process.GetCurrentProcess().MainModule?.FileName;
+				}
+				if (!string.IsNullOrEmpty(text) && File.Exists(text))
+				{
+					icon = System.Drawing.Icon.ExtractAssociatedIcon(text);
+				}
+			}
+			catch
+			{
+			}
+		}
+
 		if (icon == null)
 		{
 			icon = SystemIcons.Application;
@@ -1035,7 +1097,7 @@ public partial class SettingsWindow : Window
 		if (_notifyIcon != null)
 		{
 			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"))
+			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"))
 			{
 				Enabled = false,
 				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
@@ -1483,6 +1545,10 @@ public partial class SettingsWindow : Window
 		{
 			DeleteProfileButton.Content = I18n.T("BtnDeleteProfile");
 		}
+		if (DuplicateProfileBtn != null)
+		{
+			DuplicateProfileBtn.Content = I18n.T("BtnDuplicateProfile");
+		}
 		if (SectorCount4Radio != null)
 		{
 			SectorCount4Radio.Content = I18n.T("SectorCount4");
@@ -1566,6 +1632,118 @@ public partial class SettingsWindow : Window
 		if (ViewTodayLogButton != null)
 		{
 			ViewTodayLogButton.Content = I18n.T("BtnViewTodayLog");
+		}
+		if (UpdateSectionTitleText != null)
+		{
+			UpdateSectionTitleText.Text = I18n.T("UpdateSectionTitle");
+		}
+		if (CheckUpdateNowBtn != null)
+		{
+			CheckUpdateNowBtn.Content = I18n.T("BtnCheckUpdate");
+		}
+		if (UpdateSilentCheckTitleText != null)
+		{
+			UpdateSilentCheckTitleText.Text = I18n.T("UpdateSilentCheckTitle");
+		}
+		if (UpdateSilentCheckDescText != null)
+		{
+			UpdateSilentCheckDescText.Text = I18n.T("UpdateSilentCheckDesc");
+		}
+		if (UpdateChannelTitleText != null)
+		{
+			UpdateChannelTitleText.Text = I18n.T("UpdateChannelTitle");
+		}
+		if (UpdateChannelDescText != null)
+		{
+			UpdateChannelDescText.Text = I18n.T("UpdateChannelDesc");
+		}
+		if (UpdateChannelComboBox != null && UpdateChannelComboBox.Items.Count >= 2)
+		{
+			if (UpdateChannelComboBox.Items[0] is ComboBoxItem itemStable) itemStable.Content = I18n.T("UpdateChannelStable");
+			if (UpdateChannelComboBox.Items[1] is ComboBoxItem itemBeta) itemBeta.Content = I18n.T("UpdateChannelBeta");
+		}
+		if (UpdateProxyTitleText != null)
+		{
+			UpdateProxyTitleText.Text = I18n.T("UpdateProxyTitle");
+		}
+		if (UpdateProxyDescText != null)
+		{
+			UpdateProxyDescText.Text = I18n.T("UpdateProxyDesc");
+		}
+		if (UpdateProxyComboBox != null && UpdateProxyComboBox.Items.Count >= 4)
+		{
+			if (UpdateProxyComboBox.Items[0] is ComboBoxItem itemGh) itemGh.Content = I18n.T("UpdateProxyGhproxy");
+			if (UpdateProxyComboBox.Items[1] is ComboBoxItem itemMo) itemMo.Content = I18n.T("UpdateProxyMoeyy");
+			if (UpdateProxyComboBox.Items[2] is ComboBoxItem itemAk) itemAk.Content = I18n.T("UpdateProxyAkams");
+			if (UpdateProxyComboBox.Items[3] is ComboBoxItem itemDir) itemDir.Content = I18n.T("UpdateProxyDirect");
+		}
+		if (ContributorsHeaderTitle != null)
+		{
+			ContributorsHeaderTitle.Text = I18n.T("ContributorsHeader");
+		}
+		if (ContributorsIntroText != null)
+		{
+			ContributorsIntroText.Text = I18n.T("ContributorsIntro");
+		}
+		if (ContributorsSyncStatusText != null)
+		{
+			ContributorsSyncStatusText.Text = I18n.T("ContributorsSyncLocal");
+		}
+		if (ContributorsRefreshText != null)
+		{
+			ContributorsRefreshText.Text = I18n.T("ContributorsRefresh");
+		}
+		if (ContributorsRepoText != null)
+		{
+			ContributorsRepoText.Text = I18n.T("ContributorsRepo");
+		}
+		if (OcrCardTitleText != null)
+		{
+			OcrCardTitleText.Text = I18n.T("OcrCardTitle");
+		}
+		if (OcrCardDescText != null)
+		{
+			OcrCardDescText.Text = I18n.T("OcrCardDesc");
+		}
+		if (Tab4OcrProviderBadge != null)
+		{
+			Tab4OcrProviderBadge.Text = I18n.T("OcrBadgeLocalEngine");
+		}
+		if (Tab4TestOcrBtn != null)
+		{
+			Tab4TestOcrBtn.Content = I18n.T("BtnTestOcr");
+		}
+		if (Tab4ConfigOcrBtn != null)
+		{
+			Tab4ConfigOcrBtn.Content = I18n.T("BtnConfigOcr");
+		}
+		if (AutoStartAsAdminTitleText != null)
+		{
+			AutoStartAsAdminTitleText.Text = I18n.T("AutoStartAsAdminTitle");
+		}
+		if (AutoStartAsAdminDescText != null)
+		{
+			AutoStartAsAdminDescText.Text = I18n.T("AutoStartAsAdminDesc");
+		}
+		if (DimensionsCardTitleText != null)
+		{
+			DimensionsCardTitleText.Text = I18n.T("DimensionsCardTitle");
+		}
+		if (VisualThemeCardTitleText != null)
+		{
+			VisualThemeCardTitleText.Text = I18n.T("VisualThemeCardTitle");
+		}
+		if (ClickSectorHintText != null)
+		{
+			ClickSectorHintText.Text = I18n.T("ClickSectorHint");
+		}
+		if (PreviewPanHintText != null)
+		{
+			PreviewPanHintText.Text = I18n.T("PreviewPanHint");
+		}
+		if (AdvancedPageSubheader != null)
+		{
+			AdvancedPageSubheader.Text = I18n.T("AdvancedPageSubheader");
 		}
 		BuildTrayContextMenu();
 	}
@@ -1712,12 +1890,13 @@ public partial class SettingsWindow : Window
 				RefreshSlots();
 				UpdateFocusEditorUi();
 				RenderMappingsWheelPreview();
-				break;
 			}
 			finally
 			{
 				_isUpdatingUi = false;
 			}
+			UpdateProfileToolbarButtonStates();
+			break;
 		case 1:
 			RenderLiveWheelPreview();
 			break;
@@ -1921,6 +2100,23 @@ public partial class SettingsWindow : Window
 			{
 				ConfigManager.CurrentConfig.DisableOnAlt = AltModifierCheckBox.IsChecked == true;
 			}
+			if (EnableEdgeCollisionAvoidanceCheckBox != null)
+			{
+				ConfigManager.CurrentConfig.EnableEdgeCollisionAvoidance = EnableEdgeCollisionAvoidanceCheckBox.IsChecked == true;
+			}
+			if (EdgeOverflowPolicyComboBox?.SelectedItem is ComboBoxItem policyItem)
+			{
+				ConfigManager.CurrentConfig.EdgeOverflowPolicy = policyItem.Tag?.ToString() ?? "ClampShift";
+			}
+			if (EdgeSafeMarginXSlider != null)
+			{
+				ConfigManager.CurrentConfig.EdgeSafeMarginX = EdgeSafeMarginXSlider.Value;
+				ConfigManager.CurrentConfig.EdgeSafeMargin = EdgeSafeMarginXSlider.Value;
+			}
+			if (EdgeSafeMarginYSlider != null)
+			{
+				ConfigManager.CurrentConfig.EdgeSafeMarginY = EdgeSafeMarginYSlider.Value;
+			}
 			if (saveToDisk)
 			{
 				ConfigManager.SaveConfig();
@@ -2007,6 +2203,7 @@ public partial class SettingsWindow : Window
 		{
 			_isUpdatingUi = false;
 		}
+		UpdateProfileToolbarButtonStates();
 		if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
 		{
 			RenderLiveWheelPreview();
@@ -2258,6 +2455,20 @@ public partial class SettingsWindow : Window
 			DispatcherPriority.Render);
 	}
 
+	private void AddProfileBtn2_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is Button btn && btn.ContextMenu != null)
+		{
+			btn.ContextMenu.PlacementTarget = btn;
+			btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+			btn.ContextMenu.IsOpen = true;
+		}
+		else
+		{
+			AddProfileButton_Click(sender, e);
+		}
+	}
+
 	private void AddProfileButton_Click(object sender, RoutedEventArgs e)
 	{
 		ProgramPickerWindow programPickerWindow = new ProgramPickerWindow();
@@ -2269,7 +2480,7 @@ public partial class SettingsWindow : Window
 		string procName = System.IO.Path.GetFileName(programPickerWindow.SelectedPath).ToLower();
 		if (ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(procName, StringComparison.OrdinalIgnoreCase)))
 		{
-			System.Windows.MessageBox.Show("已存在该程序的配置方案！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			System.Windows.MessageBox.Show(this, "已存在该程序的配置方案！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
 		int num = _selectedProfile?.SectorCount ?? 8;
@@ -2279,47 +2490,52 @@ public partial class SettingsWindow : Window
 			SectorCount = num,
 			Actions = new List<ActionItem>()
 		};
-		for (int num2 = 0; num2 < num; num2++)
+		for (int i = 0; i < num; i++)
 		{
 			wheelProfile.Actions.Add(new ActionItem
 			{
 				Type = "Hotkey",
-				Name = $"动作 {num2 + 1}",
+				Name = $"动作 {i + 1}",
 				Parameter = ""
 			});
 		}
 		ConfigManager.CurrentConfig.Profiles.Add(wheelProfile);
-		ProfilesListBox.Items.Refresh();
-		ProfilesListBox.SelectedItem = wheelProfile;
-		SyncUiToConfigAndSave();
+		ConfigManager.SaveConfig();
+
+		RefreshProfilesUi(wheelProfile);
 	}
 
 	private void AddCustomProfileButton_Click(object sender, RoutedEventArgs e)
 	{
-		InputDialog inputDialog = new InputDialog("新建自定义配置", "请输入新配置方案名称（如：游戏模式、绘图工作流、PS修图 或 myapp.exe）：", $"自定义配置_{ConfigManager.CurrentConfig.Profiles.Count}", (string input) => ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(input, StringComparison.OrdinalIgnoreCase)) ? (IsValid: false, ErrorMessage: "已存在同名的配置方案，请换一个名称！") : (IsValid: true, ErrorMessage: ""));
-		inputDialog.Owner = this;
-		if (inputDialog.ShowDialog() == true && !string.IsNullOrEmpty(inputDialog.InputText))
+		InputDialog inputDialog = new InputDialog("新建自定义配置", "请输入新配置方案名称（如：游戏模式、绘图工作流、PS修图 或 myapp.exe）：", $"自定义配置_{ConfigManager.CurrentConfig.Profiles.Count}", (string input) =>
 		{
+			if (string.IsNullOrWhiteSpace(input)) return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+			return ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(input.Trim(), StringComparison.OrdinalIgnoreCase)) ? (IsValid: false, ErrorMessage: "已存在同名的配置方案，请换一个名称！") : (IsValid: true, ErrorMessage: "");
+		});
+		inputDialog.Owner = this;
+		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+		{
+			string newName = inputDialog.InputText.Trim();
 			int num = _selectedProfile?.SectorCount ?? 8;
 			WheelProfile wheelProfile = new WheelProfile
 			{
-				ProcessName = inputDialog.InputText,
+				ProcessName = newName,
 				SectorCount = num,
 				Actions = new List<ActionItem>()
 			};
-			for (int num2 = 0; num2 < num; num2++)
+			for (int i = 0; i < num; i++)
 			{
 				wheelProfile.Actions.Add(new ActionItem
 				{
 					Type = "Hotkey",
-					Name = $"动作 {num2 + 1}",
+					Name = $"动作 {i + 1}",
 					Parameter = ""
 				});
 			}
 			ConfigManager.CurrentConfig.Profiles.Add(wheelProfile);
-			ProfilesListBox.Items.Refresh();
-			ProfilesListBox.SelectedItem = wheelProfile;
-			SyncUiToConfigAndSave();
+			ConfigManager.SaveConfig();
+
+			RefreshProfilesUi(wheelProfile);
 		}
 	}
 
@@ -2327,29 +2543,35 @@ public partial class SettingsWindow : Window
 	{
 		if (_selectedProfile == null)
 		{
-			System.Windows.MessageBox.Show("请先在列表中选择要重命名的配置方案！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			System.Windows.MessageBox.Show(this, "请先在列表中选择要重命名的配置方案！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
 		if (_selectedProfile.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
 		{
-			System.Windows.MessageBox.Show("「Global」为系统全局默认基础配置，不可重命名。", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			System.Windows.MessageBox.Show(this, "「Global」为系统全局默认基础配置，不可重命名。", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
 		string oldName = _selectedProfile.ProcessName;
 		InputDialog inputDialog = new InputDialog("重命名配置方案", "请输入配置方案「" + oldName + "」的新名称：", oldName, delegate(string input)
 		{
-			if (input.Equals(oldName, StringComparison.OrdinalIgnoreCase))
+			if (string.IsNullOrWhiteSpace(input))
+			{
+				return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+			}
+			if (input.Trim().Equals(oldName, StringComparison.OrdinalIgnoreCase))
 			{
 				return (IsValid: true, ErrorMessage: "");
 			}
-			return ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(input, StringComparison.OrdinalIgnoreCase)) ? (IsValid: false, ErrorMessage: "已存在同名的配置方案，请换一个名称！") : (IsValid: true, ErrorMessage: "");
+			return ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(input.Trim(), StringComparison.OrdinalIgnoreCase)) ? (IsValid: false, ErrorMessage: "已存在同名的配置方案，请换一个名称！") : (IsValid: true, ErrorMessage: "");
 		});
 		inputDialog.Owner = this;
-		if (inputDialog.ShowDialog() == true && !string.IsNullOrEmpty(inputDialog.InputText))
+		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
 		{
-			_selectedProfile.ProcessName = inputDialog.InputText;
-			ProfilesListBox.Items.Refresh();
-			SyncUiToConfigAndSave();
+			string newName = inputDialog.InputText.Trim();
+			_selectedProfile.ProcessName = newName;
+			ConfigManager.SaveConfig();
+
+			RefreshProfilesUi(_selectedProfile);
 		}
 	}
 
@@ -2363,19 +2585,119 @@ public partial class SettingsWindow : Window
 
 	private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
 	{
-		if (_selectedProfile != null)
+		if (_selectedProfile == null)
 		{
-			if (_selectedProfile.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
+			return;
+		}
+		if (_selectedProfile.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
+		{
+			System.Windows.MessageBox.Show(this, "全局默认配置 (Global) 是系统的基础兜底方案，不能删除！", "提示", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+			return;
+		}
+		string procName = _selectedProfile.ProcessName;
+		if (System.Windows.MessageBox.Show(this, $"确定要删除配置方案 [{procName}] 吗？\n删除后该程序将自动回退使用全局 (Global) 默认轮盘配置。", "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+		{
+			var target = _selectedProfile;
+			ConfigManager.CurrentConfig.Profiles.RemoveAll(p => p == target || string.Equals(p.ProcessName, procName, StringComparison.OrdinalIgnoreCase));
+			ConfigManager.SaveConfig();
+
+			var fallbackProfile = ConfigManager.CurrentConfig.Profiles.FirstOrDefault(p => p.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
+				?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
+
+			RefreshProfilesUi(fallbackProfile);
+		}
+	}
+
+	private void UpdateProfileToolbarButtonStates()
+	{
+		bool isGlobalOrNull = _selectedProfile == null ||
+			string.Equals(_selectedProfile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
+
+		bool canModify = !isGlobalOrNull;
+
+		if (RenameProfileBtn2 != null)
+		{
+			RenameProfileBtn2.IsEnabled = canModify;
+			RenameProfileBtn2.ToolTip = canModify ? "重命名选中的配置方案" : "全局基础配置 (Global) 为系统兜底方案，不可重命名";
+		}
+		if (DeleteProfileBtn2 != null)
+		{
+			DeleteProfileBtn2.IsEnabled = canModify;
+			DeleteProfileBtn2.ToolTip = canModify ? "删除当前选中的配置方案" : "全局基础配置 (Global) 为系统兜底方案，不可删除";
+		}
+		if (RenameProfileButton != null)
+		{
+			RenameProfileButton.IsEnabled = canModify;
+			RenameProfileButton.ToolTip = canModify ? "重命名选中的配置方案" : "全局基础配置 (Global) 为系统兜底方案，不可重命名";
+		}
+		if (DeleteProfileButton != null)
+		{
+			DeleteProfileButton.IsEnabled = canModify;
+			DeleteProfileButton.ToolTip = canModify ? "删除当前选中的配置方案" : "全局基础配置 (Global) 为系统兜底方案，不可删除";
+		}
+		if (DuplicateProfileBtn != null)
+		{
+			DuplicateProfileBtn.IsEnabled = _selectedProfile != null;
+		}
+	}
+
+	private void RefreshProfilesUi(WheelProfile? profileToSelect = null)
+	{
+		var profiles = ConfigManager.CurrentConfig?.Profiles;
+		if (profiles == null || profiles.Count == 0) return;
+
+		if (profileToSelect == null || !profiles.Contains(profileToSelect))
+		{
+			profileToSelect = profiles.FirstOrDefault(p => p.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
+				?? profiles.FirstOrDefault();
+		}
+		_selectedProfile = profileToSelect;
+
+		_isUpdatingUi = true;
+		try
+		{
+			if (ProfilesListBox != null)
 			{
-				System.Windows.MessageBox.Show("全局默认配置 (Global) 不能删除！", "提示", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+				ProfilesListBox.ItemsSource = null;
+				ProfilesListBox.ItemsSource = profiles;
+				ProfilesListBox.SelectedItem = _selectedProfile;
 			}
-			else if (System.Windows.MessageBox.Show("确定要删除配置方案 [" + _selectedProfile.ProcessName + "] 吗？", "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+
+			if (MappingsProfileComboBox != null)
 			{
-				ConfigManager.CurrentConfig.Profiles.Remove(_selectedProfile);
-				ProfilesListBox.Items.Refresh();
-				ProfilesListBox.SelectedIndex = 0;
-				SyncUiToConfigAndSave();
+				MappingsProfileComboBox.ItemsSource = null;
+				MappingsProfileComboBox.ItemsSource = profiles;
+				MappingsProfileComboBox.SelectedItem = _selectedProfile;
 			}
+
+			if (_selectedProfile != null)
+			{
+				int count = _selectedProfile.SectorCount;
+				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
+				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
+				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+			}
+
+			RefreshSlots();
+			UpdateFocusEditorUi();
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+
+		UpdateProfileToolbarButtonStates();
+
+		if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		if (MappingsSettingsGrid != null && MappingsSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderMappingsWheelPreview();
 		}
 	}
 
@@ -2421,74 +2743,27 @@ public partial class SettingsWindow : Window
 			{
 				_isUpdatingUi = false;
 			}
+			UpdateProfileToolbarButtonStates();
 		}
 	}
 
 	private void DuplicateProfileBtn_Click(object sender, RoutedEventArgs e)
 	{
 		if (_selectedProfile == null) return;
-		InputDialog inputDialog = new InputDialog("复制配置方案", "请输入新配置方案名称（如程序名或工作流名）：", _selectedProfile.ProcessName + " - 副本");
+		InputDialog inputDialog = new InputDialog("复制配置方案", "请输入新配置方案名称（如程序名或工作流名）：", _selectedProfile.ProcessName + " - 副本", (string input) =>
+		{
+			if (string.IsNullOrWhiteSpace(input)) return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+			return ConfigManager.CurrentConfig.Profiles.Any((WheelProfile p) => p.ProcessName.Equals(input.Trim(), StringComparison.OrdinalIgnoreCase)) ? (IsValid: false, ErrorMessage: "已存在同名的配置方案，请换一个名称！") : (IsValid: true, ErrorMessage: "");
+		});
 		inputDialog.Owner = this;
 		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
 		{
 			string newName = inputDialog.InputText.Trim();
-			if (ConfigManager.CurrentConfig.Profiles.Any(p => p.ProcessName.Equals(newName, StringComparison.OrdinalIgnoreCase)))
-			{
-				System.Windows.MessageBox.Show(this, "已存在同名的配置方案，请换一个名称！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-			WheelProfile newProfile = new WheelProfile
-			{
-				ProcessName = newName,
-				SectorCount = _selectedProfile.SectorCount,
-				EnableCenterAction = _selectedProfile.EnableCenterAction,
-				CenterAction = _selectedProfile.CenterAction != null ? new ActionItem
-				{
-					Name = _selectedProfile.CenterAction.Name,
-					Type = _selectedProfile.CenterAction.Type,
-					Parameter = _selectedProfile.CenterAction.Parameter,
-					Arguments = _selectedProfile.CenterAction.Arguments,
-					IconKey = _selectedProfile.CenterAction.IconKey,
-					CustomIconSvg = _selectedProfile.CenterAction.CustomIconSvg,
-					CommandTerminal = _selectedProfile.CenterAction.CommandTerminal,
-					BrowserChoice = _selectedProfile.CenterAction.BrowserChoice,
-					BrowserPath = _selectedProfile.CenterAction.BrowserPath
-				} : null,
-				Actions = _selectedProfile.Actions.Select(a => new ActionItem
-				{
-					Name = a.Name,
-					Type = a.Type,
-					Parameter = a.Parameter,
-					Arguments = a.Arguments,
-					IconKey = a.IconKey,
-					CustomIconSvg = a.CustomIconSvg,
-					CommandTerminal = a.CommandTerminal,
-					BrowserChoice = a.BrowserChoice,
-					BrowserPath = a.BrowserPath,
-					SubActions = a.SubActions?.Select(sub => new ActionItem
-					{
-						Name = sub.Name,
-						Type = sub.Type,
-						Parameter = sub.Parameter,
-						Arguments = sub.Arguments,
-						IconKey = sub.IconKey,
-						CustomIconSvg = sub.CustomIconSvg,
-						CommandTerminal = sub.CommandTerminal,
-						BrowserChoice = sub.BrowserChoice,
-						BrowserPath = sub.BrowserPath
-					}).ToList()
-				}).ToList()
-			};
+			WheelProfile newProfile = _selectedProfile.Clone(newName);
 			ConfigManager.CurrentConfig.Profiles.Add(newProfile);
 			ConfigManager.SaveConfig();
-			ProfilesListBox.Items.Refresh();
-			if (MappingsProfileComboBox != null)
-			{
-				MappingsProfileComboBox.ItemsSource = null;
-				MappingsProfileComboBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
-				MappingsProfileComboBox.SelectedItem = newProfile;
-			}
-			ProfilesListBox.SelectedItem = newProfile;
+
+			RefreshProfilesUi(newProfile);
 		}
 	}
 
@@ -2522,6 +2797,12 @@ public partial class SettingsWindow : Window
 		int count = _selectedProfile?.SectorCount ?? 8;
 		_selectedSlotIndex = Math.Max(0, Math.Min(slotIndex, count - 1));
 		_selectedSubActionIndex = null;
+		if (MappingsTier1SegmentRadio != null && MappingsTier1SegmentRadio.IsChecked != true)
+		{
+			_isUpdatingUi = true;
+			try { MappingsTier1SegmentRadio.IsChecked = true; }
+			finally { _isUpdatingUi = false; }
+		}
 		UpdateFocusEditorUi();
 		RenderMappingsWheelPreview();
 	}
@@ -2530,6 +2811,12 @@ public partial class SettingsWindow : Window
 	{
 		_selectedSlotIndex = -1;
 		_selectedSubActionIndex = null;
+		if (MappingsTier1SegmentRadio != null && MappingsTier1SegmentRadio.IsChecked != true)
+		{
+			_isUpdatingUi = true;
+			try { MappingsTier1SegmentRadio.IsChecked = true; }
+			finally { _isUpdatingUi = false; }
+		}
 		UpdateFocusEditorUi();
 		RenderMappingsWheelPreview();
 	}
@@ -2538,6 +2825,12 @@ public partial class SettingsWindow : Window
 	{
 		_selectedSlotIndex = parentSlotIndex;
 		_selectedSubActionIndex = subIndex;
+		if (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked != true)
+		{
+			_isUpdatingUi = true;
+			try { MappingsTier2SegmentRadio.IsChecked = true; }
+			finally { _isUpdatingUi = false; }
+		}
 		UpdateFocusEditorUi();
 		RenderMappingsWheelPreview();
 	}
@@ -2729,7 +3022,19 @@ public partial class SettingsWindow : Window
 			bool isWindowManager = type == "Tile" || type == "ToggleTopmost" || type == "MoveMonitor" || type == "WindowOpacity" || type == "SwitchWindow";
 			if (FocusActionTypeComboBox != null)
 			{
-				FocusActionTypeComboBox.SelectedValue = isWindowManager ? "WindowManager" : type;
+				string targetTag = isWindowManager ? "WindowManager" : type;
+				if (FocusActionTypeComboBox.ItemsSource is IEnumerable<ActionTypeItem> typeItems)
+				{
+					var match = typeItems.FirstOrDefault(ti => string.Equals(ti.Tag, targetTag, StringComparison.OrdinalIgnoreCase));
+					if (match != null && !object.ReferenceEquals(FocusActionTypeComboBox.SelectedItem, match))
+					{
+						FocusActionTypeComboBox.SelectedItem = match;
+					}
+				}
+				else
+				{
+					FocusActionTypeComboBox.SelectedValue = targetTag;
+				}
 			}
 
 			if (FocusHotkeyPanel != null) FocusHotkeyPanel.Visibility = type == "Hotkey" ? Visibility.Visible : Visibility.Collapsed;
@@ -2740,6 +3045,37 @@ public partial class SettingsWindow : Window
 			if (FocusWindowManagerPanel != null) FocusWindowManagerPanel.Visibility = isWindowManager ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusSystemPanel != null) FocusSystemPanel.Visibility = type == "System" ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusOcrPanel != null) FocusOcrPanel.Visibility = (type == "Ocr" || type == "ScreenOcr") ? Visibility.Visible : Visibility.Collapsed;
+			if (FocusShellToolPanel != null)
+			{
+				FocusShellToolPanel.Visibility = (type == "ShellTool") ? Visibility.Visible : Visibility.Collapsed;
+				if (type == "ShellTool")
+				{
+					string param = item.Parameter ?? "Windows.CopyAsPath";
+					var toolInfo = ShellActionPickerWindow.ShellTools?.FirstOrDefault(t => t.Id == param || string.Equals(t.Verb, param, StringComparison.OrdinalIgnoreCase));
+					if (toolInfo != null)
+					{
+						if (FocusShellToolIconText != null)
+						{
+							FocusShellToolIconText.Text = toolInfo.Icon;
+							FocusShellToolIconText.FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Symbol, Segoe UI");
+							FocusShellToolIconText.Foreground = (Brush)FindResource("AccentPrimaryBrush");
+						}
+						if (FocusShellToolTitleText != null) FocusShellToolTitleText.Text = $"{toolInfo.Name} ({toolInfo.Id})";
+						if (FocusShellToolDescText != null) FocusShellToolDescText.Text = toolInfo.Description;
+					}
+					else
+					{
+						if (FocusShellToolIconText != null)
+						{
+							FocusShellToolIconText.Text = "⚡";
+							FocusShellToolIconText.FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Symbol, Segoe UI");
+							FocusShellToolIconText.Foreground = (Brush)FindResource("AccentPrimaryBrush");
+						}
+						if (FocusShellToolTitleText != null) FocusShellToolTitleText.Text = string.IsNullOrEmpty(param) ? "未挑选功能 (点击右侧挑选)" : param;
+						if (FocusShellToolDescText != null) FocusShellToolDescText.Text = "从系统原生增强与右键扩展中选择常用高频功能";
+					}
+				}
+			}
 			if (FocusLaunchStandardUserCheckBox != null) FocusLaunchStandardUserCheckBox.IsChecked = item.RunAsStandardUser;
 
 			bool canInherit = type != "Launch" && type != "App";
@@ -2945,6 +3281,7 @@ public partial class SettingsWindow : Window
 			deleteBtn.MouseLeftButtonDown += (s, e) =>
 			{
 				e.Handled = true;
+				BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
 				primaryAction.SubActions.RemoveAt(subIdx);
 				if (_selectedSubActionIndex == subIdx) _selectedSubActionIndex = null;
 				else if (_selectedSubActionIndex > subIdx) _selectedSubActionIndex--;
@@ -2965,6 +3302,7 @@ public partial class SettingsWindow : Window
 
 			FocusSubActionsChipsPanel.Children.Add(chip);
 		}
+		UpdateUndoSubActionsButtonState();
 	}
 
 	private void FocusAddSubActionBtn_Click(object sender, RoutedEventArgs e)
@@ -2979,6 +3317,7 @@ public partial class SettingsWindow : Window
 			System.Windows.MessageBox.Show(this, "每个主扇区最多支持配置 4 个二级级联子动作。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
+		BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
 		int newIdx = primaryAction.SubActions.Count + 1;
 		primaryAction.SubActions.Add(new ActionItem
 		{
@@ -3003,6 +3342,7 @@ public partial class SettingsWindow : Window
 		{
 			if (System.Windows.MessageBox.Show(this, "确定要清空该扇区的所有二级动作吗？", "确认清空", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
 			{
+				BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
 				primaryAction.SubActions.Clear();
 				_selectedSubActionIndex = null;
 				UpdateFocusEditorUi();
@@ -3010,6 +3350,75 @@ public partial class SettingsWindow : Window
 				RenderMappingsWheelPreview();
 				ScheduleAutoSave();
 			}
+		}
+	}
+
+	private void FocusUndoSubActionsBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedSlotIndex < 0 || _lastSubActionsBackup == null || _lastSubActionsBackupSlotIndex != _selectedSlotIndex) return;
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+		if (profile?.Actions == null || _selectedSlotIndex >= profile.Actions.Count) return;
+		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
+
+		var previous = primaryAction.SubActions;
+		primaryAction.SubActions = _lastSubActionsBackup;
+		_lastSubActionsBackup = previous?.Select(item => new ActionItem
+		{
+			Name = item.Name,
+			Type = item.Type,
+			Parameter = item.Parameter,
+			Arguments = item.Arguments,
+			IconKey = item.IconKey,
+			CustomIconSvg = item.CustomIconSvg,
+			InheritAppIconPath = item.InheritAppIconPath,
+			BrowserChoice = item.BrowserChoice,
+			BrowserPath = item.BrowserPath,
+			CommandTerminal = item.CommandTerminal,
+			RunAsStandardUser = item.RunAsStandardUser
+		}).ToList();
+
+		_selectedSubActionIndex = null;
+		UpdateUndoSubActionsButtonState();
+		UpdateFocusEditorUi();
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void BackupSubActionsForUndo(int slotIndex, List<ActionItem>? currentSubActions)
+	{
+		_lastSubActionsBackupSlotIndex = slotIndex;
+		if (currentSubActions == null)
+		{
+			_lastSubActionsBackup = null;
+		}
+		else
+		{
+			_lastSubActionsBackup = currentSubActions.Select(item => new ActionItem
+			{
+				Name = item.Name,
+				Type = item.Type,
+				Parameter = item.Parameter,
+				Arguments = item.Arguments,
+				IconKey = item.IconKey,
+				CustomIconSvg = item.CustomIconSvg,
+				InheritAppIconPath = item.InheritAppIconPath,
+				BrowserChoice = item.BrowserChoice,
+				BrowserPath = item.BrowserPath,
+				CommandTerminal = item.CommandTerminal,
+				RunAsStandardUser = item.RunAsStandardUser
+			}).ToList();
+		}
+		UpdateUndoSubActionsButtonState();
+	}
+
+	private void UpdateUndoSubActionsButtonState()
+	{
+		if (FocusUndoSubActionsBtn != null)
+		{
+			bool canUndo = _lastSubActionsBackup != null && _lastSubActionsBackupSlotIndex == _selectedSlotIndex;
+			FocusUndoSubActionsBtn.IsEnabled = canUndo;
+			FocusUndoSubActionsBtn.Opacity = canUndo ? 1.0 : 0.45;
 		}
 	}
 
@@ -3150,6 +3559,46 @@ public partial class SettingsWindow : Window
 					item.IconKey = "Scan";
 				}
 			}
+			else if (newType == "ShellTool")
+			{
+				item.Type = "ShellTool";
+				if (string.IsNullOrEmpty(item.Parameter) || (!item.Parameter.Contains('.') && ShellActionPickerWindow.ShellTools?.Any(t => t.Id == item.Parameter) != true))
+				{
+					item.Parameter = "Windows.CopyAsPath";
+					item.Name = "复制文件/文件夹路径";
+					item.IconKey = "Copy";
+				}
+				else
+				{
+					var tool = ShellActionPickerWindow.ShellTools?.FirstOrDefault(t => t.Id == item.Parameter || string.Equals(t.Verb, item.Parameter, StringComparison.OrdinalIgnoreCase));
+					if (tool != null)
+					{
+						item.Name = tool.Name;
+						item.IconKey = tool.IconKey;
+					}
+				}
+			}
+			UpdateFocusEditorUi();
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void FocusPickShellToolBtn_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null) return;
+
+		ShellActionPickerWindow picker = new ShellActionPickerWindow(item.Parameter);
+		picker.Owner = this;
+		if (picker.ShowDialog() == true && picker.SelectedTool != null)
+		{
+			var tool = picker.SelectedTool;
+			item.Type = "ShellTool";
+			item.Parameter = tool.Id;
+			item.Name = tool.Name;
+			item.IconKey = tool.IconKey;
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -3957,6 +4406,44 @@ public partial class SettingsWindow : Window
 
 	private void MappingsTierSegmentRadio_Checked(object sender, RoutedEventArgs e)
 	{
+		if (_isUpdatingUi) return;
+		if (MappingsTier1SegmentRadio?.IsChecked == true)
+		{
+			if (_selectedSubActionIndex.HasValue)
+			{
+				_selectedSubActionIndex = null;
+				UpdateFocusEditorUi();
+			}
+		}
+		else if (MappingsTier2SegmentRadio?.IsChecked == true)
+		{
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+			if (profile != null && _selectedSlotIndex >= 0 && _selectedSlotIndex < profile.Actions.Count)
+			{
+				var action = profile.Actions[_selectedSlotIndex];
+				if (action.SubActions != null && action.SubActions.Count > 0)
+				{
+					if (!_selectedSubActionIndex.HasValue)
+					{
+						_selectedSubActionIndex = 0;
+						UpdateFocusEditorUi();
+					}
+				}
+				else
+				{
+					for (int i = 0; i < profile.Actions.Count; i++)
+					{
+						if (profile.Actions[i].SubActions != null && profile.Actions[i].SubActions.Count > 0)
+						{
+							_selectedSlotIndex = i;
+							_selectedSubActionIndex = 0;
+							UpdateFocusEditorUi();
+							break;
+						}
+					}
+				}
+			}
+		}
 		RenderMappingsWheelPreview();
 	}
 
@@ -3986,15 +4473,16 @@ public partial class SettingsWindow : Window
 			double outerR = Math.Max(30.0, ConfigManager.CurrentConfig.WheelRadius * scaleFactor);
 			double innerR = Math.Max(15.0, ConfigManager.CurrentConfig.InnerRadius * scaleFactor);
 			double coreR = Math.Max(10.0, ConfigManager.CurrentConfig.CoreRadius * scaleFactor);
-			double gap = Math.Max(0.0, ConfigManager.CurrentConfig.SectorGap * scaleFactor);
-			double cornerRadius = Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius * scaleFactor);
+			double gap = Math.Min(2.5, Math.Max(1.0, ConfigManager.CurrentConfig.SectorGap * scaleFactor));
+			double cornerRadius = Math.Min(3.5, Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius * scaleFactor));
 
 			if (innerR >= outerR) innerR = outerR * 0.5;
 			if (coreR >= innerR) coreR = innerR * 0.8;
 
 			string uiStyle = ConfigManager.CurrentConfig.UiStyle ?? "ClassicRing";
 			string theme = ConfigManager.CurrentConfig.Theme ?? "System";
-			string shape = ConfigManager.CurrentConfig.Shape ?? "Original";
+			// 功能配置界面 (Tab 2) 统一强制采用经典同心圆弧样式 ("Original")，杜绝胶囊或异形带来的扇区变形与位置失真
+			string shape = "Original";
 
 			IRadialStyleRenderer renderer = StyleRendererFactory.CreateRenderer(uiStyle);
 			renderer.Initialize(theme, ConfigManager.CurrentConfig);
@@ -4119,14 +4607,24 @@ public partial class SettingsWindow : Window
 				double contentY = centerY + Math.Sin(rad) * midR;
 
 				Geometry sectorGeo = IconHelper.CreateAdvancedSectorGeometry(centerX, centerY, startAngle, endAngle, innerR, outerR, shape, gap, cornerRadius);
-				bool isSectorSelected = (_selectedSlotIndex == slotIdx && _selectedSubActionIndex == null);
+				bool isParentSlot = (_selectedSlotIndex == slotIdx);
+				bool isSectorSelected = (isParentSlot && _selectedSubActionIndex == null);
+				bool isParentOfSelectedSub = (isParentSlot && _selectedSubActionIndex != null);
 
 				System.Windows.Shapes.Path sectorPath = new System.Windows.Shapes.Path
 				{
 					Data = sectorGeo,
-					Fill = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 56, 189, 248)) : defaultBrush,
-					Stroke = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : borderBrush,
-					StrokeThickness = isSectorSelected ? 2.4 : renderer.BorderThickness,
+					Fill = isSectorSelected 
+						? new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 56, 189, 248)) 
+						: (isParentOfSelectedSub 
+							? new SolidColorBrush(System.Windows.Media.Color.FromArgb(28, 168, 85, 247)) 
+							: defaultBrush),
+					Stroke = isSectorSelected 
+						? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) 
+						: (isParentOfSelectedSub 
+							? new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 168, 85, 247)) 
+							: borderBrush),
+					StrokeThickness = isSectorSelected ? 2.4 : (isParentOfSelectedSub ? 1.8 : renderer.BorderThickness),
 					Tag = slotIdx,
 					Cursor = System.Windows.Input.Cursors.Hand,
 					IsHitTestVisible = false
@@ -4140,6 +4638,16 @@ public partial class SettingsWindow : Window
 						BlurRadius = 14.0,
 						ShadowDepth = 0.0,
 						Opacity = 0.95
+					};
+				}
+				else if (isParentOfSelectedSub)
+				{
+					sectorPath.Effect = new DropShadowEffect
+					{
+						Color = System.Windows.Media.Color.FromRgb(168, 85, 247),
+						BlurRadius = 10.0,
+						ShadowDepth = 0.0,
+						Opacity = 0.85
 					};
 				}
 
@@ -4310,12 +4818,13 @@ public partial class SettingsWindow : Window
 				}
 
 				// 3. Draw SubActions (Icons only, NO TEXT!)
-				if (action?.SubActions != null && action.SubActions.Count > 0 && (isTier2Mode || isSectorSelected))
+				if (action?.SubActions != null && action.SubActions.Count > 0 && (isTier2Mode || isParentSlot))
 				{
-					double subInnerR = outerR + 4.0;
-					double subOuterR = subInnerR + 22.0;
+					// 功能配置界面 (Tab 2) 统一强制采用外圈同心子环布局，彻底杜绝蜂窝扇展开时的相互遮挡与混乱堆叠
 					int subCount = action.SubActions.Count;
 					double subSweep = sweepAngle / subCount;
+					double subInnerR = outerR + 4.0;
+					double subOuterR = subInnerR + 22.0;
 
 					for (int j = 0; j < subCount; j++)
 					{
@@ -4327,8 +4836,8 @@ public partial class SettingsWindow : Window
 						double subMidR = (subInnerR + subOuterR) / 2.0;
 						double subContentX = centerX + Math.Cos(subRad) * subMidR;
 						double subContentY = centerY + Math.Sin(subRad) * subMidR;
-
 						Geometry subGeo = IconHelper.CreateAdvancedSectorGeometry(centerX, centerY, subStart, subEnd, subInnerR, subOuterR, "Original", 1.5, 3.0);
+
 						bool isSubSelected = (_selectedSlotIndex == slotIdx && _selectedSubActionIndex == subIdx);
 
 						System.Windows.Shapes.Path subPath = new System.Windows.Shapes.Path
@@ -4514,7 +5023,7 @@ public partial class SettingsWindow : Window
 				int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
 
 				bool isSubVisible = isTier2Mode || (_selectedSlotIndex == slot);
-				if (isSubVisible && dist <= outerR + 40.0)
+				if (isSubVisible && dist <= outerR + 50.0)
 				{
 					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
 					{
@@ -7087,6 +7596,10 @@ public partial class SettingsWindow : Window
 
 	private void ShowSelectedActionTextCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
+		if (CoreTextOptionsPanel != null && ShowSelectedActionTextCheckBox != null)
+		{
+			CoreTextOptionsPanel.Visibility = (ShowSelectedActionTextCheckBox.IsChecked == true) ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (ShowSelectedActionTextCheckBox == null || ConfigManager.CurrentConfig == null || _isUpdatingUi)
 		{
 			return;
@@ -7571,6 +8084,10 @@ public partial class SettingsWindow : Window
 
 	private void ShowCoreIconCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
+		if (CoreIconConfigPanel != null && ShowCoreIconCheckBox != null)
+		{
+			CoreIconConfigPanel.Visibility = (ShowCoreIconCheckBox.IsChecked == true) ? Visibility.Visible : Visibility.Collapsed;
+		}
 		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
 			ConfigManager.CurrentConfig.ShowCoreIcon = ShowCoreIconCheckBox.IsChecked == true;
@@ -8669,7 +9186,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"} (64位)。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -9945,6 +10462,38 @@ public partial class SettingsWindow : Window
 						_ => 1.0, 
 					};
 					double val2 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.2) : baseFontSize) * 0.82 * num32 * (num7 / (135.0 / num5));
+					int previewCharLen = text8.Length;
+					bool previewIsPureAscii = text8.All(c => c < 128);
+					if (num19 == 12)
+					{
+						if (previewCharLen > 8 || (previewIsPureAscii && previewCharLen > 7))
+						{
+							val2 = Math.Max(5.5, val2 * 0.82);
+						}
+						else if (previewCharLen > 5)
+						{
+							val2 = Math.Max(6.0, val2 * 0.90);
+						}
+					}
+					else if (num19 == 8)
+					{
+						if (previewCharLen > 12 || (previewIsPureAscii && previewCharLen > 10))
+						{
+							val2 = Math.Max(6.2, val2 * 0.85);
+						}
+						else if (previewCharLen > 7)
+						{
+							val2 = Math.Max(6.8, val2 * 0.92);
+						}
+					}
+					else
+					{
+						if (previewCharLen > 14)
+						{
+							val2 = Math.Max(7.5, val2 * 0.88);
+						}
+					}
+
 					double maxWidth = num19 switch
 					{
 						4 => 96.0, 
@@ -9957,7 +10506,7 @@ public partial class SettingsWindow : Window
 					textElement = new TextBlock
 					{
 						Text = text8,
-						FontSize = Math.Max(6.0, val2),
+						FontSize = Math.Max(5.5, val2),
 						FontFamily = new System.Windows.Media.FontFamily(sectorFont),
 						Foreground = sectorPreviewTextBrush,
 						FontWeight = (sectorLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
@@ -10226,10 +10775,21 @@ public partial class SettingsWindow : Window
 						string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 							? actionItem2.CustomFontFamily
 							: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+						double subFontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.75 * num7);
+						int subCharLen = actionItem2.Name.Length;
+						if (subCharLen > 8)
+						{
+							subFontSize = Math.Max(4.2, subFontSize * 0.85);
+						}
+						else if (subCharLen > 5)
+						{
+							subFontSize = Math.Max(4.6, subFontSize * 0.92);
+						}
+
 						TextBlock element8 = new TextBlock
 						{
 							Text = actionItem2.Name,
-							FontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.75 * num7),
+							FontSize = subFontSize,
 							FontFamily = new FontFamily(subFontFamily),
 							Foreground = subSectorPreviewTextBrush,
 							FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Normal,

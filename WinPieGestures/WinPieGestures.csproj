@@ -23,8 +23,10 @@
 
   <ItemGroup>
     <Resource Include="app_icon.ico" />
+    <Resource Include="tray_icon.ico" />
     <Resource Include="logo.png" />
     <None Include="app_icon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="tray_icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

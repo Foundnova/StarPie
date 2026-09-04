@@ -343,24 +343,34 @@ public partial class RadialWindow : Window
 
 	private static Point ComputeClampedPhysicalCenter(Point centerPoint, double canvasSize)
 	{
-		if (ConfigManager.CurrentConfig?.EnableEdgeCollisionAvoidance == false)
+		if (ConfigManager.CurrentConfig?.EnableEdgeCollisionAvoidance != true)
 		{
 			return centerPoint;
 		}
 
 		string policy = ConfigManager.CurrentConfig?.EdgeOverflowPolicy ?? "ClampShift";
-		if (policy == "None")
+		if (string.Equals(policy, "None", StringComparison.OrdinalIgnoreCase))
 		{
 			return centerPoint;
 		}
 
 		ScreenContext screenCtx = ScreenHelper.GetScreenContextAtPoint(centerPoint);
-		double scaleX = screenCtx.DpiScale.DpiScaleX;
-		double scaleY = screenCtx.DpiScale.DpiScaleY;
-		int physicalWidth = (int)Math.Round(canvasSize * scaleX);
-		int physicalHeight = (int)Math.Round(canvasSize * scaleY);
-		int physicalLeft = (int)Math.Round(centerPoint.X - physicalWidth / 2.0);
-		int physicalTop = (int)Math.Round(centerPoint.Y - physicalHeight / 2.0);
+		double scaleX = Math.Max(0.1, screenCtx.DpiScale.DpiScaleX);
+		double scaleY = Math.Max(0.1, screenCtx.DpiScale.DpiScaleY);
+
+		// 计算轮盘的真实有效可见半径（基于主轮盘外径及多级展开子轮盘外径，而非整个巨幅透明阴影画布）
+		double wheelRadius = (ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig.WheelRadius > 0.0)
+			? ConfigManager.CurrentConfig.WheelRadius
+			: 138.0;
+		bool enableMultiTier = ConfigManager.CurrentConfig?.EnableMultiTier == true;
+		double ratio = (ConfigManager.CurrentConfig?.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
+		double subMaxR = (ConfigManager.CurrentConfig?.SubWheelOuterRadius > 0.0)
+			? ConfigManager.CurrentConfig.SubWheelOuterRadius
+			: (wheelRadius * ratio);
+		double visualRadiusDip = enableMultiTier ? Math.Max(wheelRadius, subMaxR) : wheelRadius;
+
+		double visualRadiusPxX = visualRadiusDip * scaleX;
+		double visualRadiusPxY = visualRadiusDip * scaleY;
 
 		double marginDipX = (ConfigManager.CurrentConfig?.EdgeSafeMarginX >= 0)
 			? ConfigManager.CurrentConfig.EdgeSafeMarginX
@@ -371,49 +381,60 @@ public partial class RadialWindow : Window
 		double marginX = marginDipX * scaleX;
 		double marginY = marginDipY * scaleY;
 
-		if (policy == "ClampShift")
+		// 目标屏幕可用物理工作区 (已排除任务栏等)
+		double workLeft = screenCtx.PhysicalWorkArea.Left;
+		double workRight = screenCtx.PhysicalWorkArea.Right;
+		double workTop = screenCtx.PhysicalWorkArea.Top;
+		double workBottom = screenCtx.PhysicalWorkArea.Bottom;
+
+		// 轮盘可见区域在屏幕工作区内的允许物理中心范围
+		double minCenterX = workLeft + marginX + visualRadiusPxX;
+		double maxCenterX = workRight - marginX - visualRadiusPxX;
+		double minCenterY = workTop + marginY + visualRadiusPxY;
+		double maxCenterY = workBottom - marginY - visualRadiusPxY;
+
+		// 判断当前中心点是否会导致轮盘可见边缘发生越界或侵入安全边距
+		bool overflows = centerPoint.X < minCenterX
+					  || centerPoint.X > maxCenterX
+					  || centerPoint.Y < minCenterY
+					  || centerPoint.Y > maxCenterY;
+
+		if (!overflows)
 		{
-			double safeLeft = screenCtx.PhysicalWorkArea.Left + marginX;
-			double safeRight = screenCtx.PhysicalWorkArea.Right - marginX;
-			double safeTop = screenCtx.PhysicalWorkArea.Top + marginY;
-			double safeBottom = screenCtx.PhysicalWorkArea.Bottom - marginY;
-
-			double clampedX = physicalLeft;
-			double clampedY = physicalTop;
-
-			if (clampedX < safeLeft) clampedX = safeLeft;
-			if (clampedX + physicalWidth > safeRight) clampedX = safeRight - physicalWidth;
-
-			if (clampedY < safeTop) clampedY = safeTop;
-			if (clampedY + physicalHeight > safeBottom) clampedY = safeBottom - physicalHeight;
-
-			if (safeRight < safeLeft || physicalWidth > screenCtx.PhysicalWorkArea.Width)
-			{
-				clampedX = (screenCtx.PhysicalWorkArea.Left + screenCtx.PhysicalWorkArea.Right - physicalWidth) / 2.0;
-			}
-			if (safeBottom < safeTop || physicalHeight > screenCtx.PhysicalWorkArea.Height)
-			{
-				clampedY = (screenCtx.PhysicalWorkArea.Top + screenCtx.PhysicalWorkArea.Bottom - physicalHeight) / 2.0;
-			}
-
-			return new Point(clampedX + physicalWidth / 2.0, clampedY + physicalHeight / 2.0);
-		}
-		else if (policy == "ScreenCenter")
-		{
-			bool overflows = physicalLeft < (screenCtx.PhysicalWorkArea.Left + marginX)
-						  || (physicalLeft + physicalWidth) > (screenCtx.PhysicalWorkArea.Right - marginX)
-						  || physicalTop < (screenCtx.PhysicalWorkArea.Top + marginY)
-						  || (physicalTop + physicalHeight) > (screenCtx.PhysicalWorkArea.Bottom - marginY);
-
-			if (overflows)
-			{
-				double centerX = (screenCtx.PhysicalWorkArea.Left + screenCtx.PhysicalWorkArea.Right) / 2.0;
-				double centerY = (screenCtx.PhysicalWorkArea.Top + screenCtx.PhysicalWorkArea.Bottom) / 2.0;
-				return new Point(centerX, centerY);
-			}
+			return centerPoint;
 		}
 
-		return centerPoint;
+		if (string.Equals(policy, "ScreenCenter", StringComparison.OrdinalIgnoreCase))
+		{
+			double screenCenterX = (workLeft + workRight) / 2.0;
+			double screenCenterY = (workTop + workBottom) / 2.0;
+			return new Point(screenCenterX, screenCenterY);
+		}
+		else // ClampShift
+		{
+			double clampedX = centerPoint.X;
+			double clampedY = centerPoint.Y;
+
+			if (maxCenterX >= minCenterX)
+			{
+				clampedX = Math.Clamp(centerPoint.X, minCenterX, maxCenterX);
+			}
+			else
+			{
+				clampedX = (workLeft + workRight) / 2.0;
+			}
+
+			if (maxCenterY >= minCenterY)
+			{
+				clampedY = Math.Clamp(centerPoint.Y, minCenterY, maxCenterY);
+			}
+			else
+			{
+				clampedY = (workTop + workBottom) / 2.0;
+			}
+
+			return new Point(clampedX, clampedY);
+		}
 	}
 
 	public RadialWindow(Point centerPoint, WheelProfile profile)
@@ -474,8 +495,8 @@ public partial class RadialWindow : Window
 
 		CoreTextPanel.Visibility = Visibility.Collapsed;
 		base.Loaded += RadialWindow_Loaded;
-		CoreTitle.Text = ((profile.ProcessName == "Global") ? "全局动作" : profile.ProcessName);
-		CoreSubtitle.Text = $"{profile.SectorCount} 键动作";
+		CoreTitle.Text = ((profile.ProcessName == "Global") ? I18n.T("CoreGlobalActions") : profile.ProcessName);
+		CoreSubtitle.Text = string.Format(I18n.T("CoreSectorActions"), profile.SectorCount);
 	}
 
 	private void InitializeThemeAndStyle()
@@ -1060,11 +1081,45 @@ public partial class RadialWindow : Window
 					num13 = Math.Max(num13, 12.0);
 					break;
 				}
+
+				// 文字长度与语言弹性自适应 (Auto Font-Fit)
+				int charLen = text2.Length;
+				bool isPureAscii = text2.All(c => c < 128);
+				if (sectorCount == 12)
+				{
+					if (charLen > 8 || (isPureAscii && charLen > 7))
+					{
+						num13 = Math.Max(7.5, num13 * 0.82);
+					}
+					else if (charLen > 5)
+					{
+						num13 = Math.Max(8.2, num13 * 0.90);
+					}
+				}
+				else if (sectorCount == 8)
+				{
+					if (charLen > 12 || (isPureAscii && charLen > 10))
+					{
+						num13 = Math.Max(8.5, num13 * 0.85);
+					}
+					else if (charLen > 7)
+					{
+						num13 = Math.Max(9.2, num13 * 0.92);
+					}
+				}
+				else // 4 键
+				{
+					if (charLen > 14)
+					{
+						num13 = Math.Max(10.0, num13 * 0.88);
+					}
+				}
+
 				double maxWidth = sectorCount switch
 				{
-					4 => 120.0, 
-					12 => 62.0, 
-					_ => 96.0, 
+					4 => 128.0, 
+					12 => 68.0, 
+					_ => 102.0, 
 				};
 				string sectorFont = (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.CustomFontFamily))
 					? currentAction.CustomFontFamily
@@ -1080,7 +1135,9 @@ public partial class RadialWindow : Window
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
 					MaxWidth = maxWidth,
-					MaxHeight = 34.0,
+					MaxHeight = 36.0,
+					LineHeight = Math.Max(9.0, num13 * 1.15),
+					LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
 					Effect = (Effect)base.Resources["TextShadow"]
 				};
 				TextOptions.SetTextFormattingMode((DependencyObject)(object)textElement, (TextFormattingMode)1);
@@ -1561,18 +1618,27 @@ public partial class RadialWindow : Window
 				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+				double subFinalFontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize;
+				int subCharLen = text2.Length;
+				bool subAsciiOnly = text2.All(c => c < 128);
+				if (subCharLen > 8 || (subAsciiOnly && subCharLen > 7))
+				{
+					subFinalFontSize = Math.Max(7.5, subFinalFontSize * 0.85);
+				}
 				subTextElement = new TextBlock
 				{
 					Text = text2,
 					Foreground = subTextColor,
-					FontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize,
+					FontSize = subFinalFontSize,
 					FontFamily = new FontFamily(subFontFamily),
 					FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					MaxWidth = num16 - 4.0,
-					MaxHeight = 28.0,
+					MaxWidth = num16 - 2.0,
+					MaxHeight = 32.0,
+					LineHeight = Math.Max(8.5, subFinalFontSize * 1.15),
+					LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
 					Effect = (Effect)base.Resources["TextShadow"]
 				};
 				TextOptions.SetTextFormattingMode((DependencyObject)(object)subTextElement, (TextFormattingMode)1);
@@ -2103,9 +2169,9 @@ public partial class RadialWindow : Window
 		double ringR = Math.Sqrt(2.0 - Math.Sqrt(2.0)); // 0.7653668647301795
 		return index switch
 		{
-			0 => (1.0 + ringR * 0.5, ringR * 0.8660254038),   // upper wing
-			1 => (1.0 + ringR, 0.0),                           // tip / center
-			_ => (1.0 + ringR * 0.5, -ringR * 0.8660254038)   // lower wing
+			0 => (1.0 + ringR * 0.5, -ringR * 0.8660254038),  // 左翼 (逆时针/较小角度，对于上方扇区为左侧)
+			1 => (1.0 + ringR, 0.0),                          // 中尖 (正中心)
+			_ => (1.0 + ringR * 0.5, ringR * 0.8660254038)    // 右翼 (顺时针/较大角度，对于上方扇区为右侧)
 		};
 	}
 
@@ -2126,9 +2192,9 @@ public partial class RadialWindow : Window
 			double wingDv = orbitRadius * Math.Sin(wingAngle);
 			return index switch
 			{
-				0 => (wingDu, wingDv),      // upper wing on the common orbit
-				1 => (orbitRadius, 0.0),    // tip / center
-				_ => (wingDu, -wingDv)      // lower wing on the common orbit
+				0 => (wingDu, -wingDv),     // 左翼 (共轨，对于上方扇区为左侧)
+				1 => (orbitRadius, 0.0),    // 中尖
+				_ => (wingDu, wingDv)       // 右翼 (共轨，对于上方扇区为右侧)
 			};
 		}
 		return GetFanSubOffset(index);
@@ -2136,9 +2202,9 @@ public partial class RadialWindow : Window
 
 	public static int GetFanSlotIndex(int subIndex, int totalCount)
 	{
-		if (totalCount <= 1) return 1; // Center tip
-		if (totalCount == 2) return (subIndex == 0) ? 0 : 2; // Symmetric upper/lower wings
-		return Math.Clamp(subIndex, 0, 2); // 0 = upper, 1 = tip, 2 = lower
+		if (totalCount <= 1) return 1; // 仅1项：居中尖端
+		if (totalCount == 2) return (subIndex == 0) ? 0 : 2; // 2项：0=左翼(-dv), 2=右翼(+dv)
+		return Math.Clamp(subIndex, 0, 2); // 3项：0=左翼(-dv), 1=中尖(0), 2=右翼(+dv)
 	}
 
 	public static double GetFanExtentRadius(double outer, double inner)
@@ -2529,18 +2595,27 @@ public partial class RadialWindow : Window
 				string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
+				double honeyFinalFontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize;
+				int honeyCharLen = text2.Length;
+				bool honeyAsciiOnly = text2.All(c => c < 128);
+				if (honeyCharLen > 8 || (honeyAsciiOnly && honeyCharLen > 7))
+				{
+					honeyFinalFontSize = Math.Max(7.5, honeyFinalFontSize * 0.85);
+				}
 				textBlock = new TextBlock
 				{
 					Text = text2,
 					Foreground = subTextColor,
-					FontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize,
+					FontSize = honeyFinalFontSize,
 					FontFamily = new FontFamily(subFontFamily),
 					FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					MaxWidth = containerW - 4.0,
-					MaxHeight = 26.0
+					MaxWidth = containerW - 2.0,
+					MaxHeight = 28.0,
+					LineHeight = Math.Max(8.5, honeyFinalFontSize * 1.15),
+					LineStackingStrategy = LineStackingStrategy.BlockLineHeight
 				};
 				if (base.Resources.Contains("TextShadow"))
 				{

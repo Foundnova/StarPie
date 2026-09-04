@@ -81,7 +81,7 @@ public class UpdateManager
 		{
 			Timeout = TimeSpan.FromSeconds(25)
 		};
-		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2"));
+		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"));
 		_httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 	}
 
@@ -111,6 +111,7 @@ public class UpdateManager
 		{
 			"ghproxy" => $"https://ghproxy.net/{rawUrl}",
 			"moeyy" => $"https://github.moeyy.xyz/{rawUrl}",
+			"akams" => $"https://github.akams.cn/{rawUrl}",
 			"custom" when !string.IsNullOrWhiteSpace(customProxy) => $"{customProxy.TrimEnd('/')}/{rawUrl}",
 			_ => rawUrl
 		};
@@ -331,6 +332,17 @@ public class UpdateManager
 			TotalBytesToReceive = totalRead,
 			SpeedBytesPerSecond = 0
 		});
+
+		// 移除下载文件的 Zone.Identifier (Mark of the Web)，防止触发 Windows 安全中心拦截
+		try
+		{
+			string zoneStream = destinationZipPath + ":Zone.Identifier";
+			if (File.Exists(zoneStream))
+			{
+				File.Delete(zoneStream);
+			}
+		}
+		catch { }
 	}
 
 	public bool RestartAndApplyUpdate(string downloadedZipPath)
@@ -342,53 +354,98 @@ public class UpdateManager
 			string currentExe = currentProc.MainModule?.FileName ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StarPie.exe");
 			string targetDir = Path.GetDirectoryName(currentExe)!;
 
-			string scriptPath = Path.Combine(Path.GetTempPath(), $"StarPie_Updater_{pid}.cmd");
+			// 首先尝试直接解除下载更新包的 Mark of the Web
+			try
+			{
+				string zoneStream = downloadedZipPath + ":Zone.Identifier";
+				if (File.Exists(zoneStream))
+				{
+					File.Delete(zoneStream);
+				}
+			}
+			catch { }
 
-			string scriptContent = $@"@echo off
-chcp 65001 >nul
-echo ========================================================
-echo        StarPie 自动更新管理器 (Updating StarPie)
-echo ========================================================
-echo.
-echo [1/3] 等待主进程退出 (PID: {pid})...
+			string scriptPath = Path.Combine(Path.GetTempPath(), $"StarPie_Updater_{pid}.ps1");
 
-:wait_loop
-tasklist /fi ""PID eq {pid}"" 2>nul | findstr ""{pid}"" >nul
-if %ERRORLEVEL% equ 0 (
-    timeout /t 1 /nobreak >nul
-    goto wait_loop
-)
+			// 使用原生 PowerShell 脚本执行解压、覆盖与重启：
+			// 1. 绝不使用批处理 (>nul / 2>nul)，根除 Windows 10/11 误报 "...\Lightweight\nul" 的缺陷
+			// 2. 自动调用 Unblock-File 移除所有新释放文件的 Zone.Identifier，彻底杜绝 SmartScreen / 安全中心拦截
+			// 3. 严格设置 WorkingDirectory 为 %TEMP%，隔离工作目录
+			// 4. UseShellExecute = false (通过 CreateProcessW 唤起，彻底绕开 Windows Shell 附件执行服务 AES 策略)
+			string scriptContent = $@"# StarPie 自动更新脚本
+$ErrorActionPreference = 'SilentlyContinue'
 
-echo [2/3] 正在解压新版本文件并覆盖安装目录...
-timeout /t 1 /nobreak >nul
+$targetPid = {pid}
+$zipPath = '{downloadedZipPath.Replace("'", "''")}'
+$targetDir = '{targetDir.Replace("'", "''")}'
+$exePath = '{currentExe.Replace("'", "''")}'
 
-tar -xf ""{downloadedZipPath}"" -C ""{targetDir}"" 2>nul
-if %ERRORLEVEL% neq 0 (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ""Expand-Archive -Path '{downloadedZipPath}' -DestinationPath '{targetDir}' -Force""
-)
+# 1. 等待主进程完全退出并释放所有 dll/exe 文件句柄
+try {{
+    $proc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
+    if ($proc) {{
+        $exited = $proc.WaitForExit(12000)
+        if (-not $exited) {{
+            Stop-Process -Id $targetPid -Force -ErrorAction SilentlyContinue
+        }}
+    }}
+}} catch {{}}
 
-echo [3/3] 重启新版 StarPie...
-start """" ""{currentExe}""
+Start-Sleep -Milliseconds 600
 
-echo 更新完成！
-del ""{downloadedZipPath}"" 2>nul
-(goto) 2>nul & del ""%~f0""
+# 2. 解除更新包锁定
+try {{
+    Unblock-File -LiteralPath $zipPath -ErrorAction SilentlyContinue
+}} catch {{}}
+
+# 3. 原生解压并覆盖安装目录
+$extracted = $false
+try {{
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $targetDir -Force -ErrorAction Stop
+    $extracted = $true
+}} catch {{
+    try {{
+        & tar.exe -xf $zipPath -C $targetDir
+        $extracted = $true
+    }} catch {{}}
+}}
+
+# 4. 解除安装目录下所有新释放文件的安全锁定 (消除 Internet 安全阻止)
+try {{
+    Get-ChildItem -LiteralPath $targetDir -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+}} catch {{}}
+
+# 5. 重新启动新版 StarPie
+Start-Sleep -Milliseconds 400
+try {{
+    Start-Process -FilePath $exePath -WorkingDirectory $targetDir
+}} catch {{
+    try {{
+        [System.Diagnostics.Process]::Start($exePath)
+    }} catch {{}}
+}}
+
+# 6. 清理临时更新包与自身脚本
+Start-Sleep -Milliseconds 800
+try {{ Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue }} catch {{}}
+try {{ Remove-Item -LiteralPath $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue }} catch {{}}
 ";
 
 			File.WriteAllText(scriptPath, scriptContent, System.Text.Encoding.UTF8);
 
 			ProcessStartInfo psi = new ProcessStartInfo
 			{
-				FileName = "cmd.exe",
-				Arguments = $"/c \"{scriptPath}\"",
+				FileName = "powershell.exe",
+				Arguments = $"-NoProfile -ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File \"{scriptPath}\"",
+				WorkingDirectory = Path.GetTempPath(),
 				CreateNoWindow = true,
 				WindowStyle = ProcessWindowStyle.Hidden,
-				UseShellExecute = true
+				UseShellExecute = false
 			};
 
 			Process.Start(psi);
 
-			AppLogger.LogInfo("Update script launched, shutting down current instance.");
+			AppLogger.LogInfo("Safe PowerShell update script launched, shutting down current instance.");
 			System.Windows.Application.Current.Dispatcher.Invoke(() =>
 			{
 				System.Windows.Application.Current.Shutdown();
