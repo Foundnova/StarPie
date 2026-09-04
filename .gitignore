@@ -25,6 +25,7 @@ __pycache__/
 *.pyd
 test_env_appdata/
 artifacts/
+.venv/
 
 # Large Third-Party Installers & Runtime Packages
 windowsdesktop-runtime-*.exe
