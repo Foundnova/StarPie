@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import time
 import pytest
 from pywinauto import Desktop
@@ -11,6 +12,10 @@ def get_config_path(local_app_data):
             return p
     return os.path.join(str(local_app_data), "StarPie", "config.json")
 
+def parse_px_value(text):
+    """Slider labels now embed units, e.g. '25 px'."""
+    return float(re.sub(r"[^0-9.]", "", text))
+
 def test_modify_slider_and_save(app):
     win, local_app_data = app
     
@@ -19,14 +24,14 @@ def test_modify_slider_and_save(app):
     label = win.child_window(auto_id="ThresholdValueLabel", control_type="Text")
     
     initial_text = label.window_text()
-    initial_val = float(initial_text)
+    initial_val = parse_px_value(initial_text)
     
     # 2. Set value directly using UIA RangeValue pattern
     slider.set_value(32.0)
     time.sleep(0.3)
     
     new_text = label.window_text()
-    new_val = float(new_text)
+    new_val = parse_px_value(new_text)
     
     assert new_val != initial_val, f"Slider value should have changed from {initial_val}"
     
@@ -91,10 +96,15 @@ def test_switch_all_tabs_smoothly(app):
     corner_slider = win.child_window(auto_id="SectorCornerRadiusSlider", control_type="Slider")
     assert corner_slider.exists(timeout=3), "SectorCornerRadiusSlider should exist in Appearance tab"
     
-    # Test Tab 2 (Mappings & Profiles)
+    # Test Tab 2 (Mappings & Profiles) - v1.6.8 moved profile management
+    # into the collapsible list view; switch to it before asserting.
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
+    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    if list_mode.exists(timeout=2):
+        list_mode.select()
+        time.sleep(0.4)
     profiles_list = win.child_window(auto_id="ProfilesListBox", control_type="List")
     assert profiles_list.exists(timeout=3), "ProfilesListBox should exist in Mappings tab"
     
@@ -192,7 +202,13 @@ def test_profile_management_ui_and_buttons(app):
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
-    
+
+    # v1.6.8: profile management controls live in the list view (collapsed by default)
+    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    if list_mode.exists(timeout=2):
+        list_mode.select()
+        time.sleep(0.4)
+
     add_app_btn = win.child_window(auto_id="AddProfileButton", control_type="Button")
     add_custom_btn = win.child_window(auto_id="AddCustomProfileButton", control_type="Button")
     rename_btn = win.child_window(auto_id="RenameProfileButton", control_type="Button")
@@ -223,6 +239,12 @@ def test_hotkey_recorder_and_system_presets_catalog(app):
     tab2.select()
     time.sleep(0.4)
     
+    # v1.6.8: profile list lives in the collapsible list view
+    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    if list_mode.exists(timeout=2):
+        list_mode.select()
+        time.sleep(0.4)
+
     profiles_list = win.child_window(auto_id="ProfilesListBox", control_type="List")
     assert profiles_list.exists(timeout=3), "ProfilesListBox should exist in Mappings tab"
     
@@ -244,12 +266,13 @@ def test_hotkey_recorder_and_system_presets_catalog(app):
 
 def test_v124_app_interface_themes_and_clean_appearance(app):
     """
-    Test v1.2.4 features:
+    Test v1.2.4 features (updated for v1.6.8 sidebar):
     1. Navigation to Appearance Tab (NavTab1).
-    2. Verification that 'AppThemeComboBox' (软件控制台界面主题) exists and functions.
+    2. Verification that the app theme cycle button on the collapsed sidebar
+       (SidebarThemeCollapsedButton, replaces the old AppThemeComboBox) exists.
     3. Verification that 'ThemeComboBox' (轮盘配色方案) with 7+ presets exists.
     4. Verification that Wheel Background images card is removed.
-    5. AppTheme selection, saving, and JSON persistence validation.
+    5. AppTheme cycling (System -> Light), saving, and JSON persistence validation.
     """
     win, local_app_data = app
     
@@ -257,9 +280,9 @@ def test_v124_app_interface_themes_and_clean_appearance(app):
     tab1.select()
     time.sleep(0.4)
     
-    # 1. Verify AppTheme dropdown (软件界面主题)
-    app_theme_combo = win.child_window(auto_id="AppThemeComboBox", control_type="ComboBox")
-    assert app_theme_combo.exists(timeout=3), "AppThemeComboBox should exist"
+    # 1. Verify sidebar app theme cycle button (v1.6.8 replaced AppThemeComboBox)
+    theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
+    assert theme_btn.exists(timeout=3), "SidebarThemeCollapsedButton should exist"
     
     # 2. Verify Wheel Theme dropdown (轮盘配色方案)
     wheel_theme_combo = win.child_window(auto_id="ThemeComboBox", control_type="ComboBox")
@@ -269,9 +292,9 @@ def test_v124_app_interface_themes_and_clean_appearance(app):
     wheel_bg_box = win.child_window(auto_id="WheelBgImageTextBox", control_type="Edit")
     assert not wheel_bg_box.exists(timeout=1), "WheelBgImageTextBox should NOT exist (feature canceled)"
     
-    # 4. Select App Theme by index (Index 2: Obsidian Dark)
-    app_theme_combo.select(2)
-    time.sleep(0.3)
+    # 4. Cycle app theme once: default is System, one click -> Light
+    theme_btn.invoke()
+    time.sleep(0.5)
     
     # 5. Save settings and verify config persistence
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
@@ -293,7 +316,7 @@ def test_v124_app_interface_themes_and_clean_appearance(app):
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
         
-    assert config.get("AppTheme") == "Dark", f"AppTheme ({config.get('AppTheme')}) should be 'Dark'"
+    assert config.get("AppTheme") == "Light", f"AppTheme ({config.get('AppTheme')}) should be 'Light' after one cycle from default System"
 
 
 def test_v130_wheel_themes_and_custom_preset_and_text_sync(app):
@@ -324,9 +347,10 @@ def test_v130_wheel_themes_and_custom_preset_and_text_sync(app):
     ui_style_combo.select(1)
     time.sleep(0.4)
     
-    # 4. Verify ShowText checkbox and IconLayoutMode dropdown
-    show_text_chk = win.child_window(auto_id="ShowTextCheckBox", control_type="CheckBox")
-    assert show_text_chk.exists(timeout=3), "ShowTextCheckBox should exist"
+    # 4. Verify center action-name text toggle (v1.6.8 renamed ShowTextCheckBox)
+    #    and IconLayoutMode dropdown
+    show_text_chk = win.child_window(auto_id="ShowSelectedActionTextCheckBox", control_type="CheckBox")
+    assert show_text_chk.exists(timeout=3), "ShowSelectedActionTextCheckBox should exist"
     
     layout_mode_combo = win.child_window(auto_id="IconLayoutModeComboBox", control_type="ComboBox")
     assert layout_mode_combo.exists(timeout=3), "IconLayoutModeComboBox should exist"
@@ -444,9 +468,10 @@ def test_v133_sector_count_4_8_12_adaptation_and_streamlined_shapes(app):
     tab2.select()
     time.sleep(0.5)
     
-    radio4 = win.child_window(auto_id="SectorCount4Radio", control_type="RadioButton")
-    radio8 = win.child_window(auto_id="SectorCount8Radio", control_type="RadioButton")
-    radio12 = win.child_window(auto_id="SectorCount12Radio", control_type="RadioButton")
+    # v1.6.8: canvas-mode radios on the Mappings page
+    radio4 = win.child_window(auto_id="MappingsSectorCount4Radio", control_type="RadioButton")
+    radio8 = win.child_window(auto_id="MappingsSectorCount8Radio", control_type="RadioButton")
+    radio12 = win.child_window(auto_id="MappingsSectorCount12Radio", control_type="RadioButton")
     
     assert radio4.exists(timeout=3), "SectorCount4Radio should exist"
     assert radio8.exists(timeout=3), "SectorCount8Radio should exist"
@@ -485,8 +510,9 @@ def test_v133_sector_count_4_8_12_adaptation_and_streamlined_shapes(app):
 def test_v134_memory_autosave_and_theme_persistence(app):
     """
     Test v1.3.4 features:
-    1. Switch AppTheme to Modern Light (极简纯白).
-    2. Switch UiStyle, Wheel Theme, and change sliders.
+    1. Cycle AppTheme via the sidebar theme button (v1.6.8 replaces AppThemeComboBox,
+       System -> Light, persisted immediately by SetAppTheme).
+    2. Change a slider (WheelRadiusSlider).
     3. Verify config is automatically persisted to disk via debounce / window close.
     4. Verify settings persistence without needing explicit SaveButton click.
     """
@@ -497,9 +523,11 @@ def test_v134_memory_autosave_and_theme_persistence(app):
     tab1.select()
     time.sleep(0.4)
     
-    # 2. Change AppTheme to Light
-    app_theme_combo = win.child_window(auto_id="AppThemeComboBox", control_type="ComboBox")
-    assert app_theme_combo.exists(timeout=3), "AppThemeComboBox should exist"
+    # 2. Cycle AppTheme via sidebar button (System -> Light, auto-persisted)
+    theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
+    assert theme_btn.exists(timeout=3), "SidebarThemeCollapsedButton should exist"
+    theme_btn.invoke()
+    time.sleep(0.6)
     
     # 3. Change a slider (WheelRadiusSlider)
     wheel_slider = win.child_window(auto_id="WheelRadiusSlider", control_type="Slider")
@@ -513,6 +541,7 @@ def test_v134_memory_autosave_and_theme_persistence(app):
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
         
+    assert config.get("AppTheme") == "Light", f"Auto-persisted AppTheme should be 'Light', got {config.get('AppTheme')}"
     assert abs(config.get("WheelRadius", 0) - 145.0) < 1.0, f"Auto-persisted WheelRadius should be 145, got {config.get('WheelRadius')}"
 
 
@@ -562,6 +591,12 @@ def test_v135_program_picker_clean_icons_and_core_customization(app):
     tab2.select()
     time.sleep(0.4)
     
+    # v1.6.8: AddProfileButton (opens ProgramPickerWindow) lives in the list view
+    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    if list_mode.exists(timeout=2):
+        list_mode.select()
+        time.sleep(0.4)
+
     add_btn = win.child_window(auto_id="AddProfileButton", control_type="Button")
     assert add_btn.exists(timeout=3), "AddProfileButton should exist"
 
@@ -689,6 +724,11 @@ def test_v138_i18n_multilanguage_support(app):
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
     assert "Save" in save_btn.window_text(), f"Save button should be in English, got {save_btn.window_text()}"
     
+    # v1.6.8: sidebar is collapsed by default, hiding NavTab texts; expand it first
+    sidebar_toggle = win.child_window(auto_id="SidebarToggleButton", control_type="Button")
+    if sidebar_toggle.exists(timeout=2):
+        sidebar_toggle.invoke()
+        time.sleep(0.4)
     tab0_text = win.child_window(auto_id="NavTab0Text", control_type="Text")
     assert "Trigger" in tab0_text.window_text() or "🎯" in tab0_text.window_text(), "Tab0 should update"
     
@@ -731,26 +771,17 @@ def test_v139_folder_action_type_and_i18n_consistency(app):
     tab2.select()
     time.sleep(0.4)
     
-    # 2. Check title text blocks
-    action_list_title = win.child_window(auto_id="SectorActionListTitleText", control_type="Text")
-    assert action_list_title.exists(timeout=3), "SectorActionListTitleText should exist"
+    # 2. Check the canvas focus editor title (replaces old SectorActionListTitleText)
+    focus_title = win.child_window(auto_id="FocusSlotTitleText", control_type="Text")
+    assert focus_title.exists(timeout=3), "FocusSlotTitleText should exist"
     
-    # 3. Locate slots items control and find the first type combo box
-    combos = win.descendants(control_type="ComboBox")
-    # Find type combobox inside slots (has items count == 4: Hotkey, Launch, Folder, System)
-    type_combo = None
-    for c in combos:
-        try:
-            if c.item_count() == 4:
-                type_combo = c
-                break
-        except Exception:
-            pass
-            
-    if type_combo is not None:
-        # Select index 2: Folder
-        type_combo.select(2)
-        time.sleep(0.3)
+    # 3. Locate the first slot's Action Type ComboBox (8 aggregated action types,
+    #    index 3 = Folder) and select "Folder"
+    type_combo = win.child_window(auto_id="FocusActionTypeComboBox", control_type="ComboBox")
+    assert type_combo.exists(timeout=3), "FocusActionTypeComboBox should exist"
+    assert type_combo.item_count() == 8, f"FocusActionTypeComboBox should have 8 action types, got {type_combo.item_count()}"
+    type_combo.select(3)
+    time.sleep(0.3)
     
     # 4. Save configuration
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
@@ -761,8 +792,7 @@ def test_v139_folder_action_type_and_i18n_consistency(app):
     with open(config_path, "r", encoding="utf-8") as f:
         saved_config = json.load(f)
         
-    if type_combo is not None:
-        assert saved_config["Profiles"][0]["Actions"][0]["Type"] == "Folder", "Action type should persist as Folder"
+    assert saved_config["Profiles"][0]["Actions"][0]["Type"] == "Folder", "Action type should persist as Folder"
 
 def test_v140_custom_icons_and_appearance_collapsible_and_milestones_folding(app):
     """
@@ -790,13 +820,13 @@ def test_v140_custom_icons_and_appearance_collapsible_and_milestones_folding(app
     color_expander = win.child_window(auto_id="CustomColorExpander", control_type="Group")
     assert color_expander.exists(timeout=3), "CustomColorExpander should exist"
     
-    # 2. Gestures Tab (Tab 2)
+    # 2. Gestures Tab (Tab 2) - canvas focus editor title (replaces old title text)
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
     
-    action_list_title = win.child_window(auto_id="SectorActionListTitleText", control_type="Text")
-    assert action_list_title.exists(timeout=3), "SectorActionListTitleText should exist"
+    focus_title = win.child_window(auto_id="FocusSlotTitleText", control_type="Text")
+    assert focus_title.exists(timeout=3), "FocusSlotTitleText should exist"
     
     # 3. About Tab (Tab 4)
     tab4 = win.child_window(auto_id="NavTab4", control_type="RadioButton")
@@ -839,6 +869,12 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     tab2.select()
     time.sleep(0.4)
     
+    # v1.6.8: rename control lives in the list view
+    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    if list_mode.exists(timeout=2):
+        list_mode.select()
+        time.sleep(0.4)
+
     rename_profile_btn = win.child_window(auto_id="RenameProfileButton", control_type="Button")
     assert rename_profile_btn.exists(timeout=3), "RenameProfileButton should exist"
     

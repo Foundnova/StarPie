@@ -44,4 +44,10 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 
