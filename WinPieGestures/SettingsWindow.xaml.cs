@@ -322,46 +322,41 @@ public partial class SettingsWindow : Window
 
 	private bool _previewRenderPending;
 
-	public SettingsWindow()
+	private bool _isUiInitialized = false;
+
+	public static bool IsSilentLaunch()
 	{
+		return Environment.GetCommandLineArgs().Any((string a) =>
+			string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "/minimized", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "/autostart", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase));
+	}
+
+	public void EnsureUiInitialized()
+	{
+		if (_isUiInitialized)
+		{
+			return;
+		}
+		_isUiInitialized = true;
+
 		_isUpdatingUi = true;
-		ConfigManager.LoadConfig();
-		InitializeComponent();
 		try
 		{
-			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
-		}
-		catch
-		{
-		}
-		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.2");
-		if (SidebarVersionText != null)
-		{
-			SidebarVersionText.Text = text;
-		}
-		if (AboutVersionBadgeText != null)
-		{
-			AboutVersionBadgeText.Text = text;
-		}
-		try
-		{
-			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
+			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 			ApplySidebarLayout();
 			LoadConfigToUi();
 			SlotsItemsControl.ItemsSource = _slotViewModels;
 			bool flag4 = IsRunningAsAdmin();
 			UacWarningCard.Visibility = (flag4 ? Visibility.Collapsed : Visibility.Visible);
 			RefreshSlots();
-		}
-		finally
-		{
-			_isUpdatingUi = false;
-		}
-		base.Loaded += delegate
-		{
-			ApplySidebarLayout();
 			UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig?.AppTheme ?? "System");
+
 			if (App.MainKeyboardHook != null)
 			{
 				App.MainKeyboardHook.OnExclusiveRecordCompleted += MainKeyboardHook_OnExclusiveRecordCompleted;
@@ -380,6 +375,47 @@ public partial class SettingsWindow : Window
 					CancelExclusiveRecordingIfActive();
 				};
 			}
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+	}
+
+	public SettingsWindow()
+	{
+		_isUpdatingUi = true;
+		InitializeComponent();
+		try
+		{
+			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
+		}
+		catch
+		{
+		}
+		InitializeTrayIcon();
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8");
+		if (SidebarVersionText != null)
+		{
+			SidebarVersionText.Text = text;
+		}
+		if (AboutVersionBadgeText != null)
+		{
+			AboutVersionBadgeText.Text = text;
+		}
+		_isUpdatingUi = false;
+
+		// 若为桌面正常呼起或单测环境（非静默参数），立即就绪完整 UI；若为开机自启/静默启动，延迟至首次唤起加载
+		if (!IsSilentLaunch())
+		{
+			EnsureUiInitialized();
+		}
+
+		base.Loaded += delegate
+		{
+			EnsureUiInitialized();
+			ApplySidebarLayout();
+			UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig?.AppTheme ?? "System");
 			if (AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
@@ -1783,6 +1819,7 @@ public partial class SettingsWindow : Window
 			});
 			return;
 		}
+		EnsureUiInitialized();
 		if (tabIndex >= 0)
 		{
 			SwitchToTab(tabIndex);

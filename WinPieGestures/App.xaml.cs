@@ -130,7 +130,7 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
-		AppLogger.LogInfo($"=== StarPie v1.6.0 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
+		AppLogger.LogInfo($"=== StarPie v1.6.8 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try
@@ -146,9 +146,24 @@ public partial class App : Application
 			MainGestureController = new GestureController(MainMouseHook, MainKeyboardHook);
 			MainSettingsWindow = new SettingsWindow();
 			base.MainWindow = MainSettingsWindow;
-			if (!Environment.GetCommandLineArgs().Any((string a) => string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-m", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/minimized", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/autostart", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase)))
+			if (!SettingsWindow.IsSilentLaunch())
 			{
 				MainSettingsWindow.Show();
+			}
+			else
+			{
+				// 静默启动或开机自启时，在挂载完轻量级钩子后等待后台就绪（1.5秒后）执行一次工作集规整，将静默占用压至极限
+				_ = System.Threading.Tasks.Task.Run(async () =>
+				{
+					try
+					{
+						await System.Threading.Tasks.Task.Delay(1500).ConfigureAwait(false);
+						MemoryOptimizer.TrimMemory(force: true);
+					}
+					catch
+					{
+					}
+				});
 			}
 		}
 		catch (Exception ex)
