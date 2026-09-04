@@ -352,6 +352,17 @@ public partial class SettingsWindow : Window
 		base.Loaded += delegate
 		{
 			ApplySidebarLayout();
+			UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig?.AppTheme ?? "System");
+			if (App.MainKeyboardHook != null)
+			{
+				App.MainKeyboardHook.OnExclusiveRecordCompleted += MainKeyboardHook_OnExclusiveRecordCompleted;
+				App.MainKeyboardHook.OnExclusiveRecordCancelled += MainKeyboardHook_OnExclusiveRecordCancelled;
+				App.MainKeyboardHook.OnExclusiveRecordModifiersChanged += MainKeyboardHook_OnExclusiveRecordModifiersChanged;
+			}
+			if (FocusHotkeyRecorder != null)
+			{
+				FocusHotkeyRecorder.HotkeyChanged += FocusHotkeyRecorder_HotkeyChanged;
+			}
 			if (AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
@@ -367,6 +378,8 @@ public partial class SettingsWindow : Window
 				});
 			}
 		};
+		base.Deactivated += delegate { CancelExclusiveRecordingIfActive(); };
+		base.Closing += delegate { CancelExclusiveRecordingIfActive(); };
 	}
 
 	private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
@@ -387,11 +400,61 @@ public partial class SettingsWindow : Window
 		SidebarToggleButton.HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Right;
 		SidebarBrandGrid.HorizontalAlignment = isCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
 		SidebarBrandTextPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
-		SidebarFooterPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
 		SidebarToggleIcon.Data = Geometry.Parse(isCollapsed ? "M10,6 L16,12 L10,18" : "M14,6 L8,12 L14,18");
 		string toggleText = I18n.T(isCollapsed ? "SidebarExpand" : "SidebarCollapse");
 		SidebarToggleButton.ToolTip = toggleText;
 		System.Windows.Automation.AutomationProperties.SetName(SidebarToggleButton, toggleText);
+
+		// 主题切换器折叠/展开自适应
+		if (SidebarThemeExpandedPanel != null)
+		{
+			SidebarThemeExpandedPanel.Visibility = isCollapsed ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (SidebarThemeCollapsedButton != null)
+		{
+			SidebarThemeCollapsedButton.Visibility = isCollapsed ? Visibility.Visible : Visibility.Collapsed;
+		}
+
+		// 底部版本与版权信息：折叠时持续展示，自适应居中对齐
+		SidebarFooterPanel.Visibility = Visibility.Visible;
+		if (isCollapsed)
+		{
+			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Center;
+			if (SidebarVersionBadge != null)
+			{
+				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Center;
+				SidebarVersionBadge.Padding = new Thickness(4, 2, 4, 2);
+			}
+			if (SidebarVersionText != null)
+			{
+				SidebarVersionText.FontSize = 10;
+			}
+			if (SidebarCopyrightText != null)
+			{
+				SidebarCopyrightText.Text = "© 2026";
+				SidebarCopyrightText.FontSize = 9;
+				SidebarCopyrightText.HorizontalAlignment = HorizontalAlignment.Center;
+			}
+		}
+		else
+		{
+			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Left;
+			if (SidebarVersionBadge != null)
+			{
+				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Left;
+				SidebarVersionBadge.Padding = new Thickness(6, 3, 6, 3);
+			}
+			if (SidebarVersionText != null)
+			{
+				SidebarVersionText.FontSize = 11;
+			}
+			if (SidebarCopyrightText != null)
+			{
+				SidebarCopyrightText.Text = "© 2026 StarPie";
+				SidebarCopyrightText.FontSize = 10;
+				SidebarCopyrightText.HorizontalAlignment = HorizontalAlignment.Left;
+			}
+		}
 
 		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
 		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
@@ -545,7 +608,7 @@ public partial class SettingsWindow : Window
 		}
 
 		// App Theme & Presets
-		SetComboBoxSelectedValue(AppThemeComboBox, ConfigManager.CurrentConfig.AppTheme ?? "System");
+		UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig.AppTheme ?? "System");
 		ReloadThemePresets();
 		SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
 		SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
@@ -1655,10 +1718,7 @@ public partial class SettingsWindow : Window
 		}
 		try
 		{
-			if (AppThemeComboBox?.SelectedItem is ComboBoxItem comboBoxItem)
-			{
-				ConfigManager.CurrentConfig.AppTheme = comboBoxItem.Tag?.ToString() ?? "System";
-			}
+
 			if (UiStyleComboBox?.SelectedItem is ComboBoxItem comboBoxItem2)
 			{
 				ConfigManager.CurrentConfig.UiStyle = comboBoxItem2.Tag?.ToString() ?? "ClassicRing";
@@ -3347,39 +3407,134 @@ public partial class SettingsWindow : Window
 
 	private void TogglePauseHotkeysBtn_Click(object sender, RoutedEventArgs e)
 	{
-		bool isCurrentlyPaused = (App.MainKeyboardHook != null && App.MainKeyboardHook.IsPaused) ||
-		                          (App.MainMouseHook != null && App.MainMouseHook.IsPaused);
-		bool newPaused = !isCurrentlyPaused;
-		if (App.MainKeyboardHook != null)
+		if (App.MainKeyboardHook == null) return;
+
+		bool isSuppressing = App.MainKeyboardHook.SuppressGlobalHotkeysForRecording;
+		if (isSuppressing)
 		{
-			App.MainKeyboardHook.IsPaused = newPaused;
+			// 退出独占录制状态
+			CancelExclusiveRecordingIfActive();
+			try
+			{
+				_notifyIcon?.ShowBalloonTip(1000, "StarPie", "▶️ 已恢复全局热键与按键正常监听", System.Windows.Forms.ToolTipIcon.Info);
+			}
+			catch { }
 		}
-		if (App.MainMouseHook != null)
+		else
 		{
-			App.MainMouseHook.IsPaused = newPaused;
+			// 开启独占录制：底层钩子阻断系统及其他软件全局热键，独占由 StarPie 录入
+			App.MainKeyboardHook.SuppressGlobalHotkeysForRecording = true;
+			UpdatePauseHotkeysButtonState(true);
+			if (FocusHotkeyRecorder != null)
+			{
+				FocusHotkeyRecorder.Focus();
+				FocusHotkeyRecorder.ShowExclusiveRecordingState("🔴 全局热键已暂停，请按下快捷键组合 (按Esc取消)...");
+			}
+			AppLogger.LogInfo("Activated exclusive hotkey recording mode (suppressing desktop and app hotkeys)");
+			try
+			{
+				_notifyIcon?.ShowBalloonTip(2000, "StarPie", "⏸️ 已暂时暂停桌面系统及其他软件全局快捷键，在此按下目标按键组合进行录入（按 Esc 取消）", System.Windows.Forms.ToolTipIcon.Info);
+			}
+			catch { }
 		}
-		UpdatePauseHotkeysButtonState(newPaused);
-		AppLogger.LogInfo(newPaused ? "Paused all global hotkeys and gestures" : "Resumed all global hotkeys and gestures");
-		try
-		{
-			_notifyIcon?.ShowBalloonTip(1500, "StarPie", newPaused ? "⏸️ 已暂停所有全局热键与手势拦截（可自由录制按键）" : "▶️ 已恢复全局热键与手势监听", System.Windows.Forms.ToolTipIcon.Info);
-		}
-		catch { }
 	}
 
-	private void UpdatePauseHotkeysButtonState(bool isPaused)
+	private void CancelExclusiveRecordingIfActive()
+	{
+		if (App.MainKeyboardHook != null && App.MainKeyboardHook.SuppressGlobalHotkeysForRecording)
+		{
+			App.MainKeyboardHook.SuppressGlobalHotkeysForRecording = false;
+			UpdatePauseHotkeysButtonState(false);
+			if (FocusHotkeyRecorder != null)
+			{
+				FocusHotkeyRecorder.IsRecording = false;
+				FocusHotkeyRecorder.HotkeyText = GetCurrentFocusActionItem()?.Parameter ?? "";
+			}
+		}
+	}
+
+	private void MainKeyboardHook_OnExclusiveRecordModifiersChanged(ModifierKeys modifiers)
+	{
+		Dispatcher.BeginInvoke(() =>
+		{
+			if (FocusHotkeyRecorder != null && App.MainKeyboardHook?.SuppressGlobalHotkeysForRecording == true)
+			{
+				List<string> list = new List<string>();
+				if (modifiers.HasFlag(ModifierKeys.Control)) list.Add("Ctrl");
+				if (modifiers.HasFlag(ModifierKeys.Shift)) list.Add("Shift");
+				if (modifiers.HasFlag(ModifierKeys.Alt)) list.Add("Alt");
+				if (modifiers.HasFlag(ModifierKeys.Windows)) list.Add("Win");
+				string text = list.Count > 0 ? string.Join(" + ", list) + " + ..." : "🔴 全局热键已暂停，请按下快捷键组合 (按Esc取消)...";
+				FocusHotkeyRecorder.ShowExclusiveRecordingState(text);
+			}
+		});
+	}
+
+	private void MainKeyboardHook_OnExclusiveRecordCompleted(string hotkeyStr)
+	{
+		Dispatcher.BeginInvoke(() =>
+		{
+			UpdatePauseHotkeysButtonState(false);
+			if (FocusHotkeyRecorder != null)
+			{
+				FocusHotkeyRecorder.SetRecordedHotkey(hotkeyStr);
+			}
+			var item = GetCurrentFocusActionItem();
+			if (item != null)
+			{
+				item.Parameter = hotkeyStr;
+				RefreshSlots();
+				RenderMappingsWheelPreview();
+				ScheduleAutoSave();
+			}
+			AppLogger.LogInfo($"Exclusive hotkey recorded successfully: {hotkeyStr}");
+			try
+			{
+				_notifyIcon?.ShowBalloonTip(1500, "StarPie", $"✅ 已录制快捷键: {hotkeyStr}（已恢复全局热键）", System.Windows.Forms.ToolTipIcon.Info);
+			}
+			catch { }
+		});
+	}
+
+	private void MainKeyboardHook_OnExclusiveRecordCancelled()
+	{
+		Dispatcher.BeginInvoke(() =>
+		{
+			CancelExclusiveRecordingIfActive();
+			try
+			{
+				_notifyIcon?.ShowBalloonTip(1000, "StarPie", "已取消快捷键录制，已恢复全局热键", System.Windows.Forms.ToolTipIcon.Info);
+			}
+			catch { }
+		});
+	}
+
+	private void FocusHotkeyRecorder_HotkeyChanged(object? sender, string newKey)
+	{
+		if (_isUpdatingUi) return;
+		var item = GetCurrentFocusActionItem();
+		if (item != null && item.Parameter != newKey)
+		{
+			item.Parameter = newKey ?? "";
+			RefreshSlots();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void UpdatePauseHotkeysButtonState(bool isSuppressing)
 	{
 		if (TogglePauseHotkeysBtn == null) return;
-		if (isPaused)
+		if (isSuppressing)
 		{
-			TogglePauseHotkeysBtn.Content = "▶️ 恢复全局热键";
-			TogglePauseHotkeysBtn.ToolTip = "当前全局热键与手势拦截已暂时暂停。点击即可恢复全局监听。";
-			TogglePauseHotkeysBtn.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+			TogglePauseHotkeysBtn.Content = "🔴 正在独占录制 (已暂停全局热键)";
+			TogglePauseHotkeysBtn.ToolTip = "当前桌面系统及所有其他软件全局热键已被暂时暂停！在此按下任意按键组合（如 Win+D、Alt+Tab、截屏）均可直接录入，不会触发外部动作。点击即可恢复。";
+			TogglePauseHotkeysBtn.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(244, 63, 94)); // Rose red
 		}
 		else
 		{
 			TogglePauseHotkeysBtn.Content = "⏸️ 暂停全局热键";
-			TogglePauseHotkeysBtn.ToolTip = "临时暂停所有全局按键与鼠标手势拦截，方便在此专注录入快捷键而不会误触发 StarPie 已有热键";
+			TogglePauseHotkeysBtn.ToolTip = "暂停桌面系统及其他软件的所有全局快捷键，在此独占录入快捷键而不会触发系统（如 Win+D、Alt+Tab、截屏等）或其他软件";
 			TogglePauseHotkeysBtn.ClearValue(Button.ForegroundProperty);
 		}
 	}
@@ -7922,19 +8077,70 @@ public partial class SettingsWindow : Window
 		};
 	}
 
-	private void AppThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	private void ThemeSegmentButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is System.Windows.Controls.RadioButton rb && rb.Tag is string tag)
+		{
+			SetAppTheme(tag);
+		}
+	}
+
+	private void SidebarThemeCollapsedButton_Click(object sender, RoutedEventArgs e)
+	{
+		string current = ConfigManager.CurrentConfig?.AppTheme ?? "System";
+		string next = current.ToLowerInvariant() switch
+		{
+			"system" => "Light",
+			"light" => "Dark",
+			"dark" => "TitaniumGray",
+			_ => "System"
+		};
+		SetAppTheme(next);
+	}
+
+	private void SetAppTheme(string themeTag)
 	{
 		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
-			string text = (AppThemeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "System";
-			ConfigManager.CurrentConfig.AppTheme = text;
-			AppThemeManager.ApplyTheme(this, text);
-			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
-			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+			ConfigManager.CurrentConfig.AppTheme = themeTag;
+			AppThemeManager.ApplyTheme(this, themeTag);
+			UpdateSidebarThemeVisualState(themeTag);
+			if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
 			}
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void UpdateSidebarThemeVisualState(string themeTag)
+	{
+		string tag = themeTag ?? "System";
+		if (ThemeBtnSystem != null) ThemeBtnSystem.IsChecked = string.Equals(tag, "System", StringComparison.OrdinalIgnoreCase);
+		if (ThemeBtnLight != null) ThemeBtnLight.IsChecked = string.Equals(tag, "Light", StringComparison.OrdinalIgnoreCase);
+		if (ThemeBtnDark != null) ThemeBtnDark.IsChecked = string.Equals(tag, "Dark", StringComparison.OrdinalIgnoreCase);
+		if (ThemeBtnGray != null) ThemeBtnGray.IsChecked = string.Equals(tag, "TitaniumGray", StringComparison.OrdinalIgnoreCase);
+
+		if (SidebarThemeCollapsedIcon != null)
+		{
+			SidebarThemeCollapsedIcon.Text = tag.ToLowerInvariant() switch
+			{
+				"light" => "☀️",
+				"dark" => "🌙",
+				"titaniumgray" => "⚙️",
+				_ => "🌓"
+			};
+		}
+		if (SidebarThemeCollapsedButton != null)
+		{
+			string name = tag.ToLowerInvariant() switch
+			{
+				"light" => "极简纯白",
+				"dark" => "极夜曜黑",
+				"titaniumgray" => "钛金深灰",
+				_ => "跟随系统"
+			};
+			SidebarThemeCollapsedButton.ToolTip = $"当前界面主题: {name} (点击快速循环切换)";
 		}
 	}
 

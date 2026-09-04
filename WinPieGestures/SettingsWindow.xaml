@@ -412,6 +412,34 @@
           </Setter.Value>
         </Setter>
       </Style>
+      <Style x:Key="SidebarThemeSegmentRadioStyle" TargetType="{x:Type RadioButton}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="4,5" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type RadioButton}">
+              <Border Name="SegmentBorder" Background="{TemplateBinding Control.Background}" CornerRadius="6" Padding="{TemplateBinding Control.Padding}" SnapsToDevicePixels="True">
+                <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="SegmentBorder" Value="{DynamicResource NavTabHoverBgBrush}" Property="Border.Background" />
+                  <Setter Value="{DynamicResource TextPrimaryBrush}" Property="Foreground" />
+                </Trigger>
+                <Trigger Property="ToggleButton.IsChecked" Value="True">
+                  <Setter TargetName="SegmentBorder" Value="{DynamicResource NavTabActiveBgBrush}" Property="Border.Background" />
+                  <Setter Value="{DynamicResource AccentPrimaryBrush}" Property="Foreground" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
       <Style x:Key="CardSegmentRadioStyle" TargetType="{x:Type RadioButton}">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
@@ -532,11 +560,55 @@
             </StackPanel>
           </RadioButton>
         </StackPanel>
-        <StackPanel Name="SidebarFooterPanel" Grid.Row="2" Margin="0,15,0,5" Visibility="Collapsed">
-          <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-            <TextBlock Name="SidebarVersionText" Text="v1.6.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+        <StackPanel Grid.Row="2" VerticalAlignment="Bottom" Margin="0,10,0,0">
+          <!-- 侧边栏主题切换器 (展开态: 4段胶囊分段按钮) -->
+          <Border Name="SidebarThemeExpandedPanel" Margin="0,0,0,10" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="2" SnapsToDevicePixels="True">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <RadioButton Name="ThemeBtnSystem" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="System" ToolTip="跟随系统 (System Auto)" Click="ThemeSegmentButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <TextBlock Text="🌓" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
+                  <TextBlock Text="系统" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Name="ThemeBtnLight" Grid.Column="1" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Light" ToolTip="极简纯白 (Modern Light)" Click="ThemeSegmentButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <TextBlock Text="☀️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
+                  <TextBlock Text="浅色" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Name="ThemeBtnDark" Grid.Column="2" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Dark" ToolTip="极夜曜黑 (Obsidian Dark)" Click="ThemeSegmentButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <TextBlock Text="🌙" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
+                  <TextBlock Text="曜黑" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Name="ThemeBtnGray" Grid.Column="3" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="TitaniumGray" ToolTip="钛金深灰 (Titanium Gray)" Click="ThemeSegmentButton_Click">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                  <TextBlock Text="⚙️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
+                  <TextBlock Text="钛灰" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+              </RadioButton>
+            </Grid>
           </Border>
-          <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
+
+          <!-- 侧边栏主题切换器 (折叠态: 36x36px 精致循环切换按钮) -->
+          <Button Name="SidebarThemeCollapsedButton" Visibility="Collapsed" Style="{StaticResource ModernButtonStyle}" Width="36" Height="36" Padding="0" Margin="0,0,0,10" HorizontalAlignment="Center" ToolTip="切换控制台界面主题 (点击循环切换)" Click="SidebarThemeCollapsedButton_Click">
+            <TextBlock Name="SidebarThemeCollapsedIcon" Text="🌙" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+
+          <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.6.8&#x0a;© 2026 StarPie">
+            <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
+              <TextBlock Name="SidebarVersionText" Text="v1.6.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+            </Border>
+            <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
+          </StackPanel>
         </StackPanel>
       </Grid>
     </Border>
@@ -1098,21 +1170,7 @@
             </Grid.ColumnDefinitions>
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,14,0">
               <StackPanel Margin="0,0,6,0">
-                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
-                  <UIElement.Effect>
-                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
-                  </UIElement.Effect>
-                  <StackPanel>
-                    <TextBlock Text="软件控制台界面主题 (App Theme)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4" />
-                    <TextBlock Text="定制 StarPie 控制台整体界面的视觉色彩风格，支持跟随 Windows 系统深浅色切换。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" />
-                    <ComboBox Name="AppThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" SelectionChanged="AppThemeComboBox_SelectionChanged">
-                      <ComboBoxItem Content="🌓 跟随系统 (System Auto)" Tag="System" IsSelected="True" />
-                      <ComboBoxItem Content="☀️ 极简纯白 (Modern Light)" Tag="Light" />
-                      <ComboBoxItem Content="🌙 极夜曜黑 (Obsidian Dark)" Tag="Dark" />
-                      <ComboBoxItem Content="⚙️ 钛金深灰 (Titanium Gray)" Tag="TitaniumGray" />
-                    </ComboBox>
-                  </StackPanel>
-                </Border>
+
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
                   <UIElement.Effect>
                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
@@ -2059,7 +2117,7 @@
                               <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <local:HotkeyRecorderBox x:Name="FocusHotkeyRecorder" Height="32" FontSize="12" />
-                            <Button Name="TogglePauseHotkeysBtn" Grid.Column="1" Content="⏸️ 暂停全局热键" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" ToolTip="临时暂停所有全局按键与鼠标手势拦截，方便在此专注录入快捷键而不会误触发 StarPie 已有热键" Click="TogglePauseHotkeysBtn_Click" />
+                            <Button Name="TogglePauseHotkeysBtn" Grid.Column="1" Content="⏸️ 暂停全局热键" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" ToolTip="暂停桌面系统及其他软件的所有全局快捷键，在此独占录入快捷键而不会触发系统（如 Win+D、Alt+Tab、截屏等）或其他软件" Click="TogglePauseHotkeysBtn_Click" />
                             <Button Grid.Column="2" Content="⚙️ 拼装组合" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="8,0" Margin="6,0,0,0" Click="FocusHotkeyBuilder_Click" />
                           </Grid>
                         </StackPanel>

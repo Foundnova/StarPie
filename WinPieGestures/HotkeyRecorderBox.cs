@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
@@ -14,6 +14,7 @@ public class HotkeyRecorderBox : Control
 	public static readonly DependencyProperty IsRecordingProperty;
 	public static readonly DependencyProperty PlaceholderProperty;
 
+	public event EventHandler<string>? HotkeyChanged;
 	private TextBlock? _displayTextBlock;
 	private Button? _clearButton;
 	private Border? _mainBorder;
@@ -273,7 +274,22 @@ public class HotkeyRecorderBox : Control
 		return string.Join(" + ", list);
 	}
 
-	private static string FormatKeyName(Key key)
+	public static string BuildHotkeyString(Key mainKey, ModifierKeys modifiers)
+	{
+		List<string> list = new List<string>();
+		if (modifiers.HasFlag(ModifierKeys.Control)) list.Add("Ctrl");
+		if (modifiers.HasFlag(ModifierKeys.Shift)) list.Add("Shift");
+		if (modifiers.HasFlag(ModifierKeys.Alt)) list.Add("Alt");
+		if (modifiers.HasFlag(ModifierKeys.Windows)) list.Add("Win");
+		string text = FormatKeyName(mainKey);
+		if (!string.IsNullOrEmpty(text))
+		{
+			list.Add(text);
+		}
+		return string.Join(" + ", list);
+	}
+
+	public static string FormatKeyName(Key key)
 	{
 		return key switch
 		{
@@ -324,6 +340,26 @@ public class HotkeyRecorderBox : Control
 		};
 	}
 
+	public void SetRecordedHotkey(string hotkeyText)
+	{
+		_sessionModifiers.Clear();
+		_currentPressedKey = Key.None;
+		HotkeyText = hotkeyText;
+		IsRecording = false;
+		Keyboard.ClearFocus();
+		UpdateVisualDisplay();
+	}
+
+	public void ShowExclusiveRecordingState(string text)
+	{
+		IsRecording = true;
+		if (_displayTextBlock != null)
+		{
+			_displayTextBlock.Text = text;
+			_displayTextBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E11D48"));
+		}
+	}
+
 	private void UpdateVisualDisplay()
 	{
 		if (_displayTextBlock == null) return;
@@ -367,6 +403,7 @@ public class HotkeyRecorderBox : Control
 		if (d is HotkeyRecorderBox hotkeyRecorderBox)
 		{
 			hotkeyRecorderBox.UpdateVisualDisplay();
+			hotkeyRecorderBox.HotkeyChanged?.Invoke(hotkeyRecorderBox, (string)e.NewValue);
 		}
 	}
 

@@ -116,6 +116,28 @@ public class KeyboardHook : IDisposable
 		set => Volatile.Write(ref _isPaused, value ? 1 : 0);
 	}
 
+	private int _suppressGlobalHotkeysForRecording;
+
+	public bool SuppressGlobalHotkeysForRecording
+	{
+		get => Volatile.Read(ref _suppressGlobalHotkeysForRecording) != 0;
+		set => Volatile.Write(ref _suppressGlobalHotkeysForRecording, value ? 1 : 0);
+	}
+
+	public event Action? OnExclusiveRecordCancelled;
+
+	public event Action<string>? OnExclusiveRecordCompleted;
+
+	public event Action<ModifierKeys>? OnExclusiveRecordModifiersChanged;
+
+	public static bool IsModifierVk(uint vkCode)
+	{
+		return vkCode == 16 || vkCode == 160 || vkCode == 161 ||
+		       vkCode == 17 || vkCode == 162 || vkCode == 163 ||
+		       vkCode == 18 || vkCode == 164 || vkCode == 165 ||
+		       vkCode == 91 || vkCode == 92;
+	}
+
 	public event EventHandler<GlobalKeyEventArgs>? OnKeyDown;
 
 	public event EventHandler<GlobalKeyEventArgs>? OnKeyUp;
@@ -345,10 +367,6 @@ public class KeyboardHook : IDisposable
 
 	private nint HookCallback(int nCode, nint wParam, nint lParam)
 	{
-		if (IsPaused)
-		{
-			return CallNextHookEx(_hookId, nCode, wParam, lParam);
-		}
 		if (nCode >= 0)
 		{
 			KBDLLHOOKSTRUCT kbd = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
@@ -361,6 +379,48 @@ public class KeyboardHook : IDisposable
 			int num = (int)wParam;
 			uint vkCode = kbd.vkCode;
 			ModifierKeys currentModifiers = GetCurrentModifiers();
+
+			if (SuppressGlobalHotkeysForRecording)
+			{
+				if (num == WM_KEYDOWN || num == WM_SYSKEYDOWN)
+				{
+					if (vkCode == 27) // Escape -> 取消独占录制
+					{
+						SuppressGlobalHotkeysForRecording = false;
+						OnExclusiveRecordCancelled?.Invoke();
+						return 1;
+					}
+
+					if (IsModifierVk(vkCode))
+					{
+						OnExclusiveRecordModifiersChanged?.Invoke(currentModifiers);
+						return 1; // 吞没修饰键，防止 Win 键弹出开始菜单、Alt 激活系统菜单
+					}
+
+					Key key = KeyInterop.KeyFromVirtualKey((int)vkCode);
+					string hotkeyStr = HotkeyRecorderBox.BuildHotkeyString(key, currentModifiers);
+					if (!string.IsNullOrEmpty(hotkeyStr))
+					{
+						SuppressGlobalHotkeysForRecording = false;
+						OnExclusiveRecordCompleted?.Invoke(hotkeyStr);
+					}
+					return 1; // 吞没按键，防止桌面最小化(Win+D)、任务切换(Alt+Tab)、截屏等
+				}
+				else if (num == WM_KEYUP || num == WM_SYSKEYUP)
+				{
+					if (IsModifierVk(vkCode))
+					{
+						OnExclusiveRecordModifiersChanged?.Invoke(currentModifiers);
+					}
+					return 1; // 吞没松开事件
+				}
+			}
+
+			if (IsPaused)
+			{
+				return CallNextHookEx(_hookId, nCode, wParam, lParam);
+			}
+
 			GlobalKeyEventArgs e = new GlobalKeyEventArgs(vkCode, currentModifiers);
 			OnRawKeyEvent?.Invoke(this, e);
 
