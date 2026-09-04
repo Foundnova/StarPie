@@ -25,6 +25,7 @@ __pycache__/
 *.pyd
 test_env_appdata/
 artifacts/
+.venv/
 
 # Large Third-Party Installers & Runtime Packages
 windowsdesktop-runtime-*.exe
@@ -43,11 +44,5 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
-
-# Python
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
 
 
