@@ -1079,40 +1079,61 @@
                   </Border>
                 </StackPanel>
               </Border>
-              <!-- 屏幕边缘呼出防溢出设置 -->
+              <!-- 屏幕边缘呼出智能防溢出与光标自动对齐设置 -->
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="EdgeOverflowTitleText" Text="屏幕边缘呼出防溢出 (Edge Collision Avoidance)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Name="EdgeOverflowDescText" Text="当在屏幕四周边缘（顶部、底部或两侧）呼出轮盘时，自动检测显示器工作区边界，防止轮盘扇区被屏幕边缘截断。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
-
-                  <Grid Margin="0,0,0,10">
+                  <!-- 顶部主开关行 -->
+                  <Grid Margin="0,0,0,0">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
-                      <ColumnDefinition Width="220" />
+                      <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                      <TextBlock Text="防溢出处理策略 (Policy):" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                      <TextBlock Text="智能贴边：自动推入屏幕并保持安全边距；屏幕中心：直接在当前显示器正中展现。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Name="EdgeOverflowTitleText" Text="屏幕边缘呼出智能防溢出与光标自动对齐" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="EdgeOverflowDescText" Text="当在屏幕四周边缘（顶部、底部或两侧）呼出轮盘时，智能检测显示器安全边界，防止轮盘扇区被截断并自动对齐光标至轮盘物理中心。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                     </StackPanel>
-                    <ComboBox Name="EdgeOverflowPolicyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="EdgeOverflowPolicyComboBox_SelectionChanged">
-                      <ComboBoxItem Tag="ClampShift" Content="🛡️ 智能贴边防溢出 (推荐)" IsSelected="True" />
-                      <ComboBoxItem Tag="ScreenCenter" Content="🎯 屏幕物理正中心呼出" />
-                      <ComboBoxItem Tag="None" Content="🚫 原生跟随光标 (允许溢出)" />
-                    </ComboBox>
+                    <CheckBox Name="EnableEdgeCollisionAvoidanceCheckBox" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center" Checked="EnableEdgeCollisionAvoidanceCheckBox_Changed" Unchecked="EnableEdgeCollisionAvoidanceCheckBox_Changed" />
                   </Grid>
 
-                  <StackPanel Name="EdgeSafeMarginPanel">
-                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                  <!-- 折叠详细调节面板：关闭开关时默认折叠收纳 -->
+                  <StackPanel Name="EdgeCollisionDetailsPanel" Margin="0,14,0,0" Visibility="Collapsed">
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                       <StackPanel>
-                        <Grid Margin="0,0,0,4">
-                          <TextBlock Text="边缘安全间距 (Safe Margin):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-                          <TextBlock Name="EdgeSafeMarginValueText" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        <!-- 防溢出处理策略 -->
+                        <Grid Margin="0,0,0,14">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                          </Grid.ColumnDefinitions>
+                          <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="防溢出处理策略 (Policy):" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="智能贴边：自动推入屏幕并对齐光标；屏幕中心：直接在当前显示器正中展现。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ComboBox Name="EdgeOverflowPolicyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="EdgeOverflowPolicyComboBox_SelectionChanged">
+                            <ComboBoxItem Tag="ClampShift" Content="🛡️ 智能贴边防溢出 (推荐)" IsSelected="True" />
+                            <ComboBoxItem Tag="ScreenCenter" Content="🎯 屏幕物理正中心呼出" />
+                            <ComboBoxItem Tag="None" Content="🚫 原生跟随光标 (允许溢出)" />
+                          </ComboBox>
                         </Grid>
-                        <Slider Name="EdgeSafeMarginSlider" Minimum="8" Maximum="48" SmallChange="2" LargeChange="4" Value="16" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginSlider_ValueChanged" />
-                        <TextBlock Text="调节轮盘外圈边缘距离屏幕物理边界的保留间距。保持一定距离可彻底避免扇区与文字超出视口。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+
+                        <!-- X轴区域调节滑块 (水平安全边距) -->
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Text="X 轴边缘安全边距 (水平容差区域):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="EdgeSafeMarginXValueText" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="EdgeSafeMarginXSlider" Minimum="0" Maximum="80" SmallChange="2" LargeChange="5" Value="16" TickFrequency="4" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginXSlider_ValueChanged" />
+                        <TextBlock Text="调节轮盘左右边缘距离屏幕物理视口边界的保留间距。增大数值可让轮盘更早贴入屏幕内侧并自动对齐光标。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,12" />
+
+                        <!-- Y轴区域调节滑块 (垂直安全边距) -->
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Text="Y 轴边缘安全边距 (垂直容差区域):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="EdgeSafeMarginYValueText" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="EdgeSafeMarginYSlider" Minimum="0" Maximum="80" SmallChange="2" LargeChange="5" Value="16" TickFrequency="4" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginYSlider_ValueChanged" />
+                        <TextBlock Text="调节轮盘上下边缘距离屏幕物理视口边界（避让任务栏与顶部标题栏）的保留间距。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                       </StackPanel>
                     </Border>
                   </StackPanel>

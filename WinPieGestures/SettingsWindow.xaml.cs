@@ -362,6 +362,14 @@ public partial class SettingsWindow : Window
 			if (FocusHotkeyRecorder != null)
 			{
 				FocusHotkeyRecorder.HotkeyChanged += FocusHotkeyRecorder_HotkeyChanged;
+				FocusHotkeyRecorder.RecordingStarted += delegate
+				{
+					StartExclusiveRecording();
+				};
+				FocusHotkeyRecorder.RecordingCancelled += delegate
+				{
+					CancelExclusiveRecordingIfActive();
+				};
 			}
 			if (AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
@@ -865,14 +873,33 @@ public partial class SettingsWindow : Window
 		RefreshProcessListUI();
 
 		// Edge Collision Avoidance
-		SetComboBoxSelectedValue(EdgeOverflowPolicyComboBox, ConfigManager.CurrentConfig.EdgeOverflowPolicy ?? "ClampShift");
-		if (EdgeSafeMarginSlider != null)
+		bool edgeAvoidance = ConfigManager.CurrentConfig.EnableEdgeCollisionAvoidance;
+		if (EnableEdgeCollisionAvoidanceCheckBox != null)
 		{
-			EdgeSafeMarginSlider.Value = ConfigManager.CurrentConfig.EdgeSafeMargin > 0 ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0;
+			EnableEdgeCollisionAvoidanceCheckBox.IsChecked = edgeAvoidance;
 		}
-		if (EdgeSafeMarginValueText != null)
+		if (EdgeCollisionDetailsPanel != null)
 		{
-			EdgeSafeMarginValueText.Text = $"{EdgeSafeMarginSlider?.Value ?? 16.0:0} px";
+			EdgeCollisionDetailsPanel.Visibility = edgeAvoidance ? Visibility.Visible : Visibility.Collapsed;
+		}
+		SetComboBoxSelectedValue(EdgeOverflowPolicyComboBox, ConfigManager.CurrentConfig.EdgeOverflowPolicy ?? "ClampShift");
+		double marginX = (ConfigManager.CurrentConfig.EdgeSafeMarginX >= 0) ? ConfigManager.CurrentConfig.EdgeSafeMarginX : ((ConfigManager.CurrentConfig.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0);
+		double marginY = (ConfigManager.CurrentConfig.EdgeSafeMarginY >= 0) ? ConfigManager.CurrentConfig.EdgeSafeMarginY : ((ConfigManager.CurrentConfig.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0);
+		if (EdgeSafeMarginXSlider != null)
+		{
+			EdgeSafeMarginXSlider.Value = marginX;
+		}
+		if (EdgeSafeMarginXValueText != null)
+		{
+			EdgeSafeMarginXValueText.Text = $"{marginX:0} px";
+		}
+		if (EdgeSafeMarginYSlider != null)
+		{
+			EdgeSafeMarginYSlider.Value = marginY;
+		}
+		if (EdgeSafeMarginYValueText != null)
+		{
+			EdgeSafeMarginYValueText.Text = $"{marginY:0} px";
 		}
 
 		// AutoStart
@@ -3417,6 +3444,26 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void StartExclusiveRecording()
+	{
+		if (App.MainKeyboardHook == null) return;
+		if (App.MainKeyboardHook.SuppressGlobalHotkeysForRecording) return;
+
+		App.MainKeyboardHook.StartExclusiveRecording();
+		UpdatePauseHotkeysButtonState(true);
+		if (FocusHotkeyRecorder != null)
+		{
+			FocusHotkeyRecorder.Focus();
+			FocusHotkeyRecorder.ShowExclusiveRecordingState("🔴 全局热键已暂停，请按下快捷键组合 (如 Win+D、Alt+Tab)...");
+		}
+		AppLogger.LogInfo("Activated exclusive hotkey recording mode (suppressing desktop and app hotkeys)");
+		try
+		{
+			_notifyIcon?.ShowBalloonTip(2000, "StarPie", "⏸️ 已暂时暂停桌面系统及其他软件全局快捷键，在此按下目标按键组合进行录入（按 Esc 取消）", System.Windows.Forms.ToolTipIcon.Info);
+		}
+		catch { }
+	}
+
 	private void TogglePauseHotkeysBtn_Click(object sender, RoutedEventArgs e)
 	{
 		if (App.MainKeyboardHook == null) return;
@@ -3435,19 +3482,7 @@ public partial class SettingsWindow : Window
 		else
 		{
 			// 开启独占录制：底层钩子阻断系统及其他软件全局热键，独占由 StarPie 录入
-			App.MainKeyboardHook.SuppressGlobalHotkeysForRecording = true;
-			UpdatePauseHotkeysButtonState(true);
-			if (FocusHotkeyRecorder != null)
-			{
-				FocusHotkeyRecorder.Focus();
-				FocusHotkeyRecorder.ShowExclusiveRecordingState("🔴 全局热键已暂停，请按下快捷键组合 (按Esc取消)...");
-			}
-			AppLogger.LogInfo("Activated exclusive hotkey recording mode (suppressing desktop and app hotkeys)");
-			try
-			{
-				_notifyIcon?.ShowBalloonTip(2000, "StarPie", "⏸️ 已暂时暂停桌面系统及其他软件全局快捷键，在此按下目标按键组合进行录入（按 Esc 取消）", System.Windows.Forms.ToolTipIcon.Info);
-			}
-			catch { }
+			StartExclusiveRecording();
 		}
 	}
 
@@ -3455,7 +3490,7 @@ public partial class SettingsWindow : Window
 	{
 		if (App.MainKeyboardHook != null && App.MainKeyboardHook.SuppressGlobalHotkeysForRecording)
 		{
-			App.MainKeyboardHook.SuppressGlobalHotkeysForRecording = false;
+			App.MainKeyboardHook.CancelExclusiveRecording();
 			UpdatePauseHotkeysButtonState(false);
 			if (FocusHotkeyRecorder != null)
 			{
@@ -3476,7 +3511,7 @@ public partial class SettingsWindow : Window
 				if (modifiers.HasFlag(ModifierKeys.Shift)) list.Add("Shift");
 				if (modifiers.HasFlag(ModifierKeys.Alt)) list.Add("Alt");
 				if (modifiers.HasFlag(ModifierKeys.Windows)) list.Add("Win");
-				string text = list.Count > 0 ? string.Join(" + ", list) + " + ..." : "🔴 全局热键已暂停，请按下快捷键组合 (按Esc取消)...";
+				string text = list.Count > 0 ? $"🔴 {string.Join(" + ", list)} + ... (按Esc取消)" : "🔴 全局热键已暂停，请按下快捷键组合 (如 Win+D、Alt+Tab)...";
 				FocusHotkeyRecorder.ShowExclusiveRecordingState(text);
 			}
 		});
@@ -7232,15 +7267,40 @@ public partial class SettingsWindow : Window
 		ScheduleAutoSave();
 	}
 
-	private void EdgeSafeMarginSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	private void EnableEdgeCollisionAvoidanceCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
 		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
-		double val = EdgeSafeMarginSlider?.Value ?? 16.0;
-		if (EdgeSafeMarginValueText != null)
+		bool isChecked = EnableEdgeCollisionAvoidanceCheckBox?.IsChecked == true;
+		ConfigManager.CurrentConfig.EnableEdgeCollisionAvoidance = isChecked;
+		if (EdgeCollisionDetailsPanel != null)
 		{
-			EdgeSafeMarginValueText.Text = $"{val:0} px";
+			EdgeCollisionDetailsPanel.Visibility = isChecked ? Visibility.Visible : Visibility.Collapsed;
 		}
+		ScheduleAutoSave();
+	}
+
+	private void EdgeSafeMarginXSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		double val = EdgeSafeMarginXSlider?.Value ?? 16.0;
+		if (EdgeSafeMarginXValueText != null)
+		{
+			EdgeSafeMarginXValueText.Text = $"{val:0} px";
+		}
+		ConfigManager.CurrentConfig.EdgeSafeMarginX = val;
 		ConfigManager.CurrentConfig.EdgeSafeMargin = val;
+		ScheduleAutoSave();
+	}
+
+	private void EdgeSafeMarginYSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		double val = EdgeSafeMarginYSlider?.Value ?? 16.0;
+		if (EdgeSafeMarginYValueText != null)
+		{
+			EdgeSafeMarginYValueText.Text = $"{val:0} px";
+		}
+		ConfigManager.CurrentConfig.EdgeSafeMarginY = val;
 		ScheduleAutoSave();
 	}
 

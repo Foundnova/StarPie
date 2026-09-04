@@ -15,10 +15,14 @@ public class HotkeyRecorderBox : Control
 	public static readonly DependencyProperty PlaceholderProperty;
 
 	public event EventHandler<string>? HotkeyChanged;
+	public event EventHandler? RecordingStarted;
+	public event EventHandler? RecordingCancelled;
+
 	private TextBlock? _displayTextBlock;
 	private Button? _clearButton;
 	private Border? _mainBorder;
 	private Key _currentPressedKey = Key.None;
+	private string? _customRecordingHint;
 	private readonly HashSet<string> _sessionModifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 	public string HotkeyText
@@ -70,7 +74,9 @@ public class HotkeyRecorderBox : Control
 			{
 				HotkeyText = string.Empty;
 				_sessionModifiers.Clear();
+				_customRecordingHint = null;
 				IsRecording = false;
+				RecordingCancelled?.Invoke(this, EventArgs.Empty);
 				e.Handled = true;
 			};
 		}
@@ -88,12 +94,14 @@ public class HotkeyRecorderBox : Control
 				_sessionModifiers.Clear();
 				IsRecording = true;
 				_currentPressedKey = Key.None;
+				RecordingStarted?.Invoke(this, EventArgs.Empty);
 			}
 			else
 			{
 				CommitModifierIfAny();
 				IsRecording = false;
 				Keyboard.ClearFocus();
+				RecordingCancelled?.Invoke(this, EventArgs.Empty);
 			}
 			e.Handled = true;
 		}
@@ -106,6 +114,7 @@ public class HotkeyRecorderBox : Control
 		IsRecording = true;
 		_currentPressedKey = Key.None;
 		UpdateVisualDisplay();
+		RecordingStarted?.Invoke(this, EventArgs.Empty);
 	}
 
 	protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
@@ -116,6 +125,7 @@ public class HotkeyRecorderBox : Control
 			CommitModifierIfAny();
 			IsRecording = false;
 			UpdateVisualDisplay();
+			RecordingCancelled?.Invoke(this, EventArgs.Empty);
 		}
 	}
 
@@ -134,9 +144,11 @@ public class HotkeyRecorderBox : Control
 		if (val == Key.Escape)
 		{
 			_sessionModifiers.Clear();
+			_customRecordingHint = null;
 			IsRecording = false;
 			Keyboard.ClearFocus();
 			UpdateVisualDisplay();
+			RecordingCancelled?.Invoke(this, EventArgs.Empty);
 			return;
 		}
 
@@ -311,6 +323,17 @@ public class HotkeyRecorderBox : Control
 			Key.Pause => "Pause",
 			Key.Capital => "CapsLock",
 			Key.Escape => "Esc",
+			Key.OemTilde => "`",
+			Key.OemMinus => "-",
+			Key.OemPlus => "=",
+			Key.OemOpenBrackets => "[",
+			Key.OemCloseBrackets => "]",
+			Key.OemPipe => "\\",
+			Key.OemSemicolon => ";",
+			Key.OemQuotes => "'",
+			Key.OemComma => ",",
+			Key.OemPeriod => ".",
+			Key.OemQuestion => "/",
 			Key.Multiply => "NumMultiply",
 			Key.Divide => "NumDivide",
 			Key.Add => "NumAdd",
@@ -342,6 +365,7 @@ public class HotkeyRecorderBox : Control
 
 	public void SetRecordedHotkey(string hotkeyText)
 	{
+		_customRecordingHint = null;
 		_sessionModifiers.Clear();
 		_currentPressedKey = Key.None;
 		HotkeyText = hotkeyText;
@@ -352,12 +376,9 @@ public class HotkeyRecorderBox : Control
 
 	public void ShowExclusiveRecordingState(string text)
 	{
+		_customRecordingHint = text;
 		IsRecording = true;
-		if (_displayTextBlock != null)
-		{
-			_displayTextBlock.Text = text;
-			_displayTextBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E11D48"));
-		}
+		UpdateVisualDisplay();
 	}
 
 	private void UpdateVisualDisplay()
@@ -366,7 +387,7 @@ public class HotkeyRecorderBox : Control
 
 		if (IsRecording)
 		{
-			_displayTextBlock.Text = "🔴 录制中... 点击或按Esc完成";
+			_displayTextBlock.Text = !string.IsNullOrEmpty(_customRecordingHint) ? _customRecordingHint : "🔴 录制中... 点击或按Esc完成";
 			_displayTextBlock.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E11D48"));
 			if (_mainBorder != null)
 			{
@@ -376,6 +397,7 @@ public class HotkeyRecorderBox : Control
 		}
 		else
 		{
+			_customRecordingHint = null;
 			if (string.IsNullOrEmpty(HotkeyText))
 			{
 				_displayTextBlock.Text = Placeholder;

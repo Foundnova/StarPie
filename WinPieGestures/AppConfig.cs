@@ -234,10 +234,19 @@ public class AppConfig
 	/// <summary>平铺窗口高级设置卡片是否展开（默认收起折叠）</summary>
 	public bool TileSettingsExpanded { get; set; } = false;
 
+	/// <summary>是否启用屏幕边缘呼出智能防溢出与光标自动对齐（默认开启）</summary>
+	public bool EnableEdgeCollisionAvoidance { get; set; } = true;
+
 	/// <summary>屏幕边缘呼出防溢出策略："ClampShift" (智能贴边安全防溢出 - 默认), "ScreenCenter" (屏幕中心呼出), "None" (原生不处理)</summary>
 	public string EdgeOverflowPolicy { get; set; } = "ClampShift";
 
-	/// <summary>屏幕边缘呼出安全边距 (像素)</summary>
+	/// <summary>屏幕边缘呼出 X 轴水平安全边距 (像素，默认 16px)</summary>
+	public double EdgeSafeMarginX { get; set; } = 16.0;
+
+	/// <summary>屏幕边缘呼出 Y 轴垂直安全边距 (像素，默认 16px)</summary>
+	public double EdgeSafeMarginY { get; set; } = 16.0;
+
+	/// <summary>屏幕边缘呼出安全边距 (像素，保留兼容)</summary>
 	public double EdgeSafeMargin { get; set; } = 16.0;
 
 	/// <summary>OCR 截屏文字识别引擎全局配置</summary>

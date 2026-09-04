@@ -343,6 +343,11 @@ public partial class RadialWindow : Window
 
 	private static Point ComputeClampedPhysicalCenter(Point centerPoint, double canvasSize)
 	{
+		if (ConfigManager.CurrentConfig?.EnableEdgeCollisionAvoidance == false)
+		{
+			return centerPoint;
+		}
+
 		string policy = ConfigManager.CurrentConfig?.EdgeOverflowPolicy ?? "ClampShift";
 		if (policy == "None")
 		{
@@ -357,9 +362,14 @@ public partial class RadialWindow : Window
 		int physicalLeft = (int)Math.Round(centerPoint.X - physicalWidth / 2.0);
 		int physicalTop = (int)Math.Round(centerPoint.Y - physicalHeight / 2.0);
 
-		double marginDip = (ConfigManager.CurrentConfig?.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0;
-		double marginX = marginDip * scaleX;
-		double marginY = marginDip * scaleY;
+		double marginDipX = (ConfigManager.CurrentConfig?.EdgeSafeMarginX >= 0)
+			? ConfigManager.CurrentConfig.EdgeSafeMarginX
+			: ((ConfigManager.CurrentConfig?.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0);
+		double marginDipY = (ConfigManager.CurrentConfig?.EdgeSafeMarginY >= 0)
+			? ConfigManager.CurrentConfig.EdgeSafeMarginY
+			: ((ConfigManager.CurrentConfig?.EdgeSafeMargin > 0) ? ConfigManager.CurrentConfig.EdgeSafeMargin : 16.0);
+		double marginX = marginDipX * scaleX;
+		double marginY = marginDipY * scaleY;
 
 		if (policy == "ClampShift")
 		{

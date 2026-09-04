@@ -124,6 +124,59 @@ public class KeyboardHook : IDisposable
 		set => Volatile.Write(ref _suppressGlobalHotkeysForRecording, value ? 1 : 0);
 	}
 
+	private readonly HashSet<uint> _exclusiveDownModifiers = new HashSet<uint>();
+	private volatile bool _isDrainingModifiers;
+	private volatile string? _pendingCompletedHotkey;
+	private long _drainingStartTicks;
+
+	public void StartExclusiveRecording()
+	{
+		lock (_exclusiveDownModifiers)
+		{
+			_exclusiveDownModifiers.Clear();
+			_isDrainingModifiers = false;
+			_pendingCompletedHotkey = null;
+			_drainingStartTicks = 0;
+		}
+		SuppressGlobalHotkeysForRecording = true;
+	}
+
+	public void CancelExclusiveRecording()
+	{
+		lock (_exclusiveDownModifiers)
+		{
+			_exclusiveDownModifiers.Clear();
+			_isDrainingModifiers = false;
+			_pendingCompletedHotkey = null;
+			_drainingStartTicks = 0;
+		}
+		SuppressGlobalHotkeysForRecording = false;
+		OnExclusiveRecordCancelled?.Invoke();
+	}
+
+	public ModifierKeys GetExclusiveActiveModifiers()
+	{
+		ModifierKeys mods = ModifierKeys.None;
+		lock (_exclusiveDownModifiers)
+		{
+			if (_exclusiveDownModifiers.Contains(17) || _exclusiveDownModifiers.Contains(162) || _exclusiveDownModifiers.Contains(163))
+				mods |= ModifierKeys.Control;
+			if (_exclusiveDownModifiers.Contains(16) || _exclusiveDownModifiers.Contains(160) || _exclusiveDownModifiers.Contains(161))
+				mods |= ModifierKeys.Shift;
+			if (_exclusiveDownModifiers.Contains(18) || _exclusiveDownModifiers.Contains(164) || _exclusiveDownModifiers.Contains(165))
+				mods |= ModifierKeys.Alt;
+			if (_exclusiveDownModifiers.Contains(91) || _exclusiveDownModifiers.Contains(92))
+				mods |= ModifierKeys.Windows;
+		}
+
+		if ((GetAsyncKeyState(17) & 0x8000) != 0) mods |= ModifierKeys.Control;
+		if ((GetAsyncKeyState(16) & 0x8000) != 0) mods |= ModifierKeys.Shift;
+		if ((GetAsyncKeyState(18) & 0x8000) != 0) mods |= ModifierKeys.Alt;
+		if ((GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0) mods |= ModifierKeys.Windows;
+
+		return mods;
+	}
+
 	public event Action? OnExclusiveRecordCancelled;
 
 	public event Action<string>? OnExclusiveRecordCompleted;
@@ -382,37 +435,96 @@ public class KeyboardHook : IDisposable
 
 			if (SuppressGlobalHotkeysForRecording)
 			{
-				if (num == WM_KEYDOWN || num == WM_SYSKEYDOWN)
+				bool isDown = (num == WM_KEYDOWN || num == WM_SYSKEYDOWN);
+				bool isUp = (num == WM_KEYUP || num == WM_SYSKEYUP);
+
+				if (_isDrainingModifiers)
 				{
-					if (vkCode == 27) // Escape -> 取消独占录制
+					// 录制完成排空阶段：持续吞没按键松开事件，直到用户释放所有物理按键
+					if (isUp && IsModifierVk(vkCode))
 					{
+						lock (_exclusiveDownModifiers)
+						{
+							_exclusiveDownModifiers.Remove(vkCode);
+						}
+					}
+
+					bool anyModPhysicallyDown = false;
+					lock (_exclusiveDownModifiers)
+					{
+						if (_exclusiveDownModifiers.Count > 0) anyModPhysicallyDown = true;
+					}
+					if (!anyModPhysicallyDown)
+					{
+						anyModPhysicallyDown = (GetAsyncKeyState(16) & 0x8000) != 0 ||
+						                       (GetAsyncKeyState(17) & 0x8000) != 0 ||
+						                       (GetAsyncKeyState(18) & 0x8000) != 0 ||
+						                       (GetAsyncKeyState(91) & 0x8000) != 0 ||
+						                       (GetAsyncKeyState(92) & 0x8000) != 0;
+					}
+
+					// 超过 1.5 秒安全超时强制解除排空
+					bool timeout = _drainingStartTicks > 0 && (DateTime.UtcNow.Ticks - _drainingStartTicks > TimeSpan.FromSeconds(1.5).Ticks);
+
+					if (!anyModPhysicallyDown || timeout)
+					{
+						_isDrainingModifiers = false;
 						SuppressGlobalHotkeysForRecording = false;
-						OnExclusiveRecordCancelled?.Invoke();
-						return 1;
+					}
+					return 1; // 吞没全部排空事件，彻底杜绝 Win 开始菜单与 Alt 系统菜单弹出
+				}
+
+				if (isDown)
+				{
+					if (vkCode == 27) // Escape
+					{
+						ModifierKeys mods = GetExclusiveActiveModifiers();
+						if (mods == ModifierKeys.None)
+						{
+							// 单纯按下 Esc：取消独占录制
+							_isDrainingModifiers = true;
+							_drainingStartTicks = DateTime.UtcNow.Ticks;
+							OnExclusiveRecordCancelled?.Invoke();
+							return 1;
+						}
 					}
 
 					if (IsModifierVk(vkCode))
 					{
-						OnExclusiveRecordModifiersChanged?.Invoke(currentModifiers);
-						return 1; // 吞没修饰键，防止 Win 键弹出开始菜单、Alt 激活系统菜单
+						lock (_exclusiveDownModifiers)
+						{
+							_exclusiveDownModifiers.Add(vkCode);
+						}
+						ModifierKeys mods = GetExclusiveActiveModifiers();
+						OnExclusiveRecordModifiersChanged?.Invoke(mods);
+						return 1; // 吞没修饰键按下
 					}
 
+					// 普通主按键按下：获取当前捕获的修饰键组合并构建热键字符串
+					ModifierKeys currentMods = GetExclusiveActiveModifiers();
 					Key key = KeyInterop.KeyFromVirtualKey((int)vkCode);
-					string hotkeyStr = HotkeyRecorderBox.BuildHotkeyString(key, currentModifiers);
+					string hotkeyStr = HotkeyRecorderBox.BuildHotkeyString(key, currentMods);
 					if (!string.IsNullOrEmpty(hotkeyStr))
 					{
-						SuppressGlobalHotkeysForRecording = false;
+						_pendingCompletedHotkey = hotkeyStr;
+						_isDrainingModifiers = true;
+						_drainingStartTicks = DateTime.UtcNow.Ticks;
 						OnExclusiveRecordCompleted?.Invoke(hotkeyStr);
 					}
-					return 1; // 吞没按键，防止桌面最小化(Win+D)、任务切换(Alt+Tab)、截屏等
+					return 1; // 吞没主按键按下，防止触发 Win+D、Alt+Tab 等系统与外部热键
 				}
-				else if (num == WM_KEYUP || num == WM_SYSKEYUP)
+				else if (isUp)
 				{
 					if (IsModifierVk(vkCode))
 					{
-						OnExclusiveRecordModifiersChanged?.Invoke(currentModifiers);
+						lock (_exclusiveDownModifiers)
+						{
+							_exclusiveDownModifiers.Remove(vkCode);
+						}
+						ModifierKeys mods = GetExclusiveActiveModifiers();
+						OnExclusiveRecordModifiersChanged?.Invoke(mods);
 					}
-					return 1; // 吞没松开事件
+					return 1; // 吞没按键松开
 				}
 			}
 
