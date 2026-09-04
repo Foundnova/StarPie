@@ -240,6 +240,9 @@ public class KeyboardHook : IDisposable
 	[DllImport("user32.dll")]
 	private static extern short GetAsyncKeyState(int nVirtKey);
 
+	[DllImport("user32.dll")]
+	private static extern short GetKeyState(int nVirtKey);
+
 	public KeyboardHook()
 	{
 		_proc = HookCallback;
@@ -541,6 +544,14 @@ public class KeyboardHook : IDisposable
 			case WM_KEYDOWN:
 			case WM_SYSKEYDOWN:
 			{
+				if (!IsModifierVk(vkCode))
+				{
+					// 用户按下常规物理按键：若检测到底层存在物理未按但虚拟状态卡死的幽灵修饰键，立即就地自愈解除
+					if (CheckAndHealGhostModifiers())
+					{
+						currentModifiers = GetCurrentModifiers();
+					}
+				}
 				GlobalKeyEventArgs e3 = new GlobalKeyEventArgs(vkCode, currentModifiers);
 				OnKeyDown?.Invoke(this, e3);
 				if (e3.Handled)
@@ -565,11 +576,64 @@ public class KeyboardHook : IDisposable
 		return CallNextHookEx(_hookId, nCode, wParam, lParam);
 	}
 
+	/// <summary>
+	/// 检查并自愈幽灵粘滞修饰键：物理按键并未按下，但系统/消息队列的虚拟状态显示为按下。
+	/// </summary>
+	private bool CheckAndHealGhostModifiers()
+	{
+		try
+		{
+			bool hasGhost = false;
+
+			// Ctrl: 物理未按，但虚拟或消息队列状态显示按下
+			bool ctrlPhys = (GetAsyncKeyState(17) & 0x8000) != 0 || (GetAsyncKeyState(162) & 0x8000) != 0 || (GetAsyncKeyState(163) & 0x8000) != 0;
+			if (!ctrlPhys && ((GetKeyState(17) & 0x8000) != 0 || (GetKeyState(162) & 0x8000) != 0 || (GetKeyState(163) & 0x8000) != 0))
+			{
+				hasGhost = true;
+			}
+
+			// Shift: 物理未按，但虚拟按下
+			bool shiftPhys = (GetAsyncKeyState(16) & 0x8000) != 0 || (GetAsyncKeyState(160) & 0x8000) != 0 || (GetAsyncKeyState(161) & 0x8000) != 0;
+			if (!shiftPhys && ((GetKeyState(16) & 0x8000) != 0 || (GetKeyState(160) & 0x8000) != 0 || (GetKeyState(161) & 0x8000) != 0))
+			{
+				hasGhost = true;
+			}
+
+			// Alt: 物理未按，但虚拟按下
+			bool altPhys = (GetAsyncKeyState(18) & 0x8000) != 0 || (GetAsyncKeyState(164) & 0x8000) != 0 || (GetAsyncKeyState(165) & 0x8000) != 0;
+			if (!altPhys && ((GetKeyState(18) & 0x8000) != 0 || (GetKeyState(164) & 0x8000) != 0 || (GetKeyState(165) & 0x8000) != 0))
+			{
+				hasGhost = true;
+			}
+
+			// Win: 物理未按，但虚拟按下
+			bool winPhys = (GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0;
+			if (!winPhys && ((GetKeyState(91) & 0x8000) != 0 || (GetKeyState(92) & 0x8000) != 0))
+			{
+				hasGhost = true;
+			}
+
+			if (hasGhost)
+			{
+				ActionExecutor.ReleaseStuckModifiers();
+				return true;
+			}
+		}
+		catch
+		{
+		}
+		return false;
+	}
+
 	public void ReplayKeyPress(uint vkCode)
 	{
 		if (vkCode == 0) return;
 
 		ushort scan = (ushort)MapVirtualKey(vkCode, 0u);
+		if (vkCode == 44) // VK_SNAPSHOT: 强制 scan = 0，杜绝 SysReq 硬件扫描码破坏系统按键状态
+		{
+			scan = 0;
+		}
 		INPUT down = new INPUT
 		{
 			type = INPUT_KEYBOARD,
@@ -603,7 +667,7 @@ public class KeyboardHook : IDisposable
 
 		if (vkCode == 33 || vkCode == 34 || vkCode == 35 || vkCode == 36 ||
 		    vkCode == 37 || vkCode == 38 || vkCode == 39 || vkCode == 40 ||
-		    vkCode == 44 || vkCode == 45 || vkCode == 46 ||
+		    vkCode == 45 || vkCode == 46 ||
 		    vkCode == 91 || vkCode == 92 || vkCode == 111 ||
 		    (vkCode >= 166 && vkCode <= 179))
 		{

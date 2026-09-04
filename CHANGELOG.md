@@ -4,7 +4,26 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
+## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 热键粘滞按键失灵彻底根治 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
+
+### ⌨️ 快捷热键触发后键盘按键失灵与修饰键粘滞彻底排查与根治 (Hotkeys & Modifiers Reliability Overhaul)
+1. **彻底排查根因 1：`VK_SNAPSHOT` (44 / PrintScreen) 硬件扫描码与扩展键标志位混乱修复**：
+   - 排查发现 Win32 `MapVirtualKey(44, 0)` 在 Windows 下会返回 `0x54`（PS/2 键盘的 `SysReq` 系统中断请求扫描码），原逻辑又为其追加了 `KEYEVENTF_EXTENDEDKEY (0x0001)` 合成为非法序列 `E0 54`，导致 Windows 底层驱动与键盘过滤驱动识别异常、直接截断丢弃后续的 `KeyUp` 消息；
+   - **修复**：在 `ActionExecutor.CreateKeyInput` 与 `KeyboardHook.ReplayKeyPress` 中，针对 `vk == 44`（PrintScreen/Snapshot）强制设置 `wScan = 0` 并剥离 `KEYEVENTF_EXTENDEDKEY`，确保 Windows 采用干净纯粹的标准虚拟键注入，杜绝驱动层硬件扫描码中断异常；
+2. **彻底排查根因 2：截屏工具抢占焦点导致的修饰键丢失与异步状态脱节**：
+   - 用户在触发 `Ctrl + PrintScreen`、`Win + Shift + S`、`Ctrl + Alt + A` 等截图类热键时，第三方截屏软件（如 Snipaste、PixPin、ShareX、微信/QQ 截图、Windows 截图工具）会在 20ms~80ms 内迅速弹出全屏遮罩并抢占全局输入焦点；
+   - 原热键时延过短（仅 6ms），导致 `Ctrl KeyUp` 事件正好在焦点转移/目标窗口句柄未初始化的微秒级间隙被系统丢弃，新建窗口与后续应用程序的系统击键状态表将 `VK_CONTROL` 永远记录为 Down，导致打字变成触发 Ctrl 快捷键、Esc 变成打开开始菜单，引发“键盘严重失灵”；
+   - **时延规范重塑**：依工程规范将修饰键保持时延与主键时延提升至 15ms ~ 20ms，留足应用程序捕获时间；
+   - **三阶异步自愈守护 (Delayed Modifier Watchdog)**：在 `finally` 块中启动 `Task.Run` 延迟自愈守护，在焦点抢占的关键时间窗口（+50ms、+120ms、+250ms）三次自动排查，若用户物理上未按该键，强制补发 `KeyUp` 清空残留粘滞；
+3. **彻底排查根因 3：通用修饰键与具体左右键成对彻底释放 (双通道 SendInput + keybd_event 注入)**：
+   - 升级 `ForceReleaseAllModifiers` 与 `ReleaseStuckModifiers`，当释放 `Ctrl`（162）时同步释放通用 `VK_CONTROL`（17）与右侧键（163）；同理覆盖 Shift（160/161/16）、Alt（164/165/18）与 Win（91/92）；
+   - 注入机制升级为 **`SendInput`（投递消息队列）+ `keybd_event`（直接同步内核 `win32k.sys` 全局击键状态表）双通道并进**，彻底击穿跨进程焦点屏障；
+   - 严格遵循物理安全校验：调用 `(GetAsyncKeyState(vk) & 0x8000) == 0`，若用户手指确实正按在物理按键上则绝不打断，仅在物理未按而系统卡滞时精准施救；
+4. **彻底排查根因 4：低级键盘钩子实时自愈防护盾 (Instant Ghost-Modifier Shield)**：
+   - 在 `KeyboardHook.cs` 的全局低级键盘钩子中部署 `CheckAndHealGhostModifiers` 实时自愈盾；
+   - 当用户物理按下任意常规按键（如字母、数字、方向键、Esc、Space、Enter 等）时，若检测到 `!physical && virtual`（即物理上没按 Ctrl/Shift/Alt/Win，但系统虚拟状态卡死在按下态）的脱节异常，立即就地瞬间蒸发幽灵修饰键，恢复当前按键事件的真实修饰键状态，彻底杜绝任何幽灵按键干扰；
+5. **轮盘生命周期全量解卡挂钩**：
+   - 在 `GestureController` 的 `EndActiveGesture()`（手势完成）、`CancelGestureTracking()`（手势取消）与 `CloseGestureWindow()`（轮盘销毁）中全面挂接 `ReleaseStuckModifiers()`，确保轮盘呼出关闭全流程干净利落、零残留。
 
 ### ⚡ GitHub 下载加速镜像源新增 `github.akams.cn`
 1. **新增极速镜像代理节点**：

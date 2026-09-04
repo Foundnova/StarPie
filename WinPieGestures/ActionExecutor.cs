@@ -168,6 +168,12 @@ public static class ActionExecutor
 	[DllImport("user32.dll")]
 	private static extern short GetAsyncKeyState(int nVirtKey);
 
+	[DllImport("user32.dll")]
+	private static extern short GetKeyState(int nVirtKey);
+
+	[DllImport("user32.dll")]
+	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
+
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
@@ -1240,20 +1246,68 @@ public static class ActionExecutor
 
 	public const nint StarPieExtraInfo = 0x53544152;
 
-	public static void ReleaseStuckModifiers()
+	/// <summary>
+	/// 彻底强制释放修饰键，双通道 (SendInput + keybd_event) 清理操作系统与驱动状态表，
+	/// 成对释放具体键 (L/R) 与通用键 (VK_CONTROL/VK_SHIFT/VK_MENU)。
+	/// 严格遵循安全原则：如果物理键正被用户按住，绝不强行打断；仅在物理上未按时补发抬起。
+	/// </summary>
+	public static void ForceReleaseAllModifiers(IEnumerable<ushort>? modifiersToRelease = null)
 	{
 		try
 		{
-			// 智能解卡自愈：检查 Ctrl / Shift / Alt / Win，如果物理键并未按下，确保下发 KeyUp 清空系统粘滞状态
-			ushort[] modifiers = new ushort[] { 162, 160, 164, 91, 163, 161, 165, 92 }; // L/R Ctrl, Shift, Alt, Win
-			List<INPUT> upInputs = new List<INPUT>();
-			foreach (ushort mod in modifiers)
+			HashSet<ushort> targetKeys = new HashSet<ushort>();
+
+			if (modifiersToRelease != null)
 			{
-				if ((GetAsyncKeyState(mod) & 0x8000) == 0)
+				foreach (ushort mod in modifiersToRelease)
 				{
-					upInputs.Add(CreateKeyInput(mod, down: false));
+					targetKeys.Add(mod);
+					if (mod == 162 || mod == 163 || mod == 17)
+					{
+						targetKeys.Add(17);
+						targetKeys.Add(162);
+						targetKeys.Add(163);
+					}
+					else if (mod == 160 || mod == 161 || mod == 16)
+					{
+						targetKeys.Add(16);
+						targetKeys.Add(160);
+						targetKeys.Add(161);
+					}
+					else if (mod == 164 || mod == 165 || mod == 18)
+					{
+						targetKeys.Add(18);
+						targetKeys.Add(164);
+						targetKeys.Add(165);
+					}
+					else if (mod == 91 || mod == 92)
+					{
+						targetKeys.Add(91);
+						targetKeys.Add(92);
+					}
 				}
 			}
+			else
+			{
+				// 未指定特定修饰键时，全量检查 4 大修饰键（左右及通用共 11 个键位）
+				targetKeys.Add(162); targetKeys.Add(163); targetKeys.Add(17);
+				targetKeys.Add(160); targetKeys.Add(161); targetKeys.Add(16);
+				targetKeys.Add(164); targetKeys.Add(165); targetKeys.Add(18);
+				targetKeys.Add(91); targetKeys.Add(92);
+			}
+
+			List<INPUT> upInputs = new List<INPUT>();
+			foreach (ushort vk in targetKeys)
+			{
+				// 仅在用户物理未按该键时，注入 KeyUp 消除幽灵粘滞
+				if ((GetAsyncKeyState((int)vk) & 0x8000) == 0)
+				{
+					upInputs.Add(CreateKeyInput(vk, down: false));
+					// keybd_event 通道：直接刷新 win32k 系统级全局击键状态表
+					keybd_event((byte)vk, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+				}
+			}
+
 			if (upInputs.Count > 0)
 			{
 				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
@@ -1262,6 +1316,35 @@ public static class ActionExecutor
 		catch
 		{
 		}
+	}
+
+	/// <summary>全量智能解卡自愈：检查并释放所有物理未按下但可能被系统粘滞的修饰键。</summary>
+	public static void ReleaseStuckModifiers()
+	{
+		ForceReleaseAllModifiers(null);
+	}
+
+	/// <summary>
+	/// 异步延迟自愈守护：针对截屏软件（如 Snipaste、PixPin、微信截屏）或模态窗口抢占焦点导致 KeyUp 丢失的问题，
+	/// 在焦点转移与窗口创建的关键时间窗口 (+50ms, +120ms, +250ms) 自动再次校验并排空残留粘滞。
+	/// </summary>
+	private static void ScheduleModifierWatchdog()
+	{
+		System.Threading.Tasks.Task.Run(async () =>
+		{
+			try
+			{
+				await System.Threading.Tasks.Task.Delay(50).ConfigureAwait(false);
+				ReleaseStuckModifiers();
+				await System.Threading.Tasks.Task.Delay(70).ConfigureAwait(false);
+				ReleaseStuckModifiers();
+				await System.Threading.Tasks.Task.Delay(130).ConfigureAwait(false);
+				ReleaseStuckModifiers();
+			}
+			catch
+			{
+			}
+		});
 	}
 
 	private static void ExecuteHotkey(string hotkeyString)
@@ -1292,7 +1375,7 @@ public static class ActionExecutor
 					modDowns.Add(CreateKeyInput(mod, down: true));
 				}
 				SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(15);
 				List<INPUT> modUps = new List<INPUT>();
 				for (int i = hotkeyDetails.Modifiers.Count - 1; i >= 0; i--)
 				{
@@ -1311,7 +1394,7 @@ public static class ActionExecutor
 			if (downInputs.Count > 0)
 			{
 				SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(15);
 			}
 
 			if (hotkeyDetails.MainKey != 0)
@@ -1319,23 +1402,18 @@ public static class ActionExecutor
 				INPUT keySeqDown = CreateKeyInput(hotkeyDetails.MainKey, down: true);
 				INPUT keySeqUp = CreateKeyInput(hotkeyDetails.MainKey, down: false);
 				SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(20);
 				SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(15);
 			}
 		}
 		finally
 		{
-			// 3. 无论中间是否发生异常，始终安全下发所有已按下修饰键的抬起事件，彻底杜绝系统级粘滞
-			List<INPUT> upInputs = new List<INPUT>();
-			for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
-			{
-				upInputs.Add(CreateKeyInput(hotkeyDetails.Modifiers[num], down: false));
-			}
-			if (upInputs.Count > 0)
-			{
-				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-			}
+			// 3. 无论中间是否发生异常，始终安全成对释放所有修饰键（包含具体与通用修饰键，双通道刷新）
+			ForceReleaseAllModifiers(hotkeyDetails.Modifiers);
+
+			// 4. 启动异步守护自愈，针对截图抢焦点场景提供三道时间窗口的解卡保障
+			ScheduleModifierWatchdog();
 		}
 	}
 
@@ -1623,6 +1701,10 @@ public static class ActionExecutor
 			type = 1u
 		};
 		ushort scan = (ushort)MapVirtualKey((uint)vk, 0u);
+		if (vk == 44) // VK_SNAPSHOT: 必须强制 scan = 0，规避被底层驱动识别为 SysReq (0x54) 造成驱动中断状态异常与后续键丢失
+		{
+			scan = 0;
+		}
 		result.U.ki = new KEYBDINPUT
 		{
 			wVk = vk,
@@ -1633,7 +1715,6 @@ public static class ActionExecutor
 		};
 		if (vk == 33 || vk == 34 || vk == 35 || vk == 36 ||
 		    vk == 37 || vk == 38 || vk == 39 || vk == 40 ||
-		    vk == 44 ||
 		    vk == 45 || vk == 46 ||
 		    vk == 91 || vk == 92 ||
 		    vk == 111 ||

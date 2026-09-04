@@ -1,6 +1,8 @@
 ---
 type: Note
 _width: wide
+_favorite: true
+_favorite_index: 1
 ---
 # **M♭**
 
