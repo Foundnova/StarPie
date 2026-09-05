@@ -2483,24 +2483,24 @@ public static class I18n
 		};
 		dictionary["UpdateProxyGhproxy"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚡ 镜像源 1 (ghproxy.net 推荐)",
-			[LanguageCode.ZhTw] = "⚡ 鏡像源 1 (ghproxy.net 推薦)",
-			[LanguageCode.En] = "⚡ Mirror 1 (ghproxy.net Recommended)",
-			[LanguageCode.Ja] = "⚡ ミラー 1 (ghproxy.net 推奨)"
+			[LanguageCode.ZhCn] = "⚡ 镜像源 1 (ghfast.top 推荐)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 1 (ghfast.top 推薦)",
+			[LanguageCode.En] = "⚡ Mirror 1 (ghfast.top Recommended)",
+			[LanguageCode.Ja] = "⚡ ミラー 1 (ghfast.top 推奨)"
 		};
 		dictionary["UpdateProxyMoeyy"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚡ 镜像源 2 (github.moeyy.xyz)",
-			[LanguageCode.ZhTw] = "⚡ 鏡像源 2 (github.moeyy.xyz)",
-			[LanguageCode.En] = "⚡ Mirror 2 (github.moeyy.xyz)",
-			[LanguageCode.Ja] = "⚡ ミラー 2 (github.moeyy.xyz)"
+			[LanguageCode.ZhCn] = "⚡ 镜像源 2 (gh-proxy.com 备用)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 2 (gh-proxy.com 備用)",
+			[LanguageCode.En] = "⚡ Mirror 2 (gh-proxy.com Backup)",
+			[LanguageCode.Ja] = "⚡ ミラー 2 (gh-proxy.com 予備)"
 		};
 		dictionary["UpdateProxyAkams"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚡ 镜像源 3 (github.akams.cn)",
-			[LanguageCode.ZhTw] = "⚡ 鏡像源 3 (github.akams.cn)",
-			[LanguageCode.En] = "⚡ Mirror 3 (github.akams.cn)",
-			[LanguageCode.Ja] = "⚡ ミラー 3 (github.akams.cn)"
+			[LanguageCode.ZhCn] = "⚡ 镜像源 3 (mirror.ghproxy.com)",
+			[LanguageCode.ZhTw] = "⚡ 鏡像源 3 (mirror.ghproxy.com)",
+			[LanguageCode.En] = "⚡ Mirror 3 (mirror.ghproxy.com)",
+			[LanguageCode.Ja] = "⚡ ミラー 3 (mirror.ghproxy.com)"
 		};
 		dictionary["ContributorsHeader"] = new Dictionary<LanguageCode, string>
 		{

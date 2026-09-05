@@ -356,6 +356,9 @@ public partial class SettingsWindow : Window
 			UacWarningCard.Visibility = (flag4 ? Visibility.Collapsed : Visibility.Visible);
 			RefreshSlots();
 			UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig?.AppTheme ?? "System");
+			bool isDark = IsCurrentThemeDark();
+			UpdateLogoTheme(isDark);
+			ApplyTrayMenuTheme(isDark);
 
 			if (App.MainKeyboardHook != null)
 			{
@@ -416,6 +419,9 @@ public partial class SettingsWindow : Window
 			EnsureUiInitialized();
 			ApplySidebarLayout();
 			UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig?.AppTheme ?? "System");
+			bool isDark = IsCurrentThemeDark();
+			UpdateLogoTheme(isDark);
+			ApplyTrayMenuTheme(isDark);
 			if (AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
@@ -664,6 +670,9 @@ public partial class SettingsWindow : Window
 
 		// App Theme & Presets
 		UpdateSidebarThemeVisualState(ConfigManager.CurrentConfig.AppTheme ?? "System");
+		bool isDark = IsCurrentThemeDark();
+		UpdateLogoTheme(isDark);
+		ApplyTrayMenuTheme(isDark);
 		ReloadThemePresets();
 		SetComboBoxSelectedValue(ThemeComboBox, ConfigManager.CurrentConfig.Theme);
 		SetComboBoxSelectedValue(UiStyleComboBox, ConfigManager.CurrentConfig.UiStyle);
@@ -984,7 +993,10 @@ public partial class SettingsWindow : Window
 			AutoCheckUpdateCheckBox.IsChecked = ConfigManager.CurrentConfig.AutoCheckUpdate;
 		}
 		SetComboBoxSelectedValue(UpdateChannelComboBox, ConfigManager.CurrentConfig.UpdateChannel ?? "Stable");
-		SetComboBoxSelectedValue(UpdateProxyComboBox, ConfigManager.CurrentConfig.UpdateProxySource ?? "ghproxy");
+		string savedProxy = ConfigManager.CurrentConfig.UpdateProxySource ?? "ghfast";
+		if (savedProxy == "ghproxy" || savedProxy == "moeyy") savedProxy = "ghfast";
+		else if (savedProxy == "akams") savedProxy = "gh-proxy";
+		SetComboBoxSelectedValue(UpdateProxyComboBox, savedProxy);
 
 		bool isStandalone = UpdateManager.Instance.IsCurrentInstallationStandalone();
 		if (UpdatePkgStandaloneRadio != null) UpdatePkgStandaloneRadio.IsChecked = isStandalone;
@@ -1132,46 +1144,125 @@ public partial class SettingsWindow : Window
 	{
 		if (_notifyIcon != null)
 		{
-			ContextMenuStrip contextMenuStrip = new ContextMenuStrip();
-			ToolStripMenuItem value = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"))
+			ContextMenuStrip contextMenuStrip = new ContextMenuStrip
+			{
+				ShowImageMargin = false,
+				ShowCheckMargin = false,
+				Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Regular),
+				Padding = new System.Windows.Forms.Padding(3, 4, 3, 4)
+			};
+
+			ToolStripMenuItem versionItem = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"))
 			{
 				Enabled = false,
-				Font = new Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
+				Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold),
+				Padding = new System.Windows.Forms.Padding(12, 6, 12, 6)
 			};
-			contextMenuStrip.Items.Add(value);
-			contextMenuStrip.Items.Add(new ToolStripSeparator());
+			contextMenuStrip.Items.Add(versionItem);
+
+			var sep1 = new ToolStripSeparator { Margin = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+			contextMenuStrip.Items.Add(sep1);
+
 			string text = ((App.MainMouseHook != null && App.MainMouseHook.IsPaused) ? I18n.T("TrayResume") : I18n.T("TrayPause"));
 			_pauseResumeMenuItem = new ToolStripMenuItem(text, null, delegate
 			{
 				TogglePauseGestures();
-			});
+			})
+			{
+				Padding = new System.Windows.Forms.Padding(12, 5, 12, 5)
+			};
 			contextMenuStrip.Items.Add(_pauseResumeMenuItem);
-			contextMenuStrip.Items.Add(I18n.T("TrayPreferences"), null, delegate
-			{
-				ShowSettings();
-			});
-			contextMenuStrip.Items.Add(I18n.T("TrayAppearance"), null, delegate
-			{
-				ShowSettings(1);
-			});
-			contextMenuStrip.Items.Add(I18n.T("TrayGestures"), null, delegate
-			{
-				ShowSettings(2);
-			});
-			contextMenuStrip.Items.Add(I18n.T("TrayAbout"), null, delegate
-			{
-				ShowSettings(4);
-			});
-			contextMenuStrip.Items.Add(I18n.T("TrayElevate"), null, delegate(object? s, EventArgs e)
-			{
-				ElevatePrivileges_Click(s, new RoutedEventArgs());
-			});
-			contextMenuStrip.Items.Add(new ToolStripSeparator());
-			contextMenuStrip.Items.Add(I18n.T("TrayExit"), null, delegate
-			{
-				ExitApplication();
-			});
+
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayPreferences"), () => ShowSettings()));
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayAppearance"), () => ShowSettings(1)));
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayGestures"), () => ShowSettings(2)));
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayAbout"), () => ShowSettings(4)));
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayElevate"), () => ElevatePrivileges_Click(null, new RoutedEventArgs())));
+
+			var sep2 = new ToolStripSeparator { Margin = new System.Windows.Forms.Padding(0, 3, 0, 3) };
+			contextMenuStrip.Items.Add(sep2);
+
+			contextMenuStrip.Items.Add(CreateTrayMenuItem(I18n.T("TrayExit"), () => ExitApplication()));
+
 			_notifyIcon.ContextMenuStrip = contextMenuStrip;
+			ApplyTrayMenuTheme(IsCurrentThemeDark());
+		}
+	}
+
+	private ToolStripMenuItem CreateTrayMenuItem(string text, Action onClick)
+	{
+		return new ToolStripMenuItem(text, null, (s, e) => onClick?.Invoke())
+		{
+			Padding = new System.Windows.Forms.Padding(12, 5, 12, 5)
+		};
+	}
+
+	public void ApplyTrayMenuTheme(bool isDark)
+	{
+		if (_notifyIcon?.ContextMenuStrip == null) return;
+
+		var cms = _notifyIcon.ContextMenuStrip;
+		cms.Renderer = new ModernTrayRenderer(isDark);
+		cms.BackColor = isDark ? System.Drawing.Color.FromArgb(24, 24, 27) : System.Drawing.Color.FromArgb(255, 255, 255);
+
+		System.Drawing.Color enabledColor = isDark ? System.Drawing.Color.FromArgb(244, 244, 245) : System.Drawing.Color.FromArgb(15, 23, 42);
+		System.Drawing.Color disabledColor = isDark ? System.Drawing.Color.FromArgb(148, 163, 184) : System.Drawing.Color.FromArgb(100, 116, 139);
+
+		foreach (ToolStripItem item in cms.Items)
+		{
+			if (item is ToolStripMenuItem menuItem)
+			{
+				menuItem.ForeColor = menuItem.Enabled ? enabledColor : disabledColor;
+			}
+		}
+
+		cms.Invalidate();
+	}
+
+	public bool IsCurrentThemeDark()
+	{
+		string theme = ConfigManager.CurrentConfig?.AppTheme ?? "System";
+		if (string.Equals(theme, "System", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(theme))
+		{
+			return AppThemeManager.IsWindowsInDarkTheme();
+		}
+		return !string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase);
+	}
+
+	public void UpdateLogoTheme(bool isDark)
+	{
+		try
+		{
+			string logoResource = isDark ? "logo_dark.png" : "logo_light.png";
+			Uri uri;
+			try
+			{
+				uri = new Uri($"pack://application:,,,/StarPie;component/{logoResource}", UriKind.Absolute);
+			}
+			catch
+			{
+				uri = new Uri(logoResource, UriKind.Relative);
+			}
+
+			BitmapImage bitmap = new BitmapImage();
+			bitmap.BeginInit();
+			bitmap.UriSource = uri;
+			bitmap.CacheOption = BitmapCacheOption.OnLoad;
+			bitmap.EndInit();
+			((Freezable)bitmap).Freeze();
+
+			if (SidebarLogoImage != null)
+			{
+				SidebarLogoImage.Source = bitmap;
+			}
+			if (AboutLogoImage != null)
+			{
+				AboutLogoImage.Source = bitmap;
+			}
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"[UpdateLogoTheme] Failed to load logo: {ex.Message}");
 		}
 	}
 
@@ -8907,6 +8998,9 @@ public partial class SettingsWindow : Window
 			ConfigManager.CurrentConfig.AppTheme = themeTag;
 			AppThemeManager.ApplyTheme(this, themeTag);
 			UpdateSidebarThemeVisualState(themeTag);
+			bool isDark = IsCurrentThemeDark();
+			UpdateLogoTheme(isDark);
+			ApplyTrayMenuTheme(isDark);
 			if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
 				RenderLiveWheelPreview();
@@ -8917,32 +9011,41 @@ public partial class SettingsWindow : Window
 
 	private void UpdateSidebarThemeVisualState(string themeTag)
 	{
-		string tag = themeTag ?? "System";
-		if (ThemeBtnSystem != null) ThemeBtnSystem.IsChecked = string.Equals(tag, "System", StringComparison.OrdinalIgnoreCase);
-		if (ThemeBtnLight != null) ThemeBtnLight.IsChecked = string.Equals(tag, "Light", StringComparison.OrdinalIgnoreCase);
-		if (ThemeBtnDark != null) ThemeBtnDark.IsChecked = string.Equals(tag, "Dark", StringComparison.OrdinalIgnoreCase);
-		if (ThemeBtnGray != null) ThemeBtnGray.IsChecked = string.Equals(tag, "TitaniumGray", StringComparison.OrdinalIgnoreCase);
+		bool prevUpdating = _isUpdatingUi;
+		_isUpdatingUi = true;
+		try
+		{
+			string tag = themeTag ?? "System";
+			if (ThemeBtnSystem != null) ThemeBtnSystem.IsChecked = string.Equals(tag, "System", StringComparison.OrdinalIgnoreCase);
+			if (ThemeBtnLight != null) ThemeBtnLight.IsChecked = string.Equals(tag, "Light", StringComparison.OrdinalIgnoreCase);
+			if (ThemeBtnDark != null) ThemeBtnDark.IsChecked = string.Equals(tag, "Dark", StringComparison.OrdinalIgnoreCase);
+			if (ThemeBtnGray != null) ThemeBtnGray.IsChecked = string.Equals(tag, "TitaniumGray", StringComparison.OrdinalIgnoreCase);
 
-		if (SidebarThemeCollapsedIcon != null)
-		{
-			SidebarThemeCollapsedIcon.Text = tag.ToLowerInvariant() switch
+			if (SidebarThemeCollapsedIcon != null)
 			{
-				"light" => "☀️",
-				"dark" => "🌙",
-				"titaniumgray" => "⚙️",
-				_ => "🌓"
-			};
+				SidebarThemeCollapsedIcon.Text = tag.ToLowerInvariant() switch
+				{
+					"light" => "☀️",
+					"dark" => "🌙",
+					"titaniumgray" => "⚙️",
+					_ => "🌓"
+				};
+			}
+			if (SidebarThemeCollapsedButton != null)
+			{
+				string name = tag.ToLowerInvariant() switch
+				{
+					"light" => "极简纯白",
+					"dark" => "极夜曜黑",
+					"titaniumgray" => "钛金深灰",
+					_ => "跟随系统"
+				};
+				SidebarThemeCollapsedButton.ToolTip = $"当前界面主题: {name} (点击快速循环切换)";
+			}
 		}
-		if (SidebarThemeCollapsedButton != null)
+		finally
 		{
-			string name = tag.ToLowerInvariant() switch
-			{
-				"light" => "极简纯白",
-				"dark" => "极夜曜黑",
-				"titaniumgray" => "钛金深灰",
-				_ => "跟随系统"
-			};
-			SidebarThemeCollapsedButton.ToolTip = $"当前界面主题: {name} (点击快速循环切换)";
+			_isUpdatingUi = prevUpdating;
 		}
 	}
 
@@ -9144,10 +9247,15 @@ public partial class SettingsWindow : Window
 			if (UpdateStatusBadgeText != null)
 			{
 				UpdateStatusBadgeText.Text = "正在检查更新...";
+				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(59, 130, 246));
+			}
+			if (UpdateStatusBadge != null)
+			{
+				UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 59, 130, 246));
 			}
 
 			string channel = ConfigManager.CurrentConfig?.UpdateChannel ?? "Stable";
-			string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghproxy";
+			string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghfast";
 			string customProxy = ConfigManager.CurrentConfig?.CustomProxyUrl ?? "";
 
 			// 仅在检查应用更新时同步一次 GitHub 贡献者名单，平时默认离线
@@ -9176,7 +9284,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"GitHub Releases 探测到更高版本 {rel.TagName} 可供升级！";
+					UpdateStatusDescText.Text = $"检测到更高版本 {rel.TagName} 可供升级！发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm}。";
 				}
 
 				if (UpdateNewVersionTagText != null)
@@ -9185,7 +9293,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateReleaseChannelTag != null)
 				{
-					UpdateReleaseChannelTag.Text = rel.IsPrerelease ? "尝鲜体验版 (Pre-release)" : "正式稳定版 (Stable)";
+					UpdateReleaseChannelTag.Text = rel.IsPrerelease ? "尝鲜测试版 (Pre-release)" : "正式稳定版 (Stable)";
 				}
 				if (UpdateReleaseDateText != null)
 				{
@@ -9223,7 +9331,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -9236,7 +9344,7 @@ public partial class SettingsWindow : Window
 				{
 					if (UpdateStatusBadgeText != null)
 					{
-						UpdateStatusBadgeText.Text = "检查更新超时";
+						UpdateStatusBadgeText.Text = "检查更新受阻";
 						UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
 					}
 					if (UpdateStatusBadge != null)
@@ -9245,7 +9353,7 @@ public partial class SettingsWindow : Window
 					}
 					if (UpdateStatusDescText != null)
 					{
-						UpdateStatusDescText.Text = "无法连接至 GitHub Releases API，建议在下方切换为国内加速镜像源重试。";
+						UpdateStatusDescText.Text = "未能从 GitHub 自动获取到 Release 数据，可点击右侧「🌐 网页发布页」手动前往查看。";
 					}
 				}
 			}
@@ -9412,7 +9520,7 @@ public partial class SettingsWindow : Window
 	{
 		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && UpdateProxyComboBox.SelectedItem is ComboBoxItem item)
 		{
-			ConfigManager.CurrentConfig.UpdateProxySource = item.Tag?.ToString() ?? "ghproxy";
+			ConfigManager.CurrentConfig.UpdateProxySource = item.Tag?.ToString() ?? "ghfast";
 			ScheduleAutoSave();
 		}
 	}

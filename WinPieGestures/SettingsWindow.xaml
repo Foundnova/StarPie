@@ -575,7 +575,7 @@
               <UIElement.Effect>
                 <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.16" />
               </UIElement.Effect>
-              <Image Source="logo.png" Width="38" Height="38" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+              <Image Name="SidebarLogoImage" Source="logo.png" Width="38" Height="38" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
             <StackPanel Name="SidebarBrandTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed">
               <TextBlock Name="SidebarBrandTitleText" Text="StarPie" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -625,25 +625,25 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
-              <RadioButton Name="ThemeBtnSystem" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="System" ToolTip="跟随系统 (System Auto)" Click="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnSystem" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="System" ToolTip="跟随系统 (System Auto)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="🌓" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="系统" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnLight" Grid.Column="1" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Light" ToolTip="极简纯白 (Modern Light)" Click="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnLight" Grid.Column="1" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Light" ToolTip="极简纯白 (Modern Light)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="☀️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="浅色" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnDark" Grid.Column="2" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Dark" ToolTip="极夜曜黑 (Obsidian Dark)" Click="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnDark" Grid.Column="2" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Dark" ToolTip="极夜曜黑 (Obsidian Dark)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="🌙" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="曜黑" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnGray" Grid.Column="3" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="TitaniumGray" ToolTip="钛金深灰 (Titanium Gray)" Click="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnGray" Grid.Column="3" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="TitaniumGray" ToolTip="钛金深灰 (Titanium Gray)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="⚙️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="钛灰" FontSize="11" VerticalAlignment="Center" />
@@ -3030,7 +3030,10 @@
                       </StackPanel>
                       <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.8 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
-                    <Button Name="CheckUpdateNowBtn" Grid.Column="1" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
+                      <Button Name="ViewReleasesWebBtn" Content="🌐 网页发布页" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" VerticalAlignment="Center" Click="OpenWebReleaseBtn_Click" ToolTip="直接在默认浏览器中打开 GitHub Releases 发布页" />
+                    </StackPanel>
                   </Grid>
 
                   <!-- 状态区 A: 发现新版本 -->
@@ -3180,9 +3183,9 @@
                           <TextBlock Name="UpdateProxyDescText" Text="解决国内访问 GitHub Releases 丢包或限速问题，自动加速代理下载" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Name="UpdateProxyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" VerticalAlignment="Center" SelectionChanged="UpdateProxyComboBox_SelectionChanged">
-                          <ComboBoxItem Tag="ghproxy" Content="⚡ 镜像源 1 (ghproxy.net 推荐)" />
-                          <ComboBoxItem Tag="moeyy" Content="⚡ 镜像源 2 (github.moeyy.xyz)" />
-                          <ComboBoxItem Tag="akams" Content="⚡ 镜像源 3 (github.akams.cn)" />
+                          <ComboBoxItem Tag="ghfast" Content="⚡ 镜像源 1 (ghfast.top 推荐)" />
+                          <ComboBoxItem Tag="gh-proxy" Content="⚡ 镜像源 2 (gh-proxy.com 备用)" />
+                          <ComboBoxItem Tag="mirror" Content="⚡ 镜像源 3 (mirror.ghproxy.com)" />
                           <ComboBoxItem Tag="direct" Content="🌐 官方直连 (GitHub Official)" />
                         </ComboBox>
                       </Grid>
@@ -3379,7 +3382,7 @@
                     <UIElement.Effect>
                       <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.16" />
                     </UIElement.Effect>
-                    <Image Source="logo.png" Width="48" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Image Name="AboutLogoImage" Source="logo.png" Width="48" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
                   </Border>
                   <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">

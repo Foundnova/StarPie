@@ -25,6 +25,8 @@
     <Resource Include="app_icon.ico" />
     <Resource Include="tray_icon.ico" />
     <Resource Include="logo.png" />
+    <Resource Include="logo_dark.png" />
+    <Resource Include="logo_light.png" />
     <None Include="app_icon.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="tray_icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

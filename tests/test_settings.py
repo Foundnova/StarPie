@@ -942,5 +942,81 @@ def test_v143_trigger_button_customization(app):
         config = json.load(f)
     assert "Trigger" in config or "TriggerButton" in config, "Trigger configuration should be persisted in config.json"
 
+def test_theme_segment_switching_and_logo(app):
+    win, local_app_data = app
+    
+    # 1. Expand sidebar if collapsed so theme radio buttons are visible
+    toggle_btn = win.child_window(auto_id="SidebarToggleButton", control_type="Button")
+    if toggle_btn.exists(timeout=2):
+        toggle_btn.invoke()
+        time.sleep(0.3)
+        
+    # 2. Switch to Dark theme
+    theme_dark = win.child_window(auto_id="ThemeBtnDark", control_type="RadioButton")
+    if theme_dark.exists(timeout=2):
+        theme_dark.select()
+        time.sleep(0.3)
+        config_path = get_config_path(local_app_data)
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        assert cfg.get("AppTheme") == "Dark"
+        
+    # 3. Switch to Light theme
+    theme_light = win.child_window(auto_id="ThemeBtnLight", control_type="RadioButton")
+    if theme_light.exists(timeout=2):
+        theme_light.select()
+        time.sleep(0.3)
+        config_path = get_config_path(local_app_data)
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        assert cfg.get("AppTheme") == "Light"
+        
+    # 4. Check SidebarLogoImage
+    logo_img = win.child_window(auto_id="SidebarLogoImage", control_type="Image")
+    assert logo_img.exists(timeout=2), "SidebarLogoImage should exist in visual tree"
+
+def test_update_ui_elements_and_check(app):
+    win, local_app_data = app
+    
+    # 1. Switch to Tab 3 (Advanced & System Settings)
+    tab3 = win.child_window(auto_id="NavTab3", control_type="RadioButton")
+    tab3.select()
+    time.sleep(0.4)
+    
+    # 2. Verify Update controls exist
+    check_btn = win.child_window(auto_id="CheckUpdateNowBtn", control_type="Button")
+    assert check_btn.exists(timeout=3), "CheckUpdateNowBtn should exist"
+    
+    web_btn = win.child_window(auto_id="ViewReleasesWebBtn", control_type="Button")
+    assert web_btn.exists(timeout=3), "ViewReleasesWebBtn should exist"
+    
+    status_text = win.child_window(auto_id="UpdateStatusBadgeText", control_type="Text")
+    assert status_text.exists(timeout=3), "UpdateStatusBadgeText should exist"
+    
+    proxy_combo = win.child_window(auto_id="UpdateProxyComboBox", control_type="ComboBox")
+    assert proxy_combo.exists(timeout=3), "UpdateProxyComboBox should exist"
+    
+    # 3. Wait for any initial background update check to finish if running
+    for _ in range(30):
+        if check_btn.is_enabled():
+            break
+        time.sleep(0.2)
+
+    # Click CheckUpdateNowBtn and verify status transitions to latest version
+    check_btn.invoke()
+    
+    # Wait for check to complete
+    for _ in range(30):
+        time.sleep(0.3)
+        if check_btn.is_enabled():
+            break
+
+    # Verify button is re-enabled and badge indicates up to date or release detected
+    assert check_btn.is_enabled(), "CheckUpdateNowBtn should be re-enabled after checking"
+    badge_val = status_text.window_text()
+    assert "最新版本" in badge_val or "新版本" in badge_val or "版本" in badge_val, f"Badge text should indicate version status, got: {badge_val}"
+
+
+
 
 

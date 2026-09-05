@@ -15,8 +15,14 @@ class Program
         string inputPath = @"g:\Users\2 Better\Desktop\design\attachments\cover.v3.png";
         string outputLogo = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo.png";
         string outputAssetsLogo = @"g:\Users\2 Better\Desktop\design\assets\logo.png";
+        string outputLogoDark = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo_dark.png";
+        string outputAssetsLogoDark = @"g:\Users\2 Better\Desktop\design\assets\logo_dark.png";
+        string outputLogoLight = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo_light.png";
+        string outputAssetsLogoLight = @"g:\Users\2 Better\Desktop\design\assets\logo_light.png";
         string outputIco = @"g:\Users\2 Better\Desktop\design\WinPieGestures\app_icon.ico";
         string outputAssetsIco = @"g:\Users\2 Better\Desktop\design\assets\app_icon.ico";
+        string outputTrayIco = @"g:\Users\2 Better\Desktop\design\WinPieGestures\tray_icon.ico";
+        string outputAssetsTrayIco = @"g:\Users\2 Better\Desktop\design\assets\tray_icon.ico";
         string outputPreviewPng = @"g:\Users\2 Better\Desktop\design\scratch\icon_clarity_preview.png";
 
         Console.WriteLine("Loading source image: " + inputPath);
@@ -226,13 +232,10 @@ class Program
         destBmp.Save(outputAssetsLogo, ImageFormat.Png);
         Console.WriteLine("Saved logo.png successfully to " + outputLogo);
 
-        // Step 2: Build Enhanced Squircle with Enlarged Wheel
-        // In the original image, wheel diameter is 900px out of 1254px (71.7%).
-        // By enlarging the wheel by ~1.16x, the wheel diameter becomes ~1045px (83.3%),
-        // providing 36% larger area and much crisper sector details on taskbar and tray!
+        // Step 2: Build Pure Circular Wheel (100% Transparent Background, No Squircle Border)
         float cx = w / 2f;
         float cy = h / 2f;
-        float wheelRadius = 452f;
+        float wheelRadius = 450f;
 
         using var wheelOnlyBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
         byte[] wheelPixels = new byte[w * h * 4];
@@ -263,79 +266,7 @@ class Program
         Marshal.Copy(wheelPixels, 0, wheelData.Scan0, wheelPixels.Length);
         wheelOnlyBmp.UnlockBits(wheelData);
 
-        // Compose Enhanced Squircle (squircle background + enlarged wheel)
-        using var enhancedSquircleBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-        using (var gEnh = Graphics.FromImage(enhancedSquircleBmp))
-        {
-            gEnh.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            gEnh.SmoothingMode = SmoothingMode.HighQuality;
-            gEnh.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            gEnh.CompositingQuality = CompositingQuality.HighQuality;
-            gEnh.Clear(Color.Transparent);
-
-            // 1. Draw base squircle
-            gEnh.DrawImage(destBmp, 0, 0, w, h);
-
-            // 2. Scale and draw enlarged wheel (scale = 1.155x)
-            float scale = 1.155f;
-            float newW = w * scale;
-            float newH = h * scale;
-            float offX = (w - newW) / 2f;
-            float offY = (h - newH) / 2f;
-            gEnh.DrawImage(wheelOnlyBmp, offX, offY, newW, newH);
-        }
-
-        // Save high-resolution logo.png (enhanced squircle)
-        enhancedSquircleBmp.Save(outputLogo, ImageFormat.Png);
-        enhancedSquircleBmp.Save(outputAssetsLogo, ImageFormat.Png);
-        Console.WriteLine("Saved enhanced logo.png to " + outputLogo);
-
-        // Step 3: Multi-tier downscaling with Unsharp Masking (USM)
-        int[] sizes = new int[] { 16, 20, 24, 32, 40, 48, 64, 96, 128, 256 };
-        var iconFrames = new Dictionary<int, Bitmap>();
-
-        // High-res intermediate mipmap (256x256)
-        using var mip256 = ResizeHighQuality(enhancedSquircleBmp, 256, 256);
-
-        foreach (int size in sizes)
-        {
-            Bitmap frame;
-            if (size >= 128)
-            {
-                frame = ResizeHighQuality(enhancedSquircleBmp, size, size);
-            }
-            else if (size >= 48)
-            {
-                frame = ResizeHighQuality(mip256, size, size);
-                frame = ApplyUnsharpMask(frame, 0.18f);
-                frame = AdjustContrast(frame, 1.05f, 1.05f);
-            }
-            else
-            {
-                // Micro sizes (16, 20, 24, 32, 40)
-                // Downscale with crisp sharpening and vibrance boost so details don't blur into mud
-                frame = ResizeHighQuality(mip256, size, size);
-                float sharpAmount = size switch
-                {
-                    16 => 0.38f,
-                    20 => 0.34f,
-                    24 => 0.30f,
-                    32 => 0.25f,
-                    _ => 0.20f
-                };
-                frame = ApplyUnsharpMask(frame, sharpAmount);
-                // Boost contrast and saturation for micro icons
-                frame = AdjustContrast(frame, 1.12f, 1.15f);
-            }
-            iconFrames[size] = frame;
-        }
-
-        // Step 4a: Generate Dedicated Pure Circular Wheel Tray Icon (tray_icon.ico)
-        // In the system tray, a border-to-border circular wheel with 100% transparent background
-        // offers maximum readability, zero wasted margin, and high contrast!
-        string outputTrayIco = @"g:\Users\2 Better\Desktop\design\WinPieGestures\tray_icon.ico";
-        string outputAssetsTrayIco = @"g:\Users\2 Better\Desktop\design\assets\tray_icon.ico";
-
+        // Crop tight circular wheel (100% transparent outside wheel radius)
         int wheelCropSize = (int)(wheelRadius * 2 + 8);
         int cropX = (int)(cx - wheelRadius - 4);
         int cropY = (int)(cy - wheelRadius - 4);
@@ -344,26 +275,82 @@ class Program
         {
             gTight.InterpolationMode = InterpolationMode.HighQualityBicubic;
             gTight.SmoothingMode = SmoothingMode.HighQuality;
+            gTight.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            gTight.CompositingQuality = CompositingQuality.HighQuality;
             gTight.Clear(Color.Transparent);
             gTight.DrawImage(wheelOnlyBmp, new Rectangle(0, 0, wheelCropSize, wheelCropSize), new Rectangle(cropX, cropY, wheelCropSize, wheelCropSize), GraphicsUnit.Pixel);
         }
 
+        // Generate Light Edition Wheel (optimized for pure white / light backgrounds with pearlescent center & sapphire blue pointer)
+        using var lightWheelBmp = CreateLightEditionWheel(tightWheelBmp);
+
+        // Save high-resolution logos (both Dark Edition and Light Edition)
+        Console.WriteLine("Saving logo_dark.png, logo_light.png, and logo.png...");
+        tightWheelBmp.Save(outputLogoDark, ImageFormat.Png);
+        tightWheelBmp.Save(outputAssetsLogoDark, ImageFormat.Png);
+        tightWheelBmp.Save(outputLogo, ImageFormat.Png);
+        tightWheelBmp.Save(outputAssetsLogo, ImageFormat.Png);
+
+        lightWheelBmp.Save(outputLogoLight, ImageFormat.Png);
+        lightWheelBmp.Save(outputAssetsLogoLight, ImageFormat.Png);
+        Console.WriteLine("Saved dual-theme logos successfully.");
+
+        // Step 3: Multi-tier downscaling with Unsharp Masking (USM) for app_icon.ico
+        // CRUCIAL: Every resolution (16 to 256) is built from tightWheelBmp (pure circular wheel on transparent background)
+        // This permanently eliminates any black / squircle background box from the Windows Taskbar!
+        int[] sizes = new int[] { 16, 20, 24, 32, 40, 48, 64, 96, 128, 256 };
+        var iconFrames = new Dictionary<int, Bitmap>();
+
+        using var appMip256 = ResizeHighQuality(tightWheelBmp, 256, 256);
+        using var appMip128 = ResizeHighQuality(appMip256, 128, 128);
+
+        foreach (int size in sizes)
+        {
+            Bitmap frame;
+            if (size >= 128)
+            {
+                frame = ResizeHighQuality(tightWheelBmp, size, size);
+            }
+            else if (size >= 48)
+            {
+                frame = ResizeHighQuality(appMip256, size, size);
+                frame = ApplyUnsharpMask(frame, 0.20f);
+                frame = AdjustContrast(frame, 1.08f, 1.10f);
+            }
+            else
+            {
+                // Micro / Taskbar sizes (16, 20, 24, 32, 40)
+                frame = ResizeHighQuality(appMip128, size, size);
+                float sharpAmount = size switch
+                {
+                    16 => 0.40f,
+                    20 => 0.35f,
+                    24 => 0.30f,
+                    32 => 0.25f,
+                    _ => 0.22f
+                };
+                frame = ApplyUnsharpMask(frame, sharpAmount);
+                frame = AdjustContrast(frame, 1.15f, 1.20f);
+            }
+            iconFrames[size] = frame;
+        }
+
+        // Step 4a: Generate Dedicated Pure Circular Wheel Tray Icon (tray_icon.ico)
         int[] traySizes = new int[] { 16, 20, 24, 32, 48, 64 };
         var trayFrames = new Dictionary<int, Bitmap>();
-        using var tightMip = ResizeHighQuality(tightWheelBmp, 128, 128);
 
         foreach (int size in traySizes)
         {
-            var frame = ResizeHighQuality(tightMip, size, size);
+            var frame = ResizeHighQuality(appMip128, size, size);
             float sharp = size switch
             {
-                16 => 0.40f,
-                20 => 0.35f,
+                16 => 0.42f,
+                20 => 0.36f,
                 24 => 0.30f,
                 _ => 0.22f
             };
             frame = ApplyUnsharpMask(frame, sharp);
-            frame = AdjustContrast(frame, 1.15f, 1.20f);
+            frame = AdjustContrast(frame, 1.16f, 1.22f);
             trayFrames[size] = frame;
         }
 
@@ -372,20 +359,12 @@ class Program
         File.Copy(outputTrayIco, outputAssetsTrayIco, true);
         Console.WriteLine("Saved tray_icon.ico to " + outputTrayIco);
 
-        // For micro sizes 16x16 and 20x20 in app_icon.ico:
-        // Use the crystal-clear pure circular wheel as well, eliminating the cramped dark squircle border!
-        iconFrames[16].Dispose();
-        iconFrames[16] = (Bitmap)trayFrames[16].Clone();
-        iconFrames[20].Dispose();
-        iconFrames[20] = (Bitmap)trayFrames[20].Clone();
-
         // Step 4b: Write standard Win32 multi-resolution ICO file (app_icon.ico)
-        // Crucial: Sizes <= 48 are written as 32bpp DIB (BITMAPINFOHEADER + BGRA + AND mask),
-        // Sizes >= 64 are written as PNG. This ensures 100% native GDI/Shell/NotifyIcon clarity!
-        Console.WriteLine("Packaging standard Win32 multi-resolution ICO (DIB for <=48, PNG for >=64)...");
+        // Sizes <= 48 written as 32bpp DIB (with alpha), Sizes >= 64 written as PNG
+        Console.WriteLine("Packaging standard Win32 multi-resolution ICO (100% transparent circular wheel)...");
         WriteWin32Ico(iconFrames, outputIco);
         File.Copy(outputIco, outputAssetsIco, true);
-        Console.WriteLine("Saved app_icon.ico to " + outputIco);
+        Console.WriteLine("Saved borderless app_icon.ico to " + outputIco);
 
         // Step 5: Generate Comparison Preview PNG for visual verification
         GenerateClarityComparison(destBmp, iconFrames, trayFrames, outputPreviewPng);
@@ -731,6 +710,110 @@ class Program
         }
 
         preview.Save(previewPath, ImageFormat.Png);
+    }
+
+    static unsafe Bitmap CreateLightEditionWheel(Bitmap darkWheel)
+    {
+        int w = darkWheel.Width;
+        int h = darkWheel.Height;
+        float cx = w / 2f;
+        float cy = h / 2f;
+        // Core radius is approx 186px when w=908 (ratio ~ 0.205)
+        float coreRadius = w * 0.205f;
+
+        var lightBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+        var srcData = darkWheel.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        var dstData = lightBmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+
+        byte* pSrc = (byte*)srcData.Scan0;
+        byte* pDst = (byte*)dstData.Scan0;
+
+        for (int y = 0; y < h; y++)
+        {
+            float dy = y - cy;
+            for (int x = 0; x < w; x++)
+            {
+                float dx = x - cx;
+                float dist = MathF.Sqrt(dx * dx + dy * dy);
+                int idx = y * srcData.Stride + x * 4;
+
+                byte b = pSrc[idx];
+                byte g = pSrc[idx + 1];
+                byte r = pSrc[idx + 2];
+                byte a = pSrc[idx + 3];
+
+                if (a == 0)
+                {
+                    pDst[idx] = 0;
+                    pDst[idx + 1] = 0;
+                    pDst[idx + 2] = 0;
+                    pDst[idx + 3] = 0;
+                    continue;
+                }
+
+                // Core region mask (smooth edge 2px)
+                float coreFactor = Math.Clamp((coreRadius + 1.5f - dist) / 3f, 0f, 1f);
+
+                if (coreFactor > 0f)
+                {
+                    float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+                    // Pointer mask: in darkWheel, pointer is bright white/pink (lum > 125)
+                    float pointerFactor = Math.Clamp((lum - 125f) / 35f, 0f, 1f);
+
+                    // Pearlescent white/silver core background (#FFFFFF at top to #E2E8F0 at bottom)
+                    float gradY = (float)y / h;
+                    float bgR = 250f - 18f * gradY;
+                    float bgG = 252f - 16f * gradY;
+                    float bgB = 255f - 10f * gradY;
+
+                    // Vivid Sapphire Blue pointer (#2563EB to #1D4ED8)
+                    float ptR = 37f - 8f * gradY;
+                    float ptG = 99f - 12f * gradY;
+                    float ptB = 235f - 19f * gradY;
+
+                    float blendedR = bgR * (1f - pointerFactor) + ptR * pointerFactor;
+                    float blendedG = bgG * (1f - pointerFactor) + ptG * pointerFactor;
+                    float blendedB = bgB * (1f - pointerFactor) + ptB * pointerFactor;
+
+                    // Blend with original base according to coreFactor
+                    byte finalR = (byte)Math.Clamp((int)MathF.Round(r * (1f - coreFactor) + blendedR * coreFactor), 0, 255);
+                    byte finalG = (byte)Math.Clamp((int)MathF.Round(g * (1f - coreFactor) + blendedG * coreFactor), 0, 255);
+                    byte finalB = (byte)Math.Clamp((int)MathF.Round(b * (1f - coreFactor) + blendedB * coreFactor), 0, 255);
+
+                    pDst[idx] = finalB;
+                    pDst[idx + 1] = finalG;
+                    pDst[idx + 2] = finalR;
+                    pDst[idx + 3] = a;
+                }
+                else
+                {
+                    // Outer sectors: slight saturation & contrast boost for light background clarity
+                    float bF = b / 255f;
+                    float gF = g / 255f;
+                    float rF = r / 255f;
+
+                    // Contrast
+                    rF = (rF - 0.5f) * 1.08f + 0.5f;
+                    gF = (gF - 0.5f) * 1.08f + 0.5f;
+                    bF = (bF - 0.5f) * 1.08f + 0.5f;
+
+                    // Saturation
+                    float gray = 0.299f * rF + 0.587f * gF + 0.114f * bF;
+                    rF = gray + (rF - gray) * 1.15f;
+                    gF = gray + (gF - gray) * 1.15f;
+                    bF = gray + (bF - gray) * 1.15f;
+
+                    pDst[idx] = (byte)Math.Clamp((int)MathF.Round(bF * 255f), 0, 255);
+                    pDst[idx + 1] = (byte)Math.Clamp((int)MathF.Round(gF * 255f), 0, 255);
+                    pDst[idx + 2] = (byte)Math.Clamp((int)MathF.Round(rF * 255f), 0, 255);
+                    pDst[idx + 3] = a;
+                }
+            }
+        }
+
+        darkWheel.UnlockBits(srcData);
+        lightBmp.UnlockBits(dstData);
+        return lightBmp;
     }
 }
 

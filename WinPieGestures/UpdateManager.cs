@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace WinPieGestures;
 
@@ -79,10 +82,9 @@ public class UpdateManager
 		};
 		_httpClient = new HttpClient(handler)
 		{
-			Timeout = TimeSpan.FromSeconds(25)
+			Timeout = TimeSpan.FromSeconds(15)
 		};
-		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"));
-		_httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"));
 	}
 
 	public bool IsCurrentInstallationStandalone()
@@ -100,7 +102,7 @@ public class UpdateManager
 
 	public Version GetCurrentVersion()
 	{
-		return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 6, 2);
+		return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 6, 8);
 	}
 
 	public string GetProxiedDownloadUrl(string rawUrl, string proxySource, string customProxy = "")
@@ -109,15 +111,15 @@ public class UpdateManager
 
 		return proxySource?.ToLowerInvariant() switch
 		{
-			"ghproxy" => $"https://ghproxy.net/{rawUrl}",
-			"moeyy" => $"https://github.moeyy.xyz/{rawUrl}",
-			"akams" => $"https://github.akams.cn/{rawUrl}",
+			"ghfast" or "ghproxy" or "moeyy" => $"https://ghfast.top/{rawUrl}",
+			"gh-proxy" or "akams" => $"https://gh-proxy.com/{rawUrl}",
+			"mirror" => $"https://mirror.ghproxy.com/{rawUrl}",
 			"custom" when !string.IsNullOrWhiteSpace(customProxy) => $"{customProxy.TrimEnd('/')}/{rawUrl}",
 			_ => rawUrl
 		};
 	}
 
-	public async Task<ReleaseInfo?> CheckForUpdateAsync(string channel = "Stable", string proxySource = "ghproxy", string customProxy = "", CancellationToken ct = default)
+	public async Task<ReleaseInfo?> CheckForUpdateAsync(string channel = "Stable", string proxySource = "ghfast", string customProxy = "", CancellationToken ct = default)
 	{
 		try
 		{
@@ -128,65 +130,121 @@ public class UpdateManager
 
 			string? json = null;
 
-			// 尝试 1：直接访问 GitHub API
+			// Tier 1: 尝试直接访问 GitHub REST API (设置 5 秒快速超时，避免长时间挂起界面)
 			try
 			{
-				using HttpResponseMessage response = await _httpClient.GetAsync(apiUrl, ct).ConfigureAwait(false);
+				using var apiCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+				apiCts.CancelAfter(TimeSpan.FromSeconds(5));
+				using var apiReq = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+				apiReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+				using HttpResponseMessage response = await _httpClient.SendAsync(apiReq, apiCts.Token).ConfigureAwait(false);
 				if (response.IsSuccessStatusCode)
 				{
-					json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+					json = await response.Content.ReadAsStringAsync(apiCts.Token).ConfigureAwait(false);
+				}
+				else
+				{
+					AppLogger.LogWarn($"GitHub REST API returned non-success code: {(int)response.StatusCode} {response.ReasonPhrase}");
 				}
 			}
 			catch (Exception ex)
 			{
-				AppLogger.LogWarn($"Direct GitHub API check failed: {ex.Message}");
+				AppLogger.LogWarn($"Direct GitHub REST API check failed ({ex.Message}), falling back to GitHub Atom feed...");
 			}
 
-			// 尝试 2：如果直接连接失败且配置了镜像源，尝试通过代理请求
-			if (string.IsNullOrEmpty(json) && !string.Equals(proxySource, "direct", StringComparison.OrdinalIgnoreCase))
+			if (!string.IsNullOrEmpty(json))
 			{
 				try
 				{
-					string proxiedApiUrl = GetProxiedDownloadUrl(apiUrl, proxySource, customProxy);
-					using HttpResponseMessage proxyResponse = await _httpClient.GetAsync(proxiedApiUrl, ct).ConfigureAwait(false);
-					if (proxyResponse.IsSuccessStatusCode)
+					using JsonDocument doc = JsonDocument.Parse(json);
+					JsonElement root = doc.RootElement;
+
+					if (isBetaChannel && root.ValueKind == JsonValueKind.Array)
 					{
-						json = await proxyResponse.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+						ReleaseInfo? bestRelease = null;
+						foreach (JsonElement item in root.EnumerateArray())
+						{
+							ReleaseInfo? rel = ParseReleaseElement(item);
+							if (rel == null) continue;
+
+							if (bestRelease == null || (rel.ParsedVersion != null && bestRelease.ParsedVersion != null && rel.ParsedVersion > bestRelease.ParsedVersion))
+							{
+								bestRelease = rel;
+							}
+						}
+						if (bestRelease != null) return bestRelease;
+					}
+					else if (root.ValueKind == JsonValueKind.Object)
+					{
+						ReleaseInfo? rel = ParseReleaseElement(root);
+						if (rel != null) return rel;
 					}
 				}
 				catch (Exception ex)
 				{
-					AppLogger.LogWarn($"Proxied GitHub API check failed: {ex.Message}");
+					AppLogger.LogWarn($"ParseReleaseElement JSON error: {ex.Message}");
 				}
 			}
 
-			if (string.IsNullOrEmpty(json))
+			// Tier 2: 降级至 GitHub 官方 Releases Atom XML Feed
+			// (在 github.com 网页主域名下，免 API 鉴权、无 60 次/小时速率限制，国内用户只要能正常访问 GitHub 网页即可 100% 极速秒通！)
+			try
 			{
-				return null;
-			}
-
-			using JsonDocument doc = JsonDocument.Parse(json);
-			JsonElement root = doc.RootElement;
-
-			if (isBetaChannel && root.ValueKind == JsonValueKind.Array)
-			{
-				// 在所有 releases 中筛选最新版本
-				ReleaseInfo? bestRelease = null;
-				foreach (JsonElement item in root.EnumerateArray())
+				using var atomCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+				atomCts.CancelAfter(TimeSpan.FromSeconds(6));
+				string atomUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases.atom";
+				using var atomReq = new HttpRequestMessage(HttpMethod.Get, atomUrl);
+				atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/atom+xml"));
+				atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+				using HttpResponseMessage atomResponse = await _httpClient.SendAsync(atomReq, atomCts.Token).ConfigureAwait(false);
+				if (atomResponse.IsSuccessStatusCode)
 				{
-					ReleaseInfo? rel = ParseReleaseElement(item);
-					if (rel == null) continue;
-
-					if (bestRelease == null || (rel.ParsedVersion != null && bestRelease.ParsedVersion != null && rel.ParsedVersion > bestRelease.ParsedVersion))
+					string atomXml = await atomResponse.Content.ReadAsStringAsync(atomCts.Token).ConfigureAwait(false);
+					ReleaseInfo? atomRelease = ParseAtomFeed(atomXml, isBetaChannel);
+					if (atomRelease != null)
 					{
-						bestRelease = rel;
+						AppLogger.LogInfo($"Successfully checked updates via GitHub Atom Feed: {atomRelease.TagName}");
+						return atomRelease;
 					}
 				}
-				return bestRelease;
+				else
+				{
+					AppLogger.LogWarn($"GitHub Atom feed returned status: {(int)atomResponse.StatusCode}");
+				}
 			}
-			else if (root.ValueKind == JsonValueKind.Object)
+			catch (Exception ex)
 			{
-				return ParseReleaseElement(root);
+				AppLogger.LogWarn($"GitHub Atom feed check failed ({ex.Message}), falling back to latest release redirect probe...");
+			}
+
+			// Tier 3: 降级至 GitHub Releases /latest 网页 302 重定向探测
+			try
+			{
+				using var redirectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+				redirectCts.CancelAfter(TimeSpan.FromSeconds(5));
+				string latestUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/latest";
+
+				using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+				using var probeClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+				probeClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"));
+
+				using var req = new HttpRequestMessage(HttpMethod.Head, latestUrl);
+				using var resp = await probeClient.SendAsync(req, redirectCts.Token).ConfigureAwait(false);
+				if ((int)resp.StatusCode is 301 or 302 && resp.Headers.Location != null)
+				{
+					string loc = resp.Headers.Location.ToString();
+					int tagIdx = loc.LastIndexOf("/tag/", StringComparison.OrdinalIgnoreCase);
+					if (tagIdx >= 0)
+					{
+						string tag = loc.Substring(tagIdx + 5).Trim();
+						AppLogger.LogInfo($"Successfully checked update tag via Latest Web Redirect: {tag}");
+						return CreateSynthesizedReleaseInfo(tag, "GitHub Releases 网页探测");
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogWarn($"Latest release redirect probe failed: {ex.Message}");
 			}
 
 			return null;
@@ -196,6 +254,138 @@ public class UpdateManager
 			AppLogger.LogError("CheckForUpdateAsync exception", ex);
 			return null;
 		}
+	}
+
+	public ReleaseInfo? ParseAtomFeed(string xml, bool isBetaChannel)
+	{
+		try
+		{
+			XDocument doc = XDocument.Parse(xml);
+			XNamespace ns = "http://www.w3.org/2005/Atom";
+			var entries = doc.Root?.Elements(ns + "entry");
+			if (entries == null) return null;
+
+			ReleaseInfo? bestRelease = null;
+			Version currentVer = GetCurrentVersion();
+
+			foreach (var entry in entries)
+			{
+				string id = entry.Element(ns + "id")?.Value ?? "";
+				string title = entry.Element(ns + "title")?.Value ?? "";
+				string updatedStr = entry.Element(ns + "updated")?.Value ?? "";
+				DateTime.TryParse(updatedStr, out DateTime publishedAt);
+
+				// 从 id 提取 tag，例如: tag:github.com,2008:Repository/1343746076/v1.6.5
+				string tag = "";
+				int slashIdx = id.LastIndexOf('/');
+				if (slashIdx >= 0 && slashIdx < id.Length - 1)
+				{
+					tag = id.Substring(slashIdx + 1).Trim();
+				}
+
+				// 若 id 未提取到，尝试从 link 提取: <link rel="alternate" type="text/html" href="https://github.com/.../releases/tag/v1.6.5"/>
+				if (string.IsNullOrEmpty(tag))
+				{
+					var linkElem = entry.Element(ns + "link");
+					string href = linkElem?.Attribute("href")?.Value ?? "";
+					int tagIdx = href.LastIndexOf("/tag/", StringComparison.OrdinalIgnoreCase);
+					if (tagIdx >= 0)
+					{
+						tag = href.Substring(tagIdx + 5).Trim();
+					}
+				}
+
+				if (string.IsNullOrEmpty(tag)) continue;
+
+				Version? parsedVer = ParseVersionFromTag(tag);
+				if (parsedVer == null) continue;
+
+				bool isPrerelease = tag.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
+									tag.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
+									tag.Contains("rc", StringComparison.OrdinalIgnoreCase) ||
+									title.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
+									title.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
+									title.Contains("内测", StringComparison.OrdinalIgnoreCase) ||
+									title.Contains("尝鲜", StringComparison.OrdinalIgnoreCase);
+
+				if (!isBetaChannel && isPrerelease)
+				{
+					// 正式版通道跳过预发布版
+					continue;
+				}
+
+				// 提取更新日志 HTML 并转换为纯文本
+				string contentHtml = entry.Element(ns + "content")?.Value ?? "";
+				string body = ConvertHtmlToMarkdown(contentHtml);
+
+				string htmlUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/tag/{tag}";
+				bool isNewer = parsedVer > currentVer;
+
+				var rel = new ReleaseInfo
+				{
+					TagName = tag,
+					ParsedVersion = parsedVer,
+					Title = string.IsNullOrWhiteSpace(title) ? tag : title,
+					Body = body,
+					PublishedAt = publishedAt != default ? publishedAt : DateTime.Now,
+					IsPrerelease = isPrerelease,
+					HtmlUrl = htmlUrl,
+					IsNewerVersion = isNewer,
+					StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",
+					LightweightAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Lightweight-win-x64.zip"
+				};
+
+				if (bestRelease == null || (rel.ParsedVersion != null && bestRelease.ParsedVersion != null && rel.ParsedVersion > bestRelease.ParsedVersion))
+				{
+					bestRelease = rel;
+				}
+			}
+
+			return bestRelease;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("ParseAtomFeed failed", ex);
+			return null;
+		}
+	}
+
+	public static string ConvertHtmlToMarkdown(string html)
+	{
+		if (string.IsNullOrWhiteSpace(html)) return "";
+
+		string text = html;
+		text = Regex.Replace(text, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"</p>", "\n\n", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"</li>", "\n", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"<li>", "• ", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"<h[1-6][^>]*>", "\n### ", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"</h[1-6]>", "\n", RegexOptions.IgnoreCase);
+		text = Regex.Replace(text, @"<[^>]+>", "", RegexOptions.IgnoreCase);
+		text = WebUtility.HtmlDecode(text);
+		text = Regex.Replace(text, @"\n{3,}", "\n\n");
+		return text.Trim();
+	}
+
+	private ReleaseInfo CreateSynthesizedReleaseInfo(string tag, string sourceTitle)
+	{
+		Version? parsedVer = ParseVersionFromTag(tag);
+		Version currentVer = GetCurrentVersion();
+		bool isNewer = parsedVer != null && parsedVer > currentVer;
+
+		return new ReleaseInfo
+		{
+			TagName = tag,
+			ParsedVersion = parsedVer,
+			Title = $"StarPie {tag}",
+			Body = $"（通过 {sourceTitle} 探测到最新版本，详细更新日志请查看 GitHub Releases 页面）",
+			PublishedAt = DateTime.Now,
+			IsPrerelease = tag.Contains("beta", StringComparison.OrdinalIgnoreCase) || tag.Contains("alpha", StringComparison.OrdinalIgnoreCase),
+			HtmlUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/tag/{tag}",
+			IsNewerVersion = isNewer,
+			StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",
+			LightweightAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Lightweight-win-x64.zip"
+		};
 	}
 
 	private ReleaseInfo? ParseReleaseElement(JsonElement elem)
@@ -284,65 +474,122 @@ public class UpdateManager
 			try { File.Delete(destinationZipPath); } catch { }
 		}
 
-		using HttpResponseMessage response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-		response.EnsureSuccessStatusCode();
+		// 构建候选下载源列表，若主镜像源不可用自动无缝故障转移 (Failover)
+		List<string> candidateUrls = new List<string> { downloadUrl };
 
-		long? totalBytes = response.Content.Headers.ContentLength;
-		long totalBytesVal = totalBytes.GetValueOrDefault(-1);
-
-		await using Stream contentStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-		await using FileStream fileStream = new FileStream(destinationZipPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
-
-		byte[] buffer = new byte[65536];
-		long totalRead = 0;
-		int read;
-		Stopwatch stopwatch = Stopwatch.StartNew();
-		long lastBytes = 0;
-		double lastSpeed = 0;
-		DateTime lastSpeedTime = DateTime.UtcNow;
-
-		while ((read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+		string rawGithubUrl = downloadUrl;
+		int ghIndex = downloadUrl.IndexOf("https://github.com/", StringComparison.OrdinalIgnoreCase);
+		if (ghIndex > 0)
 		{
-			await fileStream.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
-			totalRead += read;
-
-			DateTime now = DateTime.UtcNow;
-			double elapsedSeconds = (now - lastSpeedTime).TotalSeconds;
-			if (elapsedSeconds >= 0.3)
-			{
-				lastSpeed = (totalRead - lastBytes) / elapsedSeconds;
-				lastBytes = totalRead;
-				lastSpeedTime = now;
-			}
-
-			int percent = totalBytesVal > 0 ? (int)((totalRead * 100) / totalBytesVal) : 0;
-			progress?.Report(new UpdateProgressInfo
-			{
-				Percent = Math.Min(100, percent),
-				BytesReceived = totalRead,
-				TotalBytesToReceive = totalBytesVal,
-				SpeedBytesPerSecond = lastSpeed
-			});
+			rawGithubUrl = downloadUrl.Substring(ghIndex);
 		}
 
-		progress?.Report(new UpdateProgressInfo
+		if (rawGithubUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase))
 		{
-			Percent = 100,
-			BytesReceived = totalRead,
-			TotalBytesToReceive = totalRead,
-			SpeedBytesPerSecond = 0
-		});
+			string m1 = $"https://ghfast.top/{rawGithubUrl}";
+			string m2 = $"https://gh-proxy.com/{rawGithubUrl}";
+			string m3 = $"https://mirror.ghproxy.com/{rawGithubUrl}";
+			if (!candidateUrls.Contains(m1, StringComparer.OrdinalIgnoreCase)) candidateUrls.Add(m1);
+			if (!candidateUrls.Contains(m2, StringComparer.OrdinalIgnoreCase)) candidateUrls.Add(m2);
+			if (!candidateUrls.Contains(m3, StringComparer.OrdinalIgnoreCase)) candidateUrls.Add(m3);
+			if (!candidateUrls.Contains(rawGithubUrl, StringComparer.OrdinalIgnoreCase)) candidateUrls.Add(rawGithubUrl);
+		}
 
-		// 移除下载文件的 Zone.Identifier (Mark of the Web)，防止触发 Windows 安全中心拦截
-		try
+		Exception? lastEx = null;
+		foreach (string currentUrl in candidateUrls)
 		{
-			string zoneStream = destinationZipPath + ":Zone.Identifier";
-			if (File.Exists(zoneStream))
+			try
 			{
-				File.Delete(zoneStream);
+				AppLogger.LogInfo($"Attempting to download update asset from: {currentUrl}");
+				using var downloadReq = new HttpRequestMessage(HttpMethod.Get, currentUrl);
+				downloadReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+				using HttpResponseMessage response = await _httpClient.SendAsync(downloadReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+				if (!response.IsSuccessStatusCode)
+				{
+					AppLogger.LogWarn($"Download attempt failed with status {response.StatusCode} for URL: {currentUrl}");
+					continue;
+				}
+
+				long? totalBytes = response.Content.Headers.ContentLength;
+				long totalBytesVal = totalBytes.GetValueOrDefault(-1);
+
+				await using Stream contentStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+				await using FileStream fileStream = new FileStream(destinationZipPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true);
+
+				byte[] buffer = new byte[65536];
+				long totalRead = 0;
+				int read;
+				Stopwatch stopwatch = Stopwatch.StartNew();
+				long lastBytes = 0;
+				double lastSpeed = 0;
+				DateTime lastSpeedTime = DateTime.UtcNow;
+
+				while ((read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+				{
+					await fileStream.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+					totalRead += read;
+
+					DateTime now = DateTime.UtcNow;
+					double elapsedSeconds = (now - lastSpeedTime).TotalSeconds;
+					if (elapsedSeconds >= 0.3)
+					{
+						lastSpeed = (totalRead - lastBytes) / elapsedSeconds;
+						lastBytes = totalRead;
+						lastSpeedTime = now;
+					}
+
+					int percent = totalBytesVal > 0 ? (int)((totalRead * 100) / totalBytesVal) : 0;
+					progress?.Report(new UpdateProgressInfo
+					{
+						Percent = Math.Min(100, percent),
+						BytesReceived = totalRead,
+						TotalBytesToReceive = totalBytesVal,
+						SpeedBytesPerSecond = lastSpeed
+					});
+				}
+
+				progress?.Report(new UpdateProgressInfo
+				{
+					Percent = 100,
+					BytesReceived = totalRead,
+					TotalBytesToReceive = totalRead,
+					SpeedBytesPerSecond = 0
+				});
+
+				// 移除下载文件的 Zone.Identifier (Mark of the Web)，防止触发 Windows 安全中心拦截
+				try
+				{
+					string zoneStream = destinationZipPath + ":Zone.Identifier";
+					if (File.Exists(zoneStream))
+					{
+						File.Delete(zoneStream);
+					}
+				}
+				catch { }
+
+				AppLogger.LogInfo($"Update package successfully downloaded ({totalRead} bytes) to {destinationZipPath}");
+				return;
+			}
+			catch (Exception ex)
+			{
+				lastEx = ex;
+				AppLogger.LogWarn($"Download from {currentUrl} failed ({ex.Message}), trying next mirror...");
+				if (File.Exists(destinationZipPath))
+				{
+					try { File.Delete(destinationZipPath); } catch { }
+				}
+				if (ct.IsCancellationRequested)
+				{
+					throw;
+				}
 			}
 		}
-		catch { }
+
+		if (lastEx != null)
+		{
+			throw lastEx;
+		}
+		throw new HttpRequestException("Failed to download release asset from all mirror candidates.");
 	}
 
 	public bool RestartAndApplyUpdate(string downloadedZipPath)
