@@ -153,6 +153,7 @@ public class GestureController
 			_highlightUpdateScheduled = false;
 			_pendingGestureVersion = _gestureVersion;
 		}
+		ActionExecutor.ReleaseStuckModifiers();
 	}
 
 	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window, bool IsEscaped) EndActiveGesture()
@@ -165,6 +166,7 @@ public class GestureController
 			_gestureVersion++;
 			_highlightUpdateScheduled = false;
 			_pendingGestureVersion = _gestureVersion;
+			ActionExecutor.ReleaseStuckModifiers();
 			return result;
 		}
 	}
@@ -1396,6 +1398,8 @@ public class GestureController
 				_radialWindow = null;
 			}
 		}
+
+		ActionExecutor.ReleaseStuckModifiers();
 
 		// A newer gesture may already own the active window. Close only the
 		// completed gesture's stale window and leave the newer one untouched.

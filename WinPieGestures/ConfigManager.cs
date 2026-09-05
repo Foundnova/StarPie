@@ -175,7 +175,18 @@ public static class ConfigManager
 				}
 			}
 			I18n.SetLanguage(CurrentConfig.Language);
-			EnsureAutoStartRegistryUpToDate();
+			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
+			_ = System.Threading.Tasks.Task.Run(async () =>
+			{
+				try
+				{
+					await System.Threading.Tasks.Task.Delay(4000).ConfigureAwait(false);
+					EnsureAutoStartRegistryUpToDate();
+				}
+				catch
+				{
+				}
+			});
 		}
 		catch (Exception)
 		{
@@ -487,7 +498,15 @@ public static class ConfigManager
 
 	public static bool IsAutoStartEnabled()
 	{
-		return IsRegistryAutoStartEnabled() || IsAdminTaskAutoStartEnabled();
+		if (IsRegistryAutoStartEnabled())
+		{
+			return true;
+		}
+		if (CurrentConfig != null && CurrentConfig.AutoStartAsAdmin)
+		{
+			return IsAdminTaskAutoStartEnabled();
+		}
+		return false;
 	}
 
 	public static bool IsRegistryAutoStartEnabled()
@@ -620,7 +639,8 @@ public static class ConfigManager
 	{
 		try
 		{
-			string arguments = $"/create /tn \"StarPie_AdminAutoStart\" /tr \"\\\"{exePath}\\\" --autostart --minimized\" /sc onlogon /rl highest /f";
+			// /delay 0000:00 确保计划任务在用户登录后以零延迟（0秒）立即启动，消除 Windows 任务计划程序默认的数秒登录延迟
+			string arguments = $"/create /tn \"StarPie_AdminAutoStart\" /tr \"\\\"{exePath}\\\" --autostart --minimized\" /sc onlogon /delay 0000:00 /rl highest /f";
 			bool isElevated = IsElevated();
 			ProcessStartInfo psi = new ProcessStartInfo
 			{
@@ -632,7 +652,7 @@ public static class ConfigManager
 				WindowStyle = ProcessWindowStyle.Hidden
 			};
 			using Process process = Process.Start(psi);
-			process?.WaitForExit(3000);
+			process?.WaitForExit(2000);
 		}
 		catch (Exception)
 		{
@@ -665,6 +685,12 @@ public static class ConfigManager
 	{
 		try
 		{
+			// 若当前进程本身就是通过自启动参数呼起，说明任务与注册表均已正确就绪，直接跳过耗时的外置进程核验
+			if (Environment.GetCommandLineArgs().Any(a => string.Equals(a, "--autostart", StringComparison.OrdinalIgnoreCase)))
+			{
+				return;
+			}
+
 			if (CurrentConfig != null && CurrentConfig.AutoStartAsAdmin)
 			{
 				if (IsAdminTaskAutoStartEnabled())
