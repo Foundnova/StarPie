@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/cover.v3.png" width="110" height="110" alt="StarPie Logo" />
+<img src="./assets/logo_dark.png" width="110" height="110" alt="StarPie Logo" />
 
 # StarPie (星盘)
 
