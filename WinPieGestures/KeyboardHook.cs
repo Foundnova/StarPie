@@ -124,6 +124,28 @@ public class KeyboardHook : IDisposable
 		set => Volatile.Write(ref _suppressGlobalHotkeysForRecording, value ? 1 : 0);
 	}
 
+	private static volatile bool _isPhysicalCtrlDown = false;
+	private static volatile bool _isPhysicalShiftDown = false;
+	private static volatile bool _isPhysicalAltDown = false;
+	private static volatile bool _isPhysicalWinDown = false;
+
+	public static bool IsPhysicalModifierDown(ModifierKeys mod)
+	{
+		switch (mod)
+		{
+		case ModifierKeys.Control:
+			return _isPhysicalCtrlDown || (GetAsyncKeyState(17) & 0x8000) != 0 || (GetAsyncKeyState(162) & 0x8000) != 0 || (GetAsyncKeyState(163) & 0x8000) != 0;
+		case ModifierKeys.Shift:
+			return _isPhysicalShiftDown || (GetAsyncKeyState(16) & 0x8000) != 0 || (GetAsyncKeyState(160) & 0x8000) != 0 || (GetAsyncKeyState(161) & 0x8000) != 0;
+		case ModifierKeys.Alt:
+			return _isPhysicalAltDown || (GetAsyncKeyState(18) & 0x8000) != 0 || (GetAsyncKeyState(164) & 0x8000) != 0 || (GetAsyncKeyState(165) & 0x8000) != 0;
+		case ModifierKeys.Windows:
+			return _isPhysicalWinDown || (GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0;
+		default:
+			return false;
+		}
+	}
+
 	private readonly HashSet<uint> _exclusiveDownModifiers = new HashSet<uint>();
 	private volatile bool _isDrainingModifiers;
 	private volatile string? _pendingCompletedHotkey;
@@ -434,12 +456,29 @@ public class KeyboardHook : IDisposable
 
 			int num = (int)wParam;
 			uint vkCode = kbd.vkCode;
+			bool isDown = (num == WM_KEYDOWN || num == WM_SYSKEYDOWN);
+			bool isUp = (num == WM_KEYUP || num == WM_SYSKEYUP);
+
+			// 维护系统全局物理按键真实状态（当且仅当真实硬件动作，排除 StarPie 自发模拟）
+			if (isDown)
+			{
+				if (vkCode == 17 || vkCode == 162 || vkCode == 163) _isPhysicalCtrlDown = true;
+				else if (vkCode == 16 || vkCode == 160 || vkCode == 161) _isPhysicalShiftDown = true;
+				else if (vkCode == 18 || vkCode == 164 || vkCode == 165) _isPhysicalAltDown = true;
+				else if (vkCode == 91 || vkCode == 92) _isPhysicalWinDown = true;
+			}
+			else if (isUp)
+			{
+				if (vkCode == 17 || vkCode == 162 || vkCode == 163) _isPhysicalCtrlDown = false;
+				else if (vkCode == 16 || vkCode == 160 || vkCode == 161) _isPhysicalShiftDown = false;
+				else if (vkCode == 18 || vkCode == 164 || vkCode == 165) _isPhysicalAltDown = false;
+				else if (vkCode == 91 || vkCode == 92) _isPhysicalWinDown = false;
+			}
+
 			ModifierKeys currentModifiers = GetCurrentModifiers();
 
 			if (SuppressGlobalHotkeysForRecording)
 			{
-				bool isDown = (num == WM_KEYDOWN || num == WM_SYSKEYDOWN);
-				bool isUp = (num == WM_KEYUP || num == WM_SYSKEYUP);
 
 				if (_isDrainingModifiers)
 				{
@@ -547,10 +586,7 @@ public class KeyboardHook : IDisposable
 				if (!IsModifierVk(vkCode))
 				{
 					// 用户按下常规物理按键：若检测到底层存在物理未按但虚拟状态卡死的幽灵修饰键，立即就地自愈解除
-					if (CheckAndHealGhostModifiers())
-					{
-						currentModifiers = GetCurrentModifiers();
-					}
+					CheckAndHealGhostModifiers(ref currentModifiers);
 				}
 				GlobalKeyEventArgs e3 = new GlobalKeyEventArgs(vkCode, currentModifiers);
 				OnKeyDown?.Invoke(this, e3);
@@ -577,40 +613,40 @@ public class KeyboardHook : IDisposable
 	}
 
 	/// <summary>
-	/// 检查并自愈幽灵粘滞修饰键：物理按键并未按下，但系统/消息队列的虚拟状态显示为按下。
+	/// 检查并自愈幽灵粘滞修饰键：系统/窗口逻辑认为修饰键处于按下态，但用户物理手指并未按键。
 	/// </summary>
-	private bool CheckAndHealGhostModifiers()
+	private bool CheckAndHealGhostModifiers(ref ModifierKeys currentModifiers)
 	{
 		try
 		{
 			bool hasGhost = false;
 
-			// Ctrl: 物理未按，但虚拟或消息队列状态显示按下
-			bool ctrlPhys = (GetAsyncKeyState(17) & 0x8000) != 0 || (GetAsyncKeyState(162) & 0x8000) != 0 || (GetAsyncKeyState(163) & 0x8000) != 0;
-			if (!ctrlPhys && ((GetKeyState(17) & 0x8000) != 0 || (GetKeyState(162) & 0x8000) != 0 || (GetKeyState(163) & 0x8000) != 0))
+			// 1. Ctrl 粘滞排查：逻辑上下文有 Control，但用户物理手指根本未按任何 Ctrl
+			if (currentModifiers.HasFlag(ModifierKeys.Control) && !IsPhysicalModifierDown(ModifierKeys.Control))
 			{
 				hasGhost = true;
+				currentModifiers &= ~ModifierKeys.Control;
 			}
 
-			// Shift: 物理未按，但虚拟按下
-			bool shiftPhys = (GetAsyncKeyState(16) & 0x8000) != 0 || (GetAsyncKeyState(160) & 0x8000) != 0 || (GetAsyncKeyState(161) & 0x8000) != 0;
-			if (!shiftPhys && ((GetKeyState(16) & 0x8000) != 0 || (GetKeyState(160) & 0x8000) != 0 || (GetKeyState(161) & 0x8000) != 0))
+			// 2. Shift 粘滞排查
+			if (currentModifiers.HasFlag(ModifierKeys.Shift) && !IsPhysicalModifierDown(ModifierKeys.Shift))
 			{
 				hasGhost = true;
+				currentModifiers &= ~ModifierKeys.Shift;
 			}
 
-			// Alt: 物理未按，但虚拟按下
-			bool altPhys = (GetAsyncKeyState(18) & 0x8000) != 0 || (GetAsyncKeyState(164) & 0x8000) != 0 || (GetAsyncKeyState(165) & 0x8000) != 0;
-			if (!altPhys && ((GetKeyState(18) & 0x8000) != 0 || (GetKeyState(164) & 0x8000) != 0 || (GetKeyState(165) & 0x8000) != 0))
+			// 3. Alt 粘滞排查
+			if (currentModifiers.HasFlag(ModifierKeys.Alt) && !IsPhysicalModifierDown(ModifierKeys.Alt))
 			{
 				hasGhost = true;
+				currentModifiers &= ~ModifierKeys.Alt;
 			}
 
-			// Win: 物理未按，但虚拟按下
-			bool winPhys = (GetAsyncKeyState(91) & 0x8000) != 0 || (GetAsyncKeyState(92) & 0x8000) != 0;
-			if (!winPhys && ((GetKeyState(91) & 0x8000) != 0 || (GetKeyState(92) & 0x8000) != 0))
+			// 4. Win 粘滞排查
+			if (currentModifiers.HasFlag(ModifierKeys.Windows) && !IsPhysicalModifierDown(ModifierKeys.Windows))
 			{
 				hasGhost = true;
+				currentModifiers &= ~ModifierKeys.Windows;
 			}
 
 			if (hasGhost)

@@ -30,20 +30,24 @@
 1. **彻底排查根因 1：`VK_SNAPSHOT` (44 / PrintScreen) 硬件扫描码与扩展键标志位混乱修复**：
    - 排查发现 Win32 `MapVirtualKey(44, 0)` 在 Windows 下会返回 `0x54`（PS/2 键盘的 `SysReq` 系统中断请求扫描码），原逻辑又为其追加了 `KEYEVENTF_EXTENDEDKEY (0x0001)` 合成为非法序列 `E0 54`，导致 Windows 底层驱动与键盘过滤驱动识别异常、直接截断丢弃后续的 `KeyUp` 消息；
    - **修复**：在 `ActionExecutor.CreateKeyInput` 与 `KeyboardHook.ReplayKeyPress` 中，针对 `vk == 44`（PrintScreen/Snapshot）强制设置 `wScan = 0` 并剥离 `KEYEVENTF_EXTENDEDKEY`，确保 Windows 采用干净纯粹的标准虚拟键注入，杜绝驱动层硬件扫描码中断异常；
-2. **彻底排查根因 2：截屏工具抢占焦点导致的修饰键丢失与异步状态脱节**：
-   - 用户在触发 `Ctrl + PrintScreen`、`Win + Shift + S`、`Ctrl + Alt + A` 等截图类热键时，第三方截屏软件（如 Snipaste、PixPin、ShareX、微信/QQ 截图、Windows 截图工具）会在 20ms~80ms 内迅速弹出全屏遮罩并抢占全局输入焦点；
-   - 原热键时延过短（仅 6ms），导致 `Ctrl KeyUp` 事件正好在焦点转移/目标窗口句柄未初始化的微秒级间隙被系统丢弃，新建窗口与后续应用程序的系统击键状态表将 `VK_CONTROL` 永远记录为 Down，导致打字变成触发 Ctrl 快捷键、Esc 变成打开开始菜单，引发“键盘严重失灵”；
-   - **时延规范重塑**：依工程规范将修饰键保持时延与主键时延提升至 15ms ~ 20ms，留足应用程序捕获时间；
-   - **三阶异步自愈守护 (Delayed Modifier Watchdog)**：在 `finally` 块中启动 `Task.Run` 延迟自愈守护，在焦点抢占的关键时间窗口（+50ms、+120ms、+250ms）三次自动排查，若用户物理上未按该键，强制补发 `KeyUp` 清空残留粘滞；
+2. **彻底排查根因 2：截屏工具抢占焦点导致修饰键丢失，原生集成 AHK 级「原子快门」与「双重保险释放」**：
+   - 用户在触发 `Ctrl + PrintScreen` 等截图类热键时，第三方截屏软件（如 Snipaste、PixPin、ShareX、微信/QQ 截图、Windows 截图工具）会在 20ms~80ms 内迅速弹出全屏遮罩并抢占全局输入焦点；
+   - 原逻辑在 `PrintScreen Down` 之后执行了 20ms Sleep，导致截图工具在按键序列中途强行切断输入焦点，使后续的 `Ctrl Up` 被焦点切换吞没；
+   - **瞬态快门模式（Atomic Shutter Mode）**：针对 `VK_SNAPSHOT` (44) 瞬态系统快门键，`PrintScreen Down` 与 `PrintScreen Up` 作为一个原子数据包同时发送（0ms 间隔），消除 20ms 长时间按住给外部软件造成的窗口抢焦与序列截断；
+   - **双重保险释放（Double-Insurance Release）**：参照成熟 AHK 脚本的最佳工程经验，在首轮通过双通道发送 `Ctrl Up` 后，时延 15ms 再次补发第二轮 `Ctrl Up` 兜底，彻底消灭单次焦点转移丢包；
+   - **三阶异步自愈守护 (Delayed Modifier Watchdog)**：在 `finally` 块中启动 `Task.Run` 延迟自愈守护，在焦点抢占的关键时间窗口（+40ms、+110ms、+250ms）三次自动排查，若用户物理上未按该键，强制补发 `KeyUp` 清空残留粘滞；
 3. **彻底排查根因 3：通用修饰键与具体左右键成对彻底释放 (双通道 SendInput + keybd_event 注入)**：
    - 升级 `ForceReleaseAllModifiers` 与 `ReleaseStuckModifiers`，当释放 `Ctrl`（162）时同步释放通用 `VK_CONTROL`（17）与右侧键（163）；同理覆盖 Shift（160/161/16）、Alt（164/165/18）与 Win（91/92）；
-   - 注入机制升级为 **`SendInput`（投递消息队列）+ `keybd_event`（直接同步内核 `win32k.sys` 全局击键状态表）双通道并进**，彻底击穿跨进程焦点屏障；
+   - 为 `VK_RCONTROL` (163) 与 `VK_RMENU` (165) 补齐 Windows 必需的 `KEYEVENTF_EXTENDEDKEY (0x0001)` 标志位；
+   - 注入机制升级为 **`SendInput`（投递消息队列）+ `keybd_event`（直接同步内核 `win32k.sys` 全局击键状态表，注入真实 `MapVirtualKey` 硬件扫描码）双通道并进**，彻底击穿跨进程焦点屏障；
    - 严格遵循物理安全校验：调用 `(GetAsyncKeyState(vk) & 0x8000) == 0`，若用户手指确实正按在物理按键上则绝不打断，仅在物理未按而系统卡滞时精准施救；
-4. **彻底排查根因 4：低级键盘钩子实时自愈防护盾 (Instant Ghost-Modifier Shield)**：
-   - 在 `KeyboardHook.cs` 的全局低级键盘钩子中部署 `CheckAndHealGhostModifiers` 实时自愈盾；
-   - 当用户物理按下任意常规按键（如字母、数字、方向键、Esc、Space、Enter 等）时，若检测到 `!physical && virtual`（即物理上没按 Ctrl/Shift/Alt/Win，但系统虚拟状态卡死在按下态）的脱节异常，立即就地瞬间蒸发幽灵修饰键，恢复当前按键事件的真实修饰键状态，彻底杜绝任何幽灵按键干扰；
-5. **轮盘生命周期全量解卡挂钩**：
-   - 在 `GestureController` 的 `EndActiveGesture()`（手势完成）、`CancelGestureTracking()`（手势取消）与 `CloseGestureWindow()`（轮盘销毁）中全面挂接 `ReleaseStuckModifiers()`，确保轮盘呼出关闭全流程干净利落、零残留。
+4. **彻底排查根因 4：修复钩子线程 `GetKeyState` 失效，部署真实硬件物理状态机与瞬时自愈盾**：
+   - 查证排查发现 `GetKeyState` 只能获取调用线程自身消息队列的状态。由于键盘钩子运行在独立专用后台线程，该函数永远返回 0，导致原自愈盾未能真正生效；
+   - **重构**：在全局低级键盘钩子中引入 `_isPhysicalCtrlDown` 等真实硬件状态机，精确捕获用户手指是否真正物理按下修饰键；
+   - 当用户在键盘上敲击任意常规按键（字母、数字、方向键、Esc、Space、Enter 等）时，若检测到逻辑上修饰键被粘滞，但物理手指根本未按：**立即在按键传递前秒级剥离幽灵修饰键并注入物理 KeyUp 自愈**，彻底消灭“打字变成快捷键、键盘全面失灵”的缺陷；
+5. **轮盘生命周期全量解卡挂钩与焦点平稳缓冲**：
+   - 在 `GestureController` 的 `EndActiveGesture()`（手势完成）、`CancelGestureTracking()`（手势取消）与 `CloseGestureWindow()`（轮盘销毁）中全面挂接 `ReleaseStuckModifiers()`；
+   - 动作下发前增加 10ms 物理缓冲时延，确保透明悬浮窗销毁后 Windows DWM 焦点已完全平稳回落至目标窗口，确保热键 100% 投递成功。
 
 ### ⚡ GitHub 下载加速镜像源新增 `github.akams.cn`
 1. **新增极速镜像代理节点**：

@@ -255,6 +255,8 @@ public static class ActionExecutor
 				OcrManager.StartCaptureAndRecognize();
 				break;
 			case "Hotkey":
+				// 微量时延（10ms）：等待透明悬浮窗销毁与 Windows DWM 焦点平稳归位至目标窗口
+				System.Threading.Thread.Sleep(10);
 				ExecuteHotkey(action.Parameter);
 				break;
 			case "Command":
@@ -1303,8 +1305,14 @@ public static class ActionExecutor
 				if ((GetAsyncKeyState((int)vk) & 0x8000) == 0)
 				{
 					upInputs.Add(CreateKeyInput(vk, down: false));
-					// keybd_event 通道：直接刷新 win32k 系统级全局击键状态表
-					keybd_event((byte)vk, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+					// keybd_event 通道：注入真实硬件扫描码与扩展键标志位，直接刷新 win32k 系统级全局击键状态表
+					byte bScan = (byte)MapVirtualKey((uint)vk, 0u);
+					uint dwFlags = KEYEVENTF_KEYUP;
+					if (vk == 163 || vk == 165 || vk == 91 || vk == 92 || (vk >= 33 && vk <= 46))
+					{
+						dwFlags |= 1u; // KEYEVENTF_EXTENDEDKEY
+					}
+					keybd_event((byte)vk, bScan, dwFlags, StarPieExtraInfo);
 				}
 			}
 
@@ -1326,7 +1334,9 @@ public static class ActionExecutor
 
 	/// <summary>
 	/// 异步延迟自愈守护：针对截屏软件（如 Snipaste、PixPin、微信截屏）或模态窗口抢占焦点导致 KeyUp 丢失的问题，
-	/// 在焦点转移与窗口创建的关键时间窗口 (+50ms, +120ms, +250ms) 自动再次校验并排空残留粘滞。
+	/// <summary>
+	/// 异步延迟自愈守护：针对截屏软件（如 Snipaste、PixPin、微信截屏）或模态窗口抢占焦点导致 KeyUp 丢失的问题，
+	/// 在焦点转移与窗口创建的关键时间窗口 (+40ms, +110ms, +250ms) 自动再次校验并排空残留粘滞。
 	/// </summary>
 	private static void ScheduleModifierWatchdog()
 	{
@@ -1334,11 +1344,11 @@ public static class ActionExecutor
 		{
 			try
 			{
-				await System.Threading.Tasks.Task.Delay(50).ConfigureAwait(false);
+				await System.Threading.Tasks.Task.Delay(40).ConfigureAwait(false);
 				ReleaseStuckModifiers();
 				await System.Threading.Tasks.Task.Delay(70).ConfigureAwait(false);
 				ReleaseStuckModifiers();
-				await System.Threading.Tasks.Task.Delay(130).ConfigureAwait(false);
+				await System.Threading.Tasks.Task.Delay(140).ConfigureAwait(false);
 				ReleaseStuckModifiers();
 			}
 			catch
@@ -1394,25 +1404,44 @@ public static class ActionExecutor
 			if (downInputs.Count > 0)
 			{
 				SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(15);
+				System.Threading.Thread.Sleep(10);
 			}
 
 			if (hotkeyDetails.MainKey != 0)
 			{
 				INPUT keySeqDown = CreateKeyInput(hotkeyDetails.MainKey, down: true);
 				INPUT keySeqUp = CreateKeyInput(hotkeyDetails.MainKey, down: false);
-				SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(20);
-				SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(15);
+
+				// VK_SNAPSHOT (PrintScreen, 44): 特殊瞬态系统快门键优化
+				// PrintScreen down 与 up 作为一个原子数据包同时发送（0ms 间隔），
+				// 消除 20ms 长时间按住给第三方截图软件造成的窗口抢焦与后续按键拦截
+				if (hotkeyDetails.MainKey == 44)
+				{
+					SendInput(2u, new INPUT[] { keySeqDown, keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(15);
+				}
+				else
+				{
+					SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(15);
+					SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(10);
+				}
 			}
 		}
 		finally
 		{
-			// 3. 无论中间是否发生异常，始终安全成对释放所有修饰键（包含具体与通用修饰键，双通道刷新）
+			// 3. 第一轮成对释放所有修饰键（包含具体与通用修饰键，双通道 SendInput + keybd_event 刷新）
 			ForceReleaseAllModifiers(hotkeyDetails.Modifiers);
 
-			// 4. 启动异步守护自愈，针对截图抢焦点场景提供三道时间窗口的解卡保障
+			// 4. 双重保险释放：针对截图工具抢占焦点场景，等待 15ms 后再次补发一次修饰键释放，彻底消灭单次焦点转移丢包
+			if (hotkeyDetails.Modifiers.Count > 0)
+			{
+				System.Threading.Thread.Sleep(15);
+				ForceReleaseAllModifiers(hotkeyDetails.Modifiers);
+			}
+
+			// 5. 启动异步延迟自愈守护（+40ms, +110ms, +250ms）三道时间窗口排空残留
 			ScheduleModifierWatchdog();
 		}
 	}
@@ -1718,6 +1747,7 @@ public static class ActionExecutor
 		    vk == 45 || vk == 46 ||
 		    vk == 91 || vk == 92 ||
 		    vk == 111 ||
+		    vk == 163 || vk == 165 ||
 		    (vk >= 166 && vk <= 179))
 		{
 			result.U.ki.dwFlags |= 1u;
