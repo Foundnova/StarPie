@@ -562,17 +562,19 @@ def test_v135_program_picker_clean_icons_and_core_customization(app):
     time.sleep(0.4)
     
     # 2. Check Core Icon controls exist
+    # v1.6.8dev2: CoreIconTypeComboBox lives inside CoreIconConfigPanel, which is
+    # collapsed until ShowCoreIcon is enabled — check the box before asserting it
     core_chk = win.child_window(auto_id="ShowCoreIconCheckBox", control_type="CheckBox")
     assert core_chk.exists(timeout=3), "ShowCoreIconCheckBox should exist"
-    
+
+    if core_chk.get_toggle_state() == 0:
+        core_chk.toggle()
+        time.sleep(0.4)
+
     core_combo = win.child_window(auto_id="CoreIconTypeComboBox", control_type="ComboBox")
     assert core_combo.exists(timeout=3), "CoreIconTypeComboBox should exist"
-    
-    # 3. Toggle ShowCoreIcon and select Core Pattern
-    try:
-        core_chk.toggle()
-    except Exception:
-        pass
+
+    # 3. Select Core Pattern
     core_combo.select(1)
     time.sleep(0.6)
     
@@ -632,6 +634,15 @@ def test_v136_glow_color_customization_config_memory_and_core_image(app):
     time.sleep(0.3)
     
     # 3. Check Core Image Controls
+    # v1.6.8dev2: CoreIconTypeComboBox is hidden inside CoreIconConfigPanel until
+    # ShowCoreIcon is enabled — check the box first
+    core_chk = win.child_window(auto_id="ShowCoreIconCheckBox", control_type="CheckBox")
+    assert core_chk.exists(timeout=3), "ShowCoreIconCheckBox should exist"
+
+    if core_chk.get_toggle_state() == 0:
+        core_chk.toggle()
+        time.sleep(0.4)
+
     core_combo = win.child_window(auto_id="CoreIconTypeComboBox", control_type="ComboBox")
     assert core_combo.exists(timeout=3), "CoreIconTypeComboBox should exist"
     
@@ -775,11 +786,11 @@ def test_v139_folder_action_type_and_i18n_consistency(app):
     focus_title = win.child_window(auto_id="FocusSlotTitleText", control_type="Text")
     assert focus_title.exists(timeout=3), "FocusSlotTitleText should exist"
     
-    # 3. Locate the first slot's Action Type ComboBox (8 aggregated action types,
-    #    index 3 = Folder) and select "Folder"
+    # 3. Locate the first slot's Action Type ComboBox (9 aggregated action types
+    #    since v1.6.8dev2 added ShellTool, index 3 = Folder) and select "Folder"
     type_combo = win.child_window(auto_id="FocusActionTypeComboBox", control_type="ComboBox")
     assert type_combo.exists(timeout=3), "FocusActionTypeComboBox should exist"
-    assert type_combo.item_count() == 8, f"FocusActionTypeComboBox should have 8 action types, got {type_combo.item_count()}"
+    assert type_combo.item_count() == 9, f"FocusActionTypeComboBox should have 9 action types, got {type_combo.item_count()}"
     type_combo.select(3)
     time.sleep(0.3)
     
