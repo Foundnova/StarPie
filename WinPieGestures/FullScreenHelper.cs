@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -24,6 +24,9 @@ public static class FullScreenHelper
 	}
 
 	private const uint MONITOR_DEFAULTTONEAREST = 2u;
+	private const int GWL_EXSTYLE = -20;
+	private const int WS_EX_LAYERED = 0x00080000;
+	private const int WS_EX_TRANSPARENT = 0x00000020;
 
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
@@ -47,6 +50,9 @@ public static class FullScreenHelper
 	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
 	private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern int GetWindowLong(nint hWnd, int nIndex);
+
 	public static bool IsActiveWindowFullScreen()
 	{
 		nint foregroundWindow = GetForegroundWindow();
@@ -69,13 +75,32 @@ public static class FullScreenHelper
 		    string.Equals(className, "SysListView32", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(className, "Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(className, "Shell_SecondaryTrayWnd", StringComparison.OrdinalIgnoreCase) ||
-		    string.Equals(className, "Windows.UI.Core.CoreWindow", StringComparison.OrdinalIgnoreCase))
+		    string.Equals(className, "Windows.UI.Core.CoreWindow", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "ScreenClippingHost", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "SnippingTool", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "SnippingToolHost", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "Snipaste", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "PixPin", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "ScreenCaptureWnd", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(className, "CChatRoomScreenCaptureWnd", StringComparison.OrdinalIgnoreCase))
 		{
 			return false;
 		}
 
 		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
-		if (string.Equals(activeProc, "explorer.exe", StringComparison.OrdinalIgnoreCase))
+		if (string.Equals(activeProc, "explorer.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "screenclippinghost.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "snippingtool.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "snippingtoolhost.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "snipaste.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "pixpin.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "sharex.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "flameshot.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "lightshot.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "shellexperiencehost.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "startmenuexperiencehost.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "searchhost.exe", StringComparison.OrdinalIgnoreCase) ||
+		    string.Equals(activeProc, "textinputhost.exe", StringComparison.OrdinalIgnoreCase))
 		{
 			return false;
 		}
@@ -98,6 +123,12 @@ public static class FullScreenHelper
 
 		if (lpRect.Left <= lpmi.rcMonitor.Left && lpRect.Top <= lpmi.rcMonitor.Top && lpRect.Right >= lpmi.rcMonitor.Right && lpRect.Bottom >= lpmi.rcMonitor.Bottom)
 		{
+			// 检查是否为透明/分层窗口 (如截屏工具遮罩、透明悬浮窗、HUD等)，这类窗口绝非独占全屏游戏
+			int exStyle = GetWindowLong(foregroundWindow, GWL_EXSTYLE);
+			if ((exStyle & WS_EX_LAYERED) != 0 || (exStyle & WS_EX_TRANSPARENT) != 0)
+			{
+				return false;
+			}
 			return true;
 		}
 		return false;

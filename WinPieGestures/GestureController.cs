@@ -466,10 +466,7 @@ public class GestureController
 		{
 			// 轻点：SendInput 回放原生点击（回放事件放行，见 _gestureReplayPending）
 			_gestureReplayPending = true;
-			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-			{
-				_mouseHook.ReplayTriggerClick(gestureButton);
-			}, (DispatcherPriority)5, Array.Empty<object>());
+			ThreadPool.QueueUserWorkItem(_ => _mouseHook.ReplayTriggerClick(gestureButton));
 		}
 		e.Handled = true; // 拦截原生抬起
 	}
@@ -832,17 +829,24 @@ public class GestureController
 			e.Handled = true;
 			return;
 		}
+		bool wasTriggerDown = _mouseTriggerDown;
 		_mouseTriggerDown = false;
 		CancelLongPressTimer();
+
+		if (!wasTriggerDown && !_isGestureActive && !_isWaitingForThreshold)
+		{
+			// 若 StarPie 未曾拦截该按键的物理按下（如隔离模式、全屏抑制、或修饰键不满足），
+			// 绝不可吞掉物理抬起事件，必须直接透传给系统与前台程序！
+			e.Handled = false;
+			return;
+		}
+
 		if (_isWaitingForThreshold)
 		{
 			CancelGestureTracking();
 			_isWaitingForThreshold = false;
 			string btn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
-			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-			{
-				_mouseHook.ReplayTriggerClick(btn);
-			}, DispatcherPriority.Normal, Array.Empty<object>());
+			ThreadPool.QueueUserWorkItem(_ => _mouseHook.ReplayTriggerClick(btn));
 			e.Handled = true;
 		}
 		else
@@ -851,10 +855,7 @@ public class GestureController
 			{
 				// 安全兜底：如果等待状态已结束且手势未处于激活态（说明被提前取消或展示失败），补发重放物理按键，杜绝丢键
 				string btn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
-				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-				{
-					_mouseHook.ReplayTriggerClick(btn);
-				}, DispatcherPriority.Normal, Array.Empty<object>());
+				ThreadPool.QueueUserWorkItem(_ => _mouseHook.ReplayTriggerClick(btn));
 				e.Handled = true;
 				return;
 			}

@@ -449,18 +449,22 @@ public class MouseHook
 		{
 		case "MiddleButton":
 			mouse_event(32u, 0u, 0u, 0u, extra);
+			System.Threading.Thread.Sleep(2);
 			mouse_event(64u, 0u, 0u, 0u, extra);
 			break;
 		case "XButton1":
 			mouse_event(128u, 0u, 0u, 1u, extra);
+			System.Threading.Thread.Sleep(2);
 			mouse_event(256u, 0u, 0u, 1u, extra);
 			break;
 		case "XButton2":
 			mouse_event(128u, 0u, 0u, 2u, extra);
+			System.Threading.Thread.Sleep(2);
 			mouse_event(256u, 0u, 0u, 2u, extra);
 			break;
 		default:
 			mouse_event(8u, 0u, 0u, 0u, extra);
+			System.Threading.Thread.Sleep(2);
 			mouse_event(16u, 0u, 0u, 0u, extra);
 			break;
 		}

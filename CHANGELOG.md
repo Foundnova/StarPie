@@ -4,7 +4,22 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 热键截屏粘滞与修饰键成对释放原生根治 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
+## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 热键截屏粘滞与修饰键成对释放原生根治 & 截屏后右键单击与长按滑动失效彻底根治 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
+
+### 🖱️ 截屏后右键单击失效与长按滑动失效深度排查与彻底根治
+1. **全屏独占误判穿透与遮罩豁免 (FullScreenHelper)**：
+   - 彻底排查发现：用户触发 `Ctrl+PrintScreen` 等截屏动作后，系统或第三方截图软件（Windows `ScreenClippingHost.exe` / `SnippingTool.exe`、`Snipaste.exe`、`PixPin.exe`、`ShareX.exe` 等）会生成覆盖整屏的半透明选区遮罩或淡出动画窗口，导致 `FullScreenHelper.IsActiveWindowFullScreen()` 误判定为“独占全屏 3D 游戏”；
+   - 进而导致 StarPie 全屏抑制机制被意外激活 1~2 秒，造成轮盘无法唤起（长按滑动失效）；
+   - **分层透明属性检测与全屏白名单豁免**：
+     - 在 `FullScreenHelper` 中引入 `GWL_EXSTYLE` 扩展样式探测，凡带有 `WS_EX_LAYERED`（分层透明）或 `WS_EX_TRANSPARENT`（穿透透明）属性的全屏窗口，直接判定为辅助工具/遮罩，杜绝误判为全屏独占游戏；
+     - 显式白名单排除 `ScreenClippingHost`、`SnippingTool`、`Snipaste`、`PixPin`、`ScreenCaptureWnd` 等截图窗口类及常见截图宿主进程。
+2. **物理按键抬起 (WM_RBUTTONUP) 吞键缺陷根治 (GestureController)**：
+   - 深入分析发现原 `Hook_OnTriggerButtonUp` 存在严重时序漏洞：当轮盘处于隔离模式或全屏抑制时，`Hook_OnTriggerButtonDown` 正常放行了物理右键按下（`_mouseTriggerDown = false`, `e.Handled = false`）；但在用户松开鼠标时，由于未检查 `_mouseTriggerDown` 拦截标志，`Hook_OnTriggerButtonUp` 依然错误地执行了 `e.Handled = true` 强行吞掉了物理抬起事件；
+   - 导致前台应用与 Windows 桌面只收到了物理 Down，永远收不到物理 Up，造成右键卡死与右键单击完全失灵；
+   - **严格成对放行机制**：在 `Hook_OnTriggerButtonUp` 首部严谨校验 `wasTriggerDown`，若物理按下未曾被 StarPie 拦截，抬起事件 100% 原生透传系统（`e.Handled = false`），绝不吞键。
+3. **按键回放零延迟与时序稳固 (MouseHook & ThreadPool)**：
+   - 将 `GestureController` 中单击重放的 `Dispatcher.BeginInvoke` 迁移至 `ThreadPool.QueueUserWorkItem`，彻底脱离 WPF UI 主线程调度队列，消除窗口切换与 DWM 动画时的数百毫秒延迟；
+   - 在 `MouseHook.ReplayTriggerClick` 中为 Down 和 Up 之间插入 2ms 物理间隔，规避操作系统与应用消息队列因 0ms 紧邻而丢失按键事件的问题。
 
 ### ⌨️ 快捷热键 (Ctrl+PrintScreen) 截屏粘滞与修饰键释放架构重构
 1. **彻底排查根因与前置尝试失效剖析**：
