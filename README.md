@@ -126,7 +126,7 @@ StarPie `v1.6.8` 在原有快捷轮盘基础上，进一步整合了**轨迹手�
   <br/><br/>
   <img src="./attachments/样式展示.gif" width="680" alt="多几何形态与视觉布局展示" />
   <br/><br/>
-  <img src="./attachments轮盘样式.gif" width="680" alt="预设主题风格与画布实时渲染演示" />
+  <img src="./attachments/轮盘样式.gif" width="680" alt="预设主题风格与画布实时渲染演示" />
 </div>
 
 ---
