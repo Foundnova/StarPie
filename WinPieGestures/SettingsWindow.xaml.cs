@@ -5601,7 +5601,7 @@ public partial class SettingsWindow : Window
 
 	private void UpdateTriggerBadgeDisplay()
 	{
-		if (CurrentTriggerBadgeText != null && ConfigManager.CurrentConfig != null)
+		if (ConfigManager.CurrentConfig != null)
 		{
 			TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger;
 			if (triggerConfig == null)
@@ -5609,8 +5609,29 @@ public partial class SettingsWindow : Window
 				triggerConfig = new TriggerConfig();
 				ConfigManager.CurrentConfig.Trigger = triggerConfig;
 			}
-			string text = FormatTriggerDisplay(triggerConfig);
-			CurrentTriggerBadgeText.Text = text;
+
+			// 核心保障：若配置中选择单键鼠标左键（无修饰键），自动保障长按呼出处于开启状态，使得长按呼出轮盘，单机保持原生点击
+			bool isLeftButton = string.Equals(triggerConfig.MouseButton, "LeftButton", StringComparison.OrdinalIgnoreCase) ||
+			                    string.Equals(ConfigManager.CurrentConfig.TriggerButton, "LeftButton", StringComparison.OrdinalIgnoreCase);
+			bool hasModifier = triggerConfig.RequireCtrl || triggerConfig.RequireShift || triggerConfig.RequireAlt || triggerConfig.RequireWin;
+			if (triggerConfig.TriggerType == "Mouse" && isLeftButton && !hasModifier)
+			{
+				if (!ConfigManager.CurrentConfig.LongPressTrigger)
+				{
+					ConfigManager.CurrentConfig.LongPressTrigger = true;
+					if (LongPressTriggerCheckBox != null)
+					{
+						LongPressTriggerCheckBox.IsChecked = true;
+					}
+					ScheduleAutoSave();
+				}
+			}
+
+			if (CurrentTriggerBadgeText != null)
+			{
+				string text = FormatTriggerDisplay(triggerConfig);
+				CurrentTriggerBadgeText.Text = text;
+			}
 		}
 	}
 
@@ -5717,7 +5738,21 @@ public partial class SettingsWindow : Window
 		}
 		if (LiveSensorStatusText != null)
 		{
-			LiveSensorStatusText.Text = (saved ? "\ud83d\udfe2 触发按键录制成功并已保存！" : "\ud83d\udca1 硬件感知器已就绪：随时按下鼠标任意侧键、中键或键盘按键，此处将实时高亮反馈对应按键与键码。");
+			if (saved)
+			{
+				bool isPureLeft = string.Equals(ConfigManager.CurrentConfig?.TriggerButton, "LeftButton", StringComparison.OrdinalIgnoreCase) &&
+				                  ConfigManager.CurrentConfig?.Trigger?.RequireCtrl != true &&
+				                  ConfigManager.CurrentConfig?.Trigger?.RequireShift != true &&
+				                  ConfigManager.CurrentConfig?.Trigger?.RequireAlt != true &&
+				                  ConfigManager.CurrentConfig?.Trigger?.RequireWin != true;
+				LiveSensorStatusText.Text = isPureLeft
+					? I18n.T("TriggerLeftButtonRecordedTip")
+					: "\ud83d\udfe2 触发按键录制成功并已保存！";
+			}
+			else
+			{
+				LiveSensorStatusText.Text = "\ud83d\udca1 硬件感知器已就绪：随时按下鼠标任意侧键、中键或键盘按键，此处将实时高亮反馈对应按键与键码。";
+			}
 		}
 		if (LiveSensorDot != null)
 		{
@@ -5817,6 +5852,19 @@ public partial class SettingsWindow : Window
 					RequireAlt = (((((int)currentModifiers & 1))) > 0),
 					RequireWin = (((((int)currentModifiers & 8))) > 0)
 				};
+				// 若录入的是单独鼠标左键（无修饰键），自动开启长按呼出，确保长按稳定唤醒轮盘，单机保持原生点击
+				if (mouseButton == "LeftButton" &&
+				    !ConfigManager.CurrentConfig.Trigger.RequireCtrl &&
+				    !ConfigManager.CurrentConfig.Trigger.RequireShift &&
+				    !ConfigManager.CurrentConfig.Trigger.RequireAlt &&
+				    !ConfigManager.CurrentConfig.Trigger.RequireWin)
+				{
+					ConfigManager.CurrentConfig.LongPressTrigger = true;
+					if (LongPressTriggerCheckBox != null)
+					{
+						LongPressTriggerCheckBox.IsChecked = true;
+					}
+				}
 				ConfigManager.CurrentConfig.Trigger.DisplayText = FormatTriggerDisplay(ConfigManager.CurrentConfig.Trigger);
 				ConfigManager.CurrentConfig.TriggerButton = mouseButton;
 				ScheduleAutoSave();

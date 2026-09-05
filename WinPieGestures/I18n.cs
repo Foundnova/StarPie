@@ -1013,10 +1013,17 @@ public static class I18n
 		};
 		dictionary["TriggerRecorderDesc"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "支持鼠标所有按键（右键/中键/侧键1/侧键2）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键（如 Alt+拖动、Ctrl+侧键）一键物理录制绑定。未触发手势的轻点将自动放行原生按键点击。",
-			[LanguageCode.ZhTw] = "支持滑鼠所有按鍵（右鍵/中鍵/側鍵1/側鍵2）與鍵盤單鍵（如 CapsLock、波浪鍵~、空格、字母鍵、F區鍵等）及組合鍵（如 Alt+拖動、Ctrl+側鍵）一鍵物理錄製綁定。未觸發手勢的輕點將自動放行原生按鍵點擊。",
-			[LanguageCode.En] = "Supports one-click physical recording for all mouse buttons (Right, Middle, Side 1/2) and keyboard keys (CapsLock, ~, Space, Letters, F-keys) as well as combos (Alt+Drag, Ctrl+SideButton). Quick clicks naturally pass through native click events.",
-			[LanguageCode.Ja] = "すべてのマウスボタン（右、中央、サイド1/2）およびキーボード単キー（CapsLock、〜、スペース、ファンクションキー）やコンボ（Alt+ドラッグ、Ctrl+サイドキー）の物理録画に対応。短押しクリックは通常通り処理されます。"
+			[LanguageCode.ZhCn] = "支持鼠标所有按键（右键/中键/侧键1/侧键2/左键）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键一键物理录制绑定。绑定鼠标左键后长按可唤醒轮盘，单机左键保持系统正常点击。未触发手势的轻点将自动放行原生按键点击。",
+			[LanguageCode.ZhTw] = "支持滑鼠所有按鍵（右鍵/中鍵/側鍵1/側鍵2/左鍵）與鍵盤單鍵（如 CapsLock、波浪鍵~、空格、字母鍵、F區鍵等）及組合鍵一鍵物理錄製綁定。綁定滑鼠左鍵後長按可喚醒輪盤，單擊左鍵保持系統正常點擊。未觸發手勢的輕點將自動放行原生按鍵點擊。",
+			[LanguageCode.En] = "Supports one-click physical recording for all mouse buttons (Right, Middle, Side 1/2, Left) and keyboard keys as well as combos. When Left Button is bound, long-press opens radial menu, while quick click maintains normal click function.",
+			[LanguageCode.Ja] = "すべてのマウスボタン（右、中央、サイド1/2、左）およびキーボード単キーやコンボの物理録画に対応。左ボタン設定時は長押しでホイール起動、短押しクリックは通常の操作を維持します。"
+		};
+		dictionary["TriggerLeftButtonRecordedTip"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🟢 已成功绑定【鼠标左键】：长按左键唤醒轮盘，单机左键保持系统正常点击！",
+			[LanguageCode.ZhTw] = "🟢 已成功綁定【滑鼠左鍵】：長按左鍵喚醒輪盤，單擊左鍵保持系統正常點擊！",
+			[LanguageCode.En] = "🟢 [Left Mouse Button] bound: Long-press to open radial menu, quick click maintains normal click function!",
+			[LanguageCode.Ja] = "🟢 【マウス左ボタン】設定完了：長押しでホイール起動、短押しクリックは通常の操作を維持します！"
 		};
 		dictionary["LongPressTriggerTitle"] = new Dictionary<LanguageCode, string>
 		{

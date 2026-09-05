@@ -447,6 +447,11 @@ public class MouseHook
 		nuint extra = (nuint)StarPieExtraInfo;
 		switch (text)
 		{
+		case "LeftButton":
+			mouse_event(2u, 0u, 0u, 0u, extra);
+			System.Threading.Thread.Sleep(2);
+			mouse_event(4u, 0u, 0u, 0u, extra);
+			break;
 		case "MiddleButton":
 			mouse_event(32u, 0u, 0u, 0u, extra);
 			System.Threading.Thread.Sleep(2);

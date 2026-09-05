@@ -174,6 +174,7 @@ public static class ConfigManager
 					SaveConfig();
 				}
 			}
+			EnsureLeftButtonTriggerHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
 			_ = System.Threading.Tasks.Task.Run(async () =>
@@ -472,6 +473,7 @@ public static class ConfigManager
 			if (appConfig != null)
 			{
 				CurrentConfig = appConfig;
+				EnsureLeftButtonTriggerHealth(CurrentConfig);
 				SaveConfig();
 				return true;
 			}
@@ -480,6 +482,18 @@ public static class ConfigManager
 		{
 		}
 		return false;
+	}
+
+	private static void EnsureLeftButtonTriggerHealth(AppConfig? config)
+	{
+		if (config?.Trigger != null &&
+		    string.Equals(config.Trigger.MouseButton, "LeftButton", StringComparison.OrdinalIgnoreCase) &&
+		    !config.Trigger.RequireCtrl && !config.Trigger.RequireShift &&
+		    !config.Trigger.RequireAlt && !config.Trigger.RequireWin)
+		{
+			// 若配置了单独鼠标左键作为唤醒键，确保长按呼出开关开启，使长按可稳定唤醒轮盘，单机保持原生点击
+			config.LongPressTrigger = true;
+		}
 	}
 
 	public static bool IsElevated()

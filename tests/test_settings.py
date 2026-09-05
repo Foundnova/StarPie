@@ -1028,6 +1028,29 @@ def test_update_ui_elements_and_check(app):
     assert "最新版本" in badge_val or "新版本" in badge_val or "版本" in badge_val, f"Badge text should indicate version status, got: {badge_val}"
 
 
-
-
+def test_left_button_trigger_behavior_and_long_press(app):
+    win, local_app_data = app
+    
+    # 1. Switch to Tab 0 (Trigger and Isolation settings)
+    tab0 = win.child_window(auto_id="NavTab0", control_type="RadioButton")
+    tab0.select()
+    time.sleep(0.4)
+    
+    # 2. Verify controls exist
+    badge = win.child_window(auto_id="CurrentTriggerBadgeText", control_type="Text")
+    assert badge.exists(timeout=3), "CurrentTriggerBadgeText should exist"
+    
+    rec_btn = win.child_window(auto_id="RecordTriggerButton", control_type="Button")
+    assert rec_btn.exists(timeout=3), "RecordTriggerButton should exist"
+    
+    long_press_chk = win.child_window(auto_id="LongPressTriggerCheckBox", control_type="CheckBox")
+    assert long_press_chk.exists(timeout=3), "LongPressTriggerCheckBox should exist"
+    
+    reset_btn = win.child_window(auto_id="ResetDefaultTriggerButton", control_type="Button")
+    assert reset_btn.exists(timeout=3), "ResetDefaultTriggerButton should exist"
+    
+    # 3. Test Reset to default RightButton
+    reset_btn.invoke()
+    time.sleep(0.3)
+    assert "右键" in badge.window_text(), f"Expected RightButton in badge text, got: {badge.window_text()}"
 

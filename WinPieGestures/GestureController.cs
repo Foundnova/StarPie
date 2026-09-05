@@ -398,7 +398,9 @@ public class GestureController
 			_isGestureActive = false;
 			_mouseTriggerDown = true;
 			// 可选：长按不动超过阈值即呼出轮盘（与拖动呼出共存）
-			if (ConfigManager.CurrentConfig.LongPressTrigger)
+			// 核心保障：当触发键为鼠标左键时，自动保证长按呼出定时器启动，使得长按稳定唤醒轮盘，单机保持原生点击
+			bool isLeftButtonTrigger = string.Equals(triggerBtn, "LeftButton", StringComparison.OrdinalIgnoreCase);
+			if (ConfigManager.CurrentConfig.LongPressTrigger || isLeftButtonTrigger)
 			{
 				StartLongPressTimer();
 			}

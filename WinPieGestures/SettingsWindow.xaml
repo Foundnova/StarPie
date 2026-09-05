@@ -691,7 +691,7 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Name="TriggerRecorderTitleText" Text="轮盘唤醒触发按键 &amp; 组合键录制" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Name="TriggerRecorderDescText" Text="支持鼠标所有按键（右键/中键/侧键1/侧键2）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键（如 Alt+拖动、Ctrl+侧键）一键物理录制绑定。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
+                  <TextBlock Name="TriggerRecorderDescText" Text="支持鼠标所有按键（右键/中键/侧键1/侧键2/左键）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键一键物理录制绑定。绑定鼠标左键后长按可唤醒轮盘，单机左键保持系统正常点击。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
                   <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto" />
