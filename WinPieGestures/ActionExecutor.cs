@@ -168,6 +168,9 @@ public static class ActionExecutor
 	[DllImport("user32.dll")]
 	private static extern short GetAsyncKeyState(int nVirtKey);
 
+	[DllImport("user32.dll")]
+	private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, nint dwExtraInfo);
+
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
@@ -1244,15 +1247,13 @@ public static class ActionExecutor
 	{
 		try
 		{
-			// 智能解卡自愈：检查 Ctrl / Shift / Alt / Win，如果物理键并未按下，确保下发 KeyUp 清空系统粘滞状态
-			ushort[] modifiers = new ushort[] { 162, 160, 164, 91, 163, 161, 165, 92 }; // L/R Ctrl, Shift, Alt, Win
+			// 智能解卡自愈：强制下发 KeyUp 清空系统粘滞状态（双通道 SendInput + keybd_event 注入）
+			ushort[] modifiers = new ushort[] { 162, 163, 17, 160, 161, 16, 164, 165, 18, 91, 92 };
 			List<INPUT> upInputs = new List<INPUT>();
 			foreach (ushort mod in modifiers)
 			{
-				if ((GetAsyncKeyState(mod) & 0x8000) == 0)
-				{
-					upInputs.Add(CreateKeyInput(mod, down: false));
-				}
+				upInputs.Add(CreateKeyInput(mod, down: false));
+				keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
 			}
 			if (upInputs.Count > 0)
 			{
@@ -1281,6 +1282,9 @@ public static class ActionExecutor
 
 		AppLogger.LogInfo($"Executing Hotkey: '{hotkeyString}' (MainKey: {hotkeyDetails.MainKey}, Modifiers: [{string.Join(",", hotkeyDetails.Modifiers)}])");
 
+		// 给 DWM 窗口焦点平稳回落预留短暂缓冲时延（轮盘关闭后目标窗口焦点就绪）
+		System.Threading.Thread.Sleep(10);
+
 		try
 		{
 			// 1. If pure modifier combo (e.g. Shift + Alt, Ctrl + Shift)
@@ -1292,7 +1296,7 @@ public static class ActionExecutor
 					modDowns.Add(CreateKeyInput(mod, down: true));
 				}
 				SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(10);
 				List<INPUT> modUps = new List<INPUT>();
 				for (int i = hotkeyDetails.Modifiers.Count - 1; i >= 0; i--)
 				{
@@ -1311,22 +1315,33 @@ public static class ActionExecutor
 			if (downInputs.Count > 0)
 			{
 				SendInput((uint)downInputs.Count, downInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+				System.Threading.Thread.Sleep(12);
 			}
 
 			if (hotkeyDetails.MainKey != 0)
 			{
 				INPUT keySeqDown = CreateKeyInput(hotkeyDetails.MainKey, down: true);
 				INPUT keySeqUp = CreateKeyInput(hotkeyDetails.MainKey, down: false);
-				SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
-				SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
-				System.Threading.Thread.Sleep(6);
+
+				if (hotkeyDetails.MainKey == 44) // VK_SNAPSHOT (PrintScreen)
+				{
+					// 瞬态快门模式：PrintScreen Down 与 Up 作为一个原子数据包同时发送（0ms 间隔）
+					// 消除在 Down 和 Up 之间由于外部截图工具抢占全局输入焦点而造成的按键序列截断
+					SendInput(2u, new INPUT[] { keySeqDown, keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
+				}
+				else
+				{
+					SendInput(1u, new INPUT[] { keySeqDown }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(12);
+					SendInput(1u, new INPUT[] { keySeqUp }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(10);
+				}
 			}
 		}
 		finally
 		{
 			// 3. 无论中间是否发生异常，始终安全下发所有已按下修饰键的抬起事件，彻底杜绝系统级粘滞
+			// 第一通道：SendInput 队列下发 KeyUp
 			List<INPUT> upInputs = new List<INPUT>();
 			for (int num = hotkeyDetails.Modifiers.Count - 1; num >= 0; num--)
 			{
@@ -1335,6 +1350,44 @@ public static class ActionExecutor
 			if (upInputs.Count > 0)
 			{
 				SendInput((uint)upInputs.Count, upInputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+			}
+
+			// 第二通道：keybd_event 直接同步 win32k 全局击键状态表（跨进程/跨权限防御）
+			foreach (ushort mod in hotkeyDetails.Modifiers)
+			{
+				keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+				if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_CONTROL
+				else if (mod == 160 || mod == 161) keybd_event(16, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_SHIFT
+				else if (mod == 164 || mod == 165) keybd_event(18, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_MENU
+			}
+
+			// 4. 双重保险：针对截图软件（Snipaste/PixPin/微信截屏等）弹出全屏遮罩导致焦点延迟转移的场景，
+			// 在 +30ms 与 +80ms 异步补发修饰键释放，彻底消灭残留粘滞
+			if (hotkeyDetails.MainKey == 44 && hotkeyDetails.Modifiers.Count > 0)
+			{
+				var modsCopy = hotkeyDetails.Modifiers.ToArray();
+				System.Threading.Tasks.Task.Run(async () =>
+				{
+					try
+					{
+						await System.Threading.Tasks.Task.Delay(30).ConfigureAwait(false);
+						foreach (var mod in modsCopy)
+						{
+							keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+						}
+
+						await System.Threading.Tasks.Task.Delay(50).ConfigureAwait(false);
+						foreach (var mod in modsCopy)
+						{
+							keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+						}
+					}
+					catch
+					{
+					}
+				});
 			}
 		}
 	}
@@ -1623,6 +1676,10 @@ public static class ActionExecutor
 			type = 1u
 		};
 		ushort scan = (ushort)MapVirtualKey((uint)vk, 0u);
+		if (vk == 44) // VK_SNAPSHOT: 扫描码必须为 0，规避 PS/2 SysReq (0x54) 扫描码异常
+		{
+			scan = 0;
+		}
 		result.U.ki = new KEYBDINPUT
 		{
 			wVk = vk,
@@ -1633,10 +1690,10 @@ public static class ActionExecutor
 		};
 		if (vk == 33 || vk == 34 || vk == 35 || vk == 36 ||
 		    vk == 37 || vk == 38 || vk == 39 || vk == 40 ||
-		    vk == 44 ||
 		    vk == 45 || vk == 46 ||
 		    vk == 91 || vk == 92 ||
 		    vk == 111 ||
+		    vk == 163 || vk == 165 ||
 		    (vk >= 166 && vk <= 179))
 		{
 			result.U.ki.dwFlags |= 1u;
