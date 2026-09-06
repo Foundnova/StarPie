@@ -312,11 +312,19 @@ public static class WindowTiler
 			int globalIndex = 0;
 			foreach (List<nint> group in monitorGroups)
 			{
-				List<double[]> cells = LayoutCells(key, group.Count);
-				int count = Math.Min(group.Count, cells.Count);
+				// 固定布局超编：只平铺任务栏顺序前 nominal 个窗口，其余保持原样（不移动、不进快照）
+				List<nint> groupWindows = group;
+				int nominal = NominalCellCount(key);
+				if (nominal > 0 && group.Count > nominal)
+				{
+					AppLogger.LogInfo($"[Tile] 布局 {key} 名义 {nominal} 格，本屏 {group.Count} 窗，按任务栏顺序取前 {nominal} 个，其余 {group.Count - nominal} 窗不参与");
+					groupWindows = group.Take(nominal).ToList();
+				}
+				List<double[]> cells = LayoutCells(key, groupWindows.Count);
+				int count = Math.Min(groupWindows.Count, cells.Count);
 				for (int i = 0; i < count; i++)
 				{
-					nint hwnd = group[i];
+					nint hwnd = groupWindows[i];
 					RECT wa = WorkAreaOf(hwnd);
 					double[] c = cells[i];
 					int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
@@ -931,22 +939,13 @@ public static class WindowTiler
 			return AutoGridCells(n); // AutoGrid：按数量自适应行列
 		}
 		List<double[]> fixedCells = new List<double[]>();
-		// 固定网格布局：窗口数等于名义格数时用其标准形状；否则回退"恰好覆盖 N 的无空格网格"，
-		// 避免窗口少时出现空位（先算窗口数，再定布局）。
-		int nominal = key switch
+		// 固定网格布局：窗口数等于名义格数时用其标准形状；
+		// 缺编（n < 名义）时回退占满网格（行优先 + 末行摊平），窗口铺满整个工作区不留空位；
+		// 超编（n > 名义）由 ExecuteTile 在分组层截断到名义格数，此处恒有 n <= nominal。
+		int nominal = NominalCellCount(key);
+		if (nominal > 0 && n < nominal)
 		{
-			"2L" => 2,
-			"2T" => 2,
-			"3L12" => 3,
-			"3R21" => 3,
-			"3R" => 3,
-			"4G" => 4,
-			"6G" => 6,
-			_ => 0
-		};
-		if (nominal > 0 && n != nominal)
-		{
-			return ExactGridCells(n);
+			return FillGridCells(n);
 		}
 		switch (key)
 		{
@@ -1006,34 +1005,45 @@ public static class WindowTiler
 		return cells;
 	}
 
-	/// <summary>恰好覆盖 n 个窗口的无空格网格（行列数取 n 最接近平方的因子分解）。</summary>
-	private static List<double[]> ExactGridCells(int n)
+	/// <summary>固定布局的名义格数（2L/2T=2，3L12/3R21/3R=3，4G=4，6G=6；动态布局返回 0 表示不限）。</summary>
+	private static int NominalCellCount(string key)
+	{
+		return key switch
+		{
+			"2L" => 2,
+			"2T" => 2,
+			"3L12" => 3,
+			"3R21" => 3,
+			"3R" => 3,
+			"4G" => 4,
+			"6G" => 6,
+			_ => 0
+		};
+	}
+
+	/// <summary>
+	/// 占满网格：任意 n 个窗口铺满整个工作区、无空位。
+	/// 行优先填充（cols=⌈√n⌉），最后一行不足 cols 个窗口时摊平整行宽度。
+	/// 例：n=2 → 左右对半；n=3 → 上排 2 窗各半宽 + 下排 1 窗全宽；
+	/// n=5 → 上排 3 窗 + 下排 2 窗（各 1.5 倍宽）；n=6 → 标准 2×3 六宫格。
+	/// </summary>
+	private static List<double[]> FillGridCells(int n)
 	{
 		List<double[]> cells = new List<double[]>();
 		if (n <= 0)
 		{
 			return cells;
 		}
-		if (n == 1)
-		{
-			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
-			return cells;
-		}
 		int cols = (int)Math.Ceiling(Math.Sqrt(n));
-		while (cols > 1 && n % cols != 0)
-		{
-			cols--;
-		}
-		if (n % cols != 0)
-		{
-			cols = 1;
-		}
-		int rows = n / cols;
+		int rows = (n + cols - 1) / cols;
 		for (int i = 0; i < n; i++)
 		{
 			int r = i / cols;
 			int c = i % cols;
-			cells.Add(new[] { (double)c / cols, (double)r / rows, (double)(c + 1) / cols, (double)(r + 1) / rows });
+			// 最后一行不足 cols 个时，按实际窗口数摊平行宽，保证铺满且无空位
+			bool isLastRow = r == rows - 1;
+			int rowCols = isLastRow ? n - (rows - 1) * cols : cols;
+			cells.Add(new[] { (double)c / rowCols, (double)r / rows, (double)(c + 1) / rowCols, (double)(r + 1) / rows });
 		}
 		return cells;
 	}
