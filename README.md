@@ -39,6 +39,14 @@
 > - **低延迟响应**：基于 Win32 `WH_MOUSE_LL` 底层事件流，响应迅速，不影响鼠标正常右键点击；
 > - **绿色便携**：提供独立单文件版（内置 .NET 运行时，解压即用），配置保存于本地 `config.json`；
 
+## ✨ V1.6.8正式版视频演示
+
+<div align="center">
+
+[![Bilibili 演示视频](https://img.shields.io/badge/Bilibili-📺%20点击观看%20StarPie%20v1.6.8%20实机演示与重构解说-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1cubL6WEpB)
+
+</div>
+
 <details open>
 <summary><b>🎬 演示视频 / Video Demo </b></summary>
 <br/>
@@ -51,7 +59,6 @@
     <a href="https://www.bilibili.com/video/BV1XjtA6KEGL"><b>📺 点击前往 Bilibili 观看原声讲解与实机演示</b></a>
   </p>
 </div>
-
 </details>
 
 ---
