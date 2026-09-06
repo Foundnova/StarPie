@@ -2887,7 +2887,7 @@
                             <TextBlock Name="TileSettingsStatusText" Text="已收纳 (点击展开)" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
                           </Border>
                         </StackPanel>
-                        <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为（包含最小化窗口、排除名单与多布局循环切换）。" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                        <TextBlock Name="TileGlobalDescText" Text="「平铺窗口」动作的全局行为（屏幕边距、窗口间距、包含最小化窗口、排除名单与多布局循环切换）。" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
                       </StackPanel>
                       <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -2914,6 +2914,24 @@
                         <TextBox Name="TileExcludeProcessesTextBox" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" TextChanged="TileExcludeProcessesTextBox_TextChanged" />
                         <Button Grid.Column="1" Content="🎯 捕捉排除进程..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="6,0,0,0" ToolTip="打开智能窗口捕捉器，选取桌面运行中的程序加入平铺排除名单（自动安全排除 StarPie 自身）" Click="TileCaptureCurrentProcess_Click" />
                       </Grid>
+                      <TextBlock Name="TileMarginText" Text="屏幕边距（上 / 下 / 左 / 右，物理像素，0 = 贴边）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                      <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="6" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="6" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="6" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Name="TileMarginTopTextBox" Grid.Column="0" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" Tag="Top" TextChanged="TileMarginTextBox_TextChanged" ToolTip="上边距（0~1000 物理像素）" />
+                        <TextBox Name="TileMarginBottomTextBox" Grid.Column="2" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" Tag="Bottom" TextChanged="TileMarginTextBox_TextChanged" ToolTip="下边距（0~1000 物理像素）" />
+                        <TextBox Name="TileMarginLeftTextBox" Grid.Column="4" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" Tag="Left" TextChanged="TileMarginTextBox_TextChanged" ToolTip="左边距（0~1000 物理像素）" />
+                        <TextBox Name="TileMarginRightTextBox" Grid.Column="6" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" Tag="Right" TextChanged="TileMarginTextBox_TextChanged" ToolTip="右边距（0~1000 物理像素）" />
+                      </Grid>
+                      <TextBlock Name="TileGapText" Text="窗口间距（物理像素，0 = 紧贴）：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                      <TextBox Name="TileGapTextBox" Width="80" HorizontalAlignment="Left" Height="32" FontSize="12" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,0,10" TextChanged="TileGapTextBox_TextChanged" ToolTip="相邻窗口之间的空隙（0~500 物理像素）" />
                       <Grid Margin="0,4,0,6">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />

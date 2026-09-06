@@ -281,6 +281,17 @@ public static class WindowTiler
 				}
 			}
 			bool includeMinimized = ConfigManager.CurrentConfig?.TileIncludeMinimized == true;
+			// 屏幕边距与窗口间距（物理像素，读取时夹紧防呆）
+			int mt = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginTop ?? 0, 0, 1000);
+			int mb = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginBottom ?? 0, 0, 1000);
+			int ml = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginLeft ?? 0, 0, 1000);
+			int mr = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginRight ?? 0, 0, 1000);
+			int gap = Math.Clamp(ConfigManager.CurrentConfig?.TileGap ?? 0, 0, 500);
+			int gapHalf = gap / 2;
+			if (ml + mr + mt + mb + gap > 0)
+			{
+				AppLogger.LogInfo($"[Tile] margin L{ml}/T{mt}/R{mr}/B{mb}, gap={gap}");
+			}
 			List<nint> targets = GetTileTargets(exclude, includeMinimized);
 			AppLogger.LogInfo($"[Tile] layout='{key}' targets={targets.Count}");
 			if (targets.Count == 0)
@@ -326,11 +337,25 @@ public static class WindowTiler
 				{
 					nint hwnd = groupWindows[i];
 					RECT wa = WorkAreaOf(hwnd);
+					// 应用屏幕边距（收缩工作区，并夹紧防负尺寸）
+					wa.Left += ml;
+					wa.Top += mt;
+					wa.Right = Math.Max(wa.Left + 1, wa.Right - mr);
+					wa.Bottom = Math.Max(wa.Top + 1, wa.Bottom - mb);
 					double[] c = cells[i];
 					int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
 					int y = wa.Top + (int)Math.Round((wa.Bottom - wa.Top) * c[1]);
 					int w = (int)Math.Round((wa.Right - wa.Left) * c[2]) - (x - wa.Left);
 					int h = (int)Math.Round((wa.Bottom - wa.Top) * c[3]) - (y - wa.Top);
+					// 应用窗口间距：内边缘各收缩 gap/2，外边缘不缩（外圈留白已由边距控制）
+					int gl = c[0] > 1e-9 ? gapHalf : 0;
+					int gt = c[1] > 1e-9 ? gapHalf : 0;
+					int gr = c[2] < 1 - 1e-9 ? gapHalf : 0;
+					int gb = c[3] < 1 - 1e-9 ? gapHalf : 0;
+					x += gl;
+					y += gt;
+					w -= gl + gr;
+					h -= gt + gb;
 					w = Math.Max(1, w);
 					h = Math.Max(1, h);
 					// 最小化/最大化会无视 SetWindowPos：先无激活还原，再捕获快照坐标

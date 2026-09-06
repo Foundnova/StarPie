@@ -618,6 +618,26 @@ public partial class SettingsWindow : Window
 		{
 			TileExcludeProcessesTextBox.Text = ConfigManager.CurrentConfig.TileExcludeProcesses ?? "";
 		}
+		if (TileMarginTopTextBox != null)
+		{
+			TileMarginTopTextBox.Text = ConfigManager.CurrentConfig.TileMarginTop.ToString();
+		}
+		if (TileMarginBottomTextBox != null)
+		{
+			TileMarginBottomTextBox.Text = ConfigManager.CurrentConfig.TileMarginBottom.ToString();
+		}
+		if (TileMarginLeftTextBox != null)
+		{
+			TileMarginLeftTextBox.Text = ConfigManager.CurrentConfig.TileMarginLeft.ToString();
+		}
+		if (TileMarginRightTextBox != null)
+		{
+			TileMarginRightTextBox.Text = ConfigManager.CurrentConfig.TileMarginRight.ToString();
+		}
+		if (TileGapTextBox != null)
+		{
+			TileGapTextBox.Text = ConfigManager.CurrentConfig.TileGap.ToString();
+		}
 		RefreshTileCycleList();
 		if (TileIncludeMinimizedCheckBox != null)
 		{
@@ -1381,6 +1401,14 @@ public partial class SettingsWindow : Window
 		if (TileExcludeText != null)
 		{
 			TileExcludeText.Text = I18n.T("TileExcludeText");
+		}
+		if (TileMarginText != null)
+		{
+			TileMarginText.Text = I18n.T("TileMarginText");
+		}
+		if (TileGapText != null)
+		{
+			TileGapText.Text = I18n.T("TileGapText");
 		}
 		if (TileCycleRangeText != null)
 		{
@@ -11928,6 +11956,46 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		ConfigManager.CurrentConfig.TileExcludeProcesses = TileExcludeProcessesTextBox.Text ?? "";
+		SyncUiToConfigAndSave();
+	}
+
+	/// <summary>解析文本框为夹紧到 [min,max] 的整数（非法/空输入回落默认值）。</summary>
+	private static int ParseClampedInt(string? text, int min, int max, int fallback)
+	{
+		if (!int.TryParse((text ?? "").Trim(), out int v))
+		{
+			v = fallback;
+		}
+		return Math.Clamp(v, min, max);
+	}
+
+	private void TileMarginTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (sender is System.Windows.Controls.TextBox tb && tb.Tag is string field)
+		{
+			int v = ParseClampedInt(tb.Text, 0, 1000, 0);
+			switch (field)
+			{
+				case "Top": ConfigManager.CurrentConfig.TileMarginTop = v; break;
+				case "Bottom": ConfigManager.CurrentConfig.TileMarginBottom = v; break;
+				case "Left": ConfigManager.CurrentConfig.TileMarginLeft = v; break;
+				case "Right": ConfigManager.CurrentConfig.TileMarginRight = v; break;
+			}
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void TileGapTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.TileGap = ParseClampedInt(TileGapTextBox?.Text, 0, 500, 0);
 		SyncUiToConfigAndSave();
 	}
 
