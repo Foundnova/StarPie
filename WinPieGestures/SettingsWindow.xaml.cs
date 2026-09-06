@@ -2056,11 +2056,13 @@ public partial class SettingsWindow : Window
 		_autoSaveDebounceTimer.Start();
 	}
 
-	private void SyncUiToConfigAndSave(bool saveToDisk = true)
+	// 返回是否确实写入成功。UI 初始化期间（_isUpdatingUi）或配置为空时直接返回 false，
+	// 调用方不应在 false 时宣称“已保存”。
+	private bool SyncUiToConfigAndSave(bool saveToDisk = true)
 	{
 		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
-			return;
+			return false;
 		}
 		try
 		{
@@ -2247,11 +2249,13 @@ public partial class SettingsWindow : Window
 			}
 			if (saveToDisk)
 			{
-				ConfigManager.SaveConfig();
+				return ConfigManager.SaveConfig();
 			}
+			return true;
 		}
 		catch (Exception)
 		{
+			return false;
 		}
 	}
 
@@ -3652,7 +3656,7 @@ public partial class SettingsWindow : Window
 				{
 					item.Type = "Tile";
 					item.Parameter = "2L";
-					if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区"))
+					if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("截屏识字"))
 					{
 						item.Name = "平铺: " + WindowTiler.LayoutDisplayName("2L");
 					}
@@ -3678,7 +3682,7 @@ public partial class SettingsWindow : Window
 			else if (newType == "Ocr" || newType == "ScreenOcr")
 			{
 				item.Type = "Ocr";
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作"))
+				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("平铺"))
 				{
 					item.Name = "截屏识字";
 				}
@@ -3828,6 +3832,13 @@ public partial class SettingsWindow : Window
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
 		}
+	}
+
+	// 手势映射区与轮盘槽位区的平铺布局下拉为纯 TwoWay 绑定，只写内存；
+	// 必须在此补一次自动保存调度，否则布局修改要等下一次其他事件才被顺带落盘。
+	private void TileLayoutComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		ScheduleAutoSave();
 	}
 
 	private void ApplyFocusTileLayout(string layout)
@@ -9911,8 +9922,14 @@ public partial class SettingsWindow : Window
 
 	private void SaveButton_Click(object sender, RoutedEventArgs e)
 	{
-		SyncUiToConfigAndSave();
-		System.Windows.MessageBox.Show("配置已成功保存至硬盘！", "成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+		if (SyncUiToConfigAndSave())
+		{
+			System.Windows.MessageBox.Show("配置已成功保存至硬盘！", "成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+		}
+		else
+		{
+			System.Windows.MessageBox.Show("配置保存失败。请查看日志了解原因，并确认程序对配置目录有写入权限。", "保存失败", MessageBoxButton.OK, MessageBoxImage.Error);
+		}
 	}
 
 	private void CloseButton_Click(object sender, RoutedEventArgs e)

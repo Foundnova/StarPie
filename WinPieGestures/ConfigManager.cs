@@ -17,6 +17,10 @@ public static class ConfigManager
 
 	public static AppConfig CurrentConfig { get; private set; }
 
+	// 本次启动是否因配置文件损坏而回落到了默认配置。
+	// 为 true 时必须禁止任何自动写盘，否则会把默认配置覆盖掉用户尚可恢复的损坏文件。
+	public static bool IsFallbackConfig { get; private set; }
+
 	private static string GetAppDataFolder()
 	{
 		string path = (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("LOCALAPPDATA")) ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) : Environment.GetEnvironmentVariable("LOCALAPPDATA"));
@@ -39,6 +43,25 @@ public static class ConfigManager
 			}
 		}
 		return text;
+	}
+
+	// 保留无法解析的配置文件现场，使用户有机会手工恢复，而不是被默认配置静默覆盖。
+	private static void BackupCorruptConfig()
+	{
+		try
+		{
+			if (!File.Exists(ConfigPath))
+			{
+				return;
+			}
+			string destFileName = ConfigPath + ".corrupt." + DateTime.Now.ToString("yyyyMMddHHmmss");
+			File.Copy(ConfigPath, destFileName, overwrite: true);
+			AppLogger.LogInfo("Backed up unreadable config to '" + destFileName + "'");
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to back up unreadable config", ex);
+		}
 	}
 
 	static ConfigManager()
@@ -171,7 +194,11 @@ public static class ConfigManager
 							}
 						};
 					}
-					SaveConfig();
+					// 回落默认配置时禁止自动落盘：否则会立刻用默认值覆盖掉用户尚可恢复的配置文件
+					if (!IsFallbackConfig)
+					{
+						SaveConfig();
+					}
 				}
 			}
 			I18n.SetLanguage(CurrentConfig.Language);
@@ -188,14 +215,18 @@ public static class ConfigManager
 				}
 			});
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			AppLogger.LogError("Failed to load config from '" + ConfigPath + "', falling back to default configuration", ex);
+			BackupCorruptConfig();
+			IsFallbackConfig = true;
 			CurrentConfig = CreateDefaultConfig();
 			I18n.SetLanguage(CurrentConfig.Language);
 		}
 	}
 
-	public static void SaveConfig()
+	// 返回是否保存成功，调用方据此决定提示文案，避免无条件宣称“已保存”。
+	public static bool SaveConfig()
 	{
 		try
 		{
@@ -208,11 +239,25 @@ public static class ConfigManager
 				WriteIndented = true
 			};
 			string contents = JsonSerializer.Serialize(CurrentConfig, options);
-			File.WriteAllText(ConfigPath, contents);
+			// 原子写：先落临时文件再替换。直接 WriteAllText 一旦中途被中断（退出/崩溃/断电）
+			// 会留下截断的 config.json，下次启动即被判为损坏并回落默认配置。
+			string tempPath = ConfigPath + ".tmp";
+			File.WriteAllText(tempPath, contents);
+			if (File.Exists(ConfigPath))
+			{
+				// 保留上一份完好配置，替换失败时仍可人工回退
+				File.Replace(tempPath, ConfigPath, ConfigPath + ".bak");
+			}
+			else
+			{
+				File.Move(tempPath, ConfigPath, overwrite: true);
+			}
+			return true;
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError("Failed to save config to file", ex);
+			return false;
 		}
 	}
 

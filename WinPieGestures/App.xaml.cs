@@ -252,7 +252,16 @@ public partial class App : Application
 		}
 		try
 		{
-			ConfigManager.SaveConfig();
+			// 本次启动若因配置损坏而回落默认，绝不能在退出时把默认值写回磁盘，
+			// 否则用户尚可从 .corrupt 备份恢复的配置会被永久覆盖。
+			if (ConfigManager.IsFallbackConfig)
+			{
+				AppLogger.LogInfo("Skipped exit-time config save: loaded config was a fallback default");
+			}
+			else
+			{
+				ConfigManager.SaveConfig();
+			}
 		}
 		catch
 		{

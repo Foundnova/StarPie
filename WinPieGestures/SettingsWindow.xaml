@@ -909,7 +909,7 @@
                                   <ComboBox Grid.Column="1" Width="108" Margin="4,0,0,0" ItemsSource="{Binding Terminals}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding CommandTerminal, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="10" />
                                 </Grid>
                                 <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}" ToolTip="任务栏第 N 个应用（同 Win+N 槽位语义）" />
-                                <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
+                                <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" SelectionChanged="TileLayoutComboBox_SelectionChanged" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                               </Grid>
                               <TextBox Grid.Column="3" Height="30" FontSize="11" Margin="4,0,0,0" VerticalContentAlignment="Center" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="名称（显示自定义，可留空）" />
                               <Button Grid.Column="4" Content="测试" Height="30" Margin="4,0,0,0" Padding="4,0" FontSize="11" Style="{StaticResource ModernButtonStyle}" Click="TestGesture_Click" />
@@ -1101,7 +1101,7 @@
                                     <ComboBox ItemsSource="{Binding WindowManagerSubModes}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding WindowManagerSubMode, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="32" FontSize="11" />
                                     
                                     <!-- 平铺预设选择 -->
-                                    <ComboBox Grid.Column="1" Margin="6,0,0,0" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="32" FontSize="11" Visibility="{Binding IsTileSubMode, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
+                                    <ComboBox Grid.Column="1" Margin="6,0,0,0" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" SelectionChanged="TileLayoutComboBox_SelectionChanged" Style="{StaticResource FlatComboBoxStyle}" Height="32" FontSize="11" Visibility="{Binding IsTileSubMode, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                                     
                                     <!-- 切换任务栏序号 -->
                                     <TextBox Grid.Column="1" Margin="6,0,0,0" Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="32" FontSize="11.5" VerticalContentAlignment="Center" Visibility="{Binding IsSwitchWindowSubMode, Converter={StaticResource BoolToVis}}" ToolTip="输入任务栏序号 1~20 (等同 Win + 序号)" />
@@ -2847,7 +2847,7 @@
                                   <Grid Visibility="{Binding IsSwitchWindowType, Converter={StaticResource BoolToVis}}">
                                     <TextBox Text="{Binding NthWindowIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" FontSize="11" VerticalContentAlignment="Center" ToolTip="任务栏第 N 个应用（顺序同任务栏/Win+N 槽位，稳定）；图标与切换目标一致；固定未运行的槽位无法启动，托盘驻留不计入" />
                                   </Grid>
-                                  <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
+                                  <ComboBox SelectedValuePath="Tag" DisplayMemberPath="DisplayText" ItemsSource="{Binding TileLayoutOptions}" SelectedValue="{Binding TileLayout, Mode=TwoWay}" SelectionChanged="TileLayoutComboBox_SelectionChanged" Style="{StaticResource FlatComboBoxStyle}" Height="30" FontSize="11" Visibility="{Binding IsTileType, Converter={StaticResource BoolToVis}}" ToolTip="平铺布局预设" />
                                 </Grid>
 
                                 <TextBox Grid.Column="4" Width="68" Margin="0,0,8,0" Height="30" FontSize="11" ToolTip="启动参数 (如命令行参数或URL)" VerticalContentAlignment="Center" Text="{Binding Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsLaunchType}" Visibility="{Binding IsLaunchType, Converter={StaticResource BoolToVis}}" />
