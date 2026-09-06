@@ -35,9 +35,17 @@
 在日常使用或专业建模软件中，可通过**鼠标右键 / 中键 / 侧键或键盘触发键**呼出快捷轮盘，也可使用独立的轨迹手势直接执行动作。当前版本支持 4 / 8 / 12 方位轮盘、多级子动作、专属程序配置（Per-App Profiles）、窗口管理与平铺、屏幕 OCR、快捷键录制、网址与命令调度，以及更完整的视觉形态定制，帮助将高频操作转化为自然的肌肉记忆。
 
 > 💡 **设计重点**：
-> - **低资源占用**：基于原生 C# WPF 构建，无浏览器内核打包，后台常驻内存以轻量化为目标，典型空闲场景约 **3 ～ 8 MB**；
+> - **低资源占用**：基于原生 C# WPF 构建，无浏览器内核打包，后台常驻内存以轻量化为目标，典型空闲场景约 **60 ～ 70 MB**；
 > - **低延迟响应**：基于 Win32 `WH_MOUSE_LL` 底层事件流，响应迅速，不影响鼠标正常右键点击；
 > - **绿色便携**：提供独立单文件版（内置 .NET 运行时，解压即用），配置保存于本地 `config.json`；
+
+## ✨ V1.6.8正式版视频演示
+
+<div align="center">
+
+[![Bilibili 演示视频](https://img.shields.io/badge/Bilibili-📺%20点击观看%20StarPie%20v1.6.8%20实机演示与重构解说-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1cubL6WEpB)
+
+</div>
 
 <details open>
 <summary><b>🎬 演示视频 / Video Demo </b></summary>
@@ -51,7 +59,6 @@
     <a href="https://www.bilibili.com/video/BV1XjtA6KEGL"><b>📺 点击前往 Bilibili 观看原声讲解与实机演示</b></a>
   </p>
 </div>
-
 </details>
 
 ---
