@@ -69,7 +69,7 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			{
 				NthWindowIndex = "1";
 			}
-			if (value == "Tile" && string.IsNullOrEmpty(IconKey))
+			if (value == "Tile" && string.IsNullOrEmpty(IconKey) && string.IsNullOrEmpty(InheritAppIconPath))
 			{
 				IconKey = "Tile"; // 默认使用平铺四宫格 logo
 			}
@@ -159,6 +159,7 @@ public class SubSlotViewModel : INotifyPropertyChanged
 				OnPropertyChanged("IconKey");
 				OnPropertyChanged("IconDisplayText");
 				OnPropertyChanged("HasVectorIcon");
+				OnPropertyChanged("ShowVectorIcon");
 				OnPropertyChanged("VectorIconData");
 			}
 		}
@@ -178,15 +179,48 @@ public class SubSlotViewModel : INotifyPropertyChanged
 				OnPropertyChanged("CustomIconSvg");
 				OnPropertyChanged("IconDisplayText");
 				OnPropertyChanged("HasVectorIcon");
+				OnPropertyChanged("ShowVectorIcon");
 				OnPropertyChanged("VectorIconData");
 			}
 		}
 	}
 
+	public string? InheritAppIconPath
+	{
+		get => Action.InheritAppIconPath;
+		set
+		{
+			if (Action.InheritAppIconPath != value)
+			{
+				Action.InheritAppIconPath = value;
+				OnPropertyChanged(nameof(InheritAppIconPath));
+				OnPropertyChanged(nameof(HasInheritedAppIcon));
+				OnPropertyChanged(nameof(InheritedAppIcon));
+				OnPropertyChanged(nameof(ShowVectorIcon));
+				OnPropertyChanged(nameof(IconDisplayText));
+			}
+		}
+	}
+
+	public bool HasInheritedAppIcon => !string.IsNullOrWhiteSpace(InheritAppIconPath);
+
+	public ImageSource? InheritedAppIcon => HasInheritedAppIcon ? IconHelper.GetIcon(InheritAppIconPath!) : null;
+
+	public bool ShowVectorIcon => HasVectorIcon && !HasInheritedAppIcon;
+
 	public string IconDisplayText
 	{
 		get
 		{
+			if (HasInheritedAppIcon)
+			{
+				try
+				{
+					string fn = System.IO.Path.GetFileNameWithoutExtension(InheritAppIconPath);
+					if (!string.IsNullOrEmpty(fn)) return fn;
+				}
+				catch { }
+			}
 			if (!string.IsNullOrEmpty(IconKey))
 			{
 				return IconKey;

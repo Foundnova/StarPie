@@ -89,7 +89,25 @@ public partial class SettingsWindow : Window
 
 	private readonly ObservableCollection<SlotViewModel> _slotViewModels = new ObservableCollection<SlotViewModel>();
 
-	private bool _isUpdatingUi = true;
+	private int _uiUpdateDepth = 0;
+	private bool _isUpdatingUi
+	{
+		get => _uiUpdateDepth > 0;
+		set
+		{
+			if (value)
+			{
+				_uiUpdateDepth++;
+			}
+			else
+			{
+				if (_uiUpdateDepth > 0)
+				{
+					_uiUpdateDepth--;
+				}
+			}
+		}
+	}
 
 	private bool _isRenderingPreview;
 
@@ -322,6 +340,7 @@ public partial class SettingsWindow : Window
 
 	private bool _previewRenderPending;
 
+	private bool _isUiInitializing = false;
 	private bool _isUiInitialized = false;
 
 	public static bool IsSilentLaunch()
@@ -339,12 +358,11 @@ public partial class SettingsWindow : Window
 
 	public void EnsureUiInitialized()
 	{
-		if (_isUiInitialized)
+		if (_isUiInitialized || _isUiInitializing)
 		{
 			return;
 		}
-		_isUiInitialized = true;
-
+		_isUiInitializing = true;
 		_isUpdatingUi = true;
 		try
 		{
@@ -378,10 +396,13 @@ public partial class SettingsWindow : Window
 					CancelExclusiveRecordingIfActive();
 				};
 			}
+
+			_isUiInitialized = true;
 		}
 		finally
 		{
 			_isUpdatingUi = false;
+			_isUiInitializing = false;
 		}
 	}
 
@@ -397,7 +418,7 @@ public partial class SettingsWindow : Window
 		{
 		}
 		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -1005,7 +1026,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 	}
@@ -1152,7 +1173,7 @@ public partial class SettingsWindow : Window
 				Padding = new System.Windows.Forms.Padding(3, 4, 3, 4)
 			};
 
-			ToolStripMenuItem versionItem = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"))
+			ToolStripMenuItem versionItem = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"))
 			{
 				Enabled = false,
 				Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold),
@@ -2036,7 +2057,7 @@ public partial class SettingsWindow : Window
 		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
 		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0037: Expected O, but got Unknown
-		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
 		}
@@ -2058,7 +2079,7 @@ public partial class SettingsWindow : Window
 
 	private void SyncUiToConfigAndSave(bool saveToDisk = true)
 	{
-		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
 		}
@@ -2260,7 +2281,10 @@ public partial class SettingsWindow : Window
 		_isClosingFromTray = true;
 		try
 		{
-			SyncUiToConfigAndSave();
+			if (_isUiInitialized)
+			{
+				SyncUiToConfigAndSave();
+			}
 		}
 		catch
 		{
@@ -2272,7 +2296,10 @@ public partial class SettingsWindow : Window
 
 	private void Window_Closing(object sender, CancelEventArgs e)
 	{
-		SyncUiToConfigAndSave();
+		if (_isUiInitialized)
+		{
+			SyncUiToConfigAndSave();
+		}
 		if (_isClosingFromTray)
 		{
 			DisposeSlotViewModels();
@@ -3131,17 +3158,48 @@ public partial class SettingsWindow : Window
 			// Name & Icon
 			if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name ?? "";
 			string iconKey = item.IconKey ?? "";
-			if (FocusIconLabel != null) FocusIconLabel.Text = !string.IsNullOrEmpty(iconKey) ? iconKey : "图标...";
-			string svg = !string.IsNullOrEmpty(item.CustomIconSvg) ? item.CustomIconSvg : IconHelper.GetSvgPathByKey(iconKey);
-			if (FocusIconPath != null)
+			ImageSource? inheritedAppIcon = !string.IsNullOrWhiteSpace(item.InheritAppIconPath) ? IconHelper.GetIcon(item.InheritAppIconPath) : null;
+			if (inheritedAppIcon != null)
 			{
-				try
+				if (FocusIconImage != null)
 				{
-					FocusIconPath.Data = !string.IsNullOrEmpty(svg) ? Geometry.Parse(svg) : null;
+					FocusIconImage.Source = inheritedAppIcon;
+					FocusIconImage.Visibility = Visibility.Visible;
 				}
-				catch
+				if (FocusIconPath != null) FocusIconPath.Visibility = Visibility.Collapsed;
+				if (FocusIconLabel != null)
 				{
-					FocusIconPath.Data = null;
+					try
+					{
+						string fn = System.IO.Path.GetFileNameWithoutExtension(item.InheritAppIconPath);
+						FocusIconLabel.Text = !string.IsNullOrEmpty(fn) ? fn : "关联图标";
+					}
+					catch
+					{
+						FocusIconLabel.Text = "关联图标";
+					}
+				}
+			}
+			else
+			{
+				if (FocusIconImage != null)
+				{
+					FocusIconImage.Source = null;
+					FocusIconImage.Visibility = Visibility.Collapsed;
+				}
+				if (FocusIconPath != null) FocusIconPath.Visibility = Visibility.Visible;
+				if (FocusIconLabel != null) FocusIconLabel.Text = !string.IsNullOrEmpty(iconKey) ? iconKey : "图标...";
+				string svg = !string.IsNullOrEmpty(item.CustomIconSvg) ? item.CustomIconSvg : IconHelper.GetSvgPathByKey(iconKey);
+				if (FocusIconPath != null)
+				{
+					try
+					{
+						FocusIconPath.Data = !string.IsNullOrEmpty(svg) ? Geometry.Parse(svg) : null;
+					}
+					catch
+					{
+						FocusIconPath.Data = null;
+					}
 				}
 			}
 
@@ -3214,6 +3272,11 @@ public partial class SettingsWindow : Window
 				{
 					bool hasInherit = !string.IsNullOrWhiteSpace(item.InheritAppIconPath);
 					if (FocusInheritIconPathTextBox != null) FocusInheritIconPathTextBox.Text = item.InheritAppIconPath ?? "";
+					if (FocusInheritIconPreviewImage != null)
+					{
+						FocusInheritIconPreviewImage.Source = inheritedAppIcon;
+						FocusInheritIconPreviewImage.Visibility = (inheritedAppIcon != null) ? Visibility.Visible : Visibility.Collapsed;
+					}
 					if (FocusInheritIconStatusLabel != null)
 					{
 						FocusInheritIconStatusLabel.Text = hasInherit ? $"已关联: {System.IO.Path.GetFileName(item.InheritAppIconPath)}" : "未关联 (显示默认动作图标)";
@@ -3748,51 +3811,75 @@ public partial class SettingsWindow : Window
 				string layout = FocusTileLayoutComboBox?.SelectedValue as string ?? "2L";
 				item.Parameter = layout;
 				item.Name = "平铺: " + WindowTiler.LayoutDisplayName(layout);
-				item.IconKey = "Tile";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Tile";
+				}
 				break;
 			case "TileCycle":
 				item.Type = "Tile";
 				item.Parameter = WindowTiler.CycleParam;
 				item.Name = "循环切换平铺";
-				item.IconKey = "Tile";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Tile";
+				}
 				break;
 			case "TileCycleBack":
 				item.Type = "Tile";
 				item.Parameter = WindowTiler.CycleBackParam;
 				item.Name = "反向循环平铺";
-				item.IconKey = "Tile";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Tile";
+				}
 				break;
 			case "TileRestore":
 				item.Type = "Tile";
 				item.Parameter = WindowTiler.RestoreParam;
 				item.Name = I18n.T("TileRestoreAllLabel");
-				item.IconKey = "Tile";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Tile";
+				}
 				break;
 			case "ToggleTopmost":
 				item.Type = "ToggleTopmost";
 				item.Parameter = "";
 				item.Name = I18n.T("ActionTypeTopmostShort");
-				item.IconKey = "Pin";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Pin";
+				}
 				break;
 			case "MoveMonitor":
 				item.Type = "MoveMonitor";
 				item.Parameter = "";
 				item.Name = I18n.T("ActionTypeMoveMonitorShort");
-				item.IconKey = "Monitor";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Monitor";
+				}
 				break;
 			case "WindowOpacity":
 				item.Type = "WindowOpacity";
 				int op = (int)(FocusWindowOpacitySlider?.Value ?? 80);
 				item.Parameter = op.ToString();
 				item.Name = $"透明度: {op}%";
-				item.IconKey = "Eye";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Eye";
+				}
 				break;
 			case "SwitchWindow":
 				item.Type = "SwitchWindow";
 				string nth = FocusWindowSwitchTextBox?.Text?.Trim() ?? "1";
 				item.Parameter = string.IsNullOrEmpty(nth) ? "1" : nth;
 				item.Name = $"切换应用 #{item.Parameter}";
-				item.IconKey = "Window";
+				if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+				{
+					item.IconKey = "Window";
+				}
 				break;
 		}
 
@@ -3838,7 +3925,10 @@ public partial class SettingsWindow : Window
 		item.Type = "Tile";
 		item.Parameter = layout;
 		item.Name = "平铺: " + WindowTiler.LayoutDisplayName(layout);
-		item.IconKey = "Tile";
+		if (string.IsNullOrEmpty(item.IconKey) && string.IsNullOrEmpty(item.InheritAppIconPath) && string.IsNullOrEmpty(item.CustomIconSvg))
+		{
+			item.IconKey = "Tile";
+		}
 		if (FocusTileLayoutComboBox != null) FocusTileLayoutComboBox.SelectedValue = layout;
 		if (FocusActionNameTextBox != null) FocusActionNameTextBox.Text = item.Name;
 		RefreshSlots();
@@ -4785,40 +4875,6 @@ public partial class SettingsWindow : Window
 
 				ActionItem? action = (profile.Actions != null && slotIdx < profile.Actions.Count) ? profile.Actions[slotIdx] : null;
 
-				string iconKey = action?.IconKey ?? "";
-				string iconSvg = "";
-				IconHelper.CustomIconItem? customIconItem = null;
-
-				if (!string.IsNullOrEmpty(action?.CustomIconSvg))
-				{
-					iconSvg = action.CustomIconSvg;
-				}
-				else if (!string.IsNullOrEmpty(action?.IconKey) && action.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
-				{
-					customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, action.IconKey, StringComparison.OrdinalIgnoreCase));
-					if (customIconItem != null && customIconItem.IsSvg)
-					{
-						iconSvg = customIconItem.SvgData;
-					}
-				}
-				if (string.IsNullOrEmpty(iconSvg) && customIconItem == null)
-				{
-					if (!string.IsNullOrEmpty(action?.IconKey))
-					{
-						iconSvg = IconHelper.GetSvgPathByKey(action.IconKey);
-					}
-					else if (action != null)
-					{
-						iconSvg = action.Type switch
-						{
-							"WebUrl" or "Url" => IconHelper.GetSvgPathByKey("Browser") ?? IconHelper.GetSvgPathByKey("ShowDesktop"),
-							"Folder" or "OpenFolder" => IconHelper.GetSvgPathByKey("Folder"),
-							"System" when !string.IsNullOrEmpty(action.Parameter) => IconHelper.GetSvgPathByKey(action.Parameter),
-							_ => ""
-						};
-					}
-				}
-
 				Brush iconBrush = isSectorSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248)) : textBrush;
 				if (action != null && !string.IsNullOrWhiteSpace(action.CustomTextColor) && !isSectorSelected)
 				{
@@ -4833,13 +4889,14 @@ public partial class SettingsWindow : Window
 
 				FrameworkElement? iconElement = null;
 
-				if (!string.IsNullOrEmpty(iconSvg))
+				// 1. Explicit Custom SVG
+				if (!string.IsNullOrEmpty(action?.CustomIconSvg))
 				{
 					try
 					{
 						iconElement = new System.Windows.Shapes.Path
 						{
-							Data = Geometry.Parse(iconSvg),
+							Data = Geometry.Parse(action.CustomIconSvg),
 							Fill = iconBrush,
 							Width = iconSize,
 							Height = iconSize,
@@ -4851,28 +4908,9 @@ public partial class SettingsWindow : Window
 					}
 					catch { }
 				}
-				else if (customIconItem != null && !customIconItem.IsSvg)
-				{
-					try
-					{
-						ImageSource imgSource = IconHelper.GetCustomImageSource(customIconItem.FilePath);
-						if (imgSource != null)
-						{
-							iconElement = new System.Windows.Controls.Image
-							{
-								Source = imgSource,
-								Width = iconSize,
-								Height = iconSize,
-								Stretch = Stretch.Uniform,
-								HorizontalAlignment = HorizontalAlignment.Center,
-								VerticalAlignment = VerticalAlignment.Center,
-								IsHitTestVisible = false
-							};
-						}
-					}
-					catch { }
-				}
-				else if (action != null && !string.IsNullOrEmpty(action.InheritAppIconPath))
+
+				// 2. Inherit external app icon (highest priority for visual appearance decoupling)
+				if (iconElement == null && action != null && !string.IsNullOrEmpty(action.InheritAppIconPath))
 				{
 					try
 					{
@@ -4893,7 +4931,96 @@ public partial class SettingsWindow : Window
 					}
 					catch { }
 				}
-				else if (action != null && action.Type == "Launch" && !string.IsNullOrEmpty(action.Parameter) && File.Exists(action.Parameter))
+
+				// 3. Custom icon pack
+				if (iconElement == null && !string.IsNullOrEmpty(action?.IconKey) && action.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					IconHelper.CustomIconItem? customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, action.IconKey, StringComparison.OrdinalIgnoreCase));
+					if (customIconItem != null)
+					{
+						if (customIconItem.IsSvg)
+						{
+							try
+							{
+								iconElement = new System.Windows.Shapes.Path
+								{
+									Data = Geometry.Parse(customIconItem.SvgData),
+									Fill = iconBrush,
+									Width = iconSize,
+									Height = iconSize,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									VerticalAlignment = VerticalAlignment.Center,
+									IsHitTestVisible = false
+								};
+							}
+							catch { }
+						}
+						else
+						{
+							try
+							{
+								ImageSource imgSource = IconHelper.GetCustomImageSource(customIconItem.FilePath);
+								if (imgSource != null)
+								{
+									iconElement = new System.Windows.Controls.Image
+									{
+										Source = imgSource,
+										Width = iconSize,
+										Height = iconSize,
+										Stretch = Stretch.Uniform,
+										HorizontalAlignment = HorizontalAlignment.Center,
+										VerticalAlignment = VerticalAlignment.Center,
+										IsHitTestVisible = false
+									};
+								}
+							}
+							catch { }
+						}
+					}
+				}
+
+				// 4. Built-in SVG by IconKey or Action.Type default
+				if (iconElement == null)
+				{
+					string iconSvg = "";
+					if (!string.IsNullOrEmpty(action?.IconKey))
+					{
+						iconSvg = IconHelper.GetSvgPathByKey(action.IconKey);
+					}
+					else if (action != null)
+					{
+						iconSvg = action.Type switch
+						{
+							"WebUrl" or "Url" => IconHelper.GetSvgPathByKey("Browser") ?? IconHelper.GetSvgPathByKey("ShowDesktop"),
+							"Folder" or "OpenFolder" => IconHelper.GetSvgPathByKey("Folder"),
+							"System" when !string.IsNullOrEmpty(action.Parameter) => IconHelper.GetSvgPathByKey(action.Parameter),
+							_ => ""
+						};
+					}
+
+					if (!string.IsNullOrEmpty(iconSvg))
+					{
+						try
+						{
+							iconElement = new System.Windows.Shapes.Path
+							{
+								Data = Geometry.Parse(iconSvg),
+								Fill = iconBrush,
+								Width = iconSize,
+								Height = iconSize,
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+						}
+						catch { }
+					}
+				}
+
+				// 5. Fallback: Launch / App target executable icon
+				if (iconElement == null && action != null && (action.Type == "Launch" || action.Type == "App") && !string.IsNullOrEmpty(action.Parameter) && File.Exists(action.Parameter))
 				{
 					try
 					{
@@ -6685,7 +6812,7 @@ public partial class SettingsWindow : Window
 
 	private void OuterEscapeCheckBox_Checked(object sender, RoutedEventArgs e)
 	{
-		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig != null)
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
 			ConfigManager.CurrentConfig.EnableOuterEscapeCancel = true;
 			if (OuterEscapeDistancePanel != null)
@@ -6699,7 +6826,7 @@ public partial class SettingsWindow : Window
 
 	private void OuterEscapeCheckBox_Unchecked(object sender, RoutedEventArgs e)
 	{
-		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig != null)
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
 			ConfigManager.CurrentConfig.EnableOuterEscapeCancel = false;
 			if (OuterEscapeDistancePanel != null)
@@ -7958,7 +8085,7 @@ public partial class SettingsWindow : Window
 
 	private void EnableEdgeCollisionAvoidanceCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
-		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null) return;
 		bool isChecked = EnableEdgeCollisionAvoidanceCheckBox?.IsChecked == true;
 		ConfigManager.CurrentConfig.EnableEdgeCollisionAvoidance = isChecked;
 		if (EdgeCollisionDetailsPanel != null)
@@ -9059,7 +9186,6 @@ public partial class SettingsWindow : Window
 
 	private void UpdateSidebarThemeVisualState(string themeTag)
 	{
-		bool prevUpdating = _isUpdatingUi;
 		_isUpdatingUi = true;
 		try
 		{
@@ -9093,13 +9219,13 @@ public partial class SettingsWindow : Window
 		}
 		finally
 		{
-			_isUpdatingUi = prevUpdating;
+			_isUpdatingUi = false;
 		}
 	}
 
 	private void DisableOnFullScreenCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
-		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
 			ConfigManager.CurrentConfig.DisableOnFullScreen = DisableOnFullScreenCheckBox.IsChecked == true;
 			SyncUiToConfigAndSave();
@@ -9108,7 +9234,7 @@ public partial class SettingsWindow : Window
 
 	private void ModifierCheckBox_Changed(object sender, RoutedEventArgs e)
 	{
-		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
 		{
 			ConfigManager.CurrentConfig.DisableOnCtrl = CtrlModifierCheckBox.IsChecked == true;
 			ConfigManager.CurrentConfig.DisableOnShift = ShiftModifierCheckBox.IsChecked == true;
@@ -9379,7 +9505,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -9629,7 +9755,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.6.8"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.6.9"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");
@@ -10574,7 +10700,83 @@ public partial class SettingsWindow : Window
 						_ => 1.0, 
 					};
 					double num30 = ((sectorLayout == "IconOnly") ? (baseIconSize * 1.35) : baseIconSize) * 0.72 * num29 * (num7 / (135.0 / num5));
-					if (!string.IsNullOrEmpty(text11))
+					// 1. Explicit Custom SVG
+					if (!string.IsNullOrEmpty(action?.CustomIconSvg))
+					{
+						try
+						{
+							iconElement = new System.Windows.Shapes.Path
+							{
+								Data = Geometry.Parse(action.CustomIconSvg),
+								Fill = sectorPreviewTextBrush,
+								Width = num30,
+								Height = num30,
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+							};
+						}
+						catch { }
+					}
+
+					// 2. Inherited App Icon
+					if (iconElement == null && action != null && !string.IsNullOrEmpty(action.InheritAppIconPath))
+					{
+						try
+						{
+							ImageSource? appIcon = IconHelper.GetIcon(action.InheritAppIconPath);
+							if (appIcon != null)
+							{
+								iconElement = new System.Windows.Controls.Image
+								{
+									Source = appIcon,
+									Width = num30,
+									Height = num30,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+								};
+							}
+						}
+						catch { }
+					}
+
+					// 3. Custom icon pack
+					if (iconElement == null && customIconItem2 != null)
+					{
+						if (!customIconItem2.IsSvg)
+						{
+							ImageSource customImageSource = IconHelper.GetCustomImageSource(customIconItem2.FilePath);
+							if (customImageSource != null)
+							{
+								iconElement = new System.Windows.Controls.Image
+								{
+									Source = customImageSource,
+									Width = num30,
+									Height = num30,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+								};
+							}
+						}
+						else if (!string.IsNullOrEmpty(customIconItem2.SvgData))
+						{
+							try
+							{
+								iconElement = new System.Windows.Shapes.Path
+								{
+									Data = Geometry.Parse(customIconItem2.SvgData),
+									Fill = sectorPreviewTextBrush,
+									Width = num30,
+									Height = num30,
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+								};
+							}
+							catch { }
+						}
+					}
+
+					// 4. Built-in IconKey SVG
+					if (iconElement == null && !string.IsNullOrEmpty(text11))
 					{
 						try
 						{
@@ -10588,26 +10790,9 @@ public partial class SettingsWindow : Window
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
 						}
-						catch
-						{
-						}
+						catch { }
 					}
-					else if (customIconItem2 != null && !customIconItem2.IsSvg)
-					{
-						ImageSource customImageSource = IconHelper.GetCustomImageSource(customIconItem2.FilePath);
-						if (customImageSource != null)
-						{
-							iconElement = new System.Windows.Controls.Image
-							{
-								Source = customImageSource,
-								Width = num30,
-								Height = num30,
-								Stretch = Stretch.Uniform,
-								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
-							};
-						}
-					}
-					else if (text9 == "Launch" && !string.IsNullOrEmpty(text10))
+					else if (iconElement == null && text9 == "Launch" && !string.IsNullOrEmpty(text10))
 					{
 						BitmapSource icon = IconHelper.GetIcon(text10);
 						if (icon != null)
@@ -10622,7 +10807,7 @@ public partial class SettingsWindow : Window
 							};
 						}
 					}
-					else
+					else if (iconElement == null)
 					{
 						try
 						{
@@ -10636,9 +10821,7 @@ public partial class SettingsWindow : Window
 								HorizontalAlignment = System.Windows.HorizontalAlignment.Center
 							};
 						}
-						catch
-						{
-						}
+						catch { }
 					}
 				}
 
@@ -10905,30 +11088,15 @@ public partial class SettingsWindow : Window
 							? actionItem2.CustomIconSize.Value
 							: ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
 						double num43 = ((subLayout == "IconOnly") ? (subBaseIconSize * 1.35) : subBaseIconSize) * 0.65 * num7;
-						string text12 = null;
-						if (!string.IsNullOrEmpty(actionItem2.CustomIconSvg))
-						{
-							text12 = actionItem2.CustomIconSvg;
-						}
-						else if (!string.IsNullOrEmpty(actionItem2.IconKey))
-						{
-							text12 = IconHelper.GetSvgPathByKey(actionItem2.IconKey);
-						}
-						else if (actionItem2.Type == "Folder" || actionItem2.Type == "OpenFolder")
-						{
-							text12 = IconHelper.GetSvgPathByKey("Folder");
-						}
-						else if (actionItem2.Type == "System" && !string.IsNullOrEmpty(actionItem2.Parameter))
-						{
-							text12 = IconHelper.GetSvgPathByKey(actionItem2.Parameter);
-						}
-						if (!string.IsNullOrEmpty(text12))
+						UIElement? subIconEl = null;
+
+						if (!string.IsNullOrEmpty(actionItem2?.CustomIconSvg))
 						{
 							try
 							{
-								System.Windows.Shapes.Path element6 = new System.Windows.Shapes.Path
+								subIconEl = new System.Windows.Shapes.Path
 								{
-									Data = Geometry.Parse(text12),
+									Data = Geometry.Parse(actionItem2.CustomIconSvg),
 									Fill = subSectorPreviewTextBrush,
 									Width = num43,
 									Height = num43,
@@ -10936,28 +11104,85 @@ public partial class SettingsWindow : Window
 									HorizontalAlignment = HorizontalAlignment.Center,
 									Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
 								};
-								stackPanel2.Children.Add(element6);
 							}
-							catch
+							catch { }
+						}
+
+						if (subIconEl == null && actionItem2 != null && !string.IsNullOrEmpty(actionItem2.InheritAppIconPath))
+						{
+							try
 							{
+								ImageSource? appIcon2 = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
+								if (appIcon2 != null)
+								{
+									subIconEl = new Image
+									{
+										Source = appIcon2,
+										Width = num43,
+										Height = num43,
+										Stretch = Stretch.Uniform,
+										HorizontalAlignment = HorizontalAlignment.Center,
+										Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
+									};
+								}
+							}
+							catch { }
+						}
+
+						if (subIconEl == null)
+						{
+							string text12 = null;
+							if (!string.IsNullOrEmpty(actionItem2?.IconKey))
+							{
+								text12 = IconHelper.GetSvgPathByKey(actionItem2.IconKey);
+							}
+							else if (actionItem2?.Type == "Folder" || actionItem2?.Type == "OpenFolder")
+							{
+								text12 = IconHelper.GetSvgPathByKey("Folder");
+							}
+							else if (actionItem2?.Type == "System" && !string.IsNullOrEmpty(actionItem2.Parameter))
+							{
+								text12 = IconHelper.GetSvgPathByKey(actionItem2.Parameter);
+							}
+
+							if (!string.IsNullOrEmpty(text12))
+							{
+								try
+								{
+									subIconEl = new System.Windows.Shapes.Path
+									{
+										Data = Geometry.Parse(text12),
+										Fill = subSectorPreviewTextBrush,
+										Width = num43,
+										Height = num43,
+										Stretch = Stretch.Uniform,
+										HorizontalAlignment = HorizontalAlignment.Center,
+										Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
+									};
+								}
+								catch { }
+							}
+							else if (actionItem2?.Type == "Launch" && !string.IsNullOrEmpty(actionItem2?.Parameter))
+							{
+								BitmapSource icon2 = IconHelper.GetIcon(actionItem2.Parameter);
+								if (icon2 != null)
+								{
+									subIconEl = new Image
+									{
+										Source = icon2,
+										Width = num43,
+										Height = num43,
+										Stretch = Stretch.Uniform,
+										HorizontalAlignment = HorizontalAlignment.Center,
+										Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
+									};
+								}
 							}
 						}
-						else if (actionItem2.Type == "Launch" && !string.IsNullOrEmpty(actionItem2.Parameter))
+
+						if (subIconEl != null)
 						{
-							BitmapSource icon2 = IconHelper.GetIcon(actionItem2.Parameter);
-							if (icon2 != null)
-							{
-								Image element7 = new Image
-								{
-									Source = icon2,
-									Width = num43,
-									Height = num43,
-									Stretch = Stretch.Uniform,
-									HorizontalAlignment = HorizontalAlignment.Center,
-									Margin = new Thickness(0, 0, 0, subShouldShowText ? 1 : 0)
-								};
-								stackPanel2.Children.Add(element7);
-							}
+							stackPanel2.Children.Add(subIconEl);
 						}
 					}
 					if (subShouldShowText && !string.IsNullOrEmpty(actionItem2.Name))

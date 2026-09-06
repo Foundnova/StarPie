@@ -965,6 +965,22 @@ public partial class RadialWindow : Window
 					{
 					}
 				}
+				if (frameworkElement2 == null && !string.IsNullOrEmpty(currentAction?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(currentAction.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement2 = new Image
+						{
+							Source = icon,
+							Width = num11 + 4.0,
+							Height = num11 + 4.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
+					}
+				}
 				if (frameworkElement2 == null && !string.IsNullOrEmpty(iconKey))
 				{
 					if (iconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
@@ -1008,22 +1024,6 @@ public partial class RadialWindow : Window
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
-					}
-				}
-				if (frameworkElement2 == null && !string.IsNullOrEmpty(currentAction?.InheritAppIconPath))
-				{
-					BitmapSource icon = IconHelper.GetIcon(currentAction.InheritAppIconPath);
-					if (icon != null)
-					{
-						frameworkElement2 = new Image
-						{
-							Source = icon,
-							Width = num11 + 4.0,
-							Height = num11 + 4.0,
-							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, shouldShowText ? 2 : 0),
-							HorizontalAlignment = HorizontalAlignment.Center
-						};
 					}
 				}
 				if (frameworkElement2 == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))
@@ -1509,6 +1509,22 @@ public partial class RadialWindow : Window
 					{
 					}
 				}
+				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement = new Image
+						{
+							Source = icon,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
+					}
+				}
 				if (frameworkElement == null && !string.IsNullOrEmpty(iconKey))
 				{
 					if (iconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
@@ -1552,22 +1568,6 @@ public partial class RadialWindow : Window
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
-					}
-				}
-				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
-				{
-					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
-					if (icon != null)
-					{
-						frameworkElement = new Image
-						{
-							Source = icon,
-							Width = subIconSize + 2.0,
-							Height = subIconSize + 2.0,
-							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
-							HorizontalAlignment = HorizontalAlignment.Center
-						};
 					}
 				}
 				if (frameworkElement == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))
@@ -2486,6 +2486,22 @@ public partial class RadialWindow : Window
 					}
 					catch { }
 				}
+				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
+				{
+					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
+					if (icon != null)
+					{
+						frameworkElement = new Image
+						{
+							Source = icon,
+							Width = subIconSize + 2.0,
+							Height = subIconSize + 2.0,
+							Stretch = Stretch.Uniform,
+							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
+							HorizontalAlignment = HorizontalAlignment.Center
+						};
+					}
+				}
 				if (frameworkElement == null && !string.IsNullOrEmpty(iconKey))
 				{
 					if (iconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
@@ -2529,22 +2545,6 @@ public partial class RadialWindow : Window
 								HorizontalAlignment = HorizontalAlignment.Center
 							};
 						}
-					}
-				}
-				if (frameworkElement == null && !string.IsNullOrEmpty(actionItem2?.InheritAppIconPath))
-				{
-					BitmapSource icon = IconHelper.GetIcon(actionItem2.InheritAppIconPath);
-					if (icon != null)
-					{
-						frameworkElement = new Image
-						{
-							Source = icon,
-							Width = subIconSize + 2.0,
-							Height = subIconSize + 2.0,
-							Stretch = Stretch.Uniform,
-							Margin = new Thickness(0.0, 0.0, 0.0, subShouldShowText ? 2 : 0),
-							HorizontalAlignment = HorizontalAlignment.Center
-						};
 					}
 				}
 				if (frameworkElement == null && (text3 == "Launch" || text3 == "App") && !string.IsNullOrEmpty(text4))

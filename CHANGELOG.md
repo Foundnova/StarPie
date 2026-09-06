@@ -4,6 +4,40 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.6.9] - 2026-09-06 (程序图标继承渲染优先级与平铺覆盖保护 & 防误触与核心配置开机静默退出无损持久化 & 动作画布与外观预览全面支持继承图标)
+
+### 🎯 核心修复 1：根治重启后轮盘扇区图标变 Win 图标问题（继承图标优先级提升与平铺子模式保护）
+1. **图标渲染短路缺陷根除**：
+   - 排查发现：在 `RadialWindow.xaml.cs`（一级扇区、二级外圈子环、二级蜂窝扇）以及 `SettingsWindow.xaml.cs`（外观实时画布、动作区画布）中，此前只要检测到 `IconKey` 或 `iconSvg` 非空，便会直接加载内置矢量 Path，导致排在后面的 `InheritAppIconPath` 判定被彻底短路跳过；
+   - 将 `currentAction?.InheritAppIconPath` 判定提升至普通 `IconKey` 判定之前（仅次于用户显式上传的自定义 SVG），优先提取并渲染外部程序的原生高清位图图标；
+2. **平铺（Tile）子模式默认覆写保护**：
+   - 深入排查发现：当动作类型为平铺或切换窗口子模式时，旧逻辑会无条件给 `item.IconKey` 赋值 `"Tile"`（4 宫格四方块图标），强行覆盖了用户之前关联程序时提取的图标；
+   - 在 `SettingsWindow.xaml.cs`（`FocusWindowSubModeComboBox_SelectionChanged`、`ApplyFocusTileLayout`）以及 ViewModel（`SlotViewModel`、`SubSlotViewModel`）中加入保护策略：仅在 `IconKey` 与 `InheritAppIconPath` 均为空时赋予默认 `"Tile"`，绝不破坏用户既有的程序图标与视觉定制；
+3. **设置控制台图标选择与焦点编辑卡片增强**：
+   - 动作区扇区焦点编辑卡片增加实时外部程序图标徽标与预览组件（`FocusInheritIconPreviewImage`、`FocusIconImage`），支持直接显示继承图标；
+   - 动作列表中支持绑定外部程序图标并自动隐藏通用矢量 Path，右侧指示文字优先呈现关联程序的友好名称。
+
+### 🛡️ 核心修复 2：根治防误触功能重启后自动被关闭问题（嵌套重入锁深度计数 & 初始化时序重写与多层持久化守卫）
+1. **嵌套 UI 抑制标志提前清零穿透排查（致命根因彻底定位）**：
+   - 深入追踪堆栈定位发现：在 `SettingsWindow.xaml.cs` 的 `LoadConfigToUi()` 执行到第 802 行时调用了 `RefreshLayoutOptionsUi()`；
+   - `RefreshLayoutOptionsUi()` 内部具有 `try { _isUpdatingUi = true; ... } finally { _isUpdatingUi = false; }`；
+   - 其 `finally` 块在退出时将全局 `_isUpdatingUi` 强行清为了 `false`，而此时第 923 行的 `DisableOnFullScreenCheckBox.IsChecked` 等防误触控件尚未被赋值；
+   - 紧随其后的第 803 行 `SetComboBoxSelectedValue(SubmenuStyleComboBox)` 触发了 `SelectionChanged` 事件，因 `_isUpdatingUi` 已被清零，事件处理程序误判为用户手动交互，并调用了 `SyncUiToConfigAndSave()`；
+   - 由于此前 `EnsureUiInitialized()` 在进入之初就将 `_isUiInitialized` 设为了 `true`，`SyncUiToConfigAndSave()` 放行执行，读取了尚未被配置赋值的 `DisableOnFullScreenCheckBox`（默认状态为 `false`），瞬间将内存中的配置改写为 `false` 并写入磁盘，导致重启 4 秒内必被复写！
+2. **重入深度计数器 (Re-entrant Depth-Counted UI Guard) 架构重塑**：
+   - 将 `_isUpdatingUi` 全面重构为基于 `_uiUpdateDepth` 的引用计数器：进入更新块递增深度，退出递减深度，仅当计数归零时才解除 UI 抑制，彻底根治所有嵌套子方法提前清零外部抑制状态的隐蔽缺陷；
+   - 修正 `UpdateSidebarThemeVisualState` 等方法的不对称赋值，消除潜在状态泄漏；
+3. **初始化生命周期原子提交守卫**：
+   - 引入 `_isUiInitializing` 重入锁，并将 `_isUiInitialized = true` 的赋值严格移至 `EnsureUiInitialized()` 的最后一步；在全部控件（包括全屏独占开关、修饰键旁路复选框、外甩取消等）完全就绪前，`_isUiInitialized` 始终保持 `false`，任何中间事件均无法触发磁盘持久化；
+   - 在 `SettingsWindow.xaml` 中为 `DisableOnFullScreenCheckBox` 显式补充 `IsChecked="True"` 默认属性，与数据模型缺省对齐。
+
+### 🎨 全场景画布渲染统一
+1. **实时轮盘、外观画布与动作画布三位一体渲染对齐**：
+   - 一级主轮盘（`RadialWindow`）、外圈子环（`Outer Sub-Ring`）、蜂窝扇（`Honeycomb Fan`）；
+   - 外观与形态实时画布（`LiveWheelPreviewCanvas`，主扇区与二级子扇区）；
+   - 手势与动作实时画布（`MappingsWheelPreviewCanvas`，主扇区与二级子扇区）；
+   - 以上全部 6 大渲染通路统一遵循：用户自定义 SVG > 关联外部程序原生图标（`InheritAppIconPath`） > 图标包扩展图标（`custom:`） > 内置矢量图标（`IconKey`） > 动作默认图标的精准优先级。
+
 ## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 热键截屏粘滞与修饰键成对释放原生根治 & 截屏后右键单击与长按滑动失效彻底根治 & 鼠标左键长按唤醒轮盘与单击原生点击放行 & Windows 开机自启极速秒开与静默启动优化 & 任务栏纯净圆形星盘图标 & 控制台黑白双版Logo动态切换 & 托盘右键菜单黑白双色主题 & 内置检查更新多级容灾与下载加速修复 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
 
 ### 🖱️ 触发键绑定左键专项优化：长按左键唤醒轮盘 & 单击左键保持系统原生点击功能

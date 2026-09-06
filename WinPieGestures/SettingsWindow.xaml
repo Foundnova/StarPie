@@ -659,9 +659,9 @@
           </Button>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.6.8&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.6.9&#x0a;© 2026 StarPie">
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.6.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.6.9" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -1211,7 +1211,7 @@
                 <StackPanel>
                   <TextBlock Name="SceneIsolationTitleText" Text="场景隔离与防误触" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Name="SceneIsolationDescText" Text="当处于特定场景或配合修饰键操作时，自动绕过轮盘拦截，放行原生右键事件。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" />
-                  <CheckBox Name="DisableOnFullScreenCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,14" Checked="DisableOnFullScreenCheckBox_Changed" Unchecked="DisableOnFullScreenCheckBox_Changed">
+                  <CheckBox Name="DisableOnFullScreenCheckBox" IsChecked="True" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,14" Checked="DisableOnFullScreenCheckBox_Changed" Unchecked="DisableOnFullScreenCheckBox_Changed">
                     <StackPanel Margin="6,0,0,0">
                       <TextBlock Name="FullScreenOptionTitleText" Text="全屏游戏/独占应用自动禁用手势" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <TextBlock Name="FullScreenOptionDescText" Text="自动检测当前前台窗口是否处于全屏独占状态，避免游戏瞄准等右键操作被拦截。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -2255,6 +2255,7 @@
                         <!-- 图标选择按钮 -->
                         <Button Name="FocusPickIconButton" Grid.Column="0" Style="{StaticResource ModernButtonStyle}" Height="54" Padding="4" Margin="0,0,10,0" ToolTip="点击选取矢量图标或自定SVG" Click="FocusPickIcon_Click">
                           <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Image Name="FocusIconImage" Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,2" Visibility="Collapsed" />
                             <Path Name="FocusIconPath" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,2" />
                             <TextBlock Name="FocusIconLabel" Text="图标..." FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
                           </StackPanel>
@@ -2566,6 +2567,7 @@
                                 <ColumnDefinition Width="Auto" />
                               </Grid.ColumnDefinitions>
                               <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Image Name="FocusInheritIconPreviewImage" Width="16" Height="16" Stretch="Uniform" Margin="0,0,6,0" Visibility="Collapsed" />
                                 <TextBlock Text="🏷️ 关联外部程序图标 (解耦执行与外观):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
                                 <TextBlock Name="FocusInheritIconStatusLabel" Text="未关联 (显示默认动作图标)" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                               </StackPanel>
@@ -2783,7 +2785,8 @@
 
                                 <Button Grid.Column="0" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="6,0" Margin="0,0,8,0" Click="PickIcon_Click" ToolTip="点击选取矢量图标">
                                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Path Width="14" Height="14" Stretch="Uniform" Fill="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" Data="{Binding VectorIconData}" Visibility="{Binding HasVectorIcon, Converter={StaticResource BoolToVis}}" />
+                                    <Image Width="14" Height="14" Stretch="Uniform" Margin="0,0,4,0" Source="{Binding InheritedAppIcon}" Visibility="{Binding HasInheritedAppIcon, Converter={StaticResource BoolToVis}}" />
+                                    <Path Width="14" Height="14" Stretch="Uniform" Fill="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" Data="{Binding VectorIconData}" Visibility="{Binding ShowVectorIcon, Converter={StaticResource BoolToVis}}" />
                                     <TextBlock Text="{Binding IconDisplayText}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="52" />
                                   </StackPanel>
                                 </Button>
@@ -3029,7 +3032,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.8 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.9 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3389,7 +3392,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.6.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.6.9" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3405,13 +3408,11 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.6.8 全新星盘发光星核图标 &amp; 二级轮盘方位对齐 &amp; 一二级配置联动 &amp; 全局文字排版适配 &amp; 视口留白防护" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🪐 【全新星盘官方品牌图标】：全面启用基于 cover.v3 烘焙的同心发光星核新图标，超椭圆边缘 Alpha 平滑抗锯齿羽化与 10 级全尺寸超清 ICO；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🧭 【二级轮盘方位对齐修复】：彻底重构蜂窝扇（Honeycomb Fan）几何方位映射，消除实际弹出时上方二级动作与设置/预览左右颠倒的缺陷；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🔄 【一级/二级配置模式无缝联动】：点击画布二级动作自动切入「二级级联」模式，子扇区持续高亮聚焦不消失，返回父级平滑切回一级主轮盘；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🔠 【轮盘扇区自适应弹性字号 (Auto Font-Fit)】：一级主轮盘、二级外圈子环与蜂窝扇文本接入弹性字号缩放，实时画布像素级对齐所见即所得；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🌐 【语言选单规范化 &amp; 视口截断防护】：消除 Windows 字体下国旗 Emoji 退化；底部增加呼吸留白消除文字遮挡；补齐中英繁日全量设置卡片 I18n 本地化；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• ⚡ 【交互体验精进】：画布缩放工具栏同级重构彻底修复点击失效；快捷键构建器增加 Pause 与实时过滤；蜂窝扇极角展开保持与防掉帧手感优化。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.6.9 关联外部图标继承加固 &amp; 防误触配置持久化保护 &amp; 状态自愈" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🏷️ 【关联外部程序图标继承加固】：彻底解决轮盘扇区重启后变成默认 Win 图标的问题，重构图标继承优先级链，无论主轮盘、外圈子环、蜂窝扇还是动作配置画布均严密继承关联程序图标；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🛡️ 【防误触配置持久化与重启保持】：重构开机静默启动与托盘关闭时的数据同步防御门禁，彻底杜绝未初始化 UI 覆盖清空「全屏防误触」、「外甩取消」与「边缘避让」等用户设置；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🖼️ 【动作编辑区视觉联动增强】：聚焦编辑卡片图标按钮与列表行全面支持关联外部图标实时回显，清晰呈现绑定应用名称与高清图标；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🔲 【窗口管理与平铺图标防冲】：优化平铺预设与模式切换逻辑，仅在未设置任何自定义/关联图标时赋予默认 Tile 图标，杜绝误冲已有视觉资产。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -3420,6 +3421,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.6.9" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="外部图标继承加固 &amp; 防误触配置持久化保护 &amp; 图标回显联动" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="彻底解决重启后扇区图标变为 Win 图标问题；加固开机自启与关机保存门禁，杜绝全屏防误触与外甩取消设置被冲掉；列表与编辑区支持关联图标实时预览；平铺预设不再覆写已有图标。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-06" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>
