@@ -108,6 +108,7 @@ public partial class SubActionEditorWindow : Window
 			if (iconPickerWindow.ShowDialog() == true)
 			{
 				dataContext.IconKey = iconPickerWindow.SelectedIconKey ?? "";
+				dataContext.InheritAppIconPath = "";
 			}
 		}
 	}
@@ -123,6 +124,9 @@ public partial class SubActionEditorWindow : Window
 		if (programPickerWindow.ShowDialog() == true && !string.IsNullOrEmpty(programPickerWindow.SelectedPath))
 		{
 			dataContext.Parameter = programPickerWindow.SelectedPath;
+			dataContext.InheritAppIconPath = programPickerWindow.SelectedPath;
+			dataContext.IconKey = "";
+			dataContext.CustomIconSvg = "";
 			if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("子动作"))
 			{
 				dataContext.Name = ((!string.IsNullOrEmpty(programPickerWindow.SelectedName)) ? programPickerWindow.SelectedName : Path.GetFileNameWithoutExtension(programPickerWindow.SelectedPath));

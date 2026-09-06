@@ -3619,6 +3619,7 @@ public partial class SettingsWindow : Window
 		if (iconPickerWindow.ShowDialog() == true)
 		{
 			item.IconKey = iconPickerWindow.SelectedIconKey ?? "";
+			item.InheritAppIconPath = "";
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -4174,6 +4175,9 @@ public partial class SettingsWindow : Window
 		if (programPicker.ShowDialog() == true && !string.IsNullOrEmpty(programPicker.SelectedPath))
 		{
 			item.Parameter = programPicker.SelectedPath;
+			item.InheritAppIconPath = programPicker.SelectedPath;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			FocusLaunchPathTextBox.Text = programPicker.SelectedPath;
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
@@ -4200,6 +4204,9 @@ public partial class SettingsWindow : Window
 		if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
 		{
 			item.Parameter = picker.SelectedPath;
+			item.InheritAppIconPath = picker.SelectedPath;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			FocusLaunchPathTextBox.Text = picker.SelectedPath;
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
@@ -4229,6 +4236,9 @@ public partial class SettingsWindow : Window
 		if (dlg.ShowDialog(this) == true)
 		{
 			item.Parameter = dlg.FileName;
+			item.InheritAppIconPath = dlg.FileName;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			FocusLaunchPathTextBox.Text = dlg.FileName;
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
@@ -9931,6 +9941,9 @@ public partial class SettingsWindow : Window
 		if (programPickerWindow.ShowDialog() == true && !string.IsNullOrEmpty(programPickerWindow.SelectedPath))
 		{
 			dataContext.Parameter = programPickerWindow.SelectedPath;
+			dataContext.InheritAppIconPath = programPickerWindow.SelectedPath;
+			dataContext.IconKey = "";
+			dataContext.CustomIconSvg = "";
 			if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("动作") || dataContext.Name == "快捷动作")
 			{
 				dataContext.Name = ((!string.IsNullOrEmpty(programPickerWindow.SelectedName)) ? programPickerWindow.SelectedName : System.IO.Path.GetFileNameWithoutExtension(programPickerWindow.SelectedPath));

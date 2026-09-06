@@ -183,6 +183,23 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		}
 	}
 
+	public string InheritAppIconPath
+	{
+		get
+		{
+			return Action.InheritAppIconPath ?? "";
+		}
+		set
+		{
+			if (Action.InheritAppIconPath != value)
+			{
+				Action.InheritAppIconPath = value;
+				OnPropertyChanged("InheritAppIconPath");
+				OnPropertyChanged("IconDisplayText");
+			}
+		}
+	}
+
 	public string IconDisplayText
 	{
 		get
@@ -194,6 +211,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			if (!string.IsNullOrEmpty(CustomIconSvg))
 			{
 				return "自定义SVG";
+			}
+			if (!string.IsNullOrEmpty(InheritAppIconPath))
+			{
+				return "程序图标";
 			}
 			return "图标...";
 		}

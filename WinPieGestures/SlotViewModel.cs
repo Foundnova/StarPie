@@ -568,6 +568,23 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		}
 	}
 
+	public string InheritAppIconPath
+	{
+		get
+		{
+			return Action.InheritAppIconPath ?? "";
+		}
+		set
+		{
+			if (Action.InheritAppIconPath != value)
+			{
+				Action.InheritAppIconPath = value;
+				OnPropertyChanged("InheritAppIconPath");
+				OnPropertyChanged("IconDisplayText");
+			}
+		}
+	}
+
 	public string IconDisplayText
 	{
 		get
@@ -579,6 +596,10 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 			if (!string.IsNullOrEmpty(CustomIconSvg))
 			{
 				return "自定义SVG";
+			}
+			if (!string.IsNullOrEmpty(InheritAppIconPath))
+			{
+				return "程序图标";
 			}
 			return "图标...";
 		}
