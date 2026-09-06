@@ -64,6 +64,9 @@ public static class WindowTiler
 	private static extern bool IsWindowVisible(nint hWnd);
 
 	[DllImport("user32.dll")]
+	private static extern bool IsWindow(nint hWnd);
+
+	[DllImport("user32.dll")]
 	private static extern bool IsIconic(nint hWnd);
 
 	[DllImport("user32.dll")]
@@ -119,6 +122,9 @@ public static class WindowTiler
 	private delegate bool EnumMonitorsProc(nint hMonitor, nint hdcMonitor, ref RECT lprcMonitor, nint dwData);
 
 	private const int SW_RESTORE = 9;
+
+	/// <summary>还原窗口但不激活（不抢前台焦点）；Win32 SW_SHOWNOACTIVATE。</summary>
+	private const int SW_SHOWNOACTIVATE = 4;
 	private const uint SWP_NOZORDER = 0x0004;
 	private const uint SWP_NOMOVE = 0x0002;
 	private const uint SWP_NOSIZE = 0x0001;
@@ -132,9 +138,21 @@ public static class WindowTiler
 	private const uint LWA_COLORKEY = 0x00000001;
 	private const uint SW_RESTORE_U = 9u;
 
-	// 上次平铺快照（供「恢复」与内存记忆）
-	private static readonly Dictionary<nint, RECT> s_lastSnapshot = new Dictionary<nint, RECT>();
-	private static int s_cycleIndex;
+	// 上次平铺快照（供「恢复」与内存记忆）。条目同时记录进程 PID：
+	// HWND 会被系统复用，恢复时校验 PID 避免把旧坐标应用到无关窗口。
+	private readonly struct TileSnapshotEntry
+	{
+		public readonly RECT Rect;
+		public readonly uint Pid;
+
+		public TileSnapshotEntry(RECT rect, uint pid)
+		{
+			Rect = rect;
+			Pid = pid;
+		}
+	}
+
+	private static readonly Dictionary<nint, TileSnapshotEntry> s_lastSnapshot = new Dictionary<nint, TileSnapshotEntry>();
 	private static string s_currentLayout = "2L";
 
 	/// <summary>可选布局 key 列表（顺序即编辑器下拉顺序）。</summary>
@@ -263,6 +281,17 @@ public static class WindowTiler
 				}
 			}
 			bool includeMinimized = ConfigManager.CurrentConfig?.TileIncludeMinimized == true;
+			// 屏幕边距与窗口间距（物理像素，读取时夹紧防呆）
+			int mt = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginTop ?? 0, 0, 1000);
+			int mb = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginBottom ?? 0, 0, 1000);
+			int ml = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginLeft ?? 0, 0, 1000);
+			int mr = Math.Clamp(ConfigManager.CurrentConfig?.TileMarginRight ?? 0, 0, 1000);
+			int gap = Math.Clamp(ConfigManager.CurrentConfig?.TileGap ?? 0, 0, 500);
+			int gapHalf = gap / 2;
+			if (ml + mr + mt + mb + gap > 0)
+			{
+				AppLogger.LogInfo($"[Tile] margin L{ml}/T{mt}/R{mr}/B{mb}, gap={gap}");
+			}
 			List<nint> targets = GetTileTargets(exclude, includeMinimized);
 			AppLogger.LogInfo($"[Tile] layout='{key}' targets={targets.Count}");
 			if (targets.Count == 0)
@@ -272,37 +301,98 @@ public static class WindowTiler
 			foreach (nint t in targets)
 			{
 				GetWindowThreadProcessId(t, out uint tp);
-				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"}");
+				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"} title=\"{TitleOf(t)}\"");
 			}
-			List<double[]> cells = LayoutCells(key, targets.Count);
-			int count = Math.Min(targets.Count, cells.Count);
-			Dictionary<nint, RECT> snapshot = new Dictionary<nint, RECT>();
-			for (int i = 0; i < count; i++)
+			// 按显示器分区平铺：同一显示器上的窗口独立套用布局，
+			// 避免"两窗分布两屏各占半屏"的不可预测行为。分区顺序 = 显示器在目标序列中的首次出现顺序。
+			List<List<nint>> monitorGroups = new List<List<nint>>();
+			Dictionary<nint, int> groupIndexByMonitor = new Dictionary<nint, int>();
+			foreach (nint hwnd in targets)
 			{
-				RECT wa = WorkAreaOf(targets[i]);
-				double[] c = cells[i];
-				int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
-				int y = wa.Top + (int)Math.Round((wa.Bottom - wa.Top) * c[1]);
-				int w = (int)Math.Round((wa.Right - wa.Left) * c[2]) - (x - wa.Left);
-				int h = (int)Math.Round((wa.Bottom - wa.Top) * c[3]) - (y - wa.Top);
-				w = Math.Max(1, w);
-				h = Math.Max(1, h);
-				RECT before;
-				GetWindowRect(targets[i], out before);
-				// 最小化/最大化会无视 SetWindowPos：先还原，再定位
-				if (IsIconic(targets[i]) || IsZoomed(targets[i]))
+				nint mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+				if (!groupIndexByMonitor.TryGetValue(mon, out int gi))
 				{
-					ShowWindow(targets[i], SW_RESTORE);
+					gi = monitorGroups.Count;
+					groupIndexByMonitor[mon] = gi;
+					monitorGroups.Add(new List<nint>());
 				}
-				bool ok = SetWindowPos(targets[i], HWND_TOP, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
-				AppLogger.LogInfo($"[Tile] #{i} hwnd=0x{targets[i]:X} rect=({x},{y},{w}x{h}) ok={ok}");
-				if (ok)
+				monitorGroups[gi].Add(hwnd);
+			}
+
+			Dictionary<nint, TileSnapshotEntry> snapshot = new Dictionary<nint, TileSnapshotEntry>();
+			int globalIndex = 0;
+			foreach (List<nint> group in monitorGroups)
+			{
+				// 固定布局超编：只平铺任务栏顺序前 nominal 个窗口，其余保持原样（不移动、不进快照）
+				List<nint> groupWindows = group;
+				int nominal = NominalCellCount(key);
+				if (nominal > 0 && group.Count > nominal)
 				{
-					snapshot[targets[i]] = before;
+					AppLogger.LogInfo($"[Tile] 布局 {key} 名义 {nominal} 格，本屏 {group.Count} 窗，按任务栏顺序取前 {nominal} 个，其余 {group.Count - nominal} 窗不参与");
+					groupWindows = group.Take(nominal).ToList();
+				}
+				List<double[]> cells = LayoutCells(key, groupWindows.Count);
+				int count = Math.Min(groupWindows.Count, cells.Count);
+				for (int i = 0; i < count; i++)
+				{
+					nint hwnd = groupWindows[i];
+					RECT wa = WorkAreaOf(hwnd);
+					// 应用屏幕边距（收缩工作区，并夹紧防负尺寸）
+					wa.Left += ml;
+					wa.Top += mt;
+					wa.Right = Math.Max(wa.Left + 1, wa.Right - mr);
+					wa.Bottom = Math.Max(wa.Top + 1, wa.Bottom - mb);
+					double[] c = cells[i];
+					int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
+					int y = wa.Top + (int)Math.Round((wa.Bottom - wa.Top) * c[1]);
+					int w = (int)Math.Round((wa.Right - wa.Left) * c[2]) - (x - wa.Left);
+					int h = (int)Math.Round((wa.Bottom - wa.Top) * c[3]) - (y - wa.Top);
+					// 应用窗口间距：内边缘各收缩 gap/2，外边缘不缩（外圈留白已由边距控制）
+					int gl = c[0] > 1e-9 ? gapHalf : 0;
+					int gt = c[1] > 1e-9 ? gapHalf : 0;
+					int gr = c[2] < 1 - 1e-9 ? gapHalf : 0;
+					int gb = c[3] < 1 - 1e-9 ? gapHalf : 0;
+					x += gl;
+					y += gt;
+					w -= gl + gr;
+					h -= gt + gb;
+					w = Math.Max(1, w);
+					h = Math.Max(1, h);
+					// 最小化/最大化会无视 SetWindowPos：先无激活还原，再捕获快照坐标
+					// （顺序很重要：最小化窗口的 GetWindowRect 是 -32000 系，必须还原后读取）
+					if (IsIconic(hwnd) || IsZoomed(hwnd))
+					{
+						ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+					}
+					GetWindowRect(hwnd, out RECT before);
+					GetWindowThreadProcessId(hwnd, out uint pid);
+					bool ok = SetWindowPos(hwnd, HWND_TOP, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
+					AppLogger.LogInfo($"[Tile] #{globalIndex} hwnd=0x{hwnd:X} exe={ExeNameOfPid(pid) ?? "?"} title=\"{TitleOf(hwnd)}\" rect=({x},{y},{w}x{h}) ok={ok}");
+					globalIndex++;
+					if (ok)
+					{
+						snapshot[hwnd] = new TileSnapshotEntry(before, pid);
+					}
 				}
 			}
 			lock (s_lastSnapshot)
 			{
+				// 清理已销毁窗口的陈旧条目（HWND 可能被系统复用，恢复时还需校验 PID）
+				List<nint> dead = null;
+				foreach (var kv in s_lastSnapshot)
+				{
+					if (!IsWindow(kv.Key))
+					{
+						(dead ??= new List<nint>()).Add(kv.Key);
+					}
+				}
+				if (dead != null)
+				{
+					foreach (nint d in dead)
+					{
+						s_lastSnapshot.Remove(d);
+					}
+				}
 				// 只记录"第一次"平铺前的状态：后续换布局/循环不覆盖，
 				// 保证「还原所有窗口」始终回到首次平铺之前的样式。
 				if (s_lastSnapshot.Count == 0)
@@ -325,20 +415,31 @@ public static class WindowTiler
 	{
 		try
 		{
-			Dictionary<nint, RECT> snap;
+			Dictionary<nint, TileSnapshotEntry> snap;
 			lock (s_lastSnapshot)
 			{
-				snap = new Dictionary<nint, RECT>(s_lastSnapshot);
+				snap = new Dictionary<nint, TileSnapshotEntry>(s_lastSnapshot);
 			}
 			AppLogger.LogInfo($"[Tile] restore targets={snap.Count}");
 			foreach (var kv in snap)
 			{
 				try
 				{
-					RECT r = kv.Value;
+					// HWND 会被系统复用：窗口已销毁或 PID 不匹配（复用给了其他进程）时跳过，
+					// 避免把旧坐标应用到无关窗口。
+					if (!IsWindow(kv.Key))
+					{
+						continue;
+					}
+					GetWindowThreadProcessId(kv.Key, out uint pid);
+					if (pid != kv.Value.Pid)
+					{
+						continue;
+					}
+					RECT r = kv.Value.Rect;
 					if (IsIconic(kv.Key))
 					{
-						ShowWindow(kv.Key, SW_RESTORE);
+						ShowWindow(kv.Key, SW_SHOWNOACTIVATE);
 					}
 					SetWindowPos(kv.Key, HWND_TOP, r.Left, r.Top, Math.Max(1, r.Right - r.Left), Math.Max(1, r.Bottom - r.Top),
 						SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
@@ -507,7 +608,10 @@ public static class WindowTiler
 
 		if (result.Count == 0)
 		{
-			result.AddRange(EnumerateTopLevelWindows());
+			// 主路径（任务栏白名单 + 严格过滤）全军覆没：回退弱过滤兜底。
+			// 该路径过滤语义远弱于主路径，必须显式留痕便于排查。
+			AppLogger.LogWarn("[Tile] 主过滤路径无目标，回退弱过滤兜底枚举（VDM 不可用或所有窗口被过滤）");
+			result.AddRange(EnumerateTopLevelWindows(includeMinimized));
 		}
 		// 诊断：被黑名单/杂窗挡掉的数量（用于核对目标数与真实窗口数）
 		AppLogger.LogInfo($"[Tile]   blocked={blockedCount}");
@@ -556,6 +660,24 @@ public static class WindowTiler
 		}
 		s_exeNameCache[key] = lower;
 		return lower;
+	}
+
+	/// <summary>读取窗口标题（日志用，截断 128 字符，失败返回空串）。</summary>
+	private static string TitleOf(nint hWnd)
+	{
+		try
+		{
+			if (hWnd == IntPtr.Zero || !IsWindow(hWnd))
+			{
+				return "";
+			}
+			StringBuilder sb = new StringBuilder(128);
+			return GetWindowText(hWnd, sb, 128) > 0 ? sb.ToString() : "";
+		}
+		catch
+		{
+			return "";
+		}
 	}
 
 	/// <summary>EnumWindows 全量枚举顶层窗口（不过滤，便于分组；注意通过枚举回调收集）。</summary>
@@ -755,7 +877,7 @@ public static class WindowTiler
 	}
 
 	/// <summary>EnumWindows 兜底枚举：可见、非本进程、有标题的顶层窗口（保留任务栏顺序路径的过滤语义）。</summary>
-	private static List<nint> EnumerateTopLevelWindows()
+	private static List<nint> EnumerateTopLevelWindows(bool includeMinimized)
 	{
 		uint selfPid = (uint)Environment.ProcessId;
 		List<nint> buffer = new List<nint>();
@@ -777,7 +899,12 @@ public static class WindowTiler
 		{
 			try
 			{
-				if (h == IntPtr.Zero || !IsWindowVisible(h) || IsIconic(h))
+				if (h == IntPtr.Zero || !IsWindowVisible(h))
+				{
+					continue;
+				}
+				// 与主路径语义对齐：仅当未开启「包含最小化窗口」时才跳过最小化窗口
+				if (!includeMinimized && IsIconic(h))
 				{
 					continue;
 				}
@@ -855,22 +982,13 @@ public static class WindowTiler
 			return AutoGridCells(n); // AutoGrid：按数量自适应行列
 		}
 		List<double[]> fixedCells = new List<double[]>();
-		// 固定网格布局：窗口数等于名义格数时用其标准形状；否则回退"恰好覆盖 N 的无空格网格"，
-		// 避免窗口少时出现空位（先算窗口数，再定布局）。
-		int nominal = key switch
+		// 固定网格布局：窗口数等于名义格数时用其标准形状；
+		// 缺编（n < 名义）时回退占满网格（行优先 + 末行摊平），窗口铺满整个工作区不留空位；
+		// 超编（n > 名义）由 ExecuteTile 在分组层截断到名义格数，此处恒有 n <= nominal。
+		int nominal = NominalCellCount(key);
+		if (nominal > 0 && n < nominal)
 		{
-			"2L" => 2,
-			"2T" => 2,
-			"3L12" => 3,
-			"3R21" => 3,
-			"3R" => 3,
-			"4G" => 4,
-			"6G" => 6,
-			_ => 0
-		};
-		if (nominal > 0 && n != nominal)
-		{
-			return ExactGridCells(n);
+			return FillGridCells(n);
 		}
 		switch (key)
 		{
@@ -930,34 +1048,45 @@ public static class WindowTiler
 		return cells;
 	}
 
-	/// <summary>恰好覆盖 n 个窗口的无空格网格（行列数取 n 最接近平方的因子分解）。</summary>
-	private static List<double[]> ExactGridCells(int n)
+	/// <summary>固定布局的名义格数（2L/2T=2，3L12/3R21/3R=3，4G=4，6G=6；动态布局返回 0 表示不限）。</summary>
+	private static int NominalCellCount(string key)
+	{
+		return key switch
+		{
+			"2L" => 2,
+			"2T" => 2,
+			"3L12" => 3,
+			"3R21" => 3,
+			"3R" => 3,
+			"4G" => 4,
+			"6G" => 6,
+			_ => 0
+		};
+	}
+
+	/// <summary>
+	/// 占满网格：任意 n 个窗口铺满整个工作区、无空位。
+	/// 行优先填充（cols=⌈√n⌉），最后一行不足 cols 个窗口时摊平整行宽度。
+	/// 例：n=2 → 左右对半；n=3 → 上排 2 窗各半宽 + 下排 1 窗全宽；
+	/// n=5 → 上排 3 窗 + 下排 2 窗（各 1.5 倍宽）；n=6 → 标准 2×3 六宫格。
+	/// </summary>
+	private static List<double[]> FillGridCells(int n)
 	{
 		List<double[]> cells = new List<double[]>();
 		if (n <= 0)
 		{
 			return cells;
 		}
-		if (n == 1)
-		{
-			cells.Add(new[] { 0.0, 0.0, 1.0, 1.0 });
-			return cells;
-		}
 		int cols = (int)Math.Ceiling(Math.Sqrt(n));
-		while (cols > 1 && n % cols != 0)
-		{
-			cols--;
-		}
-		if (n % cols != 0)
-		{
-			cols = 1;
-		}
-		int rows = n / cols;
+		int rows = (n + cols - 1) / cols;
 		for (int i = 0; i < n; i++)
 		{
 			int r = i / cols;
 			int c = i % cols;
-			cells.Add(new[] { (double)c / cols, (double)r / rows, (double)(c + 1) / cols, (double)(r + 1) / rows });
+			// 最后一行不足 cols 个时，按实际窗口数摊平行宽，保证铺满且无空位
+			bool isLastRow = r == rows - 1;
+			int rowCols = isLastRow ? n - (rows - 1) * cols : cols;
+			cells.Add(new[] { (double)c / rowCols, (double)r / rows, (double)(c + 1) / rowCols, (double)(r + 1) / rows });
 		}
 		return cells;
 	}

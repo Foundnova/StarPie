@@ -46,3 +46,6 @@ $RECYCLE.BIN/
 .DS_Store
 
 
+
+# AI Assistant Workspace Data
+.workbuddy/

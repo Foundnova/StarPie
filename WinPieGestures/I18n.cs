@@ -1216,10 +1216,24 @@ public static class I18n
 		};
 		dictionary["TileGlobalDescText"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "「平铺窗口」动作的全局行为。",
-			[LanguageCode.ZhTw] = "「平鋪視窗」動作的全域行為。",
-			[LanguageCode.En] = "Global behaviour of the Tile Windows action.",
-			[LanguageCode.Ja] = "「ウィンドウを並べる」アクションの全体挙動です。"
+			[LanguageCode.ZhCn] = "「平铺窗口」动作的全局行为（屏幕边距、窗口间距、包含最小化窗口、排除名单与多布局循环切换）。",
+			[LanguageCode.ZhTw] = "「平鋪視窗」動作的全域行為（螢幕邊距、視窗間距、包含最小化視窗、排除名單與多佈局循環切換）。",
+			[LanguageCode.En] = "Global behaviour of the Tile Windows action (screen margins, window gaps, minimized windows, exclusion list and layout cycling).",
+			[LanguageCode.Ja] = "「ウィンドウを並べる」アクションの全体挙動（画面マージン、ウィンドウ間隔、最小化ウィンドウの包含、除外リスト、レイアウト切替）。"
+		};
+		dictionary["TileMarginText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "屏幕边距（上 / 下 / 左 / 右，物理像素，0 = 贴边）：",
+			[LanguageCode.ZhTw] = "螢幕邊距（上 / 下 / 左 / 右，物理像素，0 = 貼邊）：",
+			[LanguageCode.En] = "Screen margins (Top / Bottom / Left / Right, physical pixels, 0 = flush):",
+			[LanguageCode.Ja] = "画面マージン（上 / 下 / 左 / 右、物理ピクセル、0 = 端に寄せる）："
+		};
+		dictionary["TileGapText"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "窗口间距（物理像素，0 = 紧贴）：",
+			[LanguageCode.ZhTw] = "視窗間距（物理像素，0 = 緊貼）：",
+			[LanguageCode.En] = "Gap between windows (physical pixels, 0 = flush):",
+			[LanguageCode.Ja] = "ウィンドウ間隔（物理ピクセル、0 = 隙間なし）："
 		};
 		dictionary["TileMinimizeText"] = new Dictionary<LanguageCode, string>
 		{
