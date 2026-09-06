@@ -2719,6 +2719,76 @@ public static class I18n
 			[LanguageCode.En] = "⚙️ Pro Mode",
 			[LanguageCode.Ja] = "⚙️ プロ"
 		};
+		dictionary["LayerIndicatorSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘层数切换提示微标",
+			[LanguageCode.ZhTw] = "輪盤層數切換提示微標",
+			[LanguageCode.En] = "Layer Switch Indicator Badge",
+			[LanguageCode.Ja] = "レイヤ切替インジケーター"
+		};
+		dictionary["LayerIndicatorSectionDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "在高级全量模式下呼出轮盘后，滑动滚轮或按快捷键切换多层轮盘时的浮动提示徽标外观与停留时长。",
+			[LanguageCode.ZhTw] = "在高級全量模式下呼出輪盤後，滑動滾輪或按快捷鍵切換多層輪盤時的浮動提示微標外觀與停留時長。",
+			[LanguageCode.En] = "Appearance and fadeout duration of the floating layer badge when switching layers in Advanced Mode.",
+			[LanguageCode.Ja] = "アドバンスモードでレイヤを切り替える際のフロートバッジの外観と表示時間。"
+		};
+		dictionary["ShowLayerIndicator"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用层数切换浮动提示徽标 (Show Layer Indicator)",
+			[LanguageCode.ZhTw] = "啟用層數切換浮動提示微標 (Show Layer Indicator)",
+			[LanguageCode.En] = "Show Layer Switch Floating Badge",
+			[LanguageCode.Ja] = "レイヤ切替フロートバッジを表示"
+		};
+		dictionary["LayerIndicatorStyleTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "徽标预设风格 (Preset Style):",
+			[LanguageCode.ZhTw] = "微標預設風格 (Preset Style):",
+			[LanguageCode.En] = "Preset Style:",
+			[LanguageCode.Ja] = "プリセットスタイル:"
+		};
+		dictionary["LayerIndicatorIconTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "提示前置图标 (Indicator Icon):",
+			[LanguageCode.ZhTw] = "提示前置圖示 (Indicator Icon):",
+			[LanguageCode.En] = "Indicator Icon:",
+			[LanguageCode.Ja] = "インジケーターアイコン:"
+		};
+		dictionary["LayerIndicatorCornerRadiusTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "徽标平滑圆角 (Corner Radius):",
+			[LanguageCode.ZhTw] = "微標平滑圓角 (Corner Radius):",
+			[LanguageCode.En] = "Badge Corner Radius:",
+			[LanguageCode.Ja] = "バッジ角の丸み:"
+		};
+		dictionary["LayerIndicatorFontSizeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文字字号大小 (Font Size):",
+			[LanguageCode.ZhTw] = "文字字型大小 (Font Size):",
+			[LanguageCode.En] = "Font Size:",
+			[LanguageCode.Ja] = "フォントサイズ:"
+		};
+		dictionary["LayerIndicatorOffsetYTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "垂直显示位置偏移 (Offset Y):",
+			[LanguageCode.ZhTw] = "垂直顯示位置偏移 (Offset Y):",
+			[LanguageCode.En] = "Vertical Offset Y:",
+			[LanguageCode.Ja] = "垂直オフセット Y:"
+		};
+		dictionary["LayerIndicatorDurationTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "提示淡出停留时间 (Duration):",
+			[LanguageCode.ZhTw] = "提示淡出停留時間 (Duration):",
+			[LanguageCode.En] = "Fadeout Duration:",
+			[LanguageCode.Ja] = "表示時間:"
+		};
+		dictionary["BtnResetLayerIndicator"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复默认提示徽标样式",
+			[LanguageCode.ZhTw] = "🔄 恢復預設提示微標樣式",
+			[LanguageCode.En] = "🔄 Reset Indicator Style",
+			[LanguageCode.Ja] = "🔄 インジケータースタイルを初期化"
+		};
 		Translations = dictionary;
 	}
 }

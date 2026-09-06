@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using WinPieGestures;
 
@@ -187,6 +188,144 @@ public class Program
             else
             {
                 Console.WriteLine("FAIL: EnsureTriggerHealth did not resolve button collision!");
+            }
+        }
+
+        // 4. Test Layer Indicator Appearance Customization and Toggle
+        Console.WriteLine("\n--- Testing Layer Indicator Customization ---");
+        var layerIndicatorCard = sw.FindName("Tab1_LayerIndicatorCardBorder") as FrameworkElement;
+        var showLayerIndicatorCheckBox = sw.FindName("ShowLayerIndicatorCheckBox") as CheckBox;
+        var previewLayerBadge = sw.FindName("PreviewLayerIndicatorBadge") as FrameworkElement;
+        var previewLayerText = sw.FindName("PreviewLayerIndicatorText") as TextBlock;
+        var previewLayerIcon = sw.FindName("PreviewLayerIndicatorIcon") as TextBlock;
+
+        if (layerIndicatorCard == null || showLayerIndicatorCheckBox == null || previewLayerBadge == null || previewLayerText == null || previewLayerIcon == null)
+        {
+            Console.WriteLine($"FAIL: Layer indicator UI elements missing! card={layerIndicatorCard!=null}, cb={showLayerIndicatorCheckBox!=null}, badge={previewLayerBadge!=null}, text={previewLayerText!=null}, icon={previewLayerIcon!=null}");
+        }
+        else
+        {
+            // Simple mode hides Tab1_LayerIndicatorCardBorder
+            sw.ApplyConfigMode("Simple", false);
+            Console.WriteLine($"[Simple Mode] LayerIndicatorCard Visibility: {layerIndicatorCard.Visibility}");
+            if (layerIndicatorCard.Visibility == Visibility.Collapsed)
+            {
+                Console.WriteLine("SUCCESS: Tab1_LayerIndicatorCardBorder collapsed in Simple Mode!");
+            }
+            else
+            {
+                Console.WriteLine("FAIL: Tab1_LayerIndicatorCardBorder not collapsed in Simple Mode!");
+            }
+
+            // Pro mode shows Tab1_LayerIndicatorCardBorder
+            sw.ApplyConfigMode("Pro", false);
+            Console.WriteLine($"[Pro Mode] LayerIndicatorCard Visibility: {layerIndicatorCard.Visibility}");
+            if (layerIndicatorCard.Visibility == Visibility.Visible)
+            {
+                Console.WriteLine("SUCCESS: Tab1_LayerIndicatorCardBorder visible in Pro Mode!");
+            }
+            else
+            {
+                Console.WriteLine("FAIL: Tab1_LayerIndicatorCardBorder not visible in Pro Mode!");
+            }
+
+            // Test AppConfig defaults and serialization roundtrip
+            var cfg = new AppConfig
+            {
+                ShowLayerIndicator = false,
+                LayerIndicatorStyle = "Purple",
+                LayerIndicatorBg = "#E62E1065",
+                LayerIndicatorBorder = "#C084FC",
+                LayerIndicatorTextColor = "#FAF5FF",
+                LayerIndicatorIcon = "❄️",
+                LayerIndicatorFontSize = 13.0,
+                LayerIndicatorCornerRadius = 16.0,
+                LayerIndicatorOffsetY = 15.0,
+                LayerIndicatorDurationMs = 1500.0
+            };
+
+            string json = System.Text.Json.JsonSerializer.Serialize(cfg);
+            var deserialized = System.Text.Json.JsonSerializer.Deserialize<AppConfig>(json);
+
+            if (deserialized != null &&
+                deserialized.ShowLayerIndicator == false &&
+                deserialized.LayerIndicatorStyle == "Purple" &&
+                deserialized.LayerIndicatorBg == "#E62E1065" &&
+                deserialized.LayerIndicatorBorder == "#C084FC" &&
+                deserialized.LayerIndicatorTextColor == "#FAF5FF" &&
+                deserialized.LayerIndicatorIcon == "❄️" &&
+                deserialized.LayerIndicatorFontSize == 13.0 &&
+                deserialized.LayerIndicatorCornerRadius == 16.0 &&
+                deserialized.LayerIndicatorOffsetY == 15.0 &&
+                deserialized.LayerIndicatorDurationMs == 1500.0)
+            {
+                Console.WriteLine("SUCCESS: AppConfig Layer Indicator properties serialized and deserialized flawlessly!");
+            }
+            else
+            {
+                Console.WriteLine("FAIL: Serialization roundtrip mismatch for Layer Indicator properties!");
+            }
+
+            // Test RadialWindow Layer Indicator Style Application
+            ConfigManager.CurrentConfig.ShowLayerIndicator = true;
+            ConfigManager.CurrentConfig.LayerIndicatorStyle = "Aurora";
+            ConfigManager.CurrentConfig.LayerIndicatorBg = "#E6082F49";
+            ConfigManager.CurrentConfig.LayerIndicatorBorder = "#22D3EE";
+            ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#F0FDFA";
+            ConfigManager.CurrentConfig.LayerIndicatorIcon = "🌀";
+            ConfigManager.CurrentConfig.LayerIndicatorCornerRadius = 14.0;
+            ConfigManager.CurrentConfig.LayerIndicatorFontSize = 12.0;
+
+            var multiLayerProfile = new WheelProfile
+            {
+                ProcessName = "MultiLayerTest",
+                Layers = new System.Collections.Generic.List<WheelLayer>
+                {
+                    new WheelLayer { Name = "第一层" },
+                    new WheelLayer { Name = "第二层" }
+                }
+            };
+            RadialWindow rw2 = new RadialWindow(new Point(600, 600), multiLayerProfile);
+            rw2.SwitchToLayer(1);
+
+            var rwBadge = rw2.FindName("LayerIndicatorBadge") as Border;
+            var rwText = rw2.FindName("LayerIndicatorText") as TextBlock;
+            var rwIcon = rw2.FindName("LayerIndicatorIcon") as TextBlock;
+
+            if (rwBadge != null && rwText != null && rwIcon != null)
+            {
+                Console.WriteLine($"RadialWindow Badge Visibility: {rwBadge.Visibility}");
+                Console.WriteLine($"RadialWindow Badge Text: {rwText.Text}");
+                Console.WriteLine($"RadialWindow Badge Icon: {rwIcon.Text}");
+                Console.WriteLine($"RadialWindow CornerRadius: {rwBadge.CornerRadius.TopLeft}");
+
+                if (rwBadge.Visibility == Visibility.Visible &&
+                    rwText.Text.Contains("第二层") &&
+                    rwIcon.Text == "🌀" &&
+                    rwBadge.CornerRadius.TopLeft == 14.0)
+                {
+                    Console.WriteLine("SUCCESS: RadialWindow multi-layer indicator badge correctly rendered with custom style!");
+                }
+                else
+                {
+                    Console.WriteLine("FAIL: RadialWindow layer indicator badge did not match expected values!");
+                }
+
+                // Switch off indicator
+                ConfigManager.CurrentConfig.ShowLayerIndicator = false;
+                rw2.SwitchToLayer(0);
+                if (rwBadge.Visibility == Visibility.Collapsed)
+                {
+                    Console.WriteLine("SUCCESS: RadialWindow layer indicator correctly hidden when ShowLayerIndicator is false!");
+                }
+                else
+                {
+                    Console.WriteLine("FAIL: RadialWindow layer indicator remained visible when ShowLayerIndicator is false!");
+                }
+            }
+            else
+            {
+                Console.WriteLine("FAIL: RadialWindow LayerIndicator elements not found!");
             }
         }
     }

@@ -131,6 +131,37 @@ public class AppConfig
 
 	public bool ShowSelectedActionText { get; set; }
 
+	// ==================== 多层轮盘指示徽标配置 ====================
+	/// <summary>是否在切换轮盘层时显示浮动提示徽标（默认 true）</summary>
+	public bool ShowLayerIndicator { get; set; } = true;
+
+	/// <summary>层级指示徽标预设风格（"Dark", "Aurora", "Purple", "Light", "FollowTheme", "Custom"）</summary>
+	public string LayerIndicatorStyle { get; set; } = "Dark";
+
+	/// <summary>层级指示徽标背景底色（Hex 色值，默认 "#E60F172A"）</summary>
+	public string LayerIndicatorBg { get; set; } = "#E60F172A";
+
+	/// <summary>层级指示徽标边框色彩（Hex 色值，默认 "#38BDF8"）</summary>
+	public string LayerIndicatorBorder { get; set; } = "#38BDF8";
+
+	/// <summary>层级指示徽标文字与图标颜色（Hex 色值，默认 "#FFFFFF"）</summary>
+	public string LayerIndicatorTextColor { get; set; } = "#FFFFFF";
+
+	/// <summary>层级指示徽标前置图标（"🌟", "❄️", "🌀", "⚡", "🎯", "💎", "None"）</summary>
+	public string LayerIndicatorIcon { get; set; } = "🌟";
+
+	/// <summary>层级指示徽标字体字号（默认 11.5 px）</summary>
+	public double LayerIndicatorFontSize { get; set; } = 11.5;
+
+	/// <summary>层级指示徽标圆角半径（默认 12 px）</summary>
+	public double LayerIndicatorCornerRadius { get; set; } = 12.0;
+
+	/// <summary>层级指示徽标垂直显示偏移（默认 10 px）</summary>
+	public double LayerIndicatorOffsetY { get; set; } = 10.0;
+
+	/// <summary>层级指示徽标停留时长（毫秒，默认 1200ms）</summary>
+	public double LayerIndicatorDurationMs { get; set; } = 1200.0;
+
 	public double WheelRadius { get; set; } = 138.0;
 
 	public double InnerRadius { get; set; } = 52.0;

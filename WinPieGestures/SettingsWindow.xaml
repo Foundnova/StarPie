@@ -2049,6 +2049,143 @@
                     </Border>
                   </StackPanel>
                 </Border>
+
+                <!-- 卡片 5：轮盘层数切换提示微标定制 (仅高级全量模式展示) -->
+                <Border Name="Tab1_LayerIndicatorCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
+                  <UIElement.Effect>
+                    <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                  </UIElement.Effect>
+                  <StackPanel>
+                    <TextBlock Name="LayerIndicatorSectionTitle" Text="轮盘层数切换提示微标 (Layer Switch Indicator)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                    <TextBlock Name="LayerIndicatorSectionDesc" Text="在高级全量模式下呼出轮盘后，滑动滚轮或按快捷键切换多层轮盘时的浮动提示徽标外观与停留时长。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" />
+
+                    <!-- 提示显示总开关 -->
+                    <CheckBox Name="ShowLayerIndicatorCheckBox" Content="启用层数切换浮动提示徽标 (Show Layer Indicator)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowLayerIndicatorCheckBox_Changed" Unchecked="ShowLayerIndicatorCheckBox_Changed" />
+
+                    <StackPanel Name="LayerIndicatorConfigPanel" Visibility="Visible">
+                      <!-- 预设外观风格 -->
+                      <TextBlock Name="LayerIndicatorStyleTitleText" Text="徽标预设风格 (Preset Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <ComboBox Name="LayerIndicatorStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="LayerIndicatorStyleComboBox_SelectionChanged">
+                        <ComboBoxItem Content="🌌 沉浸深邃暗黑 (Dark Slate - 推荐)" Tag="Dark" IsSelected="True" />
+                        <ComboBoxItem Content="🧊 晶莹极光蓝透 (Aurora Cyan)" Tag="Aurora" />
+                        <ComboBoxItem Content="🔮 钛金晶透曜紫 (Titanium Purple)" Tag="Purple" />
+                        <ComboBoxItem Content="⚪ 极简透白浅色 (Minimalist Light)" Tag="Light" />
+                        <ComboBoxItem Content="🔘 跟随当前轮盘主题 (Follow Wheel Theme)" Tag="FollowTheme" />
+                        <ComboBoxItem Content="🎨 完全自定义色彩 (Custom Hex)" Tag="Custom" />
+                      </ComboBox>
+
+                      <!-- 前置图标选择 -->
+                      <TextBlock Name="LayerIndicatorIconTitleText" Text="提示前置图标 (Indicator Icon):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <ComboBox Name="LayerIndicatorIconComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="LayerIndicatorIconComboBox_SelectionChanged">
+                        <ComboBoxItem Content="🌟 璀璨星芒 (Star - 默认)" Tag="🌟" IsSelected="True" />
+                        <ComboBoxItem Content="❄️ 冰晶雪花 (Snowflake)" Tag="❄️" />
+                        <ComboBoxItem Content="🌀 宇宙星盘 (Galaxy Orbit)" Tag="🌀" />
+                        <ComboBoxItem Content="⚡ 极速闪电 (Lightning)" Tag="⚡" />
+                        <ComboBoxItem Content="🎯 准星靶心 (Target)" Tag="🎯" />
+                        <ComboBoxItem Content="💎 纯净宝石 (Diamond)" Tag="💎" />
+                        <ComboBoxItem Content="🚫 无前置图标 (仅文字)" Tag="None" />
+                      </ComboBox>
+
+                      <!-- 自定义颜色设置区 -->
+                      <Border Name="LayerIndicatorCustomColorBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                        <StackPanel>
+                          <TextBlock Text="🎨 徽标色彩微调 (十六进制色值 / 调色盘 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+
+                          <!-- 徽标底色 -->
+                          <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="68" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="徽标底色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <TextBox Name="LayerIndicatorBgTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="LayerIndicatorColorTextBox_TextChanged" />
+                            <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="LayerIndicatorBg" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                              <Border Name="LayerIndicatorBgPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                            </Button>
+                            <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="LayerIndicatorBg" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                          </Grid>
+
+                          <!-- 边框颜色 -->
+                          <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="68" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="边框颜色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <TextBox Name="LayerIndicatorBorderTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="LayerIndicatorColorTextBox_TextChanged" />
+                            <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="LayerIndicatorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                              <Border Name="LayerIndicatorBorderPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                            </Button>
+                            <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="LayerIndicatorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                          </Grid>
+
+                          <!-- 文字与图标颜色 -->
+                          <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="68" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="文字色彩:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <TextBox Name="LayerIndicatorTextTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="LayerIndicatorColorTextBox_TextChanged" />
+                            <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="LayerIndicatorText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                              <Border Name="LayerIndicatorTextPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                            </Button>
+                            <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="LayerIndicatorText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+
+                      <!-- 尺寸与形态滑块 -->
+                      <TextBlock Name="LayerIndicatorCornerRadiusTitleText" Text="徽标平滑圆角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <Grid Margin="0,2,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="45" />
+                        </Grid.ColumnDefinitions>
+                        <Slider Name="LayerIndicatorCornerRadiusSlider" Minimum="4" Maximum="24" Value="12" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="LayerIndicatorSlider_ValueChanged" />
+                        <TextBlock Name="LayerIndicatorCornerRadiusLabel" Grid.Column="1" Text="12 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+
+                      <TextBlock Name="LayerIndicatorFontSizeTitleText" Text="文字字号大小 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <Grid Margin="0,2,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="45" />
+                        </Grid.ColumnDefinitions>
+                        <Slider Name="LayerIndicatorFontSizeSlider" Minimum="9" Maximum="16" Value="11.5" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="LayerIndicatorSlider_ValueChanged" />
+                        <TextBlock Name="LayerIndicatorFontSizeLabel" Grid.Column="1" Text="11.5 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+
+                      <TextBlock Name="LayerIndicatorOffsetYTitleText" Text="垂直显示位置偏移 (Offset Y):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <Grid Margin="0,2,0,8">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="45" />
+                        </Grid.ColumnDefinitions>
+                        <Slider Name="LayerIndicatorOffsetYSlider" Minimum="0" Maximum="60" Value="10" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="LayerIndicatorSlider_ValueChanged" />
+                        <TextBlock Name="LayerIndicatorOffsetYLabel" Grid.Column="1" Text="10 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+
+                      <TextBlock Name="LayerIndicatorDurationTitleText" Text="提示淡出停留时间 (Duration):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <Grid Margin="0,2,0,10">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="50" />
+                        </Grid.ColumnDefinitions>
+                        <Slider Name="LayerIndicatorDurationSlider" Minimum="400" Maximum="3000" Value="1200" SmallChange="100" LargeChange="200" TickFrequency="100" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="LayerIndicatorSlider_ValueChanged" />
+                        <TextBlock Name="LayerIndicatorDurationLabel" Grid.Column="1" Text="1.2 s" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Button Name="ResetLayerIndicatorButton" Content="🔄 恢复默认提示徽标样式" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,2,0,0" Click="ResetLayerIndicatorButton_Click" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </ScrollViewer>
             <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
@@ -2088,6 +2225,18 @@
                 <Border Grid.Row="1" Background="{DynamicResource PreviewCanvasBackgroundBrush}" BorderBrush="{DynamicResource PreviewCanvasBorderBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,4,0,10">
                   <Grid Name="PreviewViewportContainer" ClipToBounds="True" Background="Transparent" MouseWheel="PreviewViewport_MouseWheel" MouseDown="PreviewViewport_MouseDown" MouseMove="PreviewViewport_MouseMove" MouseUp="PreviewViewport_MouseUp">
                     <Path Stroke="{DynamicResource PreviewGridLineBrush}" StrokeThickness="0.5" Data="M0,150 L300,150 M150,0 L150,300" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+                    
+                    <!-- 画布实时预览：层级提示徽标 -->
+                    <Border Name="PreviewLayerIndicatorBadge" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" Background="#E60F172A" BorderBrush="#38BDF8" BorderThickness="1.2" CornerRadius="12" Padding="12,4" IsHitTestVisible="False">
+                      <Border.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.4" />
+                      </Border.Effect>
+                      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Name="PreviewLayerIndicatorIcon" Text="🌟" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Name="PreviewLayerIndicatorText" Text="第 2 层 (2/2)" FontSize="11.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+
                     <Canvas Name="LiveWheelPreviewCanvas" Width="300" Height="300" HorizontalAlignment="Center" VerticalAlignment="Center" MouseMove="LiveWheelPreviewCanvas_MouseMove" MouseLeave="LiveWheelPreviewCanvas_MouseLeave">
                       <Canvas.RenderTransform>
                         <TransformGroup>

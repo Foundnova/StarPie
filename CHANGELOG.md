@@ -86,6 +86,20 @@
 5. **触发键与鼠标手势冲突双重守卫 (Trigger & Mouse Gesture Collision Guard)**：
    - 在 `ConfigManager.EnsureTriggerHealth` 与 `GestureController` 中加入双向冲突防护，当鼠标手势按键与主轮盘唤醒键偶然相同时，手势自动让位给轮盘，彻底消除原底层钩子将唤醒键硬拦截吞掉导致按键瘫痪的隐患。
 
+### 🎨 多层提示微标外观与形态深度定制 (Layer Indicator Badge Appearance Customization)
+1. **轮盘层数切换浮动提示徽标外观与形态定制面板**：
+   - 将多层切换提示微标的外观样式配置正式纳为主界面 Tab 1「轮盘外观与形态定制」面板的专属卡片（`Tab1_LayerIndicatorCardBorder`）；
+   - **高级模式专属**：遵循双模设计原则，简单模式下自动折叠收拢，高级全量模式下完整展开深度定制项；
+   - **提示显示开关**：提供「启用层数切换浮动提示徽标」总开关，用户可按需自由开启或关闭浮动提示；
+   - **6 大预设风格**：沉浸深邃暗黑（Dark Slate - 默认）、晶莹极光蓝透（Aurora Cyan）、钛金晶透曜紫（Titanium Purple）、极简透白浅色（Minimalist Light）、跟随当前轮盘主题（Follow Wheel Theme）、完全自定义色彩（Custom Hex）；
+   - **7 大前置图标**：璀璨星芒（🌟 - 默认）、冰晶雪花（❄️）、宇宙星盘（🌀）、极速闪电（⚡）、准星靶心（🎯）、纯净宝石（💎）、无前置图标（None 仅文字）；
+   - **全量色彩微调**：完全自定义模式下支持十六进制色值编辑、调色盘选择与屏幕任意位置吸色管；
+   - **平滑滑块微调**：平滑圆角（4~24px）、文字字号（9~16px）、垂直偏移（0~60px）、提示停留时长（400~3000ms），支持一键恢复默认样式；
+2. **实时交互画布 (Live Preview) 60FPS 即时联动**：
+   - 在 Tab 1 右侧常驻的交互画布中新增 `PreviewLayerIndicatorBadge` 徽标，实时呈现所选主题底色、边框、前置图标、字号与圆角，所见即所得；
+3. **主分支功能 PR 合并 (PR #61)**：
+   - 顺利合入主分支功能 PR：启动程序动作 (`Launch`) 在通过软件检索器选取目标可执行程序时，自动提取并继承其高清原生图标，省去手动寻找或设置图标的步骤。
+
 ### ⚡ 工程维护与版本发布
 1. **全模块版本号同步**：
    - 同步更新 `WinPieGestures.csproj`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`AGENTS.md` 至 `v1.7.0`；

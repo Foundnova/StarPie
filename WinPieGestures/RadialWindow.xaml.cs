@@ -986,17 +986,134 @@ public partial class RadialWindow : Window
 
 		if (_profile.Layers.Count > 1 && LayerIndicatorBadge != null && LayerIndicatorText != null)
 		{
+			AppConfig config = ConfigManager.CurrentConfig;
+			if (config?.ShowLayerIndicator == false)
+			{
+				LayerIndicatorBadge.Visibility = Visibility.Collapsed;
+				return;
+			}
+
+			ApplyLayerIndicatorStyle();
+
 			WheelLayer curLayer = _profile.Layers[layerIndex];
 			LayerIndicatorText.Text = $"{curLayer.Name} ({layerIndex + 1}/{_profile.Layers.Count})";
 			LayerIndicatorBadge.Visibility = Visibility.Visible;
 
 			_layerBadgeStoryboard?.Stop();
 			_layerBadgeStoryboard = new Storyboard();
+
 			DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(80)));
 			Storyboard.SetTarget(fadeIn, LayerIndicatorBadge);
 			Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
 			_layerBadgeStoryboard.Children.Add(fadeIn);
+
+			double durationMs = Math.Max(300.0, config?.LayerIndicatorDurationMs ?? 1200.0);
+			DoubleAnimation fadeOut = new DoubleAnimation(1.0, 0.0, new Duration(TimeSpan.FromMilliseconds(260)))
+			{
+				BeginTime = TimeSpan.FromMilliseconds(durationMs)
+			};
+			Storyboard.SetTarget(fadeOut, LayerIndicatorBadge);
+			Storyboard.SetTargetProperty(fadeOut, new PropertyPath(UIElement.OpacityProperty));
+			_layerBadgeStoryboard.Children.Add(fadeOut);
+
 			_layerBadgeStoryboard.Begin();
+		}
+	}
+
+	private static bool TryParseSolidBrush(string? hex, out SolidColorBrush brush)
+	{
+		brush = Brushes.Transparent;
+		if (string.IsNullOrWhiteSpace(hex)) return false;
+		try
+		{
+			var colorObj = System.Windows.Media.ColorConverter.ConvertFromString(hex);
+			if (colorObj is Color c)
+			{
+				brush = new SolidColorBrush(c);
+				brush.Freeze();
+				return true;
+			}
+		}
+		catch
+		{
+		}
+		return false;
+	}
+
+	private void ApplyLayerIndicatorStyle()
+	{
+		if (LayerIndicatorBadge == null || LayerIndicatorText == null || LayerIndicatorIcon == null)
+		{
+			return;
+		}
+
+		AppConfig config = ConfigManager.CurrentConfig;
+		if (config == null) return;
+
+		if (!config.ShowLayerIndicator)
+		{
+			LayerIndicatorBadge.Visibility = Visibility.Collapsed;
+			return;
+		}
+
+		double offsetY = Math.Max(0.0, config.LayerIndicatorOffsetY);
+		LayerIndicatorBadge.Margin = new Thickness(0, offsetY, 0, 0);
+
+		double cornerRadius = Math.Max(0.0, config.LayerIndicatorCornerRadius);
+		LayerIndicatorBadge.CornerRadius = new CornerRadius(cornerRadius);
+
+		double fontSize = Math.Max(8.0, config.LayerIndicatorFontSize);
+		LayerIndicatorText.FontSize = fontSize;
+		LayerIndicatorIcon.FontSize = fontSize + 0.5;
+
+		string iconStr = config.LayerIndicatorIcon;
+		if (string.Equals(iconStr, "None", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(iconStr))
+		{
+			LayerIndicatorIcon.Visibility = Visibility.Collapsed;
+		}
+		else
+		{
+			LayerIndicatorIcon.Text = iconStr;
+			LayerIndicatorIcon.Visibility = Visibility.Visible;
+		}
+
+		if (string.Equals(config.LayerIndicatorStyle, "FollowTheme", StringComparison.OrdinalIgnoreCase))
+		{
+			LayerIndicatorBadge.Background = _coreBgBrush ?? new SolidColorBrush(Color.FromArgb(230, 15, 23, 42));
+			LayerIndicatorBadge.BorderBrush = _highlightBorderBrush ?? new SolidColorBrush(Color.FromRgb(56, 189, 248));
+			LayerIndicatorText.Foreground = _textColorBrush ?? Brushes.White;
+			LayerIndicatorIcon.Foreground = _highlightBorderBrush ?? Brushes.White;
+		}
+		else
+		{
+			if (TryParseSolidBrush(config.LayerIndicatorBg, out var bgBrush))
+			{
+				LayerIndicatorBadge.Background = bgBrush;
+			}
+			else
+			{
+				LayerIndicatorBadge.Background = new SolidColorBrush(Color.FromArgb(230, 15, 23, 42));
+			}
+
+			if (TryParseSolidBrush(config.LayerIndicatorBorder, out var borderBrush))
+			{
+				LayerIndicatorBadge.BorderBrush = borderBrush;
+			}
+			else
+			{
+				LayerIndicatorBadge.BorderBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+			}
+
+			if (TryParseSolidBrush(config.LayerIndicatorTextColor, out var textBrush))
+			{
+				LayerIndicatorText.Foreground = textBrush;
+				LayerIndicatorIcon.Foreground = textBrush;
+			}
+			else
+			{
+				LayerIndicatorText.Foreground = Brushes.White;
+				LayerIndicatorIcon.Foreground = Brushes.White;
+			}
 		}
 	}
 

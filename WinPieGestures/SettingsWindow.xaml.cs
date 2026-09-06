@@ -1004,6 +1004,73 @@ public partial class SettingsWindow : Window
 			CoreImageOffsetYLabel.Text = $"{(int)ConfigManager.CurrentConfig.CoreImageOffsetY} px";
 		}
 		UpdateCoreIconPreviewUI();
+		
+		// Layer Indicator Badge Config
+		if (ShowLayerIndicatorCheckBox != null)
+		{
+			ShowLayerIndicatorCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowLayerIndicator;
+		}
+		if (LayerIndicatorConfigPanel != null)
+		{
+			LayerIndicatorConfigPanel.Visibility = ConfigManager.CurrentConfig.ShowLayerIndicator ? Visibility.Visible : Visibility.Collapsed;
+		}
+		if (LayerIndicatorStyleComboBox != null)
+		{
+			SetComboBoxSelectedValue(LayerIndicatorStyleComboBox, ConfigManager.CurrentConfig.LayerIndicatorStyle ?? "Dark");
+		}
+		if (LayerIndicatorIconComboBox != null)
+		{
+			SetComboBoxSelectedValue(LayerIndicatorIconComboBox, ConfigManager.CurrentConfig.LayerIndicatorIcon ?? "🌟");
+		}
+		if (LayerIndicatorBgTextBox != null)
+		{
+			LayerIndicatorBgTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorBg ?? "#E60F172A";
+			UpdateColorPreviewBorder(LayerIndicatorBgPreview, LayerIndicatorBgTextBox.Text);
+		}
+		if (LayerIndicatorBorderTextBox != null)
+		{
+			LayerIndicatorBorderTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorBorder ?? "#38BDF8";
+			UpdateColorPreviewBorder(LayerIndicatorBorderPreview, LayerIndicatorBorderTextBox.Text);
+		}
+		if (LayerIndicatorTextTextBox != null)
+		{
+			LayerIndicatorTextTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorTextColor ?? "#FFFFFF";
+			UpdateColorPreviewBorder(LayerIndicatorTextPreview, LayerIndicatorTextTextBox.Text);
+		}
+		if (LayerIndicatorCornerRadiusSlider != null)
+		{
+			LayerIndicatorCornerRadiusSlider.Value = (ConfigManager.CurrentConfig.LayerIndicatorCornerRadius > 0.0) ? ConfigManager.CurrentConfig.LayerIndicatorCornerRadius : 12.0;
+			if (LayerIndicatorCornerRadiusLabel != null)
+			{
+				LayerIndicatorCornerRadiusLabel.Text = $"{LayerIndicatorCornerRadiusSlider.Value:0} px";
+			}
+		}
+		if (LayerIndicatorFontSizeSlider != null)
+		{
+			LayerIndicatorFontSizeSlider.Value = (ConfigManager.CurrentConfig.LayerIndicatorFontSize > 0.0) ? ConfigManager.CurrentConfig.LayerIndicatorFontSize : 11.5;
+			if (LayerIndicatorFontSizeLabel != null)
+			{
+				LayerIndicatorFontSizeLabel.Text = $"{LayerIndicatorFontSizeSlider.Value:0.0} px";
+			}
+		}
+		if (LayerIndicatorOffsetYSlider != null)
+		{
+			LayerIndicatorOffsetYSlider.Value = (ConfigManager.CurrentConfig.LayerIndicatorOffsetY >= 0.0) ? ConfigManager.CurrentConfig.LayerIndicatorOffsetY : 10.0;
+			if (LayerIndicatorOffsetYLabel != null)
+			{
+				LayerIndicatorOffsetYLabel.Text = $"{LayerIndicatorOffsetYSlider.Value:0} px";
+			}
+		}
+		if (LayerIndicatorDurationSlider != null)
+		{
+			LayerIndicatorDurationSlider.Value = (ConfigManager.CurrentConfig.LayerIndicatorDurationMs >= 400.0) ? ConfigManager.CurrentConfig.LayerIndicatorDurationMs : 1200.0;
+			if (LayerIndicatorDurationLabel != null)
+			{
+				LayerIndicatorDurationLabel.Text = $"{LayerIndicatorDurationSlider.Value / 1000.0:0.0} s";
+			}
+		}
+		UpdateLayerIndicatorCustomPanelVisibility();
+		UpdateLayerIndicatorPreview();
 
 		// Scene Isolation
 		DisableOnFullScreenCheckBox.IsChecked = ConfigManager.CurrentConfig.DisableOnFullScreen;
@@ -1404,6 +1471,10 @@ public partial class SettingsWindow : Window
 		if (Tab1_CoreFontFamilyPanel != null)
 		{
 			Tab1_CoreFontFamilyPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab1_LayerIndicatorCardBorder != null)
+		{
+			Tab1_LayerIndicatorCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
 		}
 
 		// 3. Tab 2 手势与动作: 隐藏平铺高级正则/间距卡片与紧凑全览列表分段切换
@@ -1897,6 +1968,18 @@ public partial class SettingsWindow : Window
 		if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
 		if (SubmenuStyleFanItem != null) SubmenuStyleFanItem.Content = I18n.T("SubmenuStyleFan");
 		if (SubmenuStyleDescTextBlock != null) SubmenuStyleDescTextBlock.Text = I18n.T("SubmenuStyleDesc");
+
+		// Layer Indicator
+		if (LayerIndicatorSectionTitle != null) LayerIndicatorSectionTitle.Text = I18n.T("LayerIndicatorSectionTitle");
+		if (LayerIndicatorSectionDesc != null) LayerIndicatorSectionDesc.Text = I18n.T("LayerIndicatorSectionDesc");
+		if (ShowLayerIndicatorCheckBox != null) ShowLayerIndicatorCheckBox.Content = I18n.T("ShowLayerIndicator");
+		if (LayerIndicatorStyleTitleText != null) LayerIndicatorStyleTitleText.Text = I18n.T("LayerIndicatorStyleTitle");
+		if (LayerIndicatorIconTitleText != null) LayerIndicatorIconTitleText.Text = I18n.T("LayerIndicatorIconTitle");
+		if (LayerIndicatorCornerRadiusTitleText != null) LayerIndicatorCornerRadiusTitleText.Text = I18n.T("LayerIndicatorCornerRadiusTitle");
+		if (LayerIndicatorFontSizeTitleText != null) LayerIndicatorFontSizeTitleText.Text = I18n.T("LayerIndicatorFontSizeTitle");
+		if (LayerIndicatorOffsetYTitleText != null) LayerIndicatorOffsetYTitleText.Text = I18n.T("LayerIndicatorOffsetYTitle");
+		if (LayerIndicatorDurationTitleText != null) LayerIndicatorDurationTitleText.Text = I18n.T("LayerIndicatorDurationTitle");
+		if (ResetLayerIndicatorButton != null) ResetLayerIndicatorButton.Content = I18n.T("BtnResetLayerIndicator");
 
 		if (GesturesPageHeader != null)
 		{
@@ -8796,6 +8879,335 @@ public partial class SettingsWindow : Window
 		ScheduleAutoSave();
 	}
 
+	private void ShowLayerIndicatorCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		bool isChecked = ShowLayerIndicatorCheckBox?.IsChecked == true;
+		ConfigManager.CurrentConfig.ShowLayerIndicator = isChecked;
+		if (LayerIndicatorConfigPanel != null)
+		{
+			LayerIndicatorConfigPanel.Visibility = isChecked ? Visibility.Visible : Visibility.Collapsed;
+		}
+		UpdateLayerIndicatorPreview();
+		ScheduleAutoSave();
+	}
+
+	private void LayerIndicatorStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || LayerIndicatorStyleComboBox == null) return;
+		string style = (LayerIndicatorStyleComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Dark";
+		ConfigManager.CurrentConfig.LayerIndicatorStyle = style;
+
+		switch (style)
+		{
+			case "Dark":
+				ConfigManager.CurrentConfig.LayerIndicatorBg = "#E60F172A";
+				ConfigManager.CurrentConfig.LayerIndicatorBorder = "#38BDF8";
+				ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#FFFFFF";
+				break;
+			case "Aurora":
+				ConfigManager.CurrentConfig.LayerIndicatorBg = "#E6082F49";
+				ConfigManager.CurrentConfig.LayerIndicatorBorder = "#22D3EE";
+				ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#F0FDFA";
+				break;
+			case "Purple":
+				ConfigManager.CurrentConfig.LayerIndicatorBg = "#E62E1065";
+				ConfigManager.CurrentConfig.LayerIndicatorBorder = "#C084FC";
+				ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#FAF5FF";
+				break;
+			case "Light":
+				ConfigManager.CurrentConfig.LayerIndicatorBg = "#E6F8FAFC";
+				ConfigManager.CurrentConfig.LayerIndicatorBorder = "#64748B";
+				ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#0F172A";
+				break;
+			case "FollowTheme":
+				break;
+			case "Custom":
+				break;
+		}
+
+		_isUpdatingUi = true;
+		try
+		{
+			if (style != "Custom" && style != "FollowTheme")
+			{
+				if (LayerIndicatorBgTextBox != null) LayerIndicatorBgTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorBg;
+				if (LayerIndicatorBorderTextBox != null) LayerIndicatorBorderTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorBorder;
+				if (LayerIndicatorTextTextBox != null) LayerIndicatorTextTextBox.Text = ConfigManager.CurrentConfig.LayerIndicatorTextColor;
+				if (LayerIndicatorBgPreview != null) UpdateColorPreviewBorder(LayerIndicatorBgPreview, ConfigManager.CurrentConfig.LayerIndicatorBg);
+				if (LayerIndicatorBorderPreview != null) UpdateColorPreviewBorder(LayerIndicatorBorderPreview, ConfigManager.CurrentConfig.LayerIndicatorBorder);
+				if (LayerIndicatorTextPreview != null) UpdateColorPreviewBorder(LayerIndicatorTextPreview, ConfigManager.CurrentConfig.LayerIndicatorTextColor);
+			}
+			UpdateLayerIndicatorCustomPanelVisibility();
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+
+		UpdateLayerIndicatorPreview();
+		ScheduleAutoSave();
+	}
+
+	private void LayerIndicatorIconComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || LayerIndicatorIconComboBox == null) return;
+		string icon = (LayerIndicatorIconComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "🌟";
+		ConfigManager.CurrentConfig.LayerIndicatorIcon = icon;
+		UpdateLayerIndicatorPreview();
+		ScheduleAutoSave();
+	}
+
+	private void LayerIndicatorColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null) return;
+
+		string bgHex = LayerIndicatorBgTextBox?.Text.Trim() ?? "";
+		string borderHex = LayerIndicatorBorderTextBox?.Text.Trim() ?? "";
+		string textHex = LayerIndicatorTextTextBox?.Text.Trim() ?? "";
+
+		if (LayerIndicatorBgPreview != null) UpdateColorPreviewBorder(LayerIndicatorBgPreview, bgHex);
+		if (LayerIndicatorBorderPreview != null) UpdateColorPreviewBorder(LayerIndicatorBorderPreview, borderHex);
+		if (LayerIndicatorTextPreview != null) UpdateColorPreviewBorder(LayerIndicatorTextPreview, textHex);
+
+		if (_isUpdatingUi) return;
+
+		ConfigManager.CurrentConfig.LayerIndicatorBg = bgHex;
+		ConfigManager.CurrentConfig.LayerIndicatorBorder = borderHex;
+		ConfigManager.CurrentConfig.LayerIndicatorTextColor = textHex;
+
+		if (LayerIndicatorStyleComboBox != null && ConfigManager.CurrentConfig.LayerIndicatorStyle != "Custom" && ConfigManager.CurrentConfig.LayerIndicatorStyle != "FollowTheme")
+		{
+			ConfigManager.CurrentConfig.LayerIndicatorStyle = "Custom";
+			_isUpdatingUi = true;
+			try
+			{
+				SetComboBoxSelectedValue(LayerIndicatorStyleComboBox, "Custom");
+				UpdateLayerIndicatorCustomPanelVisibility();
+			}
+			finally
+			{
+				_isUpdatingUi = false;
+			}
+		}
+
+		UpdateLayerIndicatorPreview();
+		ScheduleAutoSave();
+	}
+
+	private void LayerIndicatorSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (ConfigManager.CurrentConfig == null) return;
+
+		if (sender == LayerIndicatorCornerRadiusSlider)
+		{
+			double val = LayerIndicatorCornerRadiusSlider.Value;
+			if (LayerIndicatorCornerRadiusLabel != null) LayerIndicatorCornerRadiusLabel.Text = $"{val:0} px";
+			if (!_isUpdatingUi) ConfigManager.CurrentConfig.LayerIndicatorCornerRadius = val;
+		}
+		else if (sender == LayerIndicatorFontSizeSlider)
+		{
+			double val = LayerIndicatorFontSizeSlider.Value;
+			if (LayerIndicatorFontSizeLabel != null) LayerIndicatorFontSizeLabel.Text = $"{val:0.0} px";
+			if (!_isUpdatingUi) ConfigManager.CurrentConfig.LayerIndicatorFontSize = val;
+		}
+		else if (sender == LayerIndicatorOffsetYSlider)
+		{
+			double val = LayerIndicatorOffsetYSlider.Value;
+			if (LayerIndicatorOffsetYLabel != null) LayerIndicatorOffsetYLabel.Text = $"{val:0} px";
+			if (!_isUpdatingUi) ConfigManager.CurrentConfig.LayerIndicatorOffsetY = val;
+		}
+		else if (sender == LayerIndicatorDurationSlider)
+		{
+			double val = LayerIndicatorDurationSlider.Value;
+			if (LayerIndicatorDurationLabel != null) LayerIndicatorDurationLabel.Text = $"{val / 1000.0:0.0} s";
+			if (!_isUpdatingUi) ConfigManager.CurrentConfig.LayerIndicatorDurationMs = val;
+		}
+
+		if (!_isUpdatingUi)
+		{
+			UpdateLayerIndicatorPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void ResetLayerIndicatorButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (ConfigManager.CurrentConfig == null) return;
+
+		_isUpdatingUi = true;
+		try
+		{
+			ConfigManager.CurrentConfig.ShowLayerIndicator = true;
+			ConfigManager.CurrentConfig.LayerIndicatorStyle = "Dark";
+			ConfigManager.CurrentConfig.LayerIndicatorBg = "#E60F172A";
+			ConfigManager.CurrentConfig.LayerIndicatorBorder = "#38BDF8";
+			ConfigManager.CurrentConfig.LayerIndicatorTextColor = "#FFFFFF";
+			ConfigManager.CurrentConfig.LayerIndicatorIcon = "🌟";
+			ConfigManager.CurrentConfig.LayerIndicatorFontSize = 11.5;
+			ConfigManager.CurrentConfig.LayerIndicatorCornerRadius = 12.0;
+			ConfigManager.CurrentConfig.LayerIndicatorOffsetY = 10.0;
+			ConfigManager.CurrentConfig.LayerIndicatorDurationMs = 1200.0;
+
+			if (ShowLayerIndicatorCheckBox != null) ShowLayerIndicatorCheckBox.IsChecked = true;
+			if (LayerIndicatorConfigPanel != null) LayerIndicatorConfigPanel.Visibility = Visibility.Visible;
+			if (LayerIndicatorStyleComboBox != null) SetComboBoxSelectedValue(LayerIndicatorStyleComboBox, "Dark");
+			if (LayerIndicatorIconComboBox != null) SetComboBoxSelectedValue(LayerIndicatorIconComboBox, "🌟");
+			if (LayerIndicatorBgTextBox != null) LayerIndicatorBgTextBox.Text = "#E60F172A";
+			if (LayerIndicatorBorderTextBox != null) LayerIndicatorBorderTextBox.Text = "#38BDF8";
+			if (LayerIndicatorTextTextBox != null) LayerIndicatorTextTextBox.Text = "#FFFFFF";
+			if (LayerIndicatorBgPreview != null) UpdateColorPreviewBorder(LayerIndicatorBgPreview, "#E60F172A");
+			if (LayerIndicatorBorderPreview != null) UpdateColorPreviewBorder(LayerIndicatorBorderPreview, "#38BDF8");
+			if (LayerIndicatorTextPreview != null) UpdateColorPreviewBorder(LayerIndicatorTextPreview, "#FFFFFF");
+
+			if (LayerIndicatorCornerRadiusSlider != null) LayerIndicatorCornerRadiusSlider.Value = 12.0;
+			if (LayerIndicatorCornerRadiusLabel != null) LayerIndicatorCornerRadiusLabel.Text = "12 px";
+			if (LayerIndicatorFontSizeSlider != null) LayerIndicatorFontSizeSlider.Value = 11.5;
+			if (LayerIndicatorFontSizeLabel != null) LayerIndicatorFontSizeLabel.Text = "11.5 px";
+			if (LayerIndicatorOffsetYSlider != null) LayerIndicatorOffsetYSlider.Value = 10.0;
+			if (LayerIndicatorOffsetYLabel != null) LayerIndicatorOffsetYLabel.Text = "10 px";
+			if (LayerIndicatorDurationSlider != null) LayerIndicatorDurationSlider.Value = 1200.0;
+			if (LayerIndicatorDurationLabel != null) LayerIndicatorDurationLabel.Text = "1.2 s";
+
+			UpdateLayerIndicatorCustomPanelVisibility();
+		}
+		finally
+		{
+			_isUpdatingUi = false;
+		}
+
+		UpdateLayerIndicatorPreview();
+		ScheduleAutoSave();
+	}
+
+	private void UpdateLayerIndicatorCustomPanelVisibility()
+	{
+		if (LayerIndicatorCustomColorBorder == null || ConfigManager.CurrentConfig == null) return;
+		string style = ConfigManager.CurrentConfig.LayerIndicatorStyle ?? "Dark";
+		LayerIndicatorCustomColorBorder.Visibility = string.Equals(style, "Custom", StringComparison.OrdinalIgnoreCase)
+			? Visibility.Visible
+			: Visibility.Collapsed;
+	}
+
+	private void UpdateLayerIndicatorPreview()
+	{
+		if (PreviewLayerIndicatorBadge == null || PreviewLayerIndicatorText == null || PreviewLayerIndicatorIcon == null)
+		{
+			return;
+		}
+
+		AppConfig? config = ConfigManager.CurrentConfig;
+		if (config == null) return;
+
+		if (!config.ShowLayerIndicator)
+		{
+			PreviewLayerIndicatorBadge.Visibility = Visibility.Collapsed;
+			return;
+		}
+
+		PreviewLayerIndicatorBadge.Visibility = Visibility.Visible;
+
+		double offsetY = Math.Max(0.0, config.LayerIndicatorOffsetY);
+		PreviewLayerIndicatorBadge.Margin = new Thickness(0, offsetY, 0, 0);
+
+		double cornerRadius = Math.Max(0.0, config.LayerIndicatorCornerRadius);
+		PreviewLayerIndicatorBadge.CornerRadius = new CornerRadius(cornerRadius);
+
+		double fontSize = Math.Max(8.0, config.LayerIndicatorFontSize);
+		PreviewLayerIndicatorText.FontSize = fontSize;
+		PreviewLayerIndicatorIcon.FontSize = fontSize + 0.5;
+
+		string iconStr = config.LayerIndicatorIcon;
+		if (string.Equals(iconStr, "None", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(iconStr))
+		{
+			PreviewLayerIndicatorIcon.Visibility = Visibility.Collapsed;
+		}
+		else
+		{
+			PreviewLayerIndicatorIcon.Text = iconStr;
+			PreviewLayerIndicatorIcon.Visibility = Visibility.Visible;
+		}
+
+		int totalLayers = 1;
+		if (_selectedProfile?.Layers != null && _selectedProfile.Layers.Count > 0)
+		{
+			totalLayers = _selectedProfile.Layers.Count;
+		}
+		else if (config.Profiles != null && config.Profiles.Count > 0 && config.Profiles[0].Layers != null && config.Profiles[0].Layers.Count > 0)
+		{
+			totalLayers = config.Profiles[0].Layers.Count;
+		}
+		int showLayer = Math.Min(2, Math.Max(1, totalLayers));
+		PreviewLayerIndicatorText.Text = $"第 {showLayer} 层 ({showLayer}/{Math.Max(2, totalLayers)})";
+
+		if (string.Equals(config.LayerIndicatorStyle, "FollowTheme", StringComparison.OrdinalIgnoreCase))
+		{
+			SolidColorBrush? themeBg = null;
+			SolidColorBrush? themeBorder = null;
+			SolidColorBrush? themeText = null;
+
+			if (TryParseSolidBrush(config.CustomSectorBg, out var parsedBg)) themeBg = parsedBg;
+			if (TryParseSolidBrush(config.CustomHighlightBorder, out var parsedBorder)) themeBorder = parsedBorder;
+			if (TryParseSolidBrush(config.CustomText, out var parsedText)) themeText = parsedText;
+
+			PreviewLayerIndicatorBadge.Background = themeBg ?? new SolidColorBrush(Color.FromArgb(230, 15, 23, 42));
+			PreviewLayerIndicatorBadge.BorderBrush = themeBorder ?? new SolidColorBrush(Color.FromRgb(56, 189, 248));
+			PreviewLayerIndicatorText.Foreground = themeText ?? Brushes.White;
+			PreviewLayerIndicatorIcon.Foreground = themeBorder ?? Brushes.White;
+		}
+		else
+		{
+			if (TryParseSolidBrush(config.LayerIndicatorBg, out var bgBrush))
+			{
+				PreviewLayerIndicatorBadge.Background = bgBrush;
+			}
+			else
+			{
+				PreviewLayerIndicatorBadge.Background = new SolidColorBrush(Color.FromArgb(230, 15, 23, 42));
+			}
+
+			if (TryParseSolidBrush(config.LayerIndicatorBorder, out var borderBrush))
+			{
+				PreviewLayerIndicatorBadge.BorderBrush = borderBrush;
+			}
+			else
+			{
+				PreviewLayerIndicatorBadge.BorderBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+			}
+
+			if (TryParseSolidBrush(config.LayerIndicatorTextColor, out var textBrush))
+			{
+				PreviewLayerIndicatorText.Foreground = textBrush;
+				PreviewLayerIndicatorIcon.Foreground = textBrush;
+			}
+			else
+			{
+				PreviewLayerIndicatorText.Foreground = Brushes.White;
+				PreviewLayerIndicatorIcon.Foreground = Brushes.White;
+			}
+		}
+	}
+
+	private static bool TryParseSolidBrush(string? hex, out SolidColorBrush brush)
+	{
+		brush = Brushes.Transparent;
+		if (string.IsNullOrWhiteSpace(hex)) return false;
+		try
+		{
+			object colorObj = ColorConverter.ConvertFromString(hex.Trim());
+			if (colorObj is Color c)
+			{
+				brush = new SolidColorBrush(c);
+				brush.Freeze();
+				return true;
+			}
+		}
+		catch
+		{
+		}
+		return false;
+	}
+
 	private void EdgeOverflowPolicyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
 		if (_isUpdatingUi || ConfigManager.CurrentConfig == null || EdgeOverflowPolicyComboBox == null) return;
@@ -9863,6 +10275,9 @@ public partial class SettingsWindow : Window
 			"SubCustomHighlightBg" => SubCustomHighlightBgTextBox, 
 			"SubCustomHighlightBorder" => SubCustomHighlightBorderTextBox, 
 			"SubCustomText" => SubCustomTextTextBox, 
+			"LayerIndicatorBg" => LayerIndicatorBgTextBox,
+			"LayerIndicatorBorder" => LayerIndicatorBorderTextBox,
+			"LayerIndicatorText" => LayerIndicatorTextTextBox,
 			_ => null, 
 		};
 	}
@@ -11976,6 +12391,7 @@ public partial class SettingsWindow : Window
 		{
 			_isRenderingPreview = false;
 		}
+		UpdateLayerIndicatorPreview();
 	}
 
 	private static Stretch ParseStretchMode(string? stretch)
