@@ -489,24 +489,25 @@ public class Program
             Console.WriteLine("FAIL: CenterPatternPriorityTip or FocusCenterCoreBtn not found in SettingsWindow!");
         }
 
-        // 8. Test ApplyTrayUipiProtection
-        Console.WriteLine("\n--- Testing ApplyTrayUipiProtection ---");
-        var applyUipiMethod = typeof(SettingsWindow).GetMethod("ApplyTrayUipiProtection", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        // 8. Test ApplyUipiProtection in TrayController
+        Console.WriteLine("\n--- Testing ApplyTrayUipiProtection in TrayController ---");
+        var applyUipiMethod = typeof(TrayController).GetMethod("ApplyUipiProtection", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (applyUipiMethod != null)
         {
             try
             {
-                applyUipiMethod.Invoke(sw, null);
-                Console.WriteLine("SUCCESS: ApplyTrayUipiProtection executed cleanly without exceptions!");
+                using var tray = new TrayController();
+                applyUipiMethod.Invoke(tray, null);
+                Console.WriteLine("SUCCESS: ApplyUipiProtection on TrayController executed cleanly without exceptions!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"FAIL: ApplyTrayUipiProtection threw: {ex.Message}");
+                Console.WriteLine($"FAIL: ApplyUipiProtection threw: {ex.Message}");
             }
         }
         else
         {
-            Console.WriteLine("FAIL: ApplyTrayUipiProtection method not found on SettingsWindow!");
+            Console.WriteLine("FAIL: ApplyUipiProtection method not found on TrayController!");
         }
 
         // 9. Test ExecuteFolder robustness with non-existent drive
