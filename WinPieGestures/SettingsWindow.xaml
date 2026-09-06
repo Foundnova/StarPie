@@ -788,7 +788,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
                           <TextBlock Text="二级菜单样式 (Submenu Style)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                          <TextBlock Text="外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                          <TextBlock Name="SubmenuStyleDescTextBlock" Text="外圈子环：子动作沿选中扇区外侧环形展开（最多4个）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多3个）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
                           <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)" IsSelected="True" />

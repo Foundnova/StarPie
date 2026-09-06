@@ -53,12 +53,19 @@ public partial class SubActionEditorWindow : Window
 	private void UpdateEmptyState()
 	{
 		EmptyStateBorder.Visibility = ((SubSlots.Count != 0) ? Visibility.Collapsed : Visibility.Visible);
-		AddSubActionButton.IsEnabled = SubSlots.Count < 4;
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		int maxAllowed = isFan ? 3 : 4;
+		AddSubActionButton.IsEnabled = SubSlots.Count < maxAllowed;
+		AddSubActionButton.ToolTip = SubSlots.Count >= maxAllowed
+			? (isFan ? "当前蜂窝扇模式下最多支持配置 3 个二级级联子动作" : "当前外圈子环模式下最多支持配置 4 个二级级联子动作")
+			: null;
 	}
 
 	private void AddSubActionButton_Click(object sender, RoutedEventArgs e)
 	{
-		if (SubSlots.Count < 4)
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		int maxAllowed = isFan ? 3 : 4;
+		if (SubSlots.Count < maxAllowed)
 		{
 			int num = SubSlots.Count + 1;
 			SubSlots.Add(new SubSlotViewModel
@@ -73,6 +80,11 @@ public partial class SubActionEditorWindow : Window
 				}
 			});
 			UpdateEmptyState();
+		}
+		else
+		{
+			string styleName = isFan ? "蜂窝扇 (Honeycomb Fan)" : "外圈子环 (Sub-Ring)";
+			System.Windows.MessageBox.Show(this, $"当前二级菜单样式为【{styleName}】，每个主扇区最多支持配置 {maxAllowed} 个二级级联子动作。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 	}
 

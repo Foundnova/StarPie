@@ -263,10 +263,10 @@ public static class I18n
 		};
 		dictionary["SubmenuStyleDesc"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "外圈子环：子动作沿选中扇区外侧环形展开（数量不限）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多三项）。",
-			[LanguageCode.ZhTw] = "外圈子環：子動作沿選中扇區外側環形展開（數量不限）；蜂窩扇：子動作以選中項為中心呈扇形排列（最多三項）。",
-			[LanguageCode.En] = "Sub-Ring: Sub-actions expand in an outer concentric ring; Honeycomb Fan: Expands outward from the selected sector in a tight fan (up to 3 items).",
-			[LanguageCode.Ja] = "外周リング：選択したセクターの外側にリング状に展開；ハニカムファン：扇状にコンパクトに展開（最大3項目）。"
+			[LanguageCode.ZhCn] = "外圈子环：子动作沿选中扇区外侧环形展开（最多4个）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多3个）。",
+			[LanguageCode.ZhTw] = "外圈子環：子動作沿選中扇區外側環形展開（最多4個）；蜂窩扇：子動作以選中項為中心呈扇形排列（最多3個）。",
+			[LanguageCode.En] = "Sub-Ring: Sub-actions expand in an outer concentric ring (up to 4 items); Honeycomb Fan: Expands outward from the selected sector in a tight fan (up to 3 items).",
+			[LanguageCode.Ja] = "外周リング：選択したセクターの外側にリング状に展開（最大4項目）；ハニカムファン：扇状にコンパクトに展開（最大3項目）。"
 		};
 		dictionary["SubmenuStyleWheel"] = new Dictionary<LanguageCode, string>
 		{

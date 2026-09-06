@@ -1700,6 +1700,7 @@ public partial class SettingsWindow : Window
 		
 		if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
 		if (SubmenuStyleFanItem != null) SubmenuStyleFanItem.Content = I18n.T("SubmenuStyleFan");
+		if (SubmenuStyleDescTextBlock != null) SubmenuStyleDescTextBlock.Text = I18n.T("SubmenuStyleDesc");
 
 		if (GesturesPageHeader != null)
 		{
@@ -3427,11 +3428,23 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		int maxAllowed = isFan ? 3 : 4;
+		if (FocusAddSubActionBtn != null)
+		{
+			bool canAdd = count < maxAllowed;
+			FocusAddSubActionBtn.IsEnabled = canAdd;
+			FocusAddSubActionBtn.ToolTip = canAdd 
+				? null 
+				: (isFan ? "当前蜂窝扇模式下最多支持配置 3 个二级级联子动作" : "当前外圈子环模式下最多支持配置 4 个二级级联子动作");
+		}
+
 		for (int i = 0; i < subActions.Count; i++)
 		{
 			int subIdx = i;
 			ActionItem subItem = subActions[i];
 			bool isSelected = (_selectedSubActionIndex == subIdx);
+			bool isExceeded = (i >= maxAllowed);
 
 			Border chip = new Border
 			{
@@ -3445,7 +3458,11 @@ public partial class SettingsWindow : Window
 				CornerRadius = new CornerRadius(6),
 				Padding = new Thickness(8, 4, 6, 4),
 				Margin = new Thickness(0, 0, 6, 6),
-				Cursor = System.Windows.Input.Cursors.Hand
+				Cursor = System.Windows.Input.Cursors.Hand,
+				Opacity = isExceeded ? 0.55 : 1.0,
+				ToolTip = isExceeded 
+					? (isFan ? "当前二级菜单样式为蜂窝扇，轮盘呼出与手势最多激活前 3 项子动作" : "当前二级菜单样式为外圈子环，最多激活前 4 项子动作")
+					: null
 			};
 
 			Grid chipGrid = new Grid();
@@ -3476,9 +3493,15 @@ public partial class SettingsWindow : Window
 				catch { }
 			}
 
+			string chipName = string.IsNullOrEmpty(subItem.Name) ? $"子动作 {subIdx + 1}" : subItem.Name;
+			if (isExceeded)
+			{
+				chipName += " (未激活)";
+			}
+
 			TextBlock textBlock = new TextBlock
 			{
-				Text = string.IsNullOrEmpty(subItem.Name) ? $"子动作 {subIdx + 1}" : subItem.Name,
+				Text = chipName,
 				FontSize = 11,
 				FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
 				Foreground = isSelected 
@@ -3535,9 +3558,13 @@ public partial class SettingsWindow : Window
 		if (profile?.Actions == null || _selectedSlotIndex >= profile.Actions.Count) return;
 		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
 		primaryAction.SubActions ??= new List<ActionItem>();
-		if (primaryAction.SubActions.Count >= 4)
+
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		int maxAllowed = isFan ? 3 : 4;
+		if (primaryAction.SubActions.Count >= maxAllowed)
 		{
-			System.Windows.MessageBox.Show(this, "每个主扇区最多支持配置 4 个二级级联子动作。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+			string styleName = isFan ? "蜂窝扇 (Honeycomb Fan)" : "外圈子环 (Sub-Ring)";
+			System.Windows.MessageBox.Show(this, $"当前二级菜单样式为【{styleName}】，每个主扇区最多支持配置 {maxAllowed} 个二级级联子动作。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
 		BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
@@ -5114,8 +5141,10 @@ public partial class SettingsWindow : Window
 				// 3. Draw SubActions (Icons only, NO TEXT!)
 				if (action?.SubActions != null && action.SubActions.Count > 0 && (isTier2Mode || isParentSlot))
 				{
-					// 功能配置界面 (Tab 2) 统一强制采用外圈同心子环布局，彻底杜绝蜂窝扇展开时的相互遮挡与混乱堆叠
-					int subCount = action.SubActions.Count;
+					// 功能配置界面 (Tab 2) 统一强制采用外圈同心子环布局，彻底杜绝蜂窝扇展开时的相互遮挡与混乱堆叠；显示数量严格匹配当前二级菜单样式上限（蜂窝扇最多3个，外圈子环最多4个）
+					bool isFanMode = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+					int maxSubCount = isFanMode ? 3 : 4;
+					int subCount = Math.Min(maxSubCount, action.SubActions.Count);
 					double subSweep = sweepAngle / subCount;
 					double subInnerR = outerR + 4.0;
 					double subOuterR = subInnerR + 22.0;
@@ -11823,6 +11852,8 @@ public partial class SettingsWindow : Window
 			{
 				RenderLiveWheelPreview();
 			}
+			RefreshFocusSubActionsChips();
+			RenderMappingsWheelPreview();
 			SyncUiToConfigAndSave();
 		}
 	}
