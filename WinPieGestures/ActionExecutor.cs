@@ -1082,6 +1082,25 @@ public static class ActionExecutor
 			}
 			else
 			{
+				try
+				{
+					string? root = System.IO.Path.GetPathRoot(text);
+					if (!string.IsNullOrEmpty(root) && !Directory.Exists(root))
+					{
+						AppLogger.LogWarn($"Target drive '{root}' for path '{text}' is not available on this machine.");
+						Application.Current?.Dispatcher.BeginInvoke(() =>
+						{
+							try
+							{
+								MessageBox.Show($"无法打开目标路径 '{folderPath}'：\n当前计算机上找不到指定的驱动器或磁盘分区（{root}）。", "StarPie - 路径不可用", MessageBoxButton.OK, MessageBoxImage.Warning);
+							}
+							catch { }
+						});
+						return;
+					}
+				}
+				catch { }
+
 				Process.Start(new ProcessStartInfo
 				{
 					FileName = text,
@@ -1092,7 +1111,14 @@ public static class ActionExecutor
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"Failed to open folder '{folderPath}'", ex);
-			MessageBox.Show("无法打开文件夹 '" + folderPath + "':\n" + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+			Application.Current?.Dispatcher.BeginInvoke(() =>
+			{
+				try
+				{
+					MessageBox.Show("无法打开文件夹 '" + folderPath + "':\n" + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+				}
+				catch { }
+			});
 		}
 	}
 

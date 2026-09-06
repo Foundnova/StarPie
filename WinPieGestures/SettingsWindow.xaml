@@ -2434,6 +2434,14 @@
                           </StackPanel>
                         </Grid>
 
+                        <!-- 自定义中心图案优先提示条 -->
+                        <Border Name="CenterPatternPriorityTip" Visibility="Collapsed" Margin="0,6,0,0" Background="#18F59E0B" BorderBrush="#80F59E0B" BorderThickness="1" CornerRadius="6" Padding="8,5">
+                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🎨" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="当前已启用自定义中心图案，轮盘中心将优先展示该图案；在中心死区内松开鼠标仍会照常触发本功能。" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Border>
+
                         <!-- 展开区 1：常用预设快速填入 -->
                         <StackPanel Name="CenterPresetsContainer" Visibility="Collapsed" Margin="0,8,0,0">
                           <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0">

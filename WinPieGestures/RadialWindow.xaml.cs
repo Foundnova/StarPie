@@ -497,6 +497,7 @@ public partial class RadialWindow : Window
 		base.Loaded += RadialWindow_Loaded;
 		CoreTitle.Text = ((profile.ProcessName == "Global") ? I18n.T("CoreGlobalActions") : profile.ProcessName);
 		CoreSubtitle.Text = string.Format(I18n.T("CoreSectorActions"), profile.SectorCount);
+		UpdateCenterIconVisuals();
 	}
 
 	private void InitializeThemeAndStyle()
@@ -688,208 +689,34 @@ public partial class RadialWindow : Window
 		storyboard.Begin();
 	}
 
-	private void UpdateCenterIconVisuals()
+	internal void UpdateCenterIconVisuals()
 	{
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		double num7 = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
 		double coreImageOffsetX = ConfigManager.CurrentConfig.CoreImageOffsetX;
 		double coreImageOffsetY = ConfigManager.CurrentConfig.CoreImageOffsetY;
 		TranslateTransform renderTransform = ((coreImageOffsetX != 0.0 || coreImageOffsetY != 0.0) ? new TranslateTransform(coreImageOffsetX, coreImageOffsetY) : null);
-		bool hasRenderedCenterActionIcon = false;
 		bool showCoreIcon = ConfigManager.CurrentConfig.ShowCoreIcon;
 		string text2 = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
 
-		if (_profile != null && _profile.EnableCenterAction && _profile.CenterAction != null)
+		bool hasCustomPattern = IconHelper.HasCustomCenterPattern(ConfigManager.CurrentConfig);
+		bool centerRendered = false;
+
+		// 1. 若开启了自定义中心图案，则优先显示自定义图案（即使用户同时开启了中心核圆动作，也优先展示自定义图案）
+		if (hasCustomPattern)
 		{
-			ActionItem centerAction = _profile.CenterAction;
-			double iconDim = coreRadius * 0.48 * num7;
-
-			if (!string.IsNullOrEmpty(centerAction.CustomIconSvg))
-			{
-				try
-				{
-					CoreExitIcon.Data = Geometry.Parse(centerAction.CustomIconSvg);
-					CoreExitIcon.Width = iconDim;
-					CoreExitIcon.Height = iconDim;
-					CoreExitIcon.RenderTransform = renderTransform;
-					CoreExitIcon.Fill = _textColorBrush;
-					CoreExitIcon.Visibility = Visibility.Visible;
-					CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-					hasRenderedCenterActionIcon = true;
-				}
-				catch { }
-			}
-
-			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.InheritAppIconPath))
-			{
-				try
-				{
-					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.InheritAppIconPath);
-					if (appIcon != null)
-					{
-						double imgDim = coreRadius * 0.95 * num7;
-						CoreCustomImageEllipse.Width = imgDim;
-						CoreCustomImageEllipse.Height = imgDim;
-						CoreCustomImageEllipse.RenderTransform = renderTransform;
-						ImageBrush imgBrush = new ImageBrush(appIcon)
-						{
-							Stretch = Stretch.Uniform,
-							AlignmentX = AlignmentX.Center,
-							AlignmentY = AlignmentY.Center
-						};
-						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
-						CoreCustomImageEllipse.Fill = imgBrush;
-						CoreCustomImageEllipse.Visibility = Visibility.Visible;
-						CoreExitIcon.Visibility = Visibility.Collapsed;
-						hasRenderedCenterActionIcon = true;
-					}
-				}
-				catch { }
-			}
-
-			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.IconKey))
-			{
-				if (centerAction.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
-				{
-					IconHelper.CustomIconItem? customIconItem = IconHelper.GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, centerAction.IconKey, StringComparison.OrdinalIgnoreCase));
-					if (customIconItem != null)
-					{
-						if (customIconItem.IsSvg && !string.IsNullOrEmpty(customIconItem.SvgData))
-						{
-							try
-							{
-								CoreExitIcon.Data = Geometry.Parse(customIconItem.SvgData);
-								CoreExitIcon.Width = iconDim;
-								CoreExitIcon.Height = iconDim;
-								CoreExitIcon.RenderTransform = renderTransform;
-								CoreExitIcon.Fill = _textColorBrush;
-								CoreExitIcon.Visibility = Visibility.Visible;
-								CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-								hasRenderedCenterActionIcon = true;
-							}
-							catch { }
-						}
-						else if (File.Exists(customIconItem.FilePath))
-						{
-							try
-							{
-								ImageSource? customSrc = IconHelper.GetCustomImageSource(customIconItem.FilePath);
-								if (customSrc != null)
-								{
-									double imgDim = coreRadius * 0.95 * num7;
-									CoreCustomImageEllipse.Width = imgDim;
-									CoreCustomImageEllipse.Height = imgDim;
-									CoreCustomImageEllipse.RenderTransform = renderTransform;
-									ImageBrush imgBrush = new ImageBrush(customSrc)
-									{
-										Stretch = Stretch.Uniform,
-										AlignmentX = AlignmentX.Center,
-										AlignmentY = AlignmentY.Center
-									};
-									RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
-									CoreCustomImageEllipse.Fill = imgBrush;
-									CoreCustomImageEllipse.Visibility = Visibility.Visible;
-									CoreExitIcon.Visibility = Visibility.Collapsed;
-									hasRenderedCenterActionIcon = true;
-								}
-							}
-							catch { }
-						}
-					}
-				}
-				else
-				{
-					string svg = IconHelper.GetSvgPathByKey(centerAction.IconKey);
-					if (!string.IsNullOrEmpty(svg))
-					{
-						try
-						{
-							CoreExitIcon.Data = Geometry.Parse(svg);
-							CoreExitIcon.Width = iconDim;
-							CoreExitIcon.Height = iconDim;
-							CoreExitIcon.RenderTransform = renderTransform;
-							CoreExitIcon.Fill = _textColorBrush;
-							CoreExitIcon.Visibility = Visibility.Visible;
-							CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-							hasRenderedCenterActionIcon = true;
-						}
-						catch { }
-					}
-				}
-			}
-
-			if (!hasRenderedCenterActionIcon && string.Equals(centerAction.Type, "Launch", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(centerAction.Parameter))
-			{
-				try
-				{
-					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.Parameter);
-					if (appIcon != null)
-					{
-						double imgDim = coreRadius * 0.95 * num7;
-						CoreCustomImageEllipse.Width = imgDim;
-						CoreCustomImageEllipse.Height = imgDim;
-						CoreCustomImageEllipse.RenderTransform = renderTransform;
-						ImageBrush imgBrush = new ImageBrush(appIcon)
-						{
-							Stretch = Stretch.Uniform,
-							AlignmentX = AlignmentX.Center,
-							AlignmentY = AlignmentY.Center
-						};
-						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
-						CoreCustomImageEllipse.Fill = imgBrush;
-						CoreCustomImageEllipse.Visibility = Visibility.Visible;
-						CoreExitIcon.Visibility = Visibility.Collapsed;
-						hasRenderedCenterActionIcon = true;
-					}
-				}
-				catch { }
-			}
-
-			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.Type))
-			{
-				string defaultKey = centerAction.Type switch
-				{
-					"WebUrl" => "Globe",
-					"Folder" => "Folder",
-					"Launch" => "Rocket",
-					"Hotkey" => "Keyboard",
-					"Command" => "Terminal",
-					"SwitchWindow" => "Layers",
-					"System" => "Settings",
-					_ => "Star"
-				};
-				string fallbackSvg = IconHelper.GetSvgPathByKey(defaultKey);
-				if (!string.IsNullOrEmpty(fallbackSvg))
-				{
-					try
-					{
-						CoreExitIcon.Data = Geometry.Parse(fallbackSvg);
-						CoreExitIcon.Width = iconDim;
-						CoreExitIcon.Height = iconDim;
-						CoreExitIcon.RenderTransform = renderTransform;
-						CoreExitIcon.Fill = _textColorBrush;
-						CoreExitIcon.Visibility = Visibility.Visible;
-						CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-						hasRenderedCenterActionIcon = true;
-					}
-					catch { }
-				}
-			}
-		}
-
-		if (!hasRenderedCenterActionIcon && showCoreIcon)
-		{
-			bool num8 = text2 == "Custom";
-			IconHelper.CustomIconItem customIconItem = null;
-			if (num8 && !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey))
+			bool isCustomType = text2 == "Custom";
+			IconHelper.CustomIconItem? customIconItem = null;
+			if (isCustomType && !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey))
 			{
 				customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
 			}
 			bool flag = customIconItem != null && !customIconItem.IsSvg && File.Exists(customIconItem.FilePath);
 			bool flag2 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
-			bool num9 = ((text2 == "Image") | flag) || (flag2 && text2 != "Custom" && text2 != "Exit");
-			string text3 = (flag ? customIconItem.FilePath : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
-			if (num9 && !string.IsNullOrEmpty(text3) && File.Exists(text3))
+			bool isImagePattern = ((text2 == "Image") | flag) || (flag2 && text2 != "Custom" && text2 != "Exit");
+			string? text3 = (flag ? customIconItem?.FilePath : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
+
+			if (isImagePattern && !string.IsNullOrEmpty(text3) && File.Exists(text3))
 			{
 				try
 				{
@@ -927,6 +754,7 @@ public partial class RadialWindow : Window
 					CoreCustomImageEllipse.Fill = imageBrush;
 					CoreCustomImageEllipse.Visibility = Visibility.Visible;
 					CoreExitIcon.Visibility = Visibility.Collapsed;
+					centerRendered = true;
 				}
 				catch
 				{
@@ -937,7 +765,209 @@ public partial class RadialWindow : Window
 			else
 			{
 				CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-				Geometry coreIconGeometry = IconHelper.GetCoreIconGeometry(text2, ConfigManager.CurrentConfig.CoreCustomIconKey, ConfigManager.CurrentConfig.CoreCustomIconSvg);
+				Geometry? coreIconGeometry = IconHelper.GetCoreIconGeometry(text2, ConfigManager.CurrentConfig.CoreCustomIconKey, ConfigManager.CurrentConfig.CoreCustomIconSvg);
+				if (coreIconGeometry != null)
+				{
+					CoreExitIcon.Data = coreIconGeometry;
+					CoreExitIcon.Width = coreRadius * 0.42 * num7;
+					CoreExitIcon.Height = coreRadius * 0.42 * num7;
+					CoreExitIcon.RenderTransform = renderTransform;
+					CoreExitIcon.Fill = _textColorBrush;
+					CoreExitIcon.Visibility = Visibility.Visible;
+					centerRendered = true;
+				}
+			}
+		}
+
+		// 2. 若未配置或未开启自定义图案，且启用了中心核圆动作，则展示动作功能图标（绝不附加自定义图片的缩放和偏移，必须严格正中居中）
+		if (!centerRendered && _profile != null && _profile.EnableCenterAction && _profile.CenterAction != null)
+		{
+			ActionItem centerAction = _profile.CenterAction;
+			double actionIconDim = coreRadius * 0.48; // 正中居中尺寸
+			double actionImgDim = coreRadius * 0.95;
+
+			// 2.1 自定义矢量 SVG
+			if (!string.IsNullOrEmpty(centerAction.CustomIconSvg))
+			{
+				try
+				{
+					CoreExitIcon.Data = Geometry.Parse(centerAction.CustomIconSvg);
+					CoreExitIcon.Width = actionIconDim;
+					CoreExitIcon.Height = actionIconDim;
+					CoreExitIcon.RenderTransform = null; // 确保不产生偏移！
+					CoreExitIcon.Fill = _textColorBrush;
+					CoreExitIcon.Visibility = Visibility.Visible;
+					CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+					centerRendered = true;
+				}
+				catch { }
+			}
+
+			// 2.2 继承应用程序图标
+			if (!centerRendered && !string.IsNullOrEmpty(centerAction.InheritAppIconPath))
+			{
+				try
+				{
+					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.InheritAppIconPath);
+					if (appIcon != null)
+					{
+						CoreCustomImageEllipse.Width = actionImgDim;
+						CoreCustomImageEllipse.Height = actionImgDim;
+						CoreCustomImageEllipse.RenderTransform = null; // 确保不产生偏移！
+						ImageBrush imgBrush = new ImageBrush(appIcon)
+						{
+							Stretch = Stretch.Uniform,
+							AlignmentX = AlignmentX.Center,
+							AlignmentY = AlignmentY.Center
+						};
+						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+						CoreCustomImageEllipse.Fill = imgBrush;
+						CoreCustomImageEllipse.Visibility = Visibility.Visible;
+						CoreExitIcon.Visibility = Visibility.Collapsed;
+						centerRendered = true;
+					}
+				}
+				catch { }
+			}
+
+			// 2.3 图标关键字 (custom: 或内置矢量)
+			if (!centerRendered && !string.IsNullOrEmpty(centerAction.IconKey))
+			{
+				if (centerAction.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					IconHelper.CustomIconItem? customIconItem = IconHelper.GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, centerAction.IconKey, StringComparison.OrdinalIgnoreCase));
+					if (customIconItem != null)
+					{
+						if (customIconItem.IsSvg && !string.IsNullOrEmpty(customIconItem.SvgData))
+						{
+							try
+							{
+								CoreExitIcon.Data = Geometry.Parse(customIconItem.SvgData);
+								CoreExitIcon.Width = actionIconDim;
+								CoreExitIcon.Height = actionIconDim;
+								CoreExitIcon.RenderTransform = null; // 确保不产生偏移！
+								CoreExitIcon.Fill = _textColorBrush;
+								CoreExitIcon.Visibility = Visibility.Visible;
+								CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+								centerRendered = true;
+							}
+							catch { }
+						}
+						else if (File.Exists(customIconItem.FilePath))
+						{
+							try
+							{
+								ImageSource? customSrc = IconHelper.GetCustomImageSource(customIconItem.FilePath);
+								if (customSrc != null)
+								{
+									CoreCustomImageEllipse.Width = actionImgDim;
+									CoreCustomImageEllipse.Height = actionImgDim;
+									CoreCustomImageEllipse.RenderTransform = null; // 确保不产生偏移！
+									ImageBrush imgBrush = new ImageBrush(customSrc)
+									{
+										Stretch = Stretch.Uniform,
+										AlignmentX = AlignmentX.Center,
+										AlignmentY = AlignmentY.Center
+									};
+									RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+									CoreCustomImageEllipse.Fill = imgBrush;
+									CoreCustomImageEllipse.Visibility = Visibility.Visible;
+									CoreExitIcon.Visibility = Visibility.Collapsed;
+									centerRendered = true;
+								}
+							}
+							catch { }
+						}
+					}
+				}
+				else
+				{
+					string svg = IconHelper.GetSvgPathByKey(centerAction.IconKey);
+					if (!string.IsNullOrEmpty(svg))
+					{
+						try
+						{
+							CoreExitIcon.Data = Geometry.Parse(svg);
+							CoreExitIcon.Width = actionIconDim;
+							CoreExitIcon.Height = actionIconDim;
+							CoreExitIcon.RenderTransform = null; // 确保不产生偏移！
+							CoreExitIcon.Fill = _textColorBrush;
+							CoreExitIcon.Visibility = Visibility.Visible;
+							CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+							centerRendered = true;
+						}
+						catch { }
+					}
+				}
+			}
+
+			// 2.4 启动目标应用程序原生提取图标
+			if (!centerRendered && string.Equals(centerAction.Type, "Launch", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(centerAction.Parameter))
+			{
+				try
+				{
+					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.Parameter);
+					if (appIcon != null)
+					{
+						CoreCustomImageEllipse.Width = actionImgDim;
+						CoreCustomImageEllipse.Height = actionImgDim;
+						CoreCustomImageEllipse.RenderTransform = null; // 确保不产生偏移！
+						ImageBrush imgBrush = new ImageBrush(appIcon)
+						{
+							Stretch = Stretch.Uniform,
+							AlignmentX = AlignmentX.Center,
+							AlignmentY = AlignmentY.Center
+						};
+						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+						CoreCustomImageEllipse.Fill = imgBrush;
+						CoreCustomImageEllipse.Visibility = Visibility.Visible;
+						CoreExitIcon.Visibility = Visibility.Collapsed;
+						centerRendered = true;
+					}
+				}
+				catch { }
+			}
+
+			// 2.5 动作类型保底默认图标
+			if (!centerRendered && !string.IsNullOrEmpty(centerAction.Type))
+			{
+				string defaultKey = centerAction.Type switch
+				{
+					"WebUrl" or "Url" => "Explorer",
+					"Folder" or "OpenFolder" => "Folder",
+					"Launch" => "Terminal",
+					"Hotkey" => "Command",
+					"Command" => "Terminal",
+					"SwitchWindow" => "Tile",
+					"System" => "Settings",
+					_ => "Command"
+				};
+				string fallbackSvg = IconHelper.GetSvgPathByKey(defaultKey);
+				if (!string.IsNullOrEmpty(fallbackSvg))
+				{
+					try
+					{
+						CoreExitIcon.Data = Geometry.Parse(fallbackSvg);
+						CoreExitIcon.Width = actionIconDim;
+						CoreExitIcon.Height = actionIconDim;
+						CoreExitIcon.RenderTransform = null; // 确保不产生偏移！
+						CoreExitIcon.Fill = _textColorBrush;
+						CoreExitIcon.Visibility = Visibility.Visible;
+						CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+						centerRendered = true;
+					}
+					catch { }
+				}
+			}
+		}
+
+		// 3. 既无自定义图案又未配置动作，保底展示默认 Exit 图标或隐藏
+		if (!centerRendered)
+		{
+			if (showCoreIcon)
+			{
+				CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+				Geometry? coreIconGeometry = IconHelper.GetCoreIconGeometry("Exit");
 				if (coreIconGeometry != null)
 				{
 					CoreExitIcon.Data = coreIconGeometry;
@@ -947,12 +977,13 @@ public partial class RadialWindow : Window
 				CoreExitIcon.RenderTransform = renderTransform;
 				CoreExitIcon.Visibility = Visibility.Visible;
 			}
+			else
+			{
+				CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+				CoreExitIcon.Visibility = Visibility.Collapsed;
+			}
 		}
-		else if (!hasRenderedCenterActionIcon)
-		{
-			CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
-			CoreExitIcon.Visibility = Visibility.Collapsed;
-		}
+
 		_defaultCoreExitIconVisibility = CoreExitIcon.Visibility;
 		_defaultCoreCustomImageVisibility = CoreCustomImageEllipse.Visibility;
 		_defaultCoreExitIconOpacity = CoreExitIcon.Opacity;

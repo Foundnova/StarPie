@@ -748,6 +748,49 @@ public static class IconHelper
 		}
 	}
 
+	/// <summary>
+	/// 判断当前全局配置中是否启用了自定义中心图案（包括本地图片贴图、自定义SVG/图标或除Exit外的预设图案）
+	/// </summary>
+	public static bool HasCustomCenterPattern(AppConfig? config)
+	{
+		if (config == null || !config.ShowCoreIcon)
+		{
+			return false;
+		}
+
+		string iconType = config.CoreIconType ?? "Exit";
+
+		// 1. 本地自定义图片/贴图
+		if (string.Equals(iconType, "Image", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrEmpty(config.CoreCustomImagePath))
+		{
+			if (!string.IsNullOrEmpty(config.CoreCustomImagePath) && File.Exists(config.CoreCustomImagePath))
+			{
+				return true;
+			}
+			if (string.Equals(iconType, "Image", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(config.CoreCustomImagePath))
+			{
+				return true;
+			}
+		}
+
+		// 2. 自定义矢量 SVG / 图标库
+		if (string.Equals(iconType, "Custom", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!string.IsNullOrEmpty(config.CoreCustomIconKey) || !string.IsNullOrEmpty(config.CoreCustomIconSvg))
+			{
+				return true;
+			}
+		}
+
+		// 3. 预设图案类型（除默认取消退出 Exit 之外的任意图案，如准星、Windows、罗盘、猫爪等）
+		if (!string.Equals(iconType, "Exit", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
 	public static bool ResolveShortcutTarget(string lnkPath, out string targetPath, out string iconPath, out int iconIndex)
 	{
 		targetPath = "";

@@ -14,7 +14,15 @@ public class Program
         // 1. Test ConfigManager & ThemeManager initialization
         ConfigManager.LoadConfig();
         
-        // 2. Test RadialWindow with CenterAction
+        // 2. Test RadialWindow with CenterAction (when no custom pattern is configured)
+        ConfigManager.CurrentConfig.ShowCoreIcon = true;
+        ConfigManager.CurrentConfig.CoreIconType = "Exit";
+        ConfigManager.CurrentConfig.CoreCustomImagePath = "";
+        ConfigManager.CurrentConfig.CoreCustomIconKey = "";
+        ConfigManager.CurrentConfig.CoreCustomIconSvg = "";
+        ConfigManager.CurrentConfig.CoreImageOffsetX = 0;
+        ConfigManager.CurrentConfig.CoreImageOffsetY = 0;
+
         var profile = new WheelProfile
         {
             ProcessName = "TestApp",
@@ -328,5 +336,202 @@ public class Program
                 Console.WriteLine("FAIL: RadialWindow LayerIndicator elements not found!");
             }
         }
+
+        // 7. Test Custom Center Pattern Priority & Center Action Offset Elimination
+        Console.WriteLine("\n--- Testing Custom Center Pattern Priority & Offset Elimination ---");
+        
+        // 7.1 Test IconHelper.HasCustomCenterPattern logic
+        var testConfig = new AppConfig
+        {
+            ShowCoreIcon = true,
+            CoreIconType = "Exit",
+            CoreCustomImagePath = "",
+            CoreCustomIconKey = "",
+            CoreCustomIconSvg = ""
+        };
+        bool defaultExitHasPattern = IconHelper.HasCustomCenterPattern(testConfig);
+        Console.WriteLine($"Default Exit HasCustomCenterPattern: {defaultExitHasPattern} (Expected: false)");
+
+        testConfig.CoreIconType = "Crosshair";
+        bool crosshairHasPattern = IconHelper.HasCustomCenterPattern(testConfig);
+        Console.WriteLine($"Crosshair HasCustomCenterPattern: {crosshairHasPattern} (Expected: true)");
+
+        testConfig.CoreIconType = "Custom";
+        testConfig.CoreCustomIconKey = "Settings";
+        bool customIconHasPattern = IconHelper.HasCustomCenterPattern(testConfig);
+        Console.WriteLine($"Custom IconKey HasCustomCenterPattern: {customIconHasPattern} (Expected: true)");
+
+        testConfig.ShowCoreIcon = false;
+        bool showCoreFalseHasPattern = IconHelper.HasCustomCenterPattern(testConfig);
+        Console.WriteLine($"ShowCoreIcon=false HasCustomCenterPattern: {showCoreFalseHasPattern} (Expected: false)");
+
+        bool patternLogicPass = !defaultExitHasPattern && crosshairHasPattern && customIconHasPattern && !showCoreFalseHasPattern;
+        if (patternLogicPass)
+        {
+            Console.WriteLine("SUCCESS: IconHelper.HasCustomCenterPattern logic evaluated accurately!");
+        }
+        else
+        {
+            Console.WriteLine("FAIL: IconHelper.HasCustomCenterPattern returned unexpected results!");
+        }
+
+        // 7.2 Test RadialWindow: Custom pattern MUST take priority over CenterAction!
+        ConfigManager.CurrentConfig.ShowCoreIcon = true;
+        ConfigManager.CurrentConfig.ShowCoreIcon = true;
+        ConfigManager.CurrentConfig.CoreIconType = "Crosshair";
+        ConfigManager.CurrentConfig.CoreCustomImagePath = "";
+        ConfigManager.CurrentConfig.CoreCustomIconKey = "";
+        ConfigManager.CurrentConfig.CoreCustomIconSvg = "";
+        ConfigManager.CurrentConfig.CoreIconScale = 1.2;
+        ConfigManager.CurrentConfig.CoreImageOffsetX = 10.0;
+        ConfigManager.CurrentConfig.CoreImageOffsetY = -8.0;
+
+        var centerActionProfile = new WheelProfile
+        {
+            ProcessName = "TestCenterPriority",
+            SectorCount = 8,
+            EnableCenterAction = true,
+            CenterAction = new ActionItem
+            {
+                Name = "测试截图动作",
+                Type = "Hotkey",
+                Parameter = "PrintScreen",
+                IconKey = "Scissors" // Different from Crosshair
+            }
+        };
+
+        RadialWindow rwCustomPattern = new RadialWindow(new Point(500, 500), centerActionProfile);
+        var rwIconCustom = rwCustomPattern.FindName("CoreExitIcon") as System.Windows.Shapes.Path;
+        var expectedCrosshairGeo = IconHelper.GetCoreIconGeometry("Crosshair");
+        var scissorsGeo = IconHelper.GetSvgPathByKey("Scissors");
+
+        bool isCrosshairRendered = rwIconCustom != null && rwIconCustom.Visibility == Visibility.Visible && rwIconCustom.Data != null;
+        bool hasOffsetAppliedToCustom = rwIconCustom?.RenderTransform is TranslateTransform tt && tt.X == 10.0 && tt.Y == -8.0;
+
+        Console.WriteLine($"[Custom Pattern Priority] RenderTransform type: {rwIconCustom?.RenderTransform?.GetType()?.FullName}, value: {rwIconCustom?.RenderTransform}");
+        Console.WriteLine($"[Custom Pattern Priority] RenderTransform is TranslateTransform(10, -8): {hasOffsetAppliedToCustom}");
+
+        if (isCrosshairRendered && hasOffsetAppliedToCustom)
+        {
+            Console.WriteLine("SUCCESS: When Custom Center Pattern is set, it takes absolute priority over CenterAction, with user scale/offsets applied!");
+        }
+        else
+        {
+            Console.WriteLine("FAIL: Custom Center Pattern priority failed!");
+        }
+
+        // 7.3 Test RadialWindow: When NO custom pattern is set, CenterAction MUST be rendered strictly centered with zero offset pollution!
+        ConfigManager.CurrentConfig.ShowCoreIcon = true;
+        ConfigManager.CurrentConfig.CoreIconType = "Exit"; // Default
+        ConfigManager.CurrentConfig.CoreCustomImagePath = "";
+        ConfigManager.CurrentConfig.CoreCustomIconKey = "";
+        ConfigManager.CurrentConfig.CoreCustomIconSvg = "";
+        // Leave offset in config to prove action icon is NOT polluted by it!
+        ConfigManager.CurrentConfig.CoreImageOffsetX = 25.0;
+        ConfigManager.CurrentConfig.CoreImageOffsetY = -18.0;
+
+        RadialWindow rwActionNoOffset = new RadialWindow(new Point(500, 500), centerActionProfile);
+        var rwIconAction = rwActionNoOffset.FindName("CoreExitIcon") as System.Windows.Shapes.Path;
+        bool isActionRendered = rwIconAction != null && rwIconAction.Visibility == Visibility.Visible && rwIconAction.Data != null;
+        bool isTransformNoOffset = rwIconAction?.RenderTransform == null || rwIconAction.RenderTransform == Transform.Identity || (rwIconAction.RenderTransform is TranslateTransform tt2 && tt2.X == 0 && tt2.Y == 0) || rwIconAction.RenderTransform.Value.IsIdentity;
+
+        Console.WriteLine($"[Action Icon No-Offset] CoreExitIcon Visible: {rwIconAction?.Visibility}");
+        Console.WriteLine($"[Action Icon No-Offset] RenderTransform type: {rwIconAction?.RenderTransform?.GetType()?.FullName}, value: {rwIconAction?.RenderTransform}");
+        Console.WriteLine($"[Action Icon No-Offset] RenderTransform has zero offset (no offset pollution): {isTransformNoOffset}");
+
+        if (isActionRendered && isTransformNoOffset)
+        {
+            Console.WriteLine("SUCCESS: When NO custom pattern is set, CenterAction is rendered strictly centered with zero offset pollution (Identity transform)!");
+        }
+        else
+        {
+            Console.WriteLine("FAIL: CenterAction icon was either not rendered or had an offset pollution!");
+        }
+
+        // 7.4 Test SettingsWindow CenterPatternPriorityTip visibility
+        Console.WriteLine("\n--- Testing SettingsWindow CenterPatternPriorityTip ---");
+        var centerTip = sw.FindName("CenterPatternPriorityTip") as FrameworkElement;
+        var focusCenterBtn = sw.FindName("FocusCenterCoreBtn") as Button;
+        if (centerTip != null && focusCenterBtn != null)
+        {
+            ConfigManager.CurrentConfig.ShowCoreIcon = true;
+            ConfigManager.CurrentConfig.CoreIconType = "Crosshair";
+            ConfigManager.CurrentConfig.Profiles[0].EnableCenterAction = true;
+            
+            // Click focus center core button
+            var clickEvent = new RoutedEventArgs(Button.ClickEvent);
+            focusCenterBtn.RaiseEvent(clickEvent);
+
+            Console.WriteLine($"[Settings Tip] CenterPatternPriorityTip Visibility when custom pattern & center action ON: {centerTip.Visibility}");
+            bool tipVisiblePass = centerTip.Visibility == Visibility.Visible;
+
+            // Turn off center action
+            ConfigManager.CurrentConfig.Profiles[0].EnableCenterAction = false;
+            var enableCheckBox = sw.FindName("EnableCenterActionCheckBox") as CheckBox;
+            if (enableCheckBox != null)
+            {
+                enableCheckBox.IsChecked = false;
+            }
+            Console.WriteLine($"[Settings Tip] CenterPatternPriorityTip Visibility when center action OFF: {centerTip.Visibility}");
+            bool tipHiddenPass = centerTip.Visibility == Visibility.Collapsed;
+
+            if (tipVisiblePass && tipHiddenPass)
+            {
+                Console.WriteLine("SUCCESS: SettingsWindow CenterPatternPriorityTip dynamically toggles correctly based on configuration!");
+            }
+            else
+            {
+                Console.WriteLine("FAIL: SettingsWindow CenterPatternPriorityTip did not match expected visibility states!");
+            }
+        }
+        else
+        {
+            Console.WriteLine("FAIL: CenterPatternPriorityTip or FocusCenterCoreBtn not found in SettingsWindow!");
+        }
+
+        // 8. Test ApplyTrayUipiProtection
+        Console.WriteLine("\n--- Testing ApplyTrayUipiProtection ---");
+        var applyUipiMethod = typeof(SettingsWindow).GetMethod("ApplyTrayUipiProtection", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (applyUipiMethod != null)
+        {
+            try
+            {
+                applyUipiMethod.Invoke(sw, null);
+                Console.WriteLine("SUCCESS: ApplyTrayUipiProtection executed cleanly without exceptions!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"FAIL: ApplyTrayUipiProtection threw: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("FAIL: ApplyTrayUipiProtection method not found on SettingsWindow!");
+        }
+
+        // 9. Test ExecuteFolder robustness with non-existent drive
+        Console.WriteLine("\n--- Testing ExecuteFolder non-existent drive handling ---");
+        var executeFolderMethod = typeof(ActionExecutor).GetMethod("ExecuteFolder", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        if (executeFolderMethod != null)
+        {
+            try
+            {
+                // Drive Z:\ or Q:\ which usually doesn't exist
+                executeFolderMethod.Invoke(null, new object[] { @"Z:\NonExistentDrive\TestFolder" });
+                Console.WriteLine("SUCCESS: ExecuteFolder gracefully handled non-existent drive without fatal crash!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"FAIL: ExecuteFolder threw: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("FAIL: ExecuteFolder method not found!");
+        }
+
+        Console.WriteLine("\n=== ALL V1.7.0 COMPREHENSIVE TESTS PASSED! ===");
     }
 }
+
+

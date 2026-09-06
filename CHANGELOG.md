@@ -49,6 +49,28 @@
    - 将 Tab 2 右上角的 `[ 🎯 画布联动精调 | 📋 紧凑全览列表 ]` 视图分段切换器放入高级模式；
    - 简单模式下自动锁定并呈现直观的可视化交互画布，免受密集表格列表干扰；高级模式下恢复显示，支持极客用户全量审阅编辑。
 
+### 🛡️ 系统托盘跨特权拖拽防卡死保护与 UIPI 消息白名单 (Tray UIPI Safety Guard)
+1. **双重 Win32 消息过滤白名单机制 (Process & HWND Filtering)**：
+   - 深度解决用户在 Windows 11 24H2 等系统中以管理员提权身份运行（`Elevated: True`）时，将系统托盘折叠菜单内的图标拖动到任务栏主区域发生 OLE 拖放死锁、导致半透明图标与光标冻结在一起的系统级冲突；
+   - 引入 Win32 `ChangeWindowMessageFilter`（进程级）与 `ChangeWindowMessageFilterEx`（句柄级）双重防御机制；
+   - 在系统托盘初始化后，自动通过底层原生窗口句柄放行来自标准中等权限资源管理器（`explorer.exe`）的 `WM_DROPFILES` (0x0233)、`WM_COPYDATA` (0x004A)、`WM_COPYGLOBALDATA` (0x0049)、`WM_SETTINGCHANGE` (0x001A)、`WM_DISPLAYCHANGE` (0x007E)、`WM_COMMAND`、托盘回调消息以及鼠标消息，彻底打通跨特权通道，避免 UIPI 拦截导致的 OLE 状态机挂起。
+
+### 📂 文件夹打开与目标路径容错健壮性增强 (Action Path Robustness)
+1. **磁盘驱动器与网络路径平滑容错**：
+   - 针对跨设备导入配置可能导致的本地磁盘驱动器不存在（如 `系统找不到指定的磁碟机`）等边界场景，增强驱动器根目录有效性预检；
+   - 异常捕获改用非阻塞 UI 线程调度，杜绝后台阻塞或未捕获崩溃，提供清晰友好的提示，保障手势主循环绝对稳定。
+
+### 🎯 自定义中心图案优先显示与动作图标居中零偏移 (Custom Center Pattern Priority & Action Icon Centering)
+1. **自定义中心图案绝对优先展示 (Custom Pattern Absolute Priority)**：
+   - 彻底修复此前开启「中心核圆动作」时，用户在 Tab 1 精心定制的中心贴图、自定义矢量图标或预设准星/猫爪/罗盘等图案被强制替换为动作图标的体验缺陷；
+   - 新增 `IconHelper.HasCustomCenterPattern(config)` 全景判决引擎：当用户开启中心图案且配置了本地图片、自定义 SVG、图标包或除默认退出 (Exit) 外的任意预设图案时，轮盘中心无论是否配置动作，均**绝对优先展示自定义图案**，用户的视觉个性化定制永不丢失；
+2. **中心动作图标正中严格居中与偏移彻底消除 (Action Icon Zero Offset)**：
+   - 彻底消除此前由于直接复用 `CoreExitIcon` / `CoreCustomImageEllipse` 控件导致自定义贴图位移（`CoreImageOffsetX` / `CoreImageOffsetY`）与缩放（`CoreIconScale`）意外污染动作功能图标产生倾斜偏移的缺陷；
+   - 当显示中心功能动作图标时，强制统一重置 `RenderTransform = null`，确保各类型动作图标始终正中居中，无任何位置漂移；
+3. **三端（实际呼出轮盘、Tab 1 外观预览、Tab 2 动作预览）视觉与交互 100% 对齐**：
+   - 全面统一 `RadialWindow.xaml.cs`（实际呼出）、`SettingsWindow.RenderLiveWheelPreview`（Tab 1）与 `SettingsWindow.RenderMappingsWheelPreview`（Tab 2）的中心渲染层级流水线；
+   - 在 Tab 2 控制台选中中心核心圆并开启中心动作时，若检测到用户已启用自定义中心图案，自动在状态栏下方呈现琥珀微光提示条 `CenterPatternPriorityTip`（说明中心优先展示自定义图案，在中心死区内松开鼠标仍会照常触发本功能），操作逻辑清清楚楚、明明白白。
+
 ### 🌟 轮盘中心核圆动作图标呼出修复 (Center Core Action Icon Fix)
 1. **实际呼出轮盘 (`RadialWindow`) 与控制台画布视觉通路彻底打通**：
    - 深入排查发现：`RadialWindow.xaml.cs` 中中心核圆区域此前仅读取全局配置 `CoreIconType`（默认为退出 'X' 叉号），未读取当前方案 `WheelProfile.CenterAction` 的动作图标；
