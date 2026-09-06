@@ -301,7 +301,7 @@ public static class WindowTiler
 			foreach (nint t in targets)
 			{
 				GetWindowThreadProcessId(t, out uint tp);
-				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"}");
+				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"} title=\"{TitleOf(t)}\"");
 			}
 			// 按显示器分区平铺：同一显示器上的窗口独立套用布局，
 			// 避免"两窗分布两屏各占半屏"的不可预测行为。分区顺序 = 显示器在目标序列中的首次出现顺序。
@@ -367,7 +367,7 @@ public static class WindowTiler
 					GetWindowRect(hwnd, out RECT before);
 					GetWindowThreadProcessId(hwnd, out uint pid);
 					bool ok = SetWindowPos(hwnd, HWND_TOP, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
-					AppLogger.LogInfo($"[Tile] #{globalIndex} hwnd=0x{hwnd:X} rect=({x},{y},{w}x{h}) ok={ok}");
+					AppLogger.LogInfo($"[Tile] #{globalIndex} hwnd=0x{hwnd:X} exe={ExeNameOfPid(pid) ?? "?"} title=\"{TitleOf(hwnd)}\" rect=({x},{y},{w}x{h}) ok={ok}");
 					globalIndex++;
 					if (ok)
 					{
@@ -660,6 +660,24 @@ public static class WindowTiler
 		}
 		s_exeNameCache[key] = lower;
 		return lower;
+	}
+
+	/// <summary>读取窗口标题（日志用，截断 128 字符，失败返回空串）。</summary>
+	private static string TitleOf(nint hWnd)
+	{
+		try
+		{
+			if (hWnd == IntPtr.Zero || !IsWindow(hWnd))
+			{
+				return "";
+			}
+			StringBuilder sb = new StringBuilder(128);
+			return GetWindowText(hWnd, sb, 128) > 0 ? sb.ToString() : "";
+		}
+		catch
+		{
+			return "";
+		}
 	}
 
 	/// <summary>EnumWindows 全量枚举顶层窗口（不过滤，便于分组；注意通过枚举回调收集）。</summary>
