@@ -64,6 +64,9 @@ public static class WindowTiler
 	private static extern bool IsWindowVisible(nint hWnd);
 
 	[DllImport("user32.dll")]
+	private static extern bool IsWindow(nint hWnd);
+
+	[DllImport("user32.dll")]
 	private static extern bool IsIconic(nint hWnd);
 
 	[DllImport("user32.dll")]
@@ -119,6 +122,9 @@ public static class WindowTiler
 	private delegate bool EnumMonitorsProc(nint hMonitor, nint hdcMonitor, ref RECT lprcMonitor, nint dwData);
 
 	private const int SW_RESTORE = 9;
+
+	/// <summary>还原窗口但不激活（不抢前台焦点）；Win32 SW_SHOWNOACTIVATE。</summary>
+	private const int SW_SHOWNOACTIVATE = 4;
 	private const uint SWP_NOZORDER = 0x0004;
 	private const uint SWP_NOMOVE = 0x0002;
 	private const uint SWP_NOSIZE = 0x0001;
@@ -132,9 +138,21 @@ public static class WindowTiler
 	private const uint LWA_COLORKEY = 0x00000001;
 	private const uint SW_RESTORE_U = 9u;
 
-	// 上次平铺快照（供「恢复」与内存记忆）
-	private static readonly Dictionary<nint, RECT> s_lastSnapshot = new Dictionary<nint, RECT>();
-	private static int s_cycleIndex;
+	// 上次平铺快照（供「恢复」与内存记忆）。条目同时记录进程 PID：
+	// HWND 会被系统复用，恢复时校验 PID 避免把旧坐标应用到无关窗口。
+	private readonly struct TileSnapshotEntry
+	{
+		public readonly RECT Rect;
+		public readonly uint Pid;
+
+		public TileSnapshotEntry(RECT rect, uint pid)
+		{
+			Rect = rect;
+			Pid = pid;
+		}
+	}
+
+	private static readonly Dictionary<nint, TileSnapshotEntry> s_lastSnapshot = new Dictionary<nint, TileSnapshotEntry>();
 	private static string s_currentLayout = "2L";
 
 	/// <summary>可选布局 key 列表（顺序即编辑器下拉顺序）。</summary>
@@ -274,35 +292,74 @@ public static class WindowTiler
 				GetWindowThreadProcessId(t, out uint tp);
 				AppLogger.LogInfo($"[Tile]   target hwnd=0x{t:X} exe={ExeNameOfPid(tp) ?? "?"}");
 			}
-			List<double[]> cells = LayoutCells(key, targets.Count);
-			int count = Math.Min(targets.Count, cells.Count);
-			Dictionary<nint, RECT> snapshot = new Dictionary<nint, RECT>();
-			for (int i = 0; i < count; i++)
+			// 按显示器分区平铺：同一显示器上的窗口独立套用布局，
+			// 避免"两窗分布两屏各占半屏"的不可预测行为。分区顺序 = 显示器在目标序列中的首次出现顺序。
+			List<List<nint>> monitorGroups = new List<List<nint>>();
+			Dictionary<nint, int> groupIndexByMonitor = new Dictionary<nint, int>();
+			foreach (nint hwnd in targets)
 			{
-				RECT wa = WorkAreaOf(targets[i]);
-				double[] c = cells[i];
-				int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
-				int y = wa.Top + (int)Math.Round((wa.Bottom - wa.Top) * c[1]);
-				int w = (int)Math.Round((wa.Right - wa.Left) * c[2]) - (x - wa.Left);
-				int h = (int)Math.Round((wa.Bottom - wa.Top) * c[3]) - (y - wa.Top);
-				w = Math.Max(1, w);
-				h = Math.Max(1, h);
-				RECT before;
-				GetWindowRect(targets[i], out before);
-				// 最小化/最大化会无视 SetWindowPos：先还原，再定位
-				if (IsIconic(targets[i]) || IsZoomed(targets[i]))
+				nint mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+				if (!groupIndexByMonitor.TryGetValue(mon, out int gi))
 				{
-					ShowWindow(targets[i], SW_RESTORE);
+					gi = monitorGroups.Count;
+					groupIndexByMonitor[mon] = gi;
+					monitorGroups.Add(new List<nint>());
 				}
-				bool ok = SetWindowPos(targets[i], HWND_TOP, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
-				AppLogger.LogInfo($"[Tile] #{i} hwnd=0x{targets[i]:X} rect=({x},{y},{w}x{h}) ok={ok}");
-				if (ok)
+				monitorGroups[gi].Add(hwnd);
+			}
+
+			Dictionary<nint, TileSnapshotEntry> snapshot = new Dictionary<nint, TileSnapshotEntry>();
+			int globalIndex = 0;
+			foreach (List<nint> group in monitorGroups)
+			{
+				List<double[]> cells = LayoutCells(key, group.Count);
+				int count = Math.Min(group.Count, cells.Count);
+				for (int i = 0; i < count; i++)
 				{
-					snapshot[targets[i]] = before;
+					nint hwnd = group[i];
+					RECT wa = WorkAreaOf(hwnd);
+					double[] c = cells[i];
+					int x = wa.Left + (int)Math.Round((wa.Right - wa.Left) * c[0]);
+					int y = wa.Top + (int)Math.Round((wa.Bottom - wa.Top) * c[1]);
+					int w = (int)Math.Round((wa.Right - wa.Left) * c[2]) - (x - wa.Left);
+					int h = (int)Math.Round((wa.Bottom - wa.Top) * c[3]) - (y - wa.Top);
+					w = Math.Max(1, w);
+					h = Math.Max(1, h);
+					// 最小化/最大化会无视 SetWindowPos：先无激活还原，再捕获快照坐标
+					// （顺序很重要：最小化窗口的 GetWindowRect 是 -32000 系，必须还原后读取）
+					if (IsIconic(hwnd) || IsZoomed(hwnd))
+					{
+						ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+					}
+					GetWindowRect(hwnd, out RECT before);
+					GetWindowThreadProcessId(hwnd, out uint pid);
+					bool ok = SetWindowPos(hwnd, HWND_TOP, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
+					AppLogger.LogInfo($"[Tile] #{globalIndex} hwnd=0x{hwnd:X} rect=({x},{y},{w}x{h}) ok={ok}");
+					globalIndex++;
+					if (ok)
+					{
+						snapshot[hwnd] = new TileSnapshotEntry(before, pid);
+					}
 				}
 			}
 			lock (s_lastSnapshot)
 			{
+				// 清理已销毁窗口的陈旧条目（HWND 可能被系统复用，恢复时还需校验 PID）
+				List<nint> dead = null;
+				foreach (var kv in s_lastSnapshot)
+				{
+					if (!IsWindow(kv.Key))
+					{
+						(dead ??= new List<nint>()).Add(kv.Key);
+					}
+				}
+				if (dead != null)
+				{
+					foreach (nint d in dead)
+					{
+						s_lastSnapshot.Remove(d);
+					}
+				}
 				// 只记录"第一次"平铺前的状态：后续换布局/循环不覆盖，
 				// 保证「还原所有窗口」始终回到首次平铺之前的样式。
 				if (s_lastSnapshot.Count == 0)
@@ -325,20 +382,31 @@ public static class WindowTiler
 	{
 		try
 		{
-			Dictionary<nint, RECT> snap;
+			Dictionary<nint, TileSnapshotEntry> snap;
 			lock (s_lastSnapshot)
 			{
-				snap = new Dictionary<nint, RECT>(s_lastSnapshot);
+				snap = new Dictionary<nint, TileSnapshotEntry>(s_lastSnapshot);
 			}
 			AppLogger.LogInfo($"[Tile] restore targets={snap.Count}");
 			foreach (var kv in snap)
 			{
 				try
 				{
-					RECT r = kv.Value;
+					// HWND 会被系统复用：窗口已销毁或 PID 不匹配（复用给了其他进程）时跳过，
+					// 避免把旧坐标应用到无关窗口。
+					if (!IsWindow(kv.Key))
+					{
+						continue;
+					}
+					GetWindowThreadProcessId(kv.Key, out uint pid);
+					if (pid != kv.Value.Pid)
+					{
+						continue;
+					}
+					RECT r = kv.Value.Rect;
 					if (IsIconic(kv.Key))
 					{
-						ShowWindow(kv.Key, SW_RESTORE);
+						ShowWindow(kv.Key, SW_SHOWNOACTIVATE);
 					}
 					SetWindowPos(kv.Key, HWND_TOP, r.Left, r.Top, Math.Max(1, r.Right - r.Left), Math.Max(1, r.Bottom - r.Top),
 						SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS);
@@ -507,7 +575,10 @@ public static class WindowTiler
 
 		if (result.Count == 0)
 		{
-			result.AddRange(EnumerateTopLevelWindows());
+			// 主路径（任务栏白名单 + 严格过滤）全军覆没：回退弱过滤兜底。
+			// 该路径过滤语义远弱于主路径，必须显式留痕便于排查。
+			AppLogger.LogWarn("[Tile] 主过滤路径无目标，回退弱过滤兜底枚举（VDM 不可用或所有窗口被过滤）");
+			result.AddRange(EnumerateTopLevelWindows(includeMinimized));
 		}
 		// 诊断：被黑名单/杂窗挡掉的数量（用于核对目标数与真实窗口数）
 		AppLogger.LogInfo($"[Tile]   blocked={blockedCount}");
@@ -755,7 +826,7 @@ public static class WindowTiler
 	}
 
 	/// <summary>EnumWindows 兜底枚举：可见、非本进程、有标题的顶层窗口（保留任务栏顺序路径的过滤语义）。</summary>
-	private static List<nint> EnumerateTopLevelWindows()
+	private static List<nint> EnumerateTopLevelWindows(bool includeMinimized)
 	{
 		uint selfPid = (uint)Environment.ProcessId;
 		List<nint> buffer = new List<nint>();
@@ -777,7 +848,12 @@ public static class WindowTiler
 		{
 			try
 			{
-				if (h == IntPtr.Zero || !IsWindowVisible(h) || IsIconic(h))
+				if (h == IntPtr.Zero || !IsWindowVisible(h))
+				{
+					continue;
+				}
+				// 与主路径语义对齐：仅当未开启「包含最小化窗口」时才跳过最小化窗口
+				if (!includeMinimized && IsIconic(h))
 				{
 					continue;
 				}

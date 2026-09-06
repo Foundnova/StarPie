@@ -439,14 +439,38 @@ public static class WindowTaskbarHelper
 			IVirtualDesktopManager? vdm = CreateVdm();
 			if (vdm == null)
 			{
-				return false;
+				// VDM 整体不可用（如系统组件缺失）：fail-open，交由上层过滤兜底，
+				// 否则所有窗口会被静默丢弃导致平铺"看不见"任何窗口。
+				LogVdmUnavailableOnce();
+				return true;
 			}
-			return vdm.IsWindowOnCurrentVirtualDesktop(hWnd, out _) == 0;
+			// COM 调用返回错误码（提权窗口、部分系统窗口常见）≠ 不在当前桌面：
+			// 仅当 HRESULT 成功时信任判定结果（BOOL 非 0 = 在当前桌面），失败则 fail-open，避免误丢真实可见窗口。
+			int onCurrent = 0;
+			if (vdm.IsWindowOnCurrentVirtualDesktop(hWnd, out onCurrent) == 0)
+			{
+				return onCurrent != 0;
+			}
+			LogVdmUnavailableOnce();
+			return true;
 		}
 		catch
 		{
-			return false;
+			LogVdmUnavailableOnce();
+			return true;
 		}
+	}
+
+	private static bool s_vdmWarned;
+
+	private static void LogVdmUnavailableOnce()
+	{
+		if (s_vdmWarned)
+		{
+			return;
+		}
+		s_vdmWarned = true;
+		AppLogger.LogWarn("[VDM] IVirtualDesktopManager 不可用/调用失败，虚拟桌面过滤已放宽（fail-open）");
 	}
 
 	/// <summary>抗权限获取进程 exe 路径（OpenProcess+QueryFullProcessImageName）；失败返回 null。</summary>
