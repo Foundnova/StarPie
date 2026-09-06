@@ -125,6 +125,8 @@ public class MouseHook
 
 	public event EventHandler<RawMouseEventArgs>? OnRawMouseButtonEvent;
 
+	public event EventHandler<MouseWheelHookEventArgs>? OnMouseWheel;
+
 	public event EventHandler<MouseEventArgs>? OnRightButtonDown
 	{
 		add
@@ -371,6 +373,18 @@ public class MouseHook
 				if (e.Handled)
 				{
 					return 1;
+				}
+				return CallNextHookEx(_hookId, nCode, wParam, lParam);
+			}
+
+			if (num == 522) // WM_MOUSEWHEEL
+			{
+				short delta = (short)((mSLLHOOKSTRUCT.mouseData >> 16) & 0xFFFF);
+				MouseWheelHookEventArgs wheelArgs = new MouseWheelHookEventArgs(delta, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				OnMouseWheel?.Invoke(this, wheelArgs);
+				if (wheelArgs.Handled)
+				{
+					return 1; // 拦截原生滚轮滚动，杜绝背景应用程序意外翻页
 				}
 				return CallNextHookEx(_hookId, nCode, wParam, lParam);
 			}

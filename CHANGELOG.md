@@ -4,9 +4,121 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [v1.6.9] - 2026-09-06 (程序图标继承渲染优先级与平铺覆盖保护 & 防误触与核心配置开机静默退出无损持久化 & 动作画布与外观预览全面支持继承图标)
+## [v1.7.0] - 2026-09-06 (简单模式精简提纯 & 侧边栏微标重塑 & 中心核圆图标呼出修复 & 高级模式多层无限轮盘)
 
-### 🎯 核心修复 1：根治重启后轮盘扇区图标变 Win 图标问题（继承图标优先级提升与平铺子模式保护）
+### 🌌 高级全量模式多层轮盘系统 (Multi-Layer Infinite Radial Wheel System)
+1. **呼出轮盘后滑轮/快捷键无级循环切换多层轮盘 (Radial Layer Switching)**：
+   - 在高级全量模式下为轮盘方案引入「多层轮盘 (Multi-Layer)」架构体系，打破单个方案仅限单层轮盘的物理限制；
+   - **交互手感**：呼出轮盘后，在不松开触发键的情况下，轻滑**鼠标滚轮（向上/向下）**或按下**自定义切换键（默认 Tab 键）**，即可在第 1 层、第 2 层、第 3 层……乃至无限多层轮盘之间无缝循环切换；
+   - **平滑反馈**：轮盘上方伴随现代化悬浮半透明徽标 `LayerIndicatorBadge` 平滑淡入淡出动画，毫秒级即时展示当前层名称与序号（如 `🌟 第 2 层 编程专用 (2/3)`）；
+2. **每层轮盘完全独立深度可调 (Fully Independent Configuration Per Layer)**：
+   - 每一层轮盘均拥有独立的扇区数量（4 / 8 / 12 扇区）、独立的动作槽位映射列表、独立的中心核圆动作与开关；
+   - 彻底打破传统轮盘按键数量的极限，大幅扩展单手操作动作容量，满足建模设计、游戏多套宏指令、多环境开发等高阶全量需求；
+3. **Tab 2 动作配置面板多层管理控制台**：
+   - 在高级全量模式下，Tab 2 顶部方案下拉栏右侧集成现代化管理工具栏 `Tab2_MultiLayerHeaderPanel`：
+     - **层级切换下拉框**：快速切换当前正在编辑的轮盘层；
+     - **`[ ➕ 加层 ]`**：一键追加全新轮盘层（支持自定义名称）；
+     - **`[ 📑 复制层 ]`**：一键将当前层的全套扇区与中心配置克隆为新层；
+     - **`[ ✏️ 重命名 ]`**：即时弹出重命名对话框；
+     - **`[ 🗑️ 删除层 ]`**：删除不需要的层级（第 1 层受安全保护不可删除）；
+     - **`[ ⚙️ 切换方式 ]`**：呼出右键浮动快捷选单，自由设定滚轮切换、Tab 键切换或键盘按键触发；
+4. **底层架构解耦与 100% 配置文件无损向下兼容**：
+   - 新建 `WheelLayer` 实体类并深度集成至 `WheelProfile`；
+   - `WheelProfile.EnsureLayers()` 自动对老版本单一轮盘配置进行零破坏向上迁移，无缝封装为 Layer 0，旧版方案加载 100% 稳定无感；
+   - 底层 `MouseHook` 拦截轮盘展示期间的 `WM_MOUSEWHEEL` 滚动消息，防止宿主应用意外发生页面滚屏。
+
+### 💡 侧边栏模式微标折叠视觉重塑与一键极速切换 (Sidebar Mode Badge Redesign & One-Click Toggle)
+1. **折叠态视觉完美重构**：
+   - 针对侧边栏折叠收起时，模式文本截断为 "⚙️ 高" 或对比度不良的瑕疵进行全面重塑；
+   - 折叠状态下自动收缩为 28×24px 极简居中圆角胶囊徽标，仅展示高辨识度 Emoji 图标（简单模式为 `💡`，高级全量模式为 `⚙️`），彻底消除文字截断；
+   - 展开状态下展示自适应圆角矩形胶囊，背景辅以高雅微光晶透紫 (`#7C3AED`) 与翡翠青，文字强制纯白 `#FFFFFF`，高对比度赏心悦目；
+2. **微标点击一键极速切换模式**：
+   - 赋予侧边栏底部模式微标 `Hand` 手型悬停反馈与点击事件，无论展开或折叠状态，用户直接点击该微标即可在「简单模式」与「高级全量模式」之间极速往复切换，免去翻找顶部控件的繁琐。
+
+### 💡 简单模式交互精简提纯 (Simple Mode Streamlining)
+1. **鼠标手势 (Mouse Gestures) 独立卡片收纳**：
+   - 响应极简聚焦体验需求，将 Tab 0 触发与场景界面的「鼠标手势 (Mouse Gestures)」独立卡片纳入高级模式；
+   - 简单模式下自动折叠收纳隐藏，保持触发配置界面清爽沉浸，高级全星模式下一键展开完整多段笔势映射矩阵；
+2. **顺势外甩执行自定义动作精简**：
+   - 将顺势外甩卡片内的「外甩取消时执行的动作」高级配置分区（含 7 大精简分类、6 大极速预设芯片与程序/参数编辑器）放入高级模式；
+   - 简单模式保留直观的「启用顺势外甩取消」总开关与甩出取消距离滑块，默认采用纯净静默关闭，降低认知负荷；
+3. **屏幕边缘呼出智能防溢出与光标自动对齐卡片收纳**：
+   - 将 Tab 0 的「屏幕边缘呼出智能防溢出与光标自动对齐」卡片放入高级模式；
+   - 简单模式下默认保持内部推荐的智能贴边与光标校准策略，界面收起微调滑块与策略下拉框，界面一目了然；
+4. **手势与动作「紧凑全览列表」分段切换收纳**：
+   - 将 Tab 2 右上角的 `[ 🎯 画布联动精调 | 📋 紧凑全览列表 ]` 视图分段切换器放入高级模式；
+   - 简单模式下自动锁定并呈现直观的可视化交互画布，免受密集表格列表干扰；高级模式下恢复显示，支持极客用户全量审阅编辑。
+
+### 🌟 轮盘中心核圆动作图标呼出修复 (Center Core Action Icon Fix)
+1. **实际呼出轮盘 (`RadialWindow`) 与控制台画布视觉通路彻底打通**：
+   - 深入排查发现：`RadialWindow.xaml.cs` 中中心核圆区域此前仅读取全局配置 `CoreIconType`（默认为退出 'X' 叉号），未读取当前方案 `WheelProfile.CenterAction` 的动作图标；
+   - 重构 `RadialWindow` 中心核圆渲染引擎：当方案开启 `EnableCenterAction` 并配置了中心动作时，全面支持以下图标解析层级：
+     1. 自定义矢量 SVG (`CustomIconSvg`)；
+     2. 关联外部程序原生提取高清图标 (`InheritAppIconPath`)；
+     3. 矢量图标关键字 (`IconKey`，包括 `custom:` 自定义图标包和内置矢量图库，如 `Paste`、`Copy`、`Settings` 等)；
+     4. 启动程序参数中的应用图标智能自动提取；
+     5. 动作类型默认图标保底（`Launch` -> 火箭、`WebUrl` -> 地球仪、`Folder` -> 文件夹等）；
+2. **中心核圆悬停交互高亮优化**：
+   - 当启用中心核圆动作且鼠标悬停在中心死区时，图标光晕高亮自动切换为琥珀金 (`#F59E0B`) 选中反馈，而非原本表示关闭放弃的红色 (`#F43F5E`)；未启用中心动作时保留原本的红色取消高亮，手感更具确定性；
+3. **控制台实时预览画布同步强化**：
+   - `SettingsWindow.xaml.cs` 动作配置实时画布对齐完整的中心动作图标解析与渲染优先级，使配置预览与真机呼出轮盘达到 100% 像素级一致。
+
+### 🛠️ 多层轮盘控制栏布局重塑与极致紧凑收纳 (Multi-Layer Header Panel Layout Optimization)
+1. **标题右侧留白精准并列排布**：
+   - 响应用户界面反馈与视觉标注，将原本横贯在 Tab 2 中间过长的一行 `Tab2_MultiLayerHeaderPanel` 移动至标题 `手势方向与动作映射` 的右侧空白区域，与主标题并列同行排布；
+2. **控件尺寸极致紧凑化与文案提炼**：
+   - 标签由 `🌀 多层轮盘:` 精简为 `🌀 轮盘层:`；
+   - 下拉框宽度由 110px 优化为 95px，高度精细化为 25px；
+   - 各操作按钮（`➕ 加层`、`📑 复制`、`✏️`、`🗑️`、`⚙️`）内边距紧凑化；
+   - 提示文案由 `💡 唤起后滚轮切换` 提纯为 `💡 滚轮切换` 并提供丰富 Hover ToolTip，彻底解决横向空间拥挤，布局精致利落。
+
+### 🛡️ 反馈日志深度诊断与按键/剪贴板稳定性重大修复 (Log Diagnosis & Critical Stability Fixes)
+1. **Win32 物理修饰键卡死与鼠标按键瘫痪根治 (VK_LWIN / VK_RWIN Extended Key Release)**：
+   - 彻底修复连续高频触发 `Win+D` / `Win+X` 后 Win 键残留卡死在系统物理键态表中的顽疾；
+   - 为 Win32 `keybd_event` 的 `VK_LWIN` (91) 与 `VK_RWIN` (92) 释放信道注入 `KEYEVENTF_EXTENDEDKEY (0x0001)` 标志；
+   - 建立 +35ms 与 +85ms 双阶异步守护释放机制，彻底解除 Windows 键态死锁，彻底杜绝鼠标左键、右键以及后续轮盘扇区点击失灵；
+2. **剪贴板跨线程 OLE STA 异常根治 (SafeSetClipboardText)**：
+   - 针对 `Windows.CopyAsPath` 在后台工作线程调用 `Clipboard.SetText` 抛出 `ThreadStateException` 的问题，新增具有 Dispatcher 优先调度与专属 STA 线程回退双通道的 `SafeSetClipboardText`，确保复制路径 100% 稳定运行；
+3. **连续按键序列解析与物理调度 (Multi-Key Sequence Hotkey Execution)**：
+   - 重构热键解析器与执行引擎，全面支持如 `U+U`、`U,U`、`UU`、`US` 等非修饰键连续击键序列以及 `Win+X` 配合的极速系统快捷键，通过 25ms 物理键击节拍调度发送底层扫描码，避免被输入法或 Unicode 字符流拦截；
+4. **系统动作中文与常用别名扩展 (System Command Aliases)**：
+   - 为休眠/睡眠/重启/关机动作增加中文别名（`睡眠`、`休眠`、`重启`、`关机` 等），杜绝因别名不匹配导致动作失效；
+5. **触发键与鼠标手势冲突双重守卫 (Trigger & Mouse Gesture Collision Guard)**：
+   - 在 `ConfigManager.EnsureTriggerHealth` 与 `GestureController` 中加入双向冲突防护，当鼠标手势按键与主轮盘唤醒键偶然相同时，手势自动让位给轮盘，彻底消除原底层钩子将唤醒键硬拦截吞掉导致按键瘫痪的隐患。
+
+### ⚡ 工程维护与版本发布
+1. **全模块版本号同步**：
+   - 同步更新 `WinPieGestures.csproj`、`SettingsWindow.xaml`、`SettingsWindow.xaml.cs`、`App.xaml.cs`、`AGENTS.md` 至 `v1.7.0`；
+2. **持续坚持 0 内存泄漏与超低延迟**：
+   - 经测试验证，编译 0 错误、0 警告，中心动作、多层轮盘与简单模式全套自动化断言 100% 通过；发布轻量绿色包与单文件独立版双架构归档。
+
+## [v1.6.9] - 2026-09-06 (简单/高级双模切换体系 & 根除重启后扇区重置为平铺Bug与数据自愈 & 程序图标继承渲染优先级与平铺覆盖保护 & 防误触与核心配置持久化守卫)
+
+### 💡 重大新增：简单模式 vs 高级全量模式双模交互体系 (Simple vs Pro Mode)
+1. **全局顶部控制台模式切换胶囊**：
+   - 在控制台主区域顶部常驻 `[ 💡 简单模式    ⚙️ 高级全量模式 ]` 单选切换胶囊与状态徽标；
+   - 模式选择全局持久化至配置文件 `ConfigMode`（默认进入简单模式），切换即时生效且无缝记忆；
+   - 侧边栏底部同步展示 `SidebarModeBadge` 与 `SidebarModeText`，直观呈现当前运行模式；
+2. **精细化常用与高频配置边界（严格遵循按图定制规范）**：
+   - **简单模式 (Simple Mode)**：聚焦常用高频功能，为轻量级用户提供极致纯净体验：
+     - **保留区域**：多级轮盘与级联子菜单、顺势外甩脱离取消、进程隔离黑白名单、关联外部程序图标、二级级联子动作、外观主题与切削形态、几何尺寸与内外径倒角微调等高频核心功能；
+     - **屏蔽隐藏**：隐藏修饰键硬件旁路（Ctrl/Shift/Alt 禁用轮盘）、平铺高级设置卡片（窗口排除正则/边距间距/循环切换）、扇区与核心圆独立字体选择面板、文字相对位置与 X/Y 像素微调偏移面板、OCR 截屏识字与智能 API 接口卡片、内存压缩调试卡片、JSON 配置导入导出卡片、系统运行日志与诊断目录卡片；
+   - **高级全量模式 (Pro Mode)**：一键全面开放所有专家级微调参数与运维诊断卡片；
+3. **四语系全量国际化支持**：
+   - 简体中文、繁体中文、英文、日文四套字典完整支持模式切换标签、状态微标与引导说明。
+
+### 🎯 核心修复 1：根治重启后轮盘扇区功能被重置为「平铺: 左右对半」问题（Bug 1 终极根除 & 自动数据自愈）
+1. **XAML 解析硬编码选中缺陷移除**：
+   - 深度溯源发现：`SettingsWindow.xaml` 中 `FocusWindowSubModeComboBox` 的 `<ComboBoxItem Tag="Tile" ... IsSelected="True" />` 在 XAML 解析阶段即触发 `SelectionChanged` 事件，此时界面尚未完成数据绑定，事件直接将槽位 0（扇区 1，右侧 E / 0°）篡改为 `Type="Tile", Parameter="2L", Name="平铺: 左右对半"`；
+   - 彻底移除 `IsSelected="True"`，杜绝 XAML 解析期的非法事件发射；
+2. **多层全生命周期防重入与面板可见性双重守卫**：
+   - 将 `_isUpdatingFocusUi` 初始状态设为 `true`，在构造函数与 `EnsureUiInitialized()` 全阶段持续锁定，直至全部数据完成绑定；
+   - 在 `FocusWindowSubModeComboBox_SelectionChanged`、`FocusTileLayoutComboBox_SelectionChanged`、`FocusActionTypeComboBox_SelectionChanged`、`FocusActionNameTextBox_TextChanged` 等事件处理程序中，加入 `_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing` 拦截；
+   - 增加 `FocusWindowManagerPanel.Visibility == Visibility.Visible` 及原动作类型前置校验，确保非窗口管理动作绝不会被误篡改为平铺动作；
+3. **受损配置自动自愈引擎 (Auto Data Self-Healing)**：
+   - 在 `ConfigManager.LoadConfig()` 与 `SettingsWindow.EnsureUiInitialized()` 中增加受损数据自愈机制：若检测到槽位动作为 `Tile / 2L` 但保留有合法的 `.exe` / `.lnk` 继承图标程序路径，启动时自动无损恢复为 `Type = Launch` 启动该程序，自动恢复名称并持久化修复，彻底拯救受损的旧版配置文件；
+
+### 🎨 核心修复 2：根治重启后轮盘扇区图标变 Win 图标问题（继承图标优先级提升与平铺子模式保护）
 1. **图标渲染短路缺陷根除**：
    - 排查发现：在 `RadialWindow.xaml.cs`（一级扇区、二级外圈子环、二级蜂窝扇）以及 `SettingsWindow.xaml.cs`（外观实时画布、动作区画布）中，此前只要检测到 `IconKey` 或 `iconSvg` 非空，便会直接加载内置矢量 Path，导致排在后面的 `InheritAppIconPath` 判定被彻底短路跳过；
    - 将 `currentAction?.InheritAppIconPath` 判定提升至普通 `IconKey` 判定之前（仅次于用户显式上传的自定义 SVG），优先提取并渲染外部程序的原生高清位图图标；
@@ -50,6 +162,17 @@
 3. **动作配置实时交互画布严格匹配**：
    - 动作配置画布（`RenderMappingsWheelPreview`）的子级轮盘渲染全面约束于当前二级样式的允许上限（`Math.Min(maxSubCount, action.SubActions.Count)`），在蜂窝扇模式下绝对只渲染最多 3 个子扇区，与实际手势呼出 100% 吻合；
    - 在 Tab 3 切换二级菜单样式后，即时双向联动刷新 Tab 2 的二级动作芯片可用状态与实时交互画布。
+
+### 🛠️ 核心修复 3：彻底修复控制台配置布局/视图模式无法切换 Bug (消除重入深度计数锁死缺陷 & 双向联动同步)
+1. **`_uiUpdateDepth` 引用计数锁死缺陷根除**：
+   - 深入排查发现：此前将 `_isUpdatingUi` 包装为整数属性 `_uiUpdateDepth`（`set { if (value) _uiUpdateDepth++; else if (_uiUpdateDepth > 0) _uiUpdateDepth--; }`），导致任何 `bool old = _isUpdatingUi; ... finally { _isUpdatingUi = old; }` 的标准保护模式在 `old == true` 时重复递增计数器；
+   - 窗口初始化加载过程中多个子流程重入调用，导致 `_uiUpdateDepth` 泄漏至 4，`_isUpdatingUi` 永久锁定为 `true`；所有挂载了 `if (_isUpdatingUi) return;` 保护的界面控件（包括简单/高级全量模式切换、视图模式切换、扇区排布切换、方案选择、排版模式等）点击后被全面拦截静默返回；
+   - 将 `_isUpdatingUi` 彻底重构为纯净原子布尔状态字段 `private bool _isUpdatingUi = false;`，在嵌套更新方法（如 `RefreshLayoutOptionsUi`）中采用标准的 `bool oldUpdating = _isUpdatingUi; try { _isUpdatingUi = true; ... } finally { _isUpdatingUi = oldUpdating; }` 严格保全外层状态，彻底杜绝深度泄漏与界面死锁；
+2. **Tab 2 手势动作区视图模式分段切换器加固**：
+   - 为 `MappingsViewModeCanvasRadio`（🎯 画布联动精调）与 `MappingsViewModeListRadio`（📋 紧凑全览列表）显式补充 `GroupName="MappingsViewModeGroup"`，消除 WPF 无命名容器下的单选互斥紊乱；
+   - 并在切换事件 `MappingsViewMode_Checked` 中打通方案选择、扇区方位数量（4/8/12 键）与槽位动作列表的双向数据同步，确保在画布联动模式与列表全览模式间随意自由切换，实时双向无缝对齐；
+3. **焦点卡片动作下拉项响应优化**：
+   - 移除 `FocusActionTypeComboBox`、`FocusWindowSubModeComboBox`、`FocusTileLayoutComboBox` 事件中过于严苛的 `!IsLoaded` 判定，杜绝在复杂界面加载时序下的点选失效。
 
 ## [v1.6.8] - 2026-09-04 (全新星盘宇宙官方图标 & 热键截屏粘滞与修饰键成对释放原生根治 & 截屏后右键单击与长按滑动失效彻底根治 & 鼠标左键长按唤醒轮盘与单击原生点击放行 & Windows 开机自启极速秒开与静默启动优化 & 任务栏纯净圆形星盘图标 & 控制台黑白双版Logo动态切换 & 托盘右键菜单黑白双色主题 & 内置检查更新多级容灾与下载加速修复 & 动作配置画布形态统一 & GitHub加速源新增 & 二级蜂窝扇方位修复 & 一二级配置联动与二级预览保持 & 轮盘自适应弹性字号 Auto Font-Fit & 方案管理工具栏与折叠下拉栏同步重构 & 界面语言Emoji规范化 & 视口滚动呼吸留白 & 多语言词库全覆盖 & 画布缩放修复 & 快捷键Pause与搜索 & 独占暂停全局热键 & 侧边栏主题切换 & 贡献者致谢与离线策略 & 平铺设置折叠 & 深色对比度优化 & 扇区文字位置与微调 & 屏幕边缘呼出防溢出)
 

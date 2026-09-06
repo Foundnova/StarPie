@@ -12,8 +12,17 @@ public class AppConfig
 
 	public double DragThreshold { get; set; } = 25.0;
 
+	/// <summary>控制台配置模式："Simple"（简单轻量模式，隐藏低频高级微调）或 "Pro"（高级全量模式，开放全部配置）。</summary>
+	public string ConfigMode { get; set; } = "Simple";
+
 	/// <summary>核心圆死区唤醒灵敏度（有效判定半径，像素）。光标在此半径内视为停留在中心核圆，可触发中心动作或静默取消。</summary>
 	public double CoreDeadzoneRadius { get; set; } = 35.0;
+
+	/// <summary>多层轮盘切换触发方式："Wheel"（鼠标滚轮上下滑动，推荐）、"Tab"（Tab 键切换）、"CustomKey"（自定义按键）。</summary>
+	public string LayerSwitchTrigger { get; set; } = "Wheel";
+
+	/// <summary>多层轮盘自定义按键触发的虚拟键码（当 LayerSwitchTrigger 为 "CustomKey" 时生效，默认 9 为 VK_TAB）。</summary>
+	public uint LayerSwitchVkCode { get; set; } = 9;
 
 	/// <summary>可选：长按触发按键（如右键）不动达到长按阈值后呼出轮盘，与拖动呼出共存。</summary>
 	public bool LongPressTrigger { get; set; }

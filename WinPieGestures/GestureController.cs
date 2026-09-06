@@ -119,6 +119,7 @@ public class GestureController
 		_mouseHook.OnTriggerButtonUp += Hook_OnTriggerButtonUp;
 		_mouseHook.OnMouseMove += Hook_OnMouseMove;
 		_mouseHook.OnRawMouseButtonEvent += Hook_OnRawMouseButton;
+		_mouseHook.OnMouseWheel += Hook_OnMouseWheel;
 		if (_keyboardHook != null)
 		{
 			_keyboardHook.OnKeyDown += KeyboardHook_OnKeyDown;
@@ -382,13 +383,6 @@ public class GestureController
 				return;
 			}
 			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
-			// 手势触发键已被 Raw 事件接管：这里只吞掉，不再走轮盘流程
-			if (ConfigManager.CurrentConfig.GestureEnabled &&
-				string.Equals(triggerBtn, ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton", StringComparison.OrdinalIgnoreCase))
-			{
-				e.Handled = true;
-				return;
-			}
 			_startPoint = e.Position;
 			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 			_currentDpiScaleX = scaleX;
@@ -421,6 +415,13 @@ public class GestureController
 			return;
 		}
 		string gestureButton = ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton";
+		var triggerConfig = ConfigManager.CurrentConfig.Trigger;
+		string wheelBtn = triggerConfig?.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
+		// 冲突守卫：若手势按键与主轮盘触发键重叠，优先保证轮盘手势，手势让位，杜绝双重拦截
+		if (string.Equals(gestureButton, wheelBtn, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
 		if (!string.Equals(e.MouseButton, gestureButton, StringComparison.OrdinalIgnoreCase))
 		{
 			return;
@@ -920,8 +921,78 @@ public class GestureController
 		}
 	}
 
+	private void Hook_OnMouseWheel(object? sender, MouseWheelHookEventArgs e)
+	{
+		if (_isGestureActive && _radialWindow != null && _activeProfile != null)
+		{
+			_activeProfile.EnsureLayers();
+			if (_activeProfile.Layers.Count > 1)
+			{
+				string trigger = ConfigManager.CurrentConfig?.LayerSwitchTrigger ?? "Wheel";
+				if (string.Equals(trigger, "Wheel", StringComparison.OrdinalIgnoreCase))
+				{
+					int count = _activeProfile.Layers.Count;
+					int curIdx = _activeProfile.ActiveLayerIndex;
+					int nextIdx;
+					if (e.Delta > 0)
+					{
+						nextIdx = (curIdx - 1 + count) % count;
+					}
+					else
+					{
+						nextIdx = (curIdx + 1) % count;
+					}
+					_activeProfile.ActiveLayerIndex = nextIdx;
+					_activeProfile.SyncRootPropertiesFromActiveLayer();
+
+					RadialWindow? rw = _radialWindow;
+					if (rw != null)
+					{
+						DispatchUi(() => rw.SwitchToLayer(nextIdx));
+					}
+					e.Handled = true;
+					return;
+				}
+			}
+		}
+	}
+
 	private void KeyboardHook_OnKeyDown(object? sender, GlobalKeyEventArgs e)
 	{
+		if (_isGestureActive && _radialWindow != null && _activeProfile != null)
+		{
+			_activeProfile.EnsureLayers();
+			if (_activeProfile.Layers.Count > 1)
+			{
+				string trigger = ConfigManager.CurrentConfig?.LayerSwitchTrigger ?? "Wheel";
+				bool isLayerSwitchKey = false;
+				if (string.Equals(trigger, "Tab", StringComparison.OrdinalIgnoreCase) && e.VkCode == 9)
+				{
+					isLayerSwitchKey = true;
+				}
+				else if (string.Equals(trigger, "CustomKey", StringComparison.OrdinalIgnoreCase) && e.VkCode == (ConfigManager.CurrentConfig?.LayerSwitchVkCode ?? 9))
+				{
+					isLayerSwitchKey = true;
+				}
+
+				if (isLayerSwitchKey)
+				{
+					int count = _activeProfile.Layers.Count;
+					int curIdx = _activeProfile.ActiveLayerIndex;
+					int nextIdx = (curIdx + 1) % count;
+					_activeProfile.ActiveLayerIndex = nextIdx;
+					_activeProfile.SyncRootPropertiesFromActiveLayer();
+
+					RadialWindow? rw = _radialWindow;
+					if (rw != null)
+					{
+						DispatchUi(() => rw.SwitchToLayer(nextIdx));
+					}
+					e.Handled = true;
+					return;
+				}
+			}
+		}
 		//IL_0028: Unknown result type (might be due to invalid IL or missing references)
 		//IL_002d: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0036: Unknown result type (might be due to invalid IL or missing references)
@@ -1285,6 +1356,11 @@ public class GestureController
 
 	private bool ShowRadialUI(Point center, WheelProfile profile, long gestureVersion)
 	{
+		profile.EnsureLayers();
+		profile.ActiveLayerIndex = 0;
+		profile.SyncRootPropertiesFromActiveLayer();
+		_activeProfile = profile;
+
 		// 预加载的线程调度与 single-flight 统一由 WindowTaskbarHelper 管理。
 		try
 		{

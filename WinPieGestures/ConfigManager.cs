@@ -201,7 +201,45 @@ public static class ConfigManager
 					}
 				}
 			}
-			EnsureLeftButtonTriggerHealth(CurrentConfig);
+			// 自动自愈此前版本中因初始事件误改写的槽位动作（保留有效程序路径，但动作被误写为 Tile / 2L）
+			if (CurrentConfig.Profiles != null)
+			{
+				bool healedAny = false;
+				foreach (WheelProfile profile in CurrentConfig.Profiles)
+				{
+					if (profile?.Actions == null) continue;
+					foreach (ActionItem action in profile.Actions)
+					{
+						if (action == null) continue;
+						if (action.Type == "Tile" && action.Parameter == "2L" &&
+							!string.IsNullOrWhiteSpace(action.InheritAppIconPath) &&
+							(action.InheritAppIconPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+							 action.InheritAppIconPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ||
+							 action.InheritAppIconPath.Contains("\\") || action.InheritAppIconPath.Contains("/")) &&
+							(action.Name != null && action.Name.Contains("平铺")))
+						{
+							action.Type = "Launch";
+							action.Parameter = action.InheritAppIconPath;
+							try
+							{
+								string baseName = Path.GetFileNameWithoutExtension(action.InheritAppIconPath);
+								if (!string.IsNullOrWhiteSpace(baseName))
+								{
+									action.Name = baseName;
+								}
+							}
+							catch { }
+							healedAny = true;
+						}
+					}
+				}
+				if (healedAny && !IsFallbackConfig)
+				{
+					SaveConfig();
+					AppLogger.LogInfo("Successfully auto-healed corrupted slot action(s) to Launch application.");
+				}
+			}
+			EnsureTriggerHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
 			_ = System.Threading.Tasks.Task.Run(async () =>
@@ -518,7 +556,7 @@ public static class ConfigManager
 			if (appConfig != null)
 			{
 				CurrentConfig = appConfig;
-				EnsureLeftButtonTriggerHealth(CurrentConfig);
+				EnsureTriggerHealth(CurrentConfig);
 				SaveConfig();
 				return true;
 			}
@@ -529,15 +567,23 @@ public static class ConfigManager
 		return false;
 	}
 
-	private static void EnsureLeftButtonTriggerHealth(AppConfig? config)
+	private static void EnsureTriggerHealth(AppConfig? config)
 	{
-		if (config?.Trigger != null &&
+		if (config == null) return;
+		if (config.Trigger != null &&
 		    string.Equals(config.Trigger.MouseButton, "LeftButton", StringComparison.OrdinalIgnoreCase) &&
 		    !config.Trigger.RequireCtrl && !config.Trigger.RequireShift &&
 		    !config.Trigger.RequireAlt && !config.Trigger.RequireWin)
 		{
 			// 若配置了单独鼠标左键作为唤醒键，确保长按呼出开关开启，使长按可稳定唤醒轮盘，单机保持原生点击
 			config.LongPressTrigger = true;
+		}
+
+		// 冲突防护：若开启了独立鼠标手势，且手势按键与主轮盘触发键冲突，自动调整手势按键为 MiddleButton（或避免同键硬拦截）
+		string wheelBtn = config.Trigger?.MouseButton ?? config.TriggerButton ?? "RightButton";
+		if (config.GestureEnabled && string.Equals(wheelBtn, config.GestureTriggerButton, StringComparison.OrdinalIgnoreCase))
+		{
+			config.GestureTriggerButton = string.Equals(wheelBtn, "MiddleButton", StringComparison.OrdinalIgnoreCase) ? "XButton1" : "MiddleButton";
 		}
 	}
 

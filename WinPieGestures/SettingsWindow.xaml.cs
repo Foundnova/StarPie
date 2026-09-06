@@ -79,8 +79,6 @@ public partial class SettingsWindow : Window
 
 	private bool _isRecordingTrigger;
 
-	private System.Windows.Media.Brush? _originalBadgeBorderBrush;
-
 	private NotifyIcon _notifyIcon;
 
 	private bool _isClosingFromTray;
@@ -89,25 +87,7 @@ public partial class SettingsWindow : Window
 
 	private readonly ObservableCollection<SlotViewModel> _slotViewModels = new ObservableCollection<SlotViewModel>();
 
-	private int _uiUpdateDepth = 0;
-	private bool _isUpdatingUi
-	{
-		get => _uiUpdateDepth > 0;
-		set
-		{
-			if (value)
-			{
-				_uiUpdateDepth++;
-			}
-			else
-			{
-				if (_uiUpdateDepth > 0)
-				{
-					_uiUpdateDepth--;
-				}
-			}
-		}
-	}
+	private bool _isUpdatingUi = false;
 
 	private bool _isRenderingPreview;
 
@@ -184,7 +164,7 @@ public partial class SettingsWindow : Window
 	private int? _selectedSubActionIndex = null; // null: Primary slot / Center Core; 0..3: Secondary subaction
 	private List<ActionItem>? _lastSubActionsBackup = null;
 	private int _lastSubActionsBackupSlotIndex = -1;
-	private bool _isUpdatingFocusUi = false;
+	private bool _isUpdatingFocusUi = true;
 	private Point? _mappingsDragStartPos = null;
 	private int _dragSourceSlotIndex = -999; // -1: Center Core, >=0: Sector slot
 	private bool _isDraggingSlot = false;
@@ -364,8 +344,41 @@ public partial class SettingsWindow : Window
 		}
 		_isUiInitializing = true;
 		_isUpdatingUi = true;
+		_isUpdatingFocusUi = true;
 		try
 		{
+			// 自愈受损的槽位动作（继承图标存在有效程序路径，但动作类型被误改写为 Tile / 2L）
+			if (ConfigManager.CurrentConfig?.Profiles != null)
+			{
+				foreach (var profile in ConfigManager.CurrentConfig.Profiles)
+				{
+					if (profile?.Actions == null) continue;
+					foreach (var action in profile.Actions)
+					{
+						if (action == null) continue;
+						if (action.Type == "Tile" && action.Parameter == "2L" &&
+							!string.IsNullOrWhiteSpace(action.InheritAppIconPath) &&
+							(action.InheritAppIconPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+							 action.InheritAppIconPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ||
+							 action.InheritAppIconPath.Contains("\\") || action.InheritAppIconPath.Contains("/")) &&
+							(action.Name != null && action.Name.Contains("平铺")))
+						{
+							action.Type = "Launch";
+							action.Parameter = action.InheritAppIconPath;
+							try
+							{
+								string baseName = System.IO.Path.GetFileNameWithoutExtension(action.InheritAppIconPath);
+								if (!string.IsNullOrWhiteSpace(baseName))
+								{
+									action.Name = baseName;
+								}
+							}
+							catch { }
+						}
+					}
+				}
+			}
+
 			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 			ApplySidebarLayout();
 			LoadConfigToUi();
@@ -397,11 +410,15 @@ public partial class SettingsWindow : Window
 				};
 			}
 
+			UpdateFocusEditorUi();
+			ApplyConfigMode(ConfigManager.CurrentConfig?.ConfigMode ?? "Simple", false);
+
 			_isUiInitialized = true;
 		}
 		finally
 		{
 			_isUpdatingUi = false;
+			_isUpdatingFocusUi = false;
 			_isUiInitializing = false;
 		}
 	}
@@ -409,6 +426,7 @@ public partial class SettingsWindow : Window
 	public SettingsWindow()
 	{
 		_isUpdatingUi = true;
+		_isUpdatingFocusUi = true;
 		InitializeComponent();
 		try
 		{
@@ -418,7 +436,7 @@ public partial class SettingsWindow : Window
 		{
 		}
 		InitializeTrayIcon();
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -497,9 +515,23 @@ public partial class SettingsWindow : Window
 
 		// 底部版本与版权信息：折叠时持续展示，自适应居中对齐
 		SidebarFooterPanel.Visibility = Visibility.Visible;
+		bool isSimpleMode = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
 		if (isCollapsed)
 		{
 			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Center;
+			if (SidebarModeBadge != null)
+			{
+				SidebarModeBadge.HorizontalAlignment = HorizontalAlignment.Center;
+				SidebarModeBadge.Padding = new Thickness(6, 4, 6, 4);
+				SidebarModeBadge.CornerRadius = new CornerRadius(12);
+				SidebarModeBadge.ToolTip = isSimpleMode ? "当前: 简单模式 (点击快速切换至高级全星模式)" : "当前: 高级全星模式 (点击快速切换至简单模式)";
+			}
+			if (SidebarModeText != null)
+			{
+				SidebarModeText.Text = isSimpleMode ? "💡" : "⚙️";
+				SidebarModeText.FontSize = 13;
+				SidebarModeText.Foreground = Brushes.White;
+			}
 			if (SidebarVersionBadge != null)
 			{
 				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Center;
@@ -519,6 +551,19 @@ public partial class SettingsWindow : Window
 		else
 		{
 			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Left;
+			if (SidebarModeBadge != null)
+			{
+				SidebarModeBadge.HorizontalAlignment = HorizontalAlignment.Left;
+				SidebarModeBadge.Padding = new Thickness(7, 3, 7, 3);
+				SidebarModeBadge.CornerRadius = new CornerRadius(6);
+				SidebarModeBadge.ToolTip = isSimpleMode ? "点击快速切换至高级全星模式" : "点击快速切换至简单模式";
+			}
+			if (SidebarModeText != null)
+			{
+				SidebarModeText.Text = I18n.T(isSimpleMode ? "SidebarModeSimple" : "SidebarModePro");
+				SidebarModeText.FontSize = 10.5;
+				SidebarModeText.Foreground = Brushes.White;
+			}
 			if (SidebarVersionBadge != null)
 			{
 				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Left;
@@ -1046,7 +1091,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 	}
@@ -1193,7 +1238,7 @@ public partial class SettingsWindow : Window
 				Padding = new System.Windows.Forms.Padding(3, 4, 3, 4)
 			};
 
-			ToolStripMenuItem versionItem = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"))
+			ToolStripMenuItem versionItem = new ToolStripMenuItem("StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0"))
 			{
 				Enabled = false,
 				Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold),
@@ -1318,9 +1363,160 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	public void ApplyConfigMode(string mode, bool save = true)
+	{
+		bool isSimple = !string.Equals(mode, "Pro", StringComparison.OrdinalIgnoreCase) &&
+						!string.Equals(mode, "Advanced", StringComparison.OrdinalIgnoreCase);
+
+		string normalizedMode = isSimple ? "Simple" : "Pro";
+		if (ConfigManager.CurrentConfig != null)
+		{
+			ConfigManager.CurrentConfig.ConfigMode = normalizedMode;
+		}
+
+		// 1. Tab 0 触发与场景隔离: 隐藏修饰键硬件旁路、鼠标手势卡片、外甩自定义动作、屏幕边缘防溢出
+		if (Tab0_ModifierBypassPanel != null)
+		{
+			Tab0_ModifierBypassPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab0_MouseGesturesCardBorder != null)
+		{
+			Tab0_MouseGesturesCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab0_CancelActionOuterBorder != null)
+		{
+			Tab0_CancelActionOuterBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab0_ScreenEdgeCardBorder != null)
+		{
+			Tab0_ScreenEdgeCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+
+		// 2. Tab 1 外观与形态: 隐藏独立字体选择与文字位置偏移
+		if (Tab1_FontFamilyPanel != null)
+		{
+			Tab1_FontFamilyPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab1_TextOffsetPanel != null)
+		{
+			Tab1_TextOffsetPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab1_CoreFontFamilyPanel != null)
+		{
+			Tab1_CoreFontFamilyPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+
+		// 3. Tab 2 手势与动作: 隐藏平铺高级正则/间距卡片与紧凑全览列表分段切换
+		if (Tab2_TileSettingsCardBorder != null)
+		{
+			Tab2_TileSettingsCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab2_MultiLayerHeaderPanel != null)
+		{
+			Tab2_MultiLayerHeaderPanel.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab2_MappingsViewModeBorder != null)
+		{
+			Tab2_MappingsViewModeBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (isSimple && MappingsViewModeCanvasRadio != null && MappingsViewModeCanvasRadio.IsChecked != true)
+		{
+			MappingsViewModeCanvasRadio.IsChecked = true;
+		}
+
+		// 4. Tab 3 高级系统: 隐藏低频 OCR接口/内存/备份/日志卡片
+		if (Tab3_OcrCardBorder != null)
+		{
+			Tab3_OcrCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab3_MemoryCardBorder != null)
+		{
+			Tab3_MemoryCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab3_BackupCardBorder != null)
+		{
+			Tab3_BackupCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+		if (Tab3_LogsCardBorder != null)
+		{
+			Tab3_LogsCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
+
+		// 5. 顶部状态微标与提示文本
+		if (ConfigModeStatusIcon != null)
+		{
+			ConfigModeStatusIcon.Text = isSimple ? "💡" : "⚙️";
+		}
+		if (ConfigModeStatusText != null)
+		{
+			ConfigModeStatusText.Text = I18n.T(isSimple ? "ConfigModeSimpleTitle" : "ConfigModeProTitle");
+		}
+		if (ConfigModeHintText != null)
+		{
+			ConfigModeHintText.Text = I18n.T(isSimple ? "ConfigModeSimpleHint" : "ConfigModeProHint");
+		}
+
+		// 6. 侧边栏微标与提示文本
+		if (SidebarModeBadge != null)
+		{
+			SidebarModeBadge.Background = isSimple ? (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush") : new SolidColorBrush(System.Windows.Media.Color.FromRgb(124, 58, 237));
+		}
+		if (SidebarModeText != null)
+		{
+			SidebarModeText.Foreground = Brushes.White;
+		}
+		ApplySidebarLayout();
+
+		// 7. 单选按钮状态同步
+		bool oldUpdating = _isUpdatingUi;
+		try
+		{
+			_isUpdatingUi = true;
+			if (ConfigModeSimpleRadio != null) ConfigModeSimpleRadio.IsChecked = isSimple;
+			if (ConfigModeProRadio != null) ConfigModeProRadio.IsChecked = !isSimple;
+		}
+		finally
+		{
+			_isUpdatingUi = oldUpdating;
+		}
+
+		if (save && _isUiInitialized && !_isUiInitializing)
+		{
+			ConfigManager.SaveConfig();
+		}
+	}
+
+	private void ConfigModeRadio_Checked(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi) return;
+		if (sender == ConfigModeSimpleRadio)
+		{
+			ApplyConfigMode("Simple", true);
+		}
+		else if (sender == ConfigModeProRadio)
+		{
+			ApplyConfigMode("Pro", true);
+		}
+	}
+
+	private void SidebarModeBadge_Click(object sender, MouseButtonEventArgs e)
+	{
+		bool isSimple = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
+		ApplyConfigMode(isSimple ? "Pro" : "Simple", true);
+	}
+
 	public void ApplyLocalization()
 	{
 		base.Title = I18n.T("WindowTitle");
+		if (ConfigModeSimpleRadio != null)
+		{
+			ConfigModeSimpleRadio.Content = I18n.T("ConfigModeSimpleRadio");
+		}
+		if (ConfigModeProRadio != null)
+		{
+			ConfigModeProRadio.Content = I18n.T("ConfigModeProRadio");
+		}
+		ApplyConfigMode(ConfigManager.CurrentConfig?.ConfigMode ?? "Simple", false);
 		if (SidebarSubtitleText != null)
 		{
 			SidebarSubtitleText.Text = I18n.T("AppSubtitle");
@@ -2044,6 +2240,11 @@ public partial class SettingsWindow : Window
 			{
 				_selectedProfile = ConfigManager.CurrentConfig.Profiles[0];
 			}
+			if (_selectedProfile != null)
+			{
+				_selectedProfile.EnsureLayers();
+				RefreshLayersUi();
+			}
 			if (ProfilesListBox != null)
 			{
 				ProfilesListBox.SelectedItem = _selectedProfile;
@@ -2296,6 +2497,10 @@ public partial class SettingsWindow : Window
 			if (EdgeSafeMarginYSlider != null)
 			{
 				ConfigManager.CurrentConfig.EdgeSafeMarginY = EdgeSafeMarginYSlider.Value;
+			}
+			if (_selectedProfile != null)
+			{
+				_selectedProfile.SyncActiveLayerFromRootProperties();
 			}
 			if (saveToDisk)
 			{
@@ -2898,12 +3103,47 @@ public partial class SettingsWindow : Window
 		{
 			MappingsCanvasModeGrid.Visibility = Visibility.Visible;
 			MappingsListModeGrid.Visibility = Visibility.Collapsed;
-			RenderMappingsWheelPreview();
+			bool oldUpdating = _isUpdatingUi;
+			try
+			{
+				_isUpdatingUi = true;
+				if (MappingsProfileComboBox != null && _selectedProfile != null)
+				{
+					MappingsProfileComboBox.SelectedItem = _selectedProfile;
+				}
+				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = _selectedProfile?.SectorCount == 4;
+				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = _selectedProfile?.SectorCount == 8;
+				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = _selectedProfile?.SectorCount == 12;
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+			}
+			finally
+			{
+				_isUpdatingUi = oldUpdating;
+			}
 		}
 		else
 		{
 			MappingsCanvasModeGrid.Visibility = Visibility.Collapsed;
 			MappingsListModeGrid.Visibility = Visibility.Visible;
+			bool oldUpdating = _isUpdatingUi;
+			try
+			{
+				_isUpdatingUi = true;
+				if (ProfilesListBox != null && _selectedProfile != null)
+				{
+					ProfilesListBox.SelectedItem = _selectedProfile;
+				}
+				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile?.SectorCount == 4;
+				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile?.SectorCount == 8;
+				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile?.SectorCount == 12;
+				RefreshSlots();
+			}
+			finally
+			{
+				_isUpdatingUi = oldUpdating;
+			}
 		}
 	}
 
@@ -2913,6 +3153,8 @@ public partial class SettingsWindow : Window
 		if (MappingsProfileComboBox.SelectedItem is WheelProfile profile)
 		{
 			_selectedProfile = profile;
+			_selectedProfile.EnsureLayers();
+			RefreshLayersUi();
 			_isUpdatingUi = true;
 			try
 			{
@@ -2932,6 +3174,193 @@ public partial class SettingsWindow : Window
 				_isUpdatingUi = false;
 			}
 			UpdateProfileToolbarButtonStates();
+		}
+	}
+
+	private void RefreshLayersUi()
+	{
+		if (_selectedProfile == null) return;
+		_selectedProfile.EnsureLayers();
+
+		bool oldUpdating = _isUpdatingUi;
+		try
+		{
+			_isUpdatingUi = true;
+			if (LayerSelectComboBox != null)
+			{
+				LayerSelectComboBox.ItemsSource = null;
+				LayerSelectComboBox.ItemsSource = _selectedProfile.Layers;
+				int targetIdx = Math.Clamp(_selectedProfile.ActiveLayerIndex, 0, _selectedProfile.Layers.Count - 1);
+				LayerSelectComboBox.SelectedIndex = targetIdx;
+			}
+			if (DeleteLayerBtn != null)
+			{
+				DeleteLayerBtn.IsEnabled = (_selectedProfile.Layers.Count > 1);
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = oldUpdating;
+		}
+	}
+
+	private void LayerSelectComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || _selectedProfile == null) return;
+		if (LayerSelectComboBox.SelectedIndex < 0 || LayerSelectComboBox.SelectedIndex >= _selectedProfile.Layers.Count) return;
+
+		_selectedProfile.ActiveLayerIndex = LayerSelectComboBox.SelectedIndex;
+		_selectedProfile.SyncRootPropertiesFromActiveLayer();
+
+		bool oldUpdating = _isUpdatingUi;
+		try
+		{
+			_isUpdatingUi = true;
+			int count = _selectedProfile.SectorCount;
+			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
+			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
+			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+
+			_selectedSlotIndex = 0;
+			_selectedSubActionIndex = null;
+			RefreshSlots();
+			UpdateFocusEditorUi();
+			RenderMappingsWheelPreview();
+		}
+		finally
+		{
+			_isUpdatingUi = oldUpdating;
+		}
+
+		if (DeleteLayerBtn != null)
+		{
+			DeleteLayerBtn.IsEnabled = (_selectedProfile.Layers.Count > 1);
+		}
+		ScheduleAutoSave();
+	}
+
+	private void AddLayerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedProfile == null) return;
+		_selectedProfile.EnsureLayers();
+
+		int nextNum = _selectedProfile.Layers.Count + 1;
+		WheelLayer newLayer = new WheelLayer
+		{
+			Name = $"第 {nextNum} 层",
+			SectorCount = 8,
+			EnableCenterAction = false,
+			Actions = new List<ActionItem>()
+		};
+		for (int i = 0; i < 8; i++)
+		{
+			newLayer.Actions.Add(new ActionItem { Type = "", Name = "", Parameter = "" });
+		}
+		_selectedProfile.Layers.Add(newLayer);
+		_selectedProfile.ActiveLayerIndex = _selectedProfile.Layers.Count - 1;
+		_selectedProfile.SyncRootPropertiesFromActiveLayer();
+
+		RefreshLayersUi();
+		RefreshSlots();
+		UpdateFocusEditorUi();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void CopyLayerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedProfile == null) return;
+		_selectedProfile.EnsureLayers();
+
+		WheelLayer curLayer = _selectedProfile.GetActiveLayer();
+		WheelLayer clonedLayer = curLayer.Clone();
+		clonedLayer.Name = $"{curLayer.Name} - 副本";
+
+		_selectedProfile.Layers.Add(clonedLayer);
+		_selectedProfile.ActiveLayerIndex = _selectedProfile.Layers.Count - 1;
+		_selectedProfile.SyncRootPropertiesFromActiveLayer();
+
+		RefreshLayersUi();
+		RefreshSlots();
+		UpdateFocusEditorUi();
+		RenderMappingsWheelPreview();
+		ScheduleAutoSave();
+	}
+
+	private void RenameLayerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedProfile == null) return;
+		_selectedProfile.EnsureLayers();
+
+		WheelLayer curLayer = _selectedProfile.GetActiveLayer();
+		InputDialog dlg = new InputDialog("重命名轮盘层", "请输入当前轮盘层的新名称（例如：办公快捷 / 浏览器 / 建模）：", curLayer.Name, input =>
+		{
+			if (string.IsNullOrWhiteSpace(input)) return (false, "层名称不能为空！");
+			return (true, "");
+		});
+		dlg.Owner = this;
+		if (dlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(dlg.InputText))
+		{
+			curLayer.Name = dlg.InputText.Trim();
+			RefreshLayersUi();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void DeleteLayerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedProfile == null) return;
+		_selectedProfile.EnsureLayers();
+
+		if (_selectedProfile.Layers.Count <= 1)
+		{
+			MessageBox.Show("至少需要保留一个轮盘层！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		int curIdx = _selectedProfile.ActiveLayerIndex;
+		WheelLayer layerToDelete = _selectedProfile.Layers[curIdx];
+		var result = MessageBox.Show($"确定要删除「{layerToDelete.Name}」吗？删除后该层配置将无法恢复。", "确认删除轮盘层", MessageBoxButton.YesNo, MessageBoxImage.Question);
+		if (result == MessageBoxResult.Yes)
+		{
+			_selectedProfile.Layers.RemoveAt(curIdx);
+			_selectedProfile.ActiveLayerIndex = Math.Max(0, curIdx - 1);
+			_selectedProfile.SyncRootPropertiesFromActiveLayer();
+
+			RefreshLayersUi();
+			RefreshSlots();
+			UpdateFocusEditorUi();
+			RenderMappingsWheelPreview();
+			ScheduleAutoSave();
+		}
+	}
+
+	private void LayerSwitchSettingBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (LayerSwitchSettingBtn?.ContextMenu != null)
+		{
+			string currentTrigger = ConfigManager.CurrentConfig?.LayerSwitchTrigger ?? "Wheel";
+			if (LayerSwitchMenuWheel != null) LayerSwitchMenuWheel.IsChecked = (currentTrigger == "Wheel");
+			if (LayerSwitchMenuTab != null) LayerSwitchMenuTab.IsChecked = (currentTrigger == "Tab");
+			LayerSwitchSettingBtn.ContextMenu.PlacementTarget = LayerSwitchSettingBtn;
+			LayerSwitchSettingBtn.ContextMenu.IsOpen = true;
+		}
+	}
+
+	private void LayerSwitchTriggerMenu_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is MenuItem item && item.Tag is string tag)
+		{
+			if (ConfigManager.CurrentConfig != null)
+			{
+				ConfigManager.CurrentConfig.LayerSwitchTrigger = tag;
+				ConfigManager.SaveConfig();
+			}
+			if (LayerSwitchMenuWheel != null) LayerSwitchMenuWheel.IsChecked = (tag == "Wheel");
+			if (LayerSwitchMenuTab != null) LayerSwitchMenuTab.IsChecked = (tag == "Tab");
 		}
 	}
 
@@ -2963,6 +3392,7 @@ public partial class SettingsWindow : Window
 		else if (MappingsSectorCount12Radio != null && MappingsSectorCount12Radio.IsChecked == true) count = 12;
 
 		_selectedProfile.SectorCount = count;
+		_selectedProfile.SyncActiveLayerFromRootProperties();
 		_isUpdatingUi = true;
 		try
 		{
@@ -3750,7 +4180,7 @@ public partial class SettingsWindow : Window
 
 	private void FocusActionNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
 	{
-		if (_isUpdatingFocusUi) return;
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null)
 		{
@@ -3763,7 +4193,8 @@ public partial class SettingsWindow : Window
 
 	private void FocusActionTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (_isUpdatingFocusUi) return;
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
+		if (FocusActionTypeComboBox == null) return;
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null && FocusActionTypeComboBox.SelectedValue is string newType)
 		{
@@ -3858,9 +4289,13 @@ public partial class SettingsWindow : Window
 
 	private void FocusWindowSubModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (_isUpdatingFocusUi) return;
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
+		if (FocusWindowSubModeComboBox == null) return;
+		if (FocusWindowManagerPanel == null || FocusWindowManagerPanel.Visibility != Visibility.Visible) return;
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item == null) return;
+		bool wasWindowType = item.Type == "Tile" || item.Type == "ToggleTopmost" || item.Type == "MoveMonitor" || item.Type == "WindowOpacity" || item.Type == "SwitchWindow";
+		if (!wasWindowType) return;
 
 		string subMode = (FocusWindowSubModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Tile";
 		switch (subMode)
@@ -3962,7 +4397,9 @@ public partial class SettingsWindow : Window
 
 	private void FocusTileLayoutComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (_isUpdatingFocusUi) return;
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
+		if (FocusTileLayoutComboBox == null) return;
+		if (FocusWindowManagerPanel == null || FocusWindowManagerPanel.Visibility != Visibility.Visible) return;
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item == null || item.Type != "Tile") return;
 		if (FocusTileLayoutComboBox.SelectedValue is string layout && WindowTiler.IsValidLayout(layout))
@@ -4808,40 +5245,242 @@ public partial class SettingsWindow : Window
 			}
 			coreGrid.Children.Add(coreCircle);
 
-			string? customCoreImage = ConfigManager.CurrentConfig.CoreCustomImagePath;
-			if (!string.IsNullOrEmpty(customCoreImage) && File.Exists(customCoreImage))
+			bool centerRendered = false;
+			ActionItem? centerItem = profile.CenterAction;
+			Brush centerIconBrush = isCenterSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : textBrush;
+
+			if (profile.EnableCenterAction && centerItem != null)
 			{
-				try
+				// 1. Explicit Custom SVG
+				if (!string.IsNullOrEmpty(centerItem.CustomIconSvg))
 				{
-					BitmapImage bitmapImage = new BitmapImage();
-					bitmapImage.BeginInit();
-					bitmapImage.UriSource = new Uri(customCoreImage, UriKind.Absolute);
-					bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-					bitmapImage.EndInit();
-					((Freezable)bitmapImage).Freeze();
-					ImageBrush imageBrush = new ImageBrush(bitmapImage)
+					try
 					{
-						Stretch = Stretch.UniformToFill,
-						AlignmentX = AlignmentX.Center,
-						AlignmentY = AlignmentY.Center
-					};
-					Ellipse imgEllipse = new Ellipse
-					{
-						Width = coreR * 1.8,
-						Height = coreR * 1.8,
-						Fill = imageBrush,
-						HorizontalAlignment = HorizontalAlignment.Center,
-						VerticalAlignment = VerticalAlignment.Center,
-						IsHitTestVisible = false
-					};
-					coreGrid.Children.Add(imgEllipse);
+						System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+						{
+							Data = Geometry.Parse(centerItem.CustomIconSvg),
+							Fill = centerIconBrush,
+							Width = Math.Max(12.0, coreR * 0.85),
+							Height = Math.Max(12.0, coreR * 0.85),
+							Stretch = Stretch.Uniform,
+							HorizontalAlignment = HorizontalAlignment.Center,
+							VerticalAlignment = VerticalAlignment.Center,
+							IsHitTestVisible = false
+						};
+						coreGrid.Children.Add(coreIconPath);
+						centerRendered = true;
+					}
+					catch { }
 				}
-				catch { }
+
+				// 2. Inherit App Icon
+				if (!centerRendered && !string.IsNullOrEmpty(centerItem.InheritAppIconPath))
+				{
+					try
+					{
+						ImageSource? appIcon = IconHelper.GetIcon(centerItem.InheritAppIconPath);
+						if (appIcon != null)
+						{
+							System.Windows.Controls.Image appImg = new System.Windows.Controls.Image
+							{
+								Source = appIcon,
+								Width = Math.Max(14.0, coreR * 0.9),
+								Height = Math.Max(14.0, coreR * 0.9),
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+							RenderOptions.SetBitmapScalingMode(appImg, BitmapScalingMode.HighQuality);
+							coreGrid.Children.Add(appImg);
+							centerRendered = true;
+						}
+					}
+					catch { }
+				}
+
+				// 3. IconKey (custom:... or standard vector SVG)
+				if (!centerRendered && !string.IsNullOrEmpty(centerItem.IconKey))
+				{
+					if (centerItem.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+					{
+						IconHelper.CustomIconItem? customIconItem = IconHelper.GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, centerItem.IconKey, StringComparison.OrdinalIgnoreCase));
+						if (customIconItem != null)
+						{
+							if (customIconItem.IsSvg && !string.IsNullOrEmpty(customIconItem.SvgData))
+							{
+								try
+								{
+									System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+									{
+										Data = Geometry.Parse(customIconItem.SvgData),
+										Fill = centerIconBrush,
+										Width = Math.Max(12.0, coreR * 0.85),
+										Height = Math.Max(12.0, coreR * 0.85),
+										Stretch = Stretch.Uniform,
+										HorizontalAlignment = HorizontalAlignment.Center,
+										VerticalAlignment = VerticalAlignment.Center,
+										IsHitTestVisible = false
+									};
+									coreGrid.Children.Add(coreIconPath);
+									centerRendered = true;
+								}
+								catch { }
+							}
+							else if (File.Exists(customIconItem.FilePath))
+							{
+								try
+								{
+									ImageSource? customSrc = IconHelper.GetCustomImageSource(customIconItem.FilePath);
+									if (customSrc != null)
+									{
+										System.Windows.Controls.Image customImg = new System.Windows.Controls.Image
+										{
+											Source = customSrc,
+											Width = Math.Max(14.0, coreR * 0.9),
+											Height = Math.Max(14.0, coreR * 0.9),
+											Stretch = Stretch.Uniform,
+											HorizontalAlignment = HorizontalAlignment.Center,
+											VerticalAlignment = VerticalAlignment.Center,
+											IsHitTestVisible = false
+										};
+										RenderOptions.SetBitmapScalingMode(customImg, BitmapScalingMode.HighQuality);
+										coreGrid.Children.Add(customImg);
+										centerRendered = true;
+									}
+								}
+								catch { }
+							}
+						}
+					}
+					else
+					{
+						string centerSvg = IconHelper.GetSvgPathByKey(centerItem.IconKey);
+						if (!string.IsNullOrEmpty(centerSvg))
+						{
+							try
+							{
+								System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+								{
+									Data = Geometry.Parse(centerSvg),
+									Fill = centerIconBrush,
+									Width = Math.Max(12.0, coreR * 0.85),
+									Height = Math.Max(12.0, coreR * 0.85),
+									Stretch = Stretch.Uniform,
+									HorizontalAlignment = HorizontalAlignment.Center,
+									VerticalAlignment = VerticalAlignment.Center,
+									IsHitTestVisible = false
+								};
+								coreGrid.Children.Add(coreIconPath);
+								centerRendered = true;
+							}
+							catch { }
+						}
+					}
+				}
+
+				// 4. Fallback for Launch with Parameter
+				if (!centerRendered && string.Equals(centerItem.Type, "Launch", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(centerItem.Parameter))
+				{
+					try
+					{
+						ImageSource? appIcon = IconHelper.GetIcon(centerItem.Parameter);
+						if (appIcon != null)
+						{
+							System.Windows.Controls.Image appImg = new System.Windows.Controls.Image
+							{
+								Source = appIcon,
+								Width = Math.Max(14.0, coreR * 0.9),
+								Height = Math.Max(14.0, coreR * 0.9),
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+							RenderOptions.SetBitmapScalingMode(appImg, BitmapScalingMode.HighQuality);
+							coreGrid.Children.Add(appImg);
+							centerRendered = true;
+						}
+					}
+					catch { }
+				}
+
+				// 5. Fallback for other action types
+				if (!centerRendered && !string.IsNullOrEmpty(centerItem.Type))
+				{
+					string defaultKey = centerItem.Type switch
+					{
+						"WebUrl" => "Globe",
+						"Folder" => "Folder",
+						"Launch" => "Rocket",
+						"Hotkey" => "Keyboard",
+						"Command" => "Terminal",
+						"SwitchWindow" => "Layers",
+						"System" => "Settings",
+						_ => "Star"
+					};
+					string fallbackSvg = IconHelper.GetSvgPathByKey(defaultKey);
+					if (!string.IsNullOrEmpty(fallbackSvg))
+					{
+						try
+						{
+							System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
+							{
+								Data = Geometry.Parse(fallbackSvg),
+								Fill = centerIconBrush,
+								Width = Math.Max(12.0, coreR * 0.85),
+								Height = Math.Max(12.0, coreR * 0.85),
+								Stretch = Stretch.Uniform,
+								HorizontalAlignment = HorizontalAlignment.Center,
+								VerticalAlignment = VerticalAlignment.Center,
+								IsHitTestVisible = false
+							};
+							coreGrid.Children.Add(coreIconPath);
+							centerRendered = true;
+						}
+						catch { }
+					}
+				}
 			}
-			else
+
+			if (!centerRendered)
 			{
-				ActionItem? centerItem = profile.CenterAction;
-				string centerIconKey = centerItem?.IconKey ?? (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey) ? ConfigManager.CurrentConfig.CoreCustomIconKey : "Settings");
+				string? customCoreImage = ConfigManager.CurrentConfig.CoreCustomImagePath;
+				if (!string.IsNullOrEmpty(customCoreImage) && File.Exists(customCoreImage))
+				{
+					try
+					{
+						BitmapImage bitmapImage = new BitmapImage();
+						bitmapImage.BeginInit();
+						bitmapImage.UriSource = new Uri(customCoreImage, UriKind.Absolute);
+						bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+						bitmapImage.EndInit();
+						((Freezable)bitmapImage).Freeze();
+						ImageBrush imageBrush = new ImageBrush(bitmapImage)
+						{
+							Stretch = Stretch.UniformToFill,
+							AlignmentX = AlignmentX.Center,
+							AlignmentY = AlignmentY.Center
+						};
+						Ellipse imgEllipse = new Ellipse
+						{
+							Width = coreR * 1.8,
+							Height = coreR * 1.8,
+							Fill = imageBrush,
+							HorizontalAlignment = HorizontalAlignment.Center,
+							VerticalAlignment = VerticalAlignment.Center,
+							IsHitTestVisible = false
+						};
+						coreGrid.Children.Add(imgEllipse);
+						centerRendered = true;
+					}
+					catch { }
+				}
+			}
+
+			if (!centerRendered)
+			{
+				string centerIconKey = (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomIconKey) ? ConfigManager.CurrentConfig.CoreCustomIconKey : "Settings");
 				string centerSvg = IconHelper.GetSvgPathByKey(centerIconKey);
 				if (!string.IsNullOrEmpty(centerSvg))
 				{
@@ -4850,7 +5489,7 @@ public partial class SettingsWindow : Window
 						System.Windows.Shapes.Path coreIconPath = new System.Windows.Shapes.Path
 						{
 							Data = Geometry.Parse(centerSvg),
-							Fill = isCenterSelected ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11)) : textBrush,
+							Fill = centerIconBrush,
 							Width = Math.Max(12.0, coreR * 0.75),
 							Height = Math.Max(12.0, coreR * 0.75),
 							Stretch = Stretch.Uniform,
@@ -7461,9 +8100,10 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
-		_isUpdatingUi = true;
+		bool oldUpdating = _isUpdatingUi;
 		try
 		{
+			_isUpdatingUi = true;
 			PopulateWheelFontFamilies();
 			PopulateCoreFontFamilies();
 			if (_selectedLayoutSlotIndex < 0)
@@ -7606,7 +8246,7 @@ public partial class SettingsWindow : Window
 		}
 		finally
 		{
-			_isUpdatingUi = false;
+			_isUpdatingUi = oldUpdating;
 		}
 	}
 
@@ -9573,7 +10213,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.9"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -9823,7 +10463,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.6.9"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.0"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");

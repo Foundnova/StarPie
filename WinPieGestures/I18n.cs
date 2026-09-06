@@ -176,6 +176,20 @@ public static class I18n
 	static I18n()
 	{
 		Dictionary<string, Dictionary<LanguageCode, string>> dictionary = new Dictionary<string, Dictionary<LanguageCode, string>>();
+		dictionary["SidebarModeSimple"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 简单模式",
+			[LanguageCode.ZhTw] = "💡 簡易模式",
+			[LanguageCode.En] = "💡 Simple Mode",
+			[LanguageCode.Ja] = "💡 シンプルモード"
+		};
+		dictionary["SidebarModePro"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚙️ 高级全星模式",
+			[LanguageCode.ZhTw] = "⚙️ 進階全星模式",
+			[LanguageCode.En] = "⚙️ Pro Full Mode",
+			[LanguageCode.Ja] = "⚙️ プロ全星モード"
+		};
 		dictionary["NewCustomPresetButton"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "➕ 新建配色",
@@ -2648,6 +2662,62 @@ public static class I18n
 			[LanguageCode.ZhTw] = "按住 Ctrl + 滑鼠拖曳可平移畫布",
 			[LanguageCode.En] = "Hold Ctrl + Drag to pan canvas",
 			[LanguageCode.Ja] = "Ctrl + ドラッグでキャンバスをパン"
+		};
+		dictionary["ConfigModeSimpleRadio"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 简单模式",
+			[LanguageCode.ZhTw] = "💡 簡單模式",
+			[LanguageCode.En] = "💡 Simple Mode",
+			[LanguageCode.Ja] = "💡 シンプルモード"
+		};
+		dictionary["ConfigModeProRadio"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚙️ 高级全量模式",
+			[LanguageCode.ZhTw] = "⚙️ 高級全量模式",
+			[LanguageCode.En] = "⚙️ Pro Full Mode",
+			[LanguageCode.Ja] = "⚙️ プロ全機能モード"
+		};
+		dictionary["ConfigModeSimpleTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "简单模式 (精简聚焦)",
+			[LanguageCode.ZhTw] = "簡單模式 (精簡聚焦)",
+			[LanguageCode.En] = "Simple Mode (Focused)",
+			[LanguageCode.Ja] = "シンプルモード (集中)"
+		};
+		dictionary["ConfigModeSimpleHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "已隐藏低频高级微调参数，保留核心极速配置体验",
+			[LanguageCode.ZhTw] = "已隱藏低頻高級微調參數，保留核心極速設定體驗",
+			[LanguageCode.En] = "Hidden low-frequency advanced parameters for a clean and focused experience",
+			[LanguageCode.Ja] = "高度な設定項目を非表示にし、主要な設定に集中します"
+		};
+		dictionary["ConfigModeProTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "高级全量模式 (全开)",
+			[LanguageCode.ZhTw] = "高級全量模式 (全開)",
+			[LanguageCode.En] = "Pro Full Mode (Unrestricted)",
+			[LanguageCode.Ja] = "プロ全機能モード (全開)"
+		};
+		dictionary["ConfigModeProHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "已全量开放字体排版、平铺高级参数、OCR接口、内存管理与系统日志等专家功能",
+			[LanguageCode.ZhTw] = "已全量開放字型排版、平鋪進階參數、OCR介面、記憶體管理與系統日誌等專家功能",
+			[LanguageCode.En] = "Full access to fonts, window tiling regex, OCR APIs, memory trimming and runtime logs",
+			[LanguageCode.Ja] = "フォント、ウィンドウ分割詳細、OCR API、メモリ管理、ログなどの全機能を利用できます"
+		};
+		dictionary["SidebarModeSimple"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 简单模式",
+			[LanguageCode.ZhTw] = "💡 簡單模式",
+			[LanguageCode.En] = "💡 Simple",
+			[LanguageCode.Ja] = "💡 シンプル"
+		};
+		dictionary["SidebarModePro"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚙️ 高级模式",
+			[LanguageCode.ZhTw] = "⚙️ 高級模式",
+			[LanguageCode.En] = "⚙️ Pro Mode",
+			[LanguageCode.Ja] = "⚙️ プロ"
 		};
 		Translations = dictionary;
 	}

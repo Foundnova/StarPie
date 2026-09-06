@@ -659,21 +659,53 @@
           </Button>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.6.9&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.0&#x0a;© 2026 StarPie">
+            <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
+              <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.6.9" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
         </StackPanel>
       </Grid>
     </Border>
-    <Grid Column="1" Margin="25,25,25,20">
+    <Grid Column="1" Margin="25,18,25,20">
       <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
-      <Grid Row="0">
+
+      <!-- 全局顶部控制台栏：模式切换胶囊与状态 -->
+      <Grid Grid.Row="0" Margin="0,0,0,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        
+        <!-- 左侧：模式状态与提示徽标 -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Border Name="ConfigModeStatusBadge" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Name="ConfigModeStatusIcon" Text="💡" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center" />
+              <TextBlock Name="ConfigModeStatusText" Text="简单模式 (精简聚焦)" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <TextBlock Name="ConfigModeHintText" Text="已隐藏低频高级微调参数，保留核心极速配置体验" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="10,0,0,0" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- 右侧：模式切换胶囊单选组 -->
+        <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Name="ConfigModeSimpleRadio" Content="💡 简单模式" GroupName="ConfigModeGroup" Style="{StaticResource ModernSegmentRadioButtonStyle}" IsChecked="True" Checked="ConfigModeRadio_Checked" />
+            <RadioButton Name="ConfigModeProRadio" Content="⚙️ 高级全量模式" GroupName="ConfigModeGroup" Style="{StaticResource ModernSegmentRadioButtonStyle}" Margin="4,0,0,0" Checked="ConfigModeRadio_Checked" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Grid Row="1">
         <Grid Name="TriggerSettingsGrid" Visibility="Visible">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -807,7 +839,7 @@
                   </StackPanel>
                 </StackPanel>
               </Border>
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+              <Border Name="Tab0_MouseGesturesCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -976,7 +1008,7 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
-                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                  <Border Name="Tab0_CancelActionOuterBorder" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                     <StackPanel>
                       <TextBlock Name="CancelActionTitleText" Text="外甩取消时执行的动作" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <TextBlock Name="CancelActionDescText" Text="外甩取消（未选中任何动作）时可执行一个自定义动作代替静默关闭；需先开启上方「顺势外甩取消」。回到中心取消仍为静默关闭，不受此影响。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
@@ -1136,7 +1168,7 @@
                 </StackPanel>
               </Border>
               <!-- 屏幕边缘呼出智能防溢出与光标自动对齐设置 -->
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True">
+              <Border Name="Tab0_ScreenEdgeCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -1217,7 +1249,7 @@
                       <TextBlock Name="FullScreenOptionDescText" Text="自动检测当前前台窗口是否处于全屏独占状态，避免游戏瞄准等右键操作被拦截。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                   </CheckBox>
-                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,4,0,0">
+                  <Border Name="Tab0_ModifierBypassPanel" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,4,0,0">
                     <StackPanel>
                       <TextBlock Name="ModifierPassTitleText" Text="快捷键旁路穿透 (按住以下修饰键拖拽时不触发手势):" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
                       <WrapPanel>
@@ -1788,20 +1820,22 @@
                       <ComboBoxItem Content="仅显示图标 (极大化居中)" Tag="IconOnly" />
                       <ComboBoxItem Content="仅显示文字 (纯文字居中)" Tag="TextOnly" />
                     </ComboBox>
-                    <TextBlock Name="WheelFontFamilyTitleText" Text="轮盘文字字体 (Font Family):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                    <ComboBox Name="WheelFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="WheelFontFamilyComboBox_SelectionChanged">
-                      <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
-                      <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
-                      <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
-                      <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
-                      <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
-                      <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
-                      <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
-                      <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
-                      <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
-                      <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
-                      <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
-                    </ComboBox>
+                    <StackPanel Name="Tab1_FontFamilyPanel">
+                      <TextBlock Name="WheelFontFamilyTitleText" Text="轮盘文字字体 (Font Family):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <ComboBox Name="WheelFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="WheelFontFamilyComboBox_SelectionChanged">
+                        <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
+                        <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
+                        <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
+                        <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
+                        <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
+                        <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
+                        <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
+                        <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
+                        <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
+                        <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
+                        <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
+                      </ComboBox>
+                    </StackPanel>
                     <TextBlock Name="SectorTextColorTitleText" Text="轮盘文字颜色 (Sector Text Color):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <Grid Margin="0,0,0,10">
                       <Grid.ColumnDefinitions>
@@ -1835,7 +1869,7 @@
                     </Grid>
 
                     <!-- 文字相对位置与偏移微调 (支持归位复位) -->
-                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,2,0,0">
+                    <Border Name="Tab1_TextOffsetPanel" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,2,0,0">
                       <StackPanel>
                         <Grid Margin="0,0,0,4">
                           <Grid.ColumnDefinitions>
@@ -1962,20 +1996,22 @@
                         <TextBlock Name="CoreTextOptionsSectionTitle" Text="中心文字与选中显示定制 (Center Text &amp; Selection)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                         <CheckBox Name="ShowSelectedActionTextCheckBox" Content="选中扇区时在中心显示动作名称" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowSelectedActionTextCheckBox_Changed" Unchecked="ShowSelectedActionTextCheckBox_Changed" />
                         <StackPanel Name="CoreTextOptionsPanel" Visibility="Visible">
-                          <TextBlock Name="CoreFontFamilyTitleText" Text="中心文字字体 (Core Font Family):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                          <ComboBox Name="CoreFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="CoreFontFamilyComboBox_SelectionChanged">
-                            <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
-                            <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
-                            <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
-                            <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
-                            <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
-                            <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
-                            <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
-                            <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
-                            <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
-                            <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
-                            <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
-                          </ComboBox>
+                          <StackPanel Name="Tab1_CoreFontFamilyPanel">
+                            <TextBlock Name="CoreFontFamilyTitleText" Text="中心文字字体 (Core Font Family):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <ComboBox Name="CoreFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="CoreFontFamilyComboBox_SelectionChanged">
+                              <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
+                              <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
+                              <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
+                              <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
+                              <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
+                              <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
+                              <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
+                              <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
+                              <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
+                              <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
+                              <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
+                            </ComboBox>
+                          </StackPanel>
                           <TextBlock Name="CoreFontSizeTitleText" Text="中心文字字号大小 (Core Font Size):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
@@ -2095,15 +2131,40 @@
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
-              <TextBlock Name="GesturesPageHeader" Text="手势方向与动作映射" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Name="GesturesPageHeader" Text="手势方向与动作映射" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+
+                <!-- 紧凑型多层轮盘管理工具栏 (仅高级全量模式展示，移至标题右侧留白处) -->
+                <Border Name="Tab2_MultiLayerHeaderPanel" VerticalAlignment="Center" Margin="14,0,0,0" HorizontalAlignment="Left" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="5,2">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🌀 轮盘层:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="3,0,5,0" />
+                    <ComboBox Name="LayerSelectComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="25" Width="95" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="LayerSelectComboBox_SelectionChanged" />
+                    <Button Name="AddLayerBtn" Content="➕ 加层" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="4,0,2,0" ToolTip="新增一层独立轮盘配置（支持无限多层）" Click="AddLayerBtn_Click" />
+                    <Button Name="CopyLayerBtn" Content="📑 复制" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,2,0" ToolTip="复制当前层的所有扇区动作与中心核圆到新层" Click="CopyLayerBtn_Click" />
+                    <Button Name="RenameLayerBtn" Content="✏️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,2,0" ToolTip="重命名当前轮盘层" Click="RenameLayerBtn_Click" />
+                    <Button Name="DeleteLayerBtn" Content="🗑️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,2,0" ToolTip="删除当前轮盘层（至少保留一层）" Click="DeleteLayerBtn_Click" />
+                    <Border Width="1" Height="12" Background="{DynamicResource CardBorderBrush}" Margin="4,0" VerticalAlignment="Center" />
+                    <TextBlock Text="💡 滚轮切换" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="1,0,3,0" />
+                    <Button Name="LayerSwitchSettingBtn" Content="⚙️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,1,0" ToolTip="配置轮盘层切换触发方式 (鼠标滚轮 / 快捷键)" Click="LayerSwitchSettingBtn_Click">
+                      <Button.ContextMenu>
+                        <ContextMenu Style="{StaticResource ModernContextMenuStyle}">
+                          <MenuItem Name="LayerSwitchMenuWheel" Header="🖱️ 鼠标滚轮滑动切换 (推荐)" Style="{StaticResource ModernMenuItemStyle}" Click="LayerSwitchTriggerMenu_Click" Tag="Wheel" />
+                          <MenuItem Name="LayerSwitchMenuTab" Header="⌨️ Tab 键循环切换" Style="{StaticResource ModernMenuItemStyle}" Click="LayerSwitchTriggerMenu_Click" Tag="Tab" />
+                        </ContextMenu>
+                      </Button.ContextMenu>
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+
               <TextBlock Name="GesturesPageSubheader" Text="支持针对不同前台应用程序设置专属的多向手势轮盘、按键动作、中心核圆与级联子动作。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
             </StackPanel>
 
             <!-- 视图模式分段切换 (画布联动精调 vs 紧凑全览列表) -->
-            <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+            <Border Name="Tab2_MappingsViewModeBorder" Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal">
-                <RadioButton Name="MappingsViewModeCanvasRadio" Content="🎯 画布联动精调 (推荐)" Style="{StaticResource ModernSegmentRadioButtonStyle}" IsChecked="True" Checked="MappingsViewMode_Checked" />
-                <RadioButton Name="MappingsViewModeListRadio" Content="📋 紧凑全览列表" Style="{StaticResource ModernSegmentRadioButtonStyle}" Margin="4,0,0,0" Checked="MappingsViewMode_Checked" />
+                <RadioButton Name="MappingsViewModeCanvasRadio" GroupName="MappingsViewModeGroup" Content="🎯 画布联动精调 (推荐)" Style="{StaticResource ModernSegmentRadioButtonStyle}" IsChecked="True" Checked="MappingsViewMode_Checked" />
+                <RadioButton Name="MappingsViewModeListRadio" GroupName="MappingsViewModeGroup" Content="📋 紧凑全览列表" Style="{StaticResource ModernSegmentRadioButtonStyle}" Margin="4,0,0,0" Checked="MappingsViewMode_Checked" />
               </StackPanel>
             </Border>
           </Grid>
@@ -2407,7 +2468,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="控制模式:" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,8,0" />
                             <ComboBox Name="FocusWindowSubModeComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" SelectionChanged="FocusWindowSubModeComboBox_SelectionChanged">
-                              <ComboBoxItem Tag="Tile" Content="🔲 平铺窗口排布" IsSelected="True" />
+                              <ComboBoxItem Tag="Tile" Content="🔲 平铺窗口排布" />
                               <ComboBoxItem Tag="TileCycle" Content="🔄 循环切换平铺" />
                               <ComboBoxItem Tag="TileCycleBack" Content="⬅️ 反向循环平铺" />
                               <ComboBoxItem Tag="TileRestore" Content="⏪ 还原平铺快照" />
@@ -2872,7 +2933,7 @@
                 </Border>
 
                 <!-- 平铺窗口全局设置 (可折叠收纳) -->
-                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" Margin="0,0,0,14">
+                <Border Name="Tab2_TileSettingsCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" Margin="0,0,0,14">
                   <UIElement.Effect>
                     <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                   </UIElement.Effect>
@@ -3050,7 +3111,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.6.9 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.0 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3243,7 +3304,7 @@
               </Border>
 
               <!-- Card: OCR 截屏识字与智能接口设置 -->
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+              <Border Name="Tab3_OcrCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -3321,7 +3382,7 @@
                   <Button Name="ElevateButton" Grid.Column="1" Content="提升权限" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="14,0" VerticalAlignment="Center" Click="ElevatePrivileges_Click" />
                 </Grid>
               </Border>
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+              <Border Name="Tab3_MemoryCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -3340,7 +3401,7 @@
                   <Button Name="TrimMemoryButton" Grid.Column="1" Content="立即压缩内存" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="14,0" VerticalAlignment="Center" ToolTip="立即清理未引用的工作集物理内存" Click="TrimMemoryButton_Click" />
                 </Grid>
               </Border>
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
+              <Border Name="Tab3_BackupCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -3352,7 +3413,7 @@
                   </WrapPanel>
                 </StackPanel>
               </Border>
-              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+              <Border Name="Tab3_LogsCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
@@ -3410,7 +3471,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.6.9" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3426,11 +3487,11 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.6.9 关联外部图标继承加固 &amp; 防误触配置持久化保护 &amp; 状态自愈" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🏷️ 【关联外部程序图标继承加固】：彻底解决轮盘扇区重启后变成默认 Win 图标的问题，重构图标继承优先级链，无论主轮盘、外圈子环、蜂窝扇还是动作配置画布均严密继承关联程序图标；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🛡️ 【防误触配置持久化与重启保持】：重构开机静默启动与托盘关闭时的数据同步防御门禁，彻底杜绝未初始化 UI 覆盖清空「全屏防误触」、「外甩取消」与「边缘避让」等用户设置；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🖼️ 【动作编辑区视觉联动增强】：聚焦编辑卡片图标按钮与列表行全面支持关联外部图标实时回显，清晰呈现绑定应用名称与高清图标；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🔲 【窗口管理与平铺图标防冲】：优化平铺预设与模式切换逻辑，仅在未设置任何自定义/关联图标时赋予默认 Tile 图标，杜绝误冲已有视觉资产。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.7.0 简单模式层级精简 &amp; 中心核圆动作图标呼出修复 &amp; 体验提纯" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🎯 【简单模式层级精简提纯】：将「鼠标手势 (Mouse Gestures)」独立卡片、「外甩取消自定义动作」、「屏幕边缘呼出防溢出」与「紧凑全览列表」切换器全面纳入高级全星模式，简单模式更加聚焦直观；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🌟 【中心核圆动作图标呼出修复】：彻底打通轮盘中心动作图标渲染通路，无论是自定义矢量 SVG、关联外部程序图标或内置图标，在实际呼出轮盘与画布中均能完美一致呈现并支持琥珀光晕高亮；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📋 【动作分段视图模式收纳】：在简单模式下默认锁定高效直观的画布联动精调视图，收起列表分段切换，杜绝多余视图干扰；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【全域平滑过渡与性能守护】：持续保持 0 内存泄漏与 &lt;16ms 极速呼出，给创作者带来无与伦比的跟手手感。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -3439,6 +3500,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.7.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="简单模式层级精简 &amp; 中心核圆动作图标呼出修复 &amp; 体验提纯" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="鼠标手势卡片、外甩取消动作、边缘防溢出与紧凑全览列表分段切换全面放入高级模式；彻底修复实际呼出轮盘中心核圆配置图标不显示缺陷；简单模式锁定画布精调。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-06" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>
@@ -3704,7 +3782,7 @@
           </ScrollViewer>
         </Grid>
       </Grid>
-      <Border Grid.Row="1" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0" Margin="0,15,0,0">
+      <Border Grid.Row="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,15,0,0" Margin="0,15,0,0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />

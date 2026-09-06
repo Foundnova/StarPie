@@ -75,6 +75,8 @@ public static class ActionExecutor
 	{
 		public List<ushort> Modifiers { get; } = new List<ushort>();
 
+		public List<ushort> SequenceKeys { get; } = new List<ushort>();
+
 		public ushort MainKey { get; set; }
 	}
 
@@ -612,6 +614,58 @@ public static class ActionExecutor
 		}
 	}
 
+	private static void SafeSetClipboardText(string text)
+	{
+		if (string.IsNullOrEmpty(text))
+		{
+			return;
+		}
+		try
+		{
+			if (Application.Current?.Dispatcher != null)
+			{
+				Application.Current.Dispatcher.Invoke(() =>
+				{
+					try
+					{
+						System.Windows.Clipboard.SetDataObject(text, true);
+					}
+					catch
+					{
+						System.Windows.Clipboard.SetText(text);
+					}
+				});
+				return;
+			}
+		}
+		catch
+		{
+		}
+
+		// 备用：若 Dispatcher 不可用或发生跨线程异常，启动独立 STA 线程安全写入
+		try
+		{
+			Thread staThread = new Thread(() =>
+			{
+				try
+				{
+					System.Windows.Clipboard.SetDataObject(text, true);
+				}
+				catch
+				{
+					try { System.Windows.Clipboard.SetText(text); } catch { }
+				}
+			});
+			staThread.SetApartmentState(ApartmentState.STA);
+			staThread.IsBackground = true;
+			staThread.Start();
+			staThread.Join(500);
+		}
+		catch
+		{
+		}
+	}
+
 	public static void ExecuteShellTool(string verb)
 	{
 		if (string.IsNullOrWhiteSpace(verb)) return;
@@ -626,11 +680,11 @@ public static class ActionExecutor
 				var (folder, selected) = GetActiveExplorerContext();
 				if (selected.Count > 0)
 				{
-					System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, selected));
+					SafeSetClipboardText(string.Join(Environment.NewLine, selected));
 				}
 				else if (!string.IsNullOrEmpty(folder))
 				{
-					System.Windows.Clipboard.SetText(folder);
+					SafeSetClipboardText(folder);
 				}
 				break;
 			}
@@ -1253,7 +1307,12 @@ public static class ActionExecutor
 			foreach (ushort mod in modifiers)
 			{
 				upInputs.Add(CreateKeyInput(mod, down: false));
-				keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+				uint flags = KEYEVENTF_KEYUP;
+				if (mod == 91 || mod == 92 || mod == 165 || mod == 163)
+				{
+					flags |= KEYEVENTF_EXTENDEDKEY;
+				}
+				keybd_event((byte)mod, 0, flags, StarPieExtraInfo);
 			}
 			if (upInputs.Count > 0)
 			{
@@ -1275,8 +1334,48 @@ public static class ActionExecutor
 		HotkeyDetails hotkeyDetails = ParseHotkey(hotkeyString);
 		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0)
 		{
+			// 如果是连续按键字母（例如 "UU", "US", "WASD"），优先使用原生虚拟按键流发送，保证系统菜单与快捷键接收
+			string rawStr = hotkeyString.Trim();
+			if (rawStr.Length >= 2 && rawStr.Length <= 8 && rawStr.All(char.IsLetterOrDigit))
+			{
+				AppLogger.LogInfo($"Executing Key Sequence from raw token: '{rawStr}'");
+				foreach (char c in rawStr)
+				{
+					ushort vk = MapKeyStringToVk(c.ToString());
+					if (vk != 0)
+					{
+						INPUT kDown = CreateKeyInput(vk, down: true);
+						INPUT kUp = CreateKeyInput(vk, down: false);
+						SendInput(1u, new INPUT[] { kDown }, Marshal.SizeOf(typeof(INPUT)));
+						System.Threading.Thread.Sleep(15);
+						SendInput(1u, new INPUT[] { kUp }, Marshal.SizeOf(typeof(INPUT)));
+						System.Threading.Thread.Sleep(25);
+					}
+					else
+					{
+						SendTextInput(c.ToString());
+					}
+				}
+				return;
+			}
 			AppLogger.LogInfo($"Executing Text Input: '{hotkeyString}'");
 			SendTextInput(hotkeyString);
+			return;
+		}
+
+		// 无修饰键的多键序列（例如 "U+U", "U+S", "A+B"）
+		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.SequenceKeys.Count > 1)
+		{
+			AppLogger.LogInfo($"Executing Key Sequence: [{string.Join(" -> ", hotkeyDetails.SequenceKeys)}]");
+			foreach (ushort vk in hotkeyDetails.SequenceKeys)
+			{
+				INPUT kDown = CreateKeyInput(vk, down: true);
+				INPUT kUp = CreateKeyInput(vk, down: false);
+				SendInput(1u, new INPUT[] { kDown }, Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(15);
+				SendInput(1u, new INPUT[] { kUp }, Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(25);
+			}
 			return;
 		}
 
@@ -1355,33 +1454,46 @@ public static class ActionExecutor
 			// 第二通道：keybd_event 直接同步 win32k 全局击键状态表（跨进程/跨权限防御）
 			foreach (ushort mod in hotkeyDetails.Modifiers)
 			{
-				keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+				uint flags = KEYEVENTF_KEYUP;
+				if (mod == 91 || mod == 92 || mod == 165 || mod == 163)
+				{
+					flags |= KEYEVENTF_EXTENDEDKEY;
+				}
+				keybd_event((byte)mod, 0, flags, StarPieExtraInfo);
 				if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_CONTROL
 				else if (mod == 160 || mod == 161) keybd_event(16, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_SHIFT
 				else if (mod == 164 || mod == 165) keybd_event(18, 0, KEYEVENTF_KEYUP, StarPieExtraInfo); // VK_MENU
+				else if (mod == 91 || mod == 92) keybd_event((byte)mod, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, StarPieExtraInfo);
 			}
 
-			// 4. 双重保险：针对截图软件（Snipaste/PixPin/微信截屏等）弹出全屏遮罩导致焦点延迟转移的场景，
-			// 在 +30ms 与 +80ms 异步补发修饰键释放，彻底消灭残留粘滞
-			if (hotkeyDetails.MainKey == 44 && hotkeyDetails.Modifiers.Count > 0)
+			// 4. 双重保险：针对截图软件（Snipaste/PixPin/微信截屏等）或 Win 键系统菜单抢焦场景，
+			// 在 +35ms 与 +85ms 异步补发修饰键释放，彻底消灭残留粘滞
+			bool hasWinMod = hotkeyDetails.Modifiers.Contains(91) || hotkeyDetails.Modifiers.Contains(92);
+			if ((hotkeyDetails.MainKey == 44 || hasWinMod) && hotkeyDetails.Modifiers.Count > 0)
 			{
 				var modsCopy = hotkeyDetails.Modifiers.ToArray();
 				System.Threading.Tasks.Task.Run(async () =>
 				{
 					try
 					{
-						await System.Threading.Tasks.Task.Delay(30).ConfigureAwait(false);
+						await System.Threading.Tasks.Task.Delay(35).ConfigureAwait(false);
 						foreach (var mod in modsCopy)
 						{
-							keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							uint flags = KEYEVENTF_KEYUP;
+							if (mod == 91 || mod == 92 || mod == 165 || mod == 163) flags |= KEYEVENTF_EXTENDEDKEY;
+							keybd_event((byte)mod, 0, flags, StarPieExtraInfo);
 							if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							else if (mod == 91 || mod == 92) keybd_event((byte)mod, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, StarPieExtraInfo);
 						}
 
 						await System.Threading.Tasks.Task.Delay(50).ConfigureAwait(false);
 						foreach (var mod in modsCopy)
 						{
-							keybd_event((byte)mod, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							uint flags = KEYEVENTF_KEYUP;
+							if (mod == 91 || mod == 92 || mod == 165 || mod == 163) flags |= KEYEVENTF_EXTENDEDKEY;
+							keybd_event((byte)mod, 0, flags, StarPieExtraInfo);
 							if (mod == 162 || mod == 163) keybd_event(17, 0, KEYEVENTF_KEYUP, StarPieExtraInfo);
+							else if (mod == 91 || mod == 92) keybd_event((byte)mod, 0, KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY, StarPieExtraInfo);
 						}
 					}
 					catch
@@ -1591,6 +1703,9 @@ public static class ActionExecutor
 			ExecuteHotkey("Ctrl+0");
 			break;
 		case "sleep":
+		case "睡眠":
+		case "休眠":
+		case "suspend":
 			try
 			{
 				Process.Start(new ProcessStartInfo
@@ -1603,6 +1718,8 @@ public static class ActionExecutor
 			catch { }
 			break;
 		case "restart":
+		case "重启":
+		case "reboot":
 			try
 			{
 				Process.Start(new ProcessStartInfo
@@ -1615,6 +1732,8 @@ public static class ActionExecutor
 			catch { }
 			break;
 		case "shutdown":
+		case "关机":
+		case "poweroff":
 			try
 			{
 				Process.Start(new ProcessStartInfo
@@ -1704,7 +1823,7 @@ public static class ActionExecutor
 	private static HotkeyDetails ParseHotkey(string hotkeyString)
 	{
 		HotkeyDetails hotkeyDetails = new HotkeyDetails();
-		string[] array = hotkeyString.Split(new char[2] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		string[] array = hotkeyString.Split(new char[3] { '+', ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
 		for (int i = 0; i < array.Length; i++)
 		{
 			string text = array[i].Trim().ToLower();
@@ -1750,6 +1869,7 @@ public static class ActionExecutor
 			if (num != 0)
 			{
 				hotkeyDetails.MainKey = num;
+				hotkeyDetails.SequenceKeys.Add(num);
 			}
 		}
 		return hotkeyDetails;

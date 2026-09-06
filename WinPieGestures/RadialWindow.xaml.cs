@@ -618,16 +618,266 @@ public partial class RadialWindow : Window
 		CoreExitIcon.Width = coreRadius * 0.42;
 		CoreExitIcon.Height = coreRadius * 0.42;
 		CoreTitle.FontSize = Math.Max(8.0, coreRadius / 5.0);
-		CoreSubtitle.FontSize = Math.Max(6.0, coreRadius / 7.0);
+			CoreSubtitle.FontSize = Math.Max(6.0, coreRadius / 7.0);
 		bool showCoreIcon = ConfigManager.CurrentConfig.ShowCoreIcon;
 		string text2 = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
 		CoreTitle.Visibility = Visibility.Collapsed;
 		CoreSubtitle.Visibility = Visibility.Collapsed;
+		UpdateCenterIconVisuals();
+		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Width = Math.Max(32.0, Math.Min(coreRadius * 1.75, 180.0));
+		double coreFontSize = (ConfigManager.CurrentConfig?.CoreFontSize > 0.0)
+			? ConfigManager.CurrentConfig.CoreFontSize
+			: Math.Max(8.0, Math.Min(16.0, coreRadius / 4.0));
+		CoreSelectionText.FontSize = coreFontSize;
+		if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig?.CoreFontFamily))
+		{
+			try
+			{
+				CoreSelectionText.FontFamily = new FontFamily(ConfigManager.CurrentConfig.CoreFontFamily);
+			}
+			catch
+			{
+			}
+		}
+		if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
+		{
+			try
+			{
+				CoreSelectionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.CoreTextColor));
+			}
+			catch
+			{
+				CoreSelectionText.Foreground = _textColorBrush;
+			}
+		}
+		else
+		{
+			CoreSelectionText.Foreground = _textColorBrush;
+		}
+		CoreSelectionOverlay.Fill = CreateFrostedCoreBrush(_coreBgBrush);
+		Panel.SetZIndex(CoreSelectionOverlay, 20);
+		Panel.SetZIndex(CoreSelectionTextPanel, 21);
+		RenderStyleDecorations();
+		RenderSectors();
+		Storyboard storyboard = new Storyboard();
+		BackEase easingFunction = new BackEase
+		{
+			EasingMode = EasingMode.EaseOut,
+			Amplitude = 0.35
+		};
+		DoubleAnimation doubleAnimation = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
+		{
+			EasingFunction = easingFunction
+		};
+		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation, (DependencyObject)(object)MainGrid);
+		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation, new PropertyPath("RenderTransform.Children[0].ScaleX"));
+		DoubleAnimation doubleAnimation2 = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
+		{
+			EasingFunction = easingFunction
+		};
+		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation2, (DependencyObject)(object)MainGrid);
+		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation2, new PropertyPath("RenderTransform.Children[0].ScaleY"));
+		DoubleAnimation doubleAnimation3 = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(90.0)));
+		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation3, (DependencyObject)(object)MainGrid);
+		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation3, new PropertyPath(UIElement.OpacityProperty));
+		storyboard.Children.Add(doubleAnimation);
+		storyboard.Children.Add(doubleAnimation2);
+		storyboard.Children.Add(doubleAnimation3);
+		storyboard.Begin();
+	}
+
+	private void UpdateCenterIconVisuals()
+	{
+		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		double num7 = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
 		double coreImageOffsetX = ConfigManager.CurrentConfig.CoreImageOffsetX;
 		double coreImageOffsetY = ConfigManager.CurrentConfig.CoreImageOffsetY;
 		TranslateTransform renderTransform = ((coreImageOffsetX != 0.0 || coreImageOffsetY != 0.0) ? new TranslateTransform(coreImageOffsetX, coreImageOffsetY) : null);
-		if (showCoreIcon)
+		bool hasRenderedCenterActionIcon = false;
+		bool showCoreIcon = ConfigManager.CurrentConfig.ShowCoreIcon;
+		string text2 = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
+
+		if (_profile != null && _profile.EnableCenterAction && _profile.CenterAction != null)
+		{
+			ActionItem centerAction = _profile.CenterAction;
+			double iconDim = coreRadius * 0.48 * num7;
+
+			if (!string.IsNullOrEmpty(centerAction.CustomIconSvg))
+			{
+				try
+				{
+					CoreExitIcon.Data = Geometry.Parse(centerAction.CustomIconSvg);
+					CoreExitIcon.Width = iconDim;
+					CoreExitIcon.Height = iconDim;
+					CoreExitIcon.RenderTransform = renderTransform;
+					CoreExitIcon.Fill = _textColorBrush;
+					CoreExitIcon.Visibility = Visibility.Visible;
+					CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+					hasRenderedCenterActionIcon = true;
+				}
+				catch { }
+			}
+
+			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.InheritAppIconPath))
+			{
+				try
+				{
+					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.InheritAppIconPath);
+					if (appIcon != null)
+					{
+						double imgDim = coreRadius * 0.95 * num7;
+						CoreCustomImageEllipse.Width = imgDim;
+						CoreCustomImageEllipse.Height = imgDim;
+						CoreCustomImageEllipse.RenderTransform = renderTransform;
+						ImageBrush imgBrush = new ImageBrush(appIcon)
+						{
+							Stretch = Stretch.Uniform,
+							AlignmentX = AlignmentX.Center,
+							AlignmentY = AlignmentY.Center
+						};
+						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+						CoreCustomImageEllipse.Fill = imgBrush;
+						CoreCustomImageEllipse.Visibility = Visibility.Visible;
+						CoreExitIcon.Visibility = Visibility.Collapsed;
+						hasRenderedCenterActionIcon = true;
+					}
+				}
+				catch { }
+			}
+
+			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.IconKey))
+			{
+				if (centerAction.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					IconHelper.CustomIconItem? customIconItem = IconHelper.GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, centerAction.IconKey, StringComparison.OrdinalIgnoreCase));
+					if (customIconItem != null)
+					{
+						if (customIconItem.IsSvg && !string.IsNullOrEmpty(customIconItem.SvgData))
+						{
+							try
+							{
+								CoreExitIcon.Data = Geometry.Parse(customIconItem.SvgData);
+								CoreExitIcon.Width = iconDim;
+								CoreExitIcon.Height = iconDim;
+								CoreExitIcon.RenderTransform = renderTransform;
+								CoreExitIcon.Fill = _textColorBrush;
+								CoreExitIcon.Visibility = Visibility.Visible;
+								CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+								hasRenderedCenterActionIcon = true;
+							}
+							catch { }
+						}
+						else if (File.Exists(customIconItem.FilePath))
+						{
+							try
+							{
+								ImageSource? customSrc = IconHelper.GetCustomImageSource(customIconItem.FilePath);
+								if (customSrc != null)
+								{
+									double imgDim = coreRadius * 0.95 * num7;
+									CoreCustomImageEllipse.Width = imgDim;
+									CoreCustomImageEllipse.Height = imgDim;
+									CoreCustomImageEllipse.RenderTransform = renderTransform;
+									ImageBrush imgBrush = new ImageBrush(customSrc)
+									{
+										Stretch = Stretch.Uniform,
+										AlignmentX = AlignmentX.Center,
+										AlignmentY = AlignmentY.Center
+									};
+									RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+									CoreCustomImageEllipse.Fill = imgBrush;
+									CoreCustomImageEllipse.Visibility = Visibility.Visible;
+									CoreExitIcon.Visibility = Visibility.Collapsed;
+									hasRenderedCenterActionIcon = true;
+								}
+							}
+							catch { }
+						}
+					}
+				}
+				else
+				{
+					string svg = IconHelper.GetSvgPathByKey(centerAction.IconKey);
+					if (!string.IsNullOrEmpty(svg))
+					{
+						try
+						{
+							CoreExitIcon.Data = Geometry.Parse(svg);
+							CoreExitIcon.Width = iconDim;
+							CoreExitIcon.Height = iconDim;
+							CoreExitIcon.RenderTransform = renderTransform;
+							CoreExitIcon.Fill = _textColorBrush;
+							CoreExitIcon.Visibility = Visibility.Visible;
+							CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+							hasRenderedCenterActionIcon = true;
+						}
+						catch { }
+					}
+				}
+			}
+
+			if (!hasRenderedCenterActionIcon && string.Equals(centerAction.Type, "Launch", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(centerAction.Parameter))
+			{
+				try
+				{
+					BitmapSource? appIcon = IconHelper.GetIcon(centerAction.Parameter);
+					if (appIcon != null)
+					{
+						double imgDim = coreRadius * 0.95 * num7;
+						CoreCustomImageEllipse.Width = imgDim;
+						CoreCustomImageEllipse.Height = imgDim;
+						CoreCustomImageEllipse.RenderTransform = renderTransform;
+						ImageBrush imgBrush = new ImageBrush(appIcon)
+						{
+							Stretch = Stretch.Uniform,
+							AlignmentX = AlignmentX.Center,
+							AlignmentY = AlignmentY.Center
+						};
+						RenderOptions.SetBitmapScalingMode(imgBrush, BitmapScalingMode.HighQuality);
+						CoreCustomImageEllipse.Fill = imgBrush;
+						CoreCustomImageEllipse.Visibility = Visibility.Visible;
+						CoreExitIcon.Visibility = Visibility.Collapsed;
+						hasRenderedCenterActionIcon = true;
+					}
+				}
+				catch { }
+			}
+
+			if (!hasRenderedCenterActionIcon && !string.IsNullOrEmpty(centerAction.Type))
+			{
+				string defaultKey = centerAction.Type switch
+				{
+					"WebUrl" => "Globe",
+					"Folder" => "Folder",
+					"Launch" => "Rocket",
+					"Hotkey" => "Keyboard",
+					"Command" => "Terminal",
+					"SwitchWindow" => "Layers",
+					"System" => "Settings",
+					_ => "Star"
+				};
+				string fallbackSvg = IconHelper.GetSvgPathByKey(defaultKey);
+				if (!string.IsNullOrEmpty(fallbackSvg))
+				{
+					try
+					{
+						CoreExitIcon.Data = Geometry.Parse(fallbackSvg);
+						CoreExitIcon.Width = iconDim;
+						CoreExitIcon.Height = iconDim;
+						CoreExitIcon.RenderTransform = renderTransform;
+						CoreExitIcon.Fill = _textColorBrush;
+						CoreExitIcon.Visibility = Visibility.Visible;
+						CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
+						hasRenderedCenterActionIcon = true;
+					}
+					catch { }
+				}
+			}
+		}
+
+		if (!hasRenderedCenterActionIcon && showCoreIcon)
 		{
 			bool num8 = text2 == "Custom";
 			IconHelper.CustomIconItem customIconItem = null;
@@ -698,7 +948,7 @@ public partial class RadialWindow : Window
 				CoreExitIcon.Visibility = Visibility.Visible;
 			}
 		}
-		else
+		else if (!hasRenderedCenterActionIcon)
 		{
 			CoreCustomImageEllipse.Visibility = Visibility.Collapsed;
 			CoreExitIcon.Visibility = Visibility.Collapsed;
@@ -708,68 +958,46 @@ public partial class RadialWindow : Window
 		_defaultCoreExitIconOpacity = CoreExitIcon.Opacity;
 		_defaultCoreCustomImageOpacity = CoreCustomImageEllipse.Opacity;
 		_defaultCoreCustomImageEffect = CoreCustomImageEllipse.Effect;
-		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
-		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
-		CoreSelectionTextPanel.Width = Math.Max(32.0, Math.Min(coreRadius * 1.75, 180.0));
-		double coreFontSize = (ConfigManager.CurrentConfig?.CoreFontSize > 0.0)
-			? ConfigManager.CurrentConfig.CoreFontSize
-			: Math.Max(8.0, Math.Min(16.0, coreRadius / 4.0));
-		CoreSelectionText.FontSize = coreFontSize;
-		if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig?.CoreFontFamily))
+	}
+
+	private Storyboard? _layerBadgeStoryboard;
+
+	public void SwitchToLayer(int layerIndex)
+	{
+		if (_profile == null || _profile.Layers == null || _profile.Layers.Count == 0)
 		{
-			try
-			{
-				CoreSelectionText.FontFamily = new FontFamily(ConfigManager.CurrentConfig.CoreFontFamily);
-			}
-			catch
-			{
-			}
+			return;
 		}
-		if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
+		if (layerIndex < 0 || layerIndex >= _profile.Layers.Count)
 		{
-			try
-			{
-				CoreSelectionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.CoreTextColor));
-			}
-			catch
-			{
-				CoreSelectionText.Foreground = _textColorBrush;
-			}
+			return;
 		}
-		else
-		{
-			CoreSelectionText.Foreground = _textColorBrush;
-		}
-		CoreSelectionOverlay.Fill = CreateFrostedCoreBrush(_coreBgBrush);
-		Panel.SetZIndex(CoreSelectionOverlay, 20);
-		Panel.SetZIndex(CoreSelectionTextPanel, 21);
-		RenderStyleDecorations();
+
+		_profile.ActiveLayerIndex = layerIndex;
+		_profile.SyncRootPropertiesFromActiveLayer();
+
+		_currentHighlightedSector = -999;
+		_currentHighlightedSubSector = -1;
+		_activeSubTierParentSector = -1;
+		_subTierCache.Clear();
+
 		RenderSectors();
-		Storyboard storyboard = new Storyboard();
-		BackEase easingFunction = new BackEase
+		UpdateCenterIconVisuals();
+
+		if (_profile.Layers.Count > 1 && LayerIndicatorBadge != null && LayerIndicatorText != null)
 		{
-			EasingMode = EasingMode.EaseOut,
-			Amplitude = 0.35
-		};
-		DoubleAnimation doubleAnimation = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
-		{
-			EasingFunction = easingFunction
-		};
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation, new PropertyPath("RenderTransform.Children[0].ScaleX"));
-		DoubleAnimation doubleAnimation2 = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
-		{
-			EasingFunction = easingFunction
-		};
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation2, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation2, new PropertyPath("RenderTransform.Children[0].ScaleY"));
-		DoubleAnimation doubleAnimation3 = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(90.0)));
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation3, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation3, new PropertyPath(UIElement.OpacityProperty));
-		storyboard.Children.Add(doubleAnimation);
-		storyboard.Children.Add(doubleAnimation2);
-		storyboard.Children.Add(doubleAnimation3);
-		storyboard.Begin();
+			WheelLayer curLayer = _profile.Layers[layerIndex];
+			LayerIndicatorText.Text = $"{curLayer.Name} ({layerIndex + 1}/{_profile.Layers.Count})";
+			LayerIndicatorBadge.Visibility = Visibility.Visible;
+
+			_layerBadgeStoryboard?.Stop();
+			_layerBadgeStoryboard = new Storyboard();
+			DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(80)));
+			Storyboard.SetTarget(fadeIn, LayerIndicatorBadge);
+			Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+			_layerBadgeStoryboard.Children.Add(fadeIn);
+			_layerBadgeStoryboard.Begin();
+		}
 	}
 
 	private void RenderStyleDecorations()
@@ -1773,10 +2001,22 @@ public partial class RadialWindow : Window
 		}
 		if (mainIndex == -1)
 		{
-			CoreExitIcon.Fill = new SolidColorBrush(Color.FromRgb(244, 63, 94));
-			if (_styleRenderer != null)
+			bool hasCenterAction = _profile != null && _profile.EnableCenterAction && _profile.CenterAction != null && (!string.IsNullOrEmpty(_profile.CenterAction.Type) || !string.IsNullOrEmpty(_profile.CenterAction.IconKey) || !string.IsNullOrEmpty(_profile.CenterAction.Name));
+			if (hasCenterAction)
 			{
-				_styleRenderer.ApplyExitHighlight(CoreExitIcon, isHighlighted: true);
+				CoreExitIcon.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+				if (_styleRenderer != null)
+				{
+					_styleRenderer.ApplyExitHighlight(CoreExitIcon, isHighlighted: true);
+				}
+			}
+			else
+			{
+				CoreExitIcon.Fill = new SolidColorBrush(Color.FromRgb(244, 63, 94));
+				if (_styleRenderer != null)
+				{
+					_styleRenderer.ApplyExitHighlight(CoreExitIcon, isHighlighted: true);
+				}
 			}
 		}
 		else
