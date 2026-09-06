@@ -1,0 +1,129 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Publish StarPie Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag points to latest main commit
+        shell: pwsh
+        run: |
+          git fetch origin main
+
+          $tagCommit = (git rev-list -n 1 $env:GITHUB_REF_NAME).Trim()
+          $mainCommit = (git rev-parse origin/main).Trim()
+
+          if ($tagCommit -ne $mainCommit) {
+            throw "Release tag must point to the latest origin/main commit. Tag=$tagCommit Main=$mainCommit"
+          }
+
+          Write-Host "Verified release commit: $tagCommit"
+
+      - name: Verify compiled version fields
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag must use the vX.Y.Z format: $tag"
+          }
+
+          $tagVersion = $Matches.version
+          $expectedFourPartVersion = "${tagVersion}.0"
+          [xml]$project = Get-Content "WinPieGestures/WinPieGestures.csproj"
+
+          $projectVersion = [string]$project.Project.PropertyGroup.Version
+          $assemblyVersion = [string]$project.Project.PropertyGroup.AssemblyVersion
+          $fileVersion = [string]$project.Project.PropertyGroup.FileVersion
+
+          if ($projectVersion -ne $tagVersion) {
+            throw "Version mismatch: tag=$tagVersion Version=$projectVersion"
+          }
+          if ($assemblyVersion -ne $expectedFourPartVersion) {
+            throw "AssemblyVersion mismatch: expected=$expectedFourPartVersion actual=$assemblyVersion"
+          }
+          if ($fileVersion -ne $expectedFourPartVersion) {
+            throw "FileVersion mismatch: expected=$expectedFourPartVersion actual=$fileVersion"
+          }
+
+          Write-Host "Verified Version=$projectVersion AssemblyVersion=$assemblyVersion FileVersion=$fileVersion"
+
+      - name: Setup .NET SDK 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore WinPieGestures/WinPieGestures.csproj -r win-x64
+
+      - name: Build Release
+        run: dotnet build WinPieGestures/WinPieGestures.csproj -c Release --no-restore
+
+      - name: Publish Lightweight package
+        run: >
+          dotnet publish WinPieGestures/WinPieGestures.csproj
+          -c Release
+          -r win-x64
+          --no-self-contained
+          --no-restore
+          -o publish/Lightweight
+
+      - name: Publish Standalone package
+        run: >
+          dotnet publish WinPieGestures/WinPieGestures.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish/Standalone
+
+      - name: Package release assets
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+
+          $lightweightArchive = "dist/StarPie-$tag-Lightweight-win-x64.zip"
+          $standaloneArchive = "dist/StarPie-$tag-Standalone-win-x64.zip"
+
+          Compress-Archive -Path "publish/Lightweight/*" -DestinationPath $lightweightArchive -Force
+          Compress-Archive -Path "publish/Standalone/*" -DestinationPath $standaloneArchive -Force
+
+          $checksums = Get-ChildItem "dist/*.zip" | Sort-Object Name | ForEach-Object {
+            $hash = Get-FileHash $_.FullName -Algorithm SHA256
+            "$($hash.Hash.ToLowerInvariant())  $($_.Name)"
+          }
+          $checksums | Set-Content "dist/SHA256SUMS.txt" -Encoding utf8
+
+          if (-not (Test-Path "publish/Lightweight/StarPie.exe")) {
+            throw "Lightweight package does not contain StarPie.exe"
+          }
+          if (-not (Test-Path "publish/Standalone/StarPie.exe")) {
+            throw "Standalone package does not contain StarPie.exe"
+          }
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem "dist/*.zip", "dist/SHA256SUMS.txt" |
+            Sort-Object Name |
+            Select-Object -ExpandProperty FullName
+
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --generate-notes --title "StarPie $env:GITHUB_REF_NAME"
