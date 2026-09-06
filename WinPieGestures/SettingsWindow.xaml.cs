@@ -4171,6 +4171,7 @@ public partial class SettingsWindow : Window
 		if (iconPickerWindow.ShowDialog() == true)
 		{
 			item.IconKey = iconPickerWindow.SelectedIconKey ?? "";
+			item.InheritAppIconPath = "";
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -4768,6 +4769,9 @@ public partial class SettingsWindow : Window
 		{
 			item.Parameter = programPicker.SelectedPath;
 			FocusLaunchPathTextBox.Text = programPicker.SelectedPath;
+			item.InheritAppIconPath = programPicker.SelectedPath;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
 				string autoName = !string.IsNullOrEmpty(programPicker.SelectedName) 
@@ -4776,6 +4780,7 @@ public partial class SettingsWindow : Window
 				item.Name = autoName;
 				FocusActionNameTextBox.Text = autoName;
 			}
+			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
@@ -4794,6 +4799,9 @@ public partial class SettingsWindow : Window
 		{
 			item.Parameter = picker.SelectedPath;
 			FocusLaunchPathTextBox.Text = picker.SelectedPath;
+			item.InheritAppIconPath = picker.SelectedPath;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
 				string autoName = !string.IsNullOrEmpty(picker.SelectedTitle)
@@ -4802,6 +4810,7 @@ public partial class SettingsWindow : Window
 				item.Name = autoName;
 				FocusActionNameTextBox.Text = autoName;
 			}
+			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
@@ -4823,12 +4832,16 @@ public partial class SettingsWindow : Window
 		{
 			item.Parameter = dlg.FileName;
 			FocusLaunchPathTextBox.Text = dlg.FileName;
+			item.InheritAppIconPath = dlg.FileName;
+			item.IconKey = "";
+			item.CustomIconSvg = "";
 			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
 			{
 				string autoName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
 				item.Name = autoName;
 				FocusActionNameTextBox.Text = autoName;
 			}
+			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
@@ -9617,6 +9630,7 @@ public partial class SettingsWindow : Window
 		if (iconPickerWindow.ShowDialog() == true)
 		{
 			dataContext.IconKey = iconPickerWindow.SelectedIconKey ?? "";
+			dataContext.InheritAppIconPath = "";
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 			{
