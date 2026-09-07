@@ -118,17 +118,35 @@ public static class ConfigManager
 			{
 				foreach (WheelProfile profile in CurrentConfig.Profiles)
 				{
-					if (profile.Actions == null)
+					if (profile == null) continue;
+					profile.EnsureLayers();
+					if (profile.Actions != null)
 					{
-						continue;
-					}
-					foreach (ActionItem action in profile.Actions)
-					{
-						if (action.SubActions == null)
+						foreach (ActionItem action in profile.Actions)
 						{
-							List<ActionItem> list3 = (action.SubActions = new List<ActionItem>());
+							if (action != null && action.SubActions == null)
+							{
+								action.SubActions = new List<ActionItem>();
+							}
 						}
 					}
+					if (profile.Layers != null)
+					{
+						foreach (WheelLayer layer in profile.Layers)
+						{
+							if (layer.Actions != null)
+							{
+								foreach (ActionItem action in layer.Actions)
+								{
+									if (action != null && action.SubActions == null)
+									{
+										action.SubActions = new List<ActionItem>();
+									}
+								}
+							}
+						}
+					}
+					profile.SyncRootPropertiesFromActiveLayer();
 				}
 				WheelProfile wheelProfile = CurrentConfig.Profiles.FirstOrDefault((WheelProfile p) => string.Equals(p.ProcessName, "Global", StringComparison.OrdinalIgnoreCase));
 				if (wheelProfile != null && wheelProfile.Actions != null && wheelProfile.Actions.Sum((ActionItem a) => a.SubActions?.Count ?? 0) == 0)
@@ -523,6 +541,10 @@ public static class ConfigManager
 		obj.Profiles.Add(item);
 		obj.Profiles.Add(item2);
 		obj.Profiles.Add(item3);
+		foreach (var p in obj.Profiles)
+		{
+			p.EnsureLayers();
+		}
 		return obj;
 	}
 

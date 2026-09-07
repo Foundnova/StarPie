@@ -71,13 +71,45 @@ public static class ActionExecutor
 		public InputUnion U;
 	}
 
-	private class HotkeyDetails
+	public class HotkeyStep
+	{
+		public List<ushort> Modifiers { get; } = new List<ushort>();
+
+		public ushort MainKey { get; set; }
+
+		public string RawToken { get; set; } = string.Empty;
+
+		public override string ToString()
+		{
+			List<string> parts = new List<string>();
+			foreach (ushort mod in Modifiers)
+			{
+				parts.Add(mod switch
+				{
+					162 => "Ctrl",
+					160 => "Shift",
+					164 => "Alt",
+					91 => "Win",
+					_ => $"Mod({mod})"
+				});
+			}
+			if (MainKey != 0)
+			{
+				parts.Add($"VK({MainKey})");
+			}
+			return string.Join("+", parts);
+		}
+	}
+
+	public class HotkeyDetails
 	{
 		public List<ushort> Modifiers { get; } = new List<ushort>();
 
 		public List<ushort> SequenceKeys { get; } = new List<ushort>();
 
 		public ushort MainKey { get; set; }
+
+		public List<HotkeyStep> Steps { get; } = new List<HotkeyStep>();
 	}
 
 	private const int SW_HIDE = 0;
@@ -1350,6 +1382,89 @@ public static class ActionExecutor
 		}
 	}
 
+	private static void ExecuteSingleStep(HotkeyStep step)
+	{
+		try
+		{
+			// 1. 纯修饰键步骤 (如 Alt 轻敲呼出 Ribbon 菜单，或单独按下 Shift/Ctrl)
+			if (step.MainKey == 0 && step.Modifiers.Count > 0)
+			{
+				List<INPUT> modDowns = new List<INPUT>();
+				foreach (ushort mod in step.Modifiers)
+				{
+					modDowns.Add(CreateKeyInput(mod, down: true));
+				}
+				SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(15);
+
+				List<INPUT> modUps = new List<INPUT>();
+				for (int i = step.Modifiers.Count - 1; i >= 0; i--)
+				{
+					modUps.Add(CreateKeyInput(step.Modifiers[i], down: false));
+				}
+				SendInput((uint)modUps.Count, modUps.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				return;
+			}
+
+			// 2. 复合键步骤 (如 Alt+H 或 Ctrl+K)
+			if (step.Modifiers.Count > 0 && step.MainKey != 0)
+			{
+				List<INPUT> modDowns = new List<INPUT>();
+				foreach (ushort mod in step.Modifiers)
+				{
+					modDowns.Add(CreateKeyInput(mod, down: true));
+				}
+				SendInput((uint)modDowns.Count, modDowns.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				System.Threading.Thread.Sleep(12);
+
+				INPUT keyDown = CreateKeyInput(step.MainKey, down: true);
+				INPUT keyUp = CreateKeyInput(step.MainKey, down: false);
+
+				if (step.MainKey == 44) // VK_SNAPSHOT
+				{
+					SendInput(2u, new INPUT[] { keyDown, keyUp }, Marshal.SizeOf(typeof(INPUT)));
+				}
+				else
+				{
+					SendInput(1u, new INPUT[] { keyDown }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(15);
+					SendInput(1u, new INPUT[] { keyUp }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(12);
+				}
+
+				List<INPUT> modUps = new List<INPUT>();
+				for (int i = step.Modifiers.Count - 1; i >= 0; i--)
+				{
+					modUps.Add(CreateKeyInput(step.Modifiers[i], down: false));
+				}
+				SendInput((uint)modUps.Count, modUps.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+				return;
+			}
+
+			// 3. 单键轻敲步骤 (如 H, V, F 等)
+			if (step.MainKey != 0)
+			{
+				INPUT keyDown = CreateKeyInput(step.MainKey, down: true);
+				INPUT keyUp = CreateKeyInput(step.MainKey, down: false);
+
+				if (step.MainKey == 44) // VK_SNAPSHOT
+				{
+					SendInput(2u, new INPUT[] { keyDown, keyUp }, Marshal.SizeOf(typeof(INPUT)));
+				}
+				else
+				{
+					SendInput(1u, new INPUT[] { keyDown }, Marshal.SizeOf(typeof(INPUT)));
+					System.Threading.Thread.Sleep(15);
+					SendInput(1u, new INPUT[] { keyUp }, Marshal.SizeOf(typeof(INPUT)));
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Error in ExecuteSingleStep ({step}): {ex.Message}");
+		}
+	}
+
 	private static void ExecuteHotkey(string hotkeyString)
 	{
 		if (string.IsNullOrWhiteSpace(hotkeyString))
@@ -1358,7 +1473,7 @@ public static class ActionExecutor
 		}
 
 		HotkeyDetails hotkeyDetails = ParseHotkey(hotkeyString);
-		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0)
+		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.MainKey == 0 && hotkeyDetails.Steps.Count == 0)
 		{
 			// 如果是连续按键字母（例如 "UU", "US", "WASD"），优先使用原生虚拟按键流发送，保证系统菜单与快捷键接收
 			string rawStr = hotkeyString.Trim();
@@ -1389,7 +1504,25 @@ public static class ActionExecutor
 			return;
 		}
 
-		// 无修饰键的多键序列（例如 "U+U", "U+S", "A+B"）
+		// 多步骤序列（包括显式步进如 "Alt, H, V, F"、连续多键如 "Alt+H+V+F"、"U+U"、"Ctrl+K, Ctrl+C" 等）
+		if (hotkeyDetails.Steps.Count > 1)
+		{
+			AppLogger.LogInfo($"Executing Multi-Step Hotkey: '{hotkeyString}' ({hotkeyDetails.Steps.Count} steps: [{string.Join(" -> ", hotkeyDetails.Steps)}])");
+			System.Threading.Thread.Sleep(15);
+			for (int s = 0; s < hotkeyDetails.Steps.Count; s++)
+			{
+				HotkeyStep step = hotkeyDetails.Steps[s];
+				ExecuteSingleStep(step);
+				if (s < hotkeyDetails.Steps.Count - 1)
+				{
+					int stepDelay = (step.Modifiers.Contains(164) && step.MainKey == 0) ? 35 : 25;
+					System.Threading.Thread.Sleep(stepDelay);
+				}
+			}
+			return;
+		}
+
+		// 无修饰键的多键序列回退兼容（例如 "U+U", "U+S", "A+B"）
 		if (hotkeyDetails.Modifiers.Count == 0 && hotkeyDetails.SequenceKeys.Count > 1)
 		{
 			AppLogger.LogInfo($"Executing Key Sequence: [{string.Join(" -> ", hotkeyDetails.SequenceKeys)}]");
@@ -1846,59 +1979,210 @@ public static class ActionExecutor
 		return result;
 	}
 
-	private static HotkeyDetails ParseHotkey(string hotkeyString)
+	public static HotkeyStep ParseHotkeyStepToken(string token)
 	{
-		HotkeyDetails hotkeyDetails = new HotkeyDetails();
-		string[] array = hotkeyString.Split(new char[3] { '+', ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-		for (int i = 0; i < array.Length; i++)
+		HotkeyStep step = new HotkeyStep { RawToken = token };
+		string[] pieces = token.Split(new char[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		foreach (string piece in pieces)
 		{
-			string text = array[i].Trim().ToLower();
-			switch (text)
+			string lower = piece.Trim().ToLowerInvariant();
+			switch (lower)
 			{
-			case "ctrl":
-			case "control":
-			case "lctrl":
-			case "rctrl":
-				if (!hotkeyDetails.Modifiers.Contains(162))
-				{
-					hotkeyDetails.Modifiers.Add(162);
-				}
-				continue;
-			case "shift":
-			case "lshift":
-			case "rshift":
-				if (!hotkeyDetails.Modifiers.Contains(160))
-				{
-					hotkeyDetails.Modifiers.Add(160);
-				}
-				continue;
-			case "alt":
-			case "menu":
-			case "lalt":
-			case "ralt":
-				if (!hotkeyDetails.Modifiers.Contains(164))
-				{
-					hotkeyDetails.Modifiers.Add(164);
-				}
-				continue;
-			case "win":
-			case "lwin":
-			case "rwin":
-			case "windows":
-				if (!hotkeyDetails.Modifiers.Contains(91))
-				{
-					hotkeyDetails.Modifiers.Add(91);
-				}
-				continue;
-			}
-			ushort num = MapKeyStringToVk(text);
-			if (num != 0)
-			{
-				hotkeyDetails.MainKey = num;
-				hotkeyDetails.SequenceKeys.Add(num);
+				case "ctrl":
+				case "control":
+				case "lctrl":
+				case "rctrl":
+					if (!step.Modifiers.Contains(162)) step.Modifiers.Add(162);
+					break;
+				case "shift":
+				case "lshift":
+				case "rshift":
+					if (!step.Modifiers.Contains(160)) step.Modifiers.Add(160);
+					break;
+				case "alt":
+				case "menu":
+				case "lalt":
+				case "ralt":
+					if (!step.Modifiers.Contains(164)) step.Modifiers.Add(164);
+					break;
+				case "win":
+				case "lwin":
+				case "rwin":
+				case "windows":
+					if (!step.Modifiers.Contains(91)) step.Modifiers.Add(91);
+					break;
+				default:
+					ushort vk = MapKeyStringToVk(lower);
+					if (vk != 0)
+					{
+						step.MainKey = vk;
+					}
+					break;
 			}
 		}
-		return hotkeyDetails;
+		return step;
+	}
+
+	public static HotkeyDetails ParseHotkey(string hotkeyString)
+	{
+		HotkeyDetails details = new HotkeyDetails();
+		if (string.IsNullOrWhiteSpace(hotkeyString))
+		{
+			return details;
+		}
+
+		string normalized = hotkeyString.Trim().Replace("->", ",").Replace(">", ",");
+
+		// 1. 如果包含显式步进分隔符（逗号 ',' 或分号 ';'）
+		if (normalized.Contains(',') || normalized.Contains(';'))
+		{
+			string[] chunks = normalized.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+			foreach (string chunk in chunks)
+			{
+				string trimmed = chunk.Trim();
+				if (!string.IsNullOrEmpty(trimmed))
+				{
+					HotkeyStep step = ParseHotkeyStepToken(trimmed);
+					details.Steps.Add(step);
+					foreach (ushort mod in step.Modifiers)
+					{
+						if (!details.Modifiers.Contains(mod)) details.Modifiers.Add(mod);
+					}
+					if (step.MainKey != 0)
+					{
+						details.MainKey = step.MainKey;
+						details.SequenceKeys.Add(step.MainKey);
+					}
+				}
+			}
+			return details;
+		}
+
+		// 2. 无显式步进分隔符：解析以 '+' 或空格分隔的按键
+		string[] tokens = normalized.Split(new char[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		List<ushort> detectedModifiers = new List<ushort>();
+		List<ushort> detectedMainKeys = new List<ushort>();
+		List<string> rawNonModifiers = new List<string>();
+
+		for (int i = 0; i < tokens.Length; i++)
+		{
+			string text = tokens[i].Trim().ToLowerInvariant();
+			switch (text)
+			{
+				case "ctrl":
+				case "control":
+				case "lctrl":
+				case "rctrl":
+					if (!detectedModifiers.Contains(162)) detectedModifiers.Add(162);
+					break;
+				case "shift":
+				case "lshift":
+				case "rshift":
+					if (!detectedModifiers.Contains(160)) detectedModifiers.Add(160);
+					break;
+				case "alt":
+				case "menu":
+				case "lalt":
+				case "ralt":
+					if (!detectedModifiers.Contains(164)) detectedModifiers.Add(164);
+					break;
+				case "win":
+				case "lwin":
+				case "rwin":
+				case "windows":
+					if (!detectedModifiers.Contains(91)) detectedModifiers.Add(91);
+					break;
+				default:
+					ushort vk = MapKeyStringToVk(text);
+					if (vk != 0)
+					{
+						detectedMainKeys.Add(vk);
+						rawNonModifiers.Add(tokens[i]);
+					}
+					break;
+			}
+		}
+
+		// 2.1 若包含多个非修饰键（如 "Alt+H+V+F"、"U+U"、"A+B+C"），自动按步进序列解析
+		if (detectedMainKeys.Count > 1)
+		{
+			// 如果首项是修饰键（如 Alt），则将其作为第 1 步，后续每一个键作为独立步
+			if (detectedModifiers.Count > 0 && tokens.Length > detectedMainKeys.Count)
+			{
+				string firstLower = tokens[0].Trim().ToLowerInvariant();
+				bool firstIsMod = (firstLower == "alt" || firstLower == "menu" || firstLower == "ctrl" || firstLower == "shift" || firstLower == "win");
+				if (firstIsMod)
+				{
+					// 第一步：轻敲修饰键（如 Alt 唤醒 Ribbon KeyTips）
+					HotkeyStep modStep = new HotkeyStep { RawToken = tokens[0] };
+					modStep.Modifiers.AddRange(detectedModifiers);
+					details.Steps.Add(modStep);
+
+					// 后续步：每个非修饰键作为独立步（如 H -> V -> F）
+					for (int k = 0; k < detectedMainKeys.Count; k++)
+					{
+						HotkeyStep keyStep = new HotkeyStep
+						{
+							MainKey = detectedMainKeys[k],
+							RawToken = rawNonModifiers[k]
+						};
+						details.Steps.Add(keyStep);
+					}
+				}
+				else
+				{
+					// 若修饰键与主键混合，第一步组合，后续单键
+					HotkeyStep firstComboStep = new HotkeyStep { RawToken = tokens[0] };
+					firstComboStep.Modifiers.AddRange(detectedModifiers);
+					firstComboStep.MainKey = detectedMainKeys[0];
+					details.Steps.Add(firstComboStep);
+
+					for (int k = 1; k < detectedMainKeys.Count; k++)
+					{
+						HotkeyStep keyStep = new HotkeyStep
+						{
+							MainKey = detectedMainKeys[k],
+							RawToken = rawNonModifiers[k]
+						};
+						details.Steps.Add(keyStep);
+					}
+				}
+			}
+			else
+			{
+				// 无修饰键的多键序列（如 "U+U", "A+B+C"）
+				for (int k = 0; k < detectedMainKeys.Count; k++)
+				{
+					HotkeyStep keyStep = new HotkeyStep
+					{
+						MainKey = detectedMainKeys[k],
+						RawToken = rawNonModifiers[k]
+					};
+					details.Steps.Add(keyStep);
+				}
+			}
+
+			details.Modifiers.AddRange(detectedModifiers);
+			details.SequenceKeys.AddRange(detectedMainKeys);
+			details.MainKey = detectedMainKeys.LastOrDefault();
+			return details;
+		}
+
+		// 2.2 常规单步快捷键（如 "Ctrl+C", "Win+Shift+S", "Alt+F4", "Shift+Alt"）
+		HotkeyStep singleStep = new HotkeyStep { RawToken = normalized };
+		singleStep.Modifiers.AddRange(detectedModifiers);
+		if (detectedMainKeys.Count == 1)
+		{
+			singleStep.MainKey = detectedMainKeys[0];
+		}
+		details.Steps.Add(singleStep);
+		details.Modifiers.AddRange(detectedModifiers);
+		if (detectedMainKeys.Count == 1)
+		{
+			details.MainKey = detectedMainKeys[0];
+			details.SequenceKeys.Add(detectedMainKeys[0]);
+		}
+		return details;
 	}
 
 	private static ushort MapKeyStringToVk(string keyToken)

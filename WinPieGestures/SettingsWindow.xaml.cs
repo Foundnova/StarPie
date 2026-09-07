@@ -221,6 +221,66 @@ public partial class SettingsWindow : Window
 		}
 	};
 
+	private static readonly ActionItem[] DefaultPresets8 = new ActionItem[8]
+	{
+		new ActionItem
+		{
+			Type = "Hotkey",
+			Name = "复制 (Copy)",
+			Parameter = "Ctrl+C",
+			IconKey = "Copy"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "锁定电脑 (Lock)",
+			Parameter = "Lock",
+			IconKey = "Lock"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "显示桌面 (Desktop)",
+			Parameter = "ShowDesktop",
+			IconKey = "ShowDesktop"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "屏幕截图 (Capture)",
+			Parameter = "Screenshot",
+			IconKey = "Screenshot"
+		},
+		new ActionItem
+		{
+			Type = "Hotkey",
+			Name = "粘贴 (Paste)",
+			Parameter = "Ctrl+V",
+			IconKey = "Paste"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "音量减 (Vol Down)",
+			Parameter = "VolumeDown",
+			IconKey = "VolumeDown"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "关闭窗口 (Close)",
+			Parameter = "CloseWindow",
+			IconKey = "CloseWindow"
+		},
+		new ActionItem
+		{
+			Type = "System",
+			Name = "音量增 (Vol Up)",
+			Parameter = "VolumeUp",
+			IconKey = "VolumeUp"
+		}
+	};
+
 	private static readonly ActionItem[] DefaultPresets12 = new ActionItem[12]
 	{
 		new ActionItem
@@ -442,7 +502,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.1");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -910,6 +970,12 @@ public partial class SettingsWindow : Window
 		SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
 		RefreshLayoutOptionsUi();
 		SetComboBoxSelectedValue(SubmenuStyleComboBox, ConfigManager.CurrentConfig.SubmenuStyle ?? "Wheel");
+		bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		if (LivePreviewTierSegmentBorder != null)
+		{
+			LivePreviewTierSegmentBorder.Visibility = isFan ? Visibility.Visible : Visibility.Collapsed;
+		}
+		TierDimensionRadio_Checked(Tier1ConfigSegmentRadio, new RoutedEventArgs());
 		if (ShowSelectedActionTextCheckBox != null)
 		{
 			ShowSelectedActionTextCheckBox.IsChecked = ConfigManager.CurrentConfig.ShowSelectedActionText;
@@ -1191,7 +1257,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.1"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 	}
@@ -2402,9 +2468,17 @@ public partial class SettingsWindow : Window
 			{
 				ConfigManager.CurrentConfig.EdgeSafeMarginY = EdgeSafeMarginYSlider.Value;
 			}
-			if (_selectedProfile != null)
+			if (ConfigManager.CurrentConfig?.Profiles != null)
 			{
-				_selectedProfile.SyncActiveLayerFromRootProperties();
+				foreach (var p in ConfigManager.CurrentConfig.Profiles)
+				{
+					if (p == null) continue;
+					if (p == _selectedProfile)
+					{
+						p.SyncActiveLayerFromRootProperties();
+					}
+					p.EnsureLayers();
+				}
 			}
 			if (saveToDisk)
 			{
@@ -2534,7 +2608,22 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
-		_selectedProfile = ProfilesListBox.SelectedItem as WheelProfile;
+		if (ProfilesListBox.SelectedItem is WheelProfile newProfile)
+		{
+			if (_selectedProfile != null && _selectedProfile != newProfile)
+			{
+				_selectedProfile.SyncActiveLayerFromRootProperties();
+			}
+			_selectedProfile = newProfile;
+			_selectedProfile.EnsureLayers();
+			_selectedProfile.SyncRootPropertiesFromActiveLayer();
+			RefreshLayersUi();
+		}
+		else
+		{
+			_selectedProfile = null;
+		}
+
 		if (_selectedProfile == null)
 		{
 			return;
@@ -2560,6 +2649,12 @@ public partial class SettingsWindow : Window
 			if (MappingsProfileComboBox != null && MappingsProfileComboBox.SelectedItem != _selectedProfile)
 			{
 				MappingsProfileComboBox.SelectedItem = _selectedProfile;
+			}
+			_selectedSlotIndex = 0;
+			_selectedSubActionIndex = null;
+			if (MappingsTier1SegmentRadio != null)
+			{
+				MappingsTier1SegmentRadio.IsChecked = true;
 			}
 			RefreshSlots();
 			UpdateFocusEditorUi();
@@ -2616,12 +2711,28 @@ public partial class SettingsWindow : Window
 			};
 
 			profile.Actions ??= new List<ActionItem>();
+			if (profile.Actions.Count != count && profile.Actions.Count > 0)
+			{
+				profile.Actions = MigrateActionsBetweenSectorCounts(profile.Actions, profile.Actions.Count, count);
+				profile.SyncActiveLayerFromRootProperties();
+			}
 			while (profile.Actions.Count < count)
 			{
 				int index = profile.Actions.Count;
 				if (count == 12 && index < DefaultPresets12.Length)
 				{
 					ActionItem preset = DefaultPresets12[index];
+					profile.Actions.Add(new ActionItem
+					{
+						Type = preset.Type,
+						Name = preset.Name,
+						Parameter = preset.Parameter,
+						IconKey = preset.IconKey
+					});
+				}
+				else if (count == 8 && index < DefaultPresets8.Length)
+				{
+					ActionItem preset = DefaultPresets8[index];
 					profile.Actions.Add(new ActionItem
 					{
 						Type = preset.Type,
@@ -2677,6 +2788,159 @@ public partial class SettingsWindow : Window
 	private static int NormalizeSectorCount(int sectorCount)
 	{
 		return sectorCount is 4 or 8 or 12 ? sectorCount : 8;
+	}
+
+	/// <summary>
+	/// 在不同扇区数量 (4键、8键、12键) 切换时，根据绝对极坐标空间方位进行智能几何方位映射继承。
+	/// 保证东 (0° / 右)、南 (90° / 下)、西 (180° / 左)、北 (270° / 上) 等正交方位 100% 物理对齐，杜绝索引位移倒置。
+	/// </summary>
+	public static List<ActionItem> MigrateActionsBetweenSectorCounts(List<ActionItem>? sourceActions, int oldSectorCount, int newSectorCount)
+	{
+		oldSectorCount = NormalizeSectorCount(oldSectorCount);
+		newSectorCount = NormalizeSectorCount(newSectorCount);
+
+		if (sourceActions == null || sourceActions.Count == 0)
+		{
+			List<ActionItem> emptyResult = new List<ActionItem>(newSectorCount);
+			for (int i = 0; i < newSectorCount; i++)
+			{
+				emptyResult.Add(CreateDefaultPreset(newSectorCount, i));
+			}
+			return emptyResult;
+		}
+
+		if (oldSectorCount == newSectorCount && sourceActions.Count == newSectorCount)
+		{
+			return sourceActions;
+		}
+
+		ActionItem? GetSource(int index)
+		{
+			if (index >= 0 && index < sourceActions.Count && sourceActions[index] != null)
+			{
+				return sourceActions[index].Clone();
+			}
+			return null;
+		}
+
+		ActionItem CreateDefaultPreset(int count, int index)
+		{
+			if (count == 4 && index < DefaultPresets4.Length)
+			{
+				return DefaultPresets4[index].Clone();
+			}
+			if (count == 8 && index < DefaultPresets8.Length)
+			{
+				return DefaultPresets8[index].Clone();
+			}
+			if (count == 12 && index < DefaultPresets12.Length)
+			{
+				return DefaultPresets12[index].Clone();
+			}
+			return new ActionItem
+			{
+				Type = "Hotkey",
+				Name = $"动作 {index + 1}",
+				Parameter = ""
+			};
+		}
+
+		List<ActionItem> result = new List<ActionItem>(newSectorCount);
+
+		if (oldSectorCount == 4 && newSectorCount == 8)
+		{
+			// 4 -> 8: 保持 E(0), S(1->2), W(2->4), N(3->6)；斜向填充 8 键默认预设
+			result.Add(GetSource(0) ?? CreateDefaultPreset(8, 0)); // E (0°)
+			result.Add(CreateDefaultPreset(8, 1));                  // SE (45°)
+			result.Add(GetSource(1) ?? CreateDefaultPreset(8, 2)); // S (90°)
+			result.Add(CreateDefaultPreset(8, 3));                  // SW (135°)
+			result.Add(GetSource(2) ?? CreateDefaultPreset(8, 4)); // W (180°)
+			result.Add(CreateDefaultPreset(8, 5));                  // NW (225°)
+			result.Add(GetSource(3) ?? CreateDefaultPreset(8, 6)); // N (270°)
+			result.Add(CreateDefaultPreset(8, 7));                  // NE (315°)
+		}
+		else if (oldSectorCount == 8 && newSectorCount == 4)
+		{
+			// 8 -> 4: 提取 8 键中正交方位的 4 个动作 E(0), S(2), W(4), N(6)
+			result.Add(GetSource(0) ?? CreateDefaultPreset(4, 0)); // E
+			result.Add(GetSource(2) ?? CreateDefaultPreset(4, 1)); // S
+			result.Add(GetSource(4) ?? CreateDefaultPreset(4, 2)); // W
+			result.Add(GetSource(6) ?? CreateDefaultPreset(4, 3)); // N
+		}
+		else if (oldSectorCount == 4 && newSectorCount == 12)
+		{
+			// 4 -> 12: 对齐至 3点钟(0), 6点钟(3), 9点钟(6), 12点钟(9)
+			for (int i = 0; i < 12; i++)
+			{
+				if (i == 0) result.Add(GetSource(0) ?? CreateDefaultPreset(12, 0));
+				else if (i == 3) result.Add(GetSource(1) ?? CreateDefaultPreset(12, 3));
+				else if (i == 6) result.Add(GetSource(2) ?? CreateDefaultPreset(12, 6));
+				else if (i == 9) result.Add(GetSource(3) ?? CreateDefaultPreset(12, 9));
+				else result.Add(CreateDefaultPreset(12, i));
+			}
+		}
+		else if (oldSectorCount == 12 && newSectorCount == 4)
+		{
+			// 12 -> 4: 提取 12 键钟表中正交的 4 个点位 3点钟(0), 6点钟(3), 9点钟(6), 12点钟(9)
+			result.Add(GetSource(0) ?? CreateDefaultPreset(4, 0)); // E
+			result.Add(GetSource(3) ?? CreateDefaultPreset(4, 1)); // S
+			result.Add(GetSource(6) ?? CreateDefaultPreset(4, 2)); // W
+			result.Add(GetSource(9) ?? CreateDefaultPreset(4, 3)); // N
+		}
+		else if (oldSectorCount == 8 && newSectorCount == 12)
+		{
+			// 8 -> 12: 正交对齐 0, 3, 6, 9；斜向就近对齐 1->1, 3->4, 5->7, 7->10
+			for (int i = 0; i < 12; i++)
+			{
+				switch (i)
+				{
+					case 0: result.Add(GetSource(0) ?? CreateDefaultPreset(12, 0)); break; // 0°
+					case 1: result.Add(GetSource(1) ?? CreateDefaultPreset(12, 1)); break; // 30° from 45°
+					case 2: result.Add(CreateDefaultPreset(12, 2)); break;
+					case 3: result.Add(GetSource(2) ?? CreateDefaultPreset(12, 3)); break; // 90°
+					case 4: result.Add(GetSource(3) ?? CreateDefaultPreset(12, 4)); break; // 120° from 135°
+					case 5: result.Add(CreateDefaultPreset(12, 5)); break;
+					case 6: result.Add(GetSource(4) ?? CreateDefaultPreset(12, 6)); break; // 180°
+					case 7: result.Add(GetSource(5) ?? CreateDefaultPreset(12, 7)); break; // 210° from 225°
+					case 8: result.Add(CreateDefaultPreset(12, 8)); break;
+					case 9: result.Add(GetSource(6) ?? CreateDefaultPreset(12, 9)); break; // 270°
+					case 10: result.Add(GetSource(7) ?? CreateDefaultPreset(12, 10)); break; // 300° from 315°
+					case 11: result.Add(CreateDefaultPreset(12, 11)); break;
+				}
+			}
+		}
+		else if (oldSectorCount == 12 && newSectorCount == 8)
+		{
+			// 12 -> 8: 正交取 0->0, 3->2, 6->4, 9->6；斜向优先保留有实际配置的动作
+			ActionItem PickPreferred(int idxA, int idxB, int fallbackIdx8)
+			{
+				var a = GetSource(idxA);
+				var b = GetSource(idxB);
+				bool aConfigured = a != null && (!string.IsNullOrWhiteSpace(a.Parameter) || !string.IsNullOrWhiteSpace(a.InheritAppIconPath) || (a.SubActions != null && a.SubActions.Count > 0));
+				bool bConfigured = b != null && (!string.IsNullOrWhiteSpace(b.Parameter) || !string.IsNullOrWhiteSpace(b.InheritAppIconPath) || (b.SubActions != null && b.SubActions.Count > 0));
+				if (aConfigured) return a!;
+				if (bConfigured) return b!;
+				return a ?? b ?? CreateDefaultPreset(8, fallbackIdx8);
+			}
+
+			result.Add(GetSource(0) ?? CreateDefaultPreset(8, 0)); // E
+			result.Add(PickPreferred(1, 2, 1));                    // SE
+			result.Add(GetSource(3) ?? CreateDefaultPreset(8, 2)); // S
+			result.Add(PickPreferred(4, 5, 3));                    // SW
+			result.Add(GetSource(6) ?? CreateDefaultPreset(8, 4)); // W
+			result.Add(PickPreferred(7, 8, 5));                    // NW
+			result.Add(GetSource(9) ?? CreateDefaultPreset(8, 6)); // N
+			result.Add(PickPreferred(10, 11, 7));                  // NE
+		}
+		else
+		{
+			for (int i = 0; i < newSectorCount; i++)
+			{
+				result.Add(GetSource(i) ?? CreateDefaultPreset(newSectorCount, i));
+			}
+		}
+
+		return result;
 	}
 
 	private void EnsureSlotViewModels(int count)
@@ -2775,11 +3039,24 @@ public partial class SettingsWindow : Window
 		_isChangingSectorCount = true;
 		try
 		{
+			int oldSectorCount = _selectedProfile.SectorCount;
+			_selectedProfile.Actions = MigrateActionsBetweenSectorCounts(_selectedProfile.Actions, oldSectorCount, sectorCount);
+			_selectedProfile.SectorCount = sectorCount;
+			_selectedProfile.SyncActiveLayerFromRootProperties();
+
 			_isUpdatingUi = true;
 			try
 			{
-				_selectedProfile.SectorCount = sectorCount;
+				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = sectorCount == 4;
+				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = sectorCount == 8;
+				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = sectorCount == 12;
+
+				if (_selectedSlotIndex >= sectorCount) _selectedSlotIndex = 0;
+				_selectedSubActionIndex = null;
+
 				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
 			}
 			finally
 			{
@@ -2848,6 +3125,7 @@ public partial class SettingsWindow : Window
 			System.Windows.MessageBox.Show(this, "已存在该程序的配置方案！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
+		_selectedProfile?.SyncActiveLayerFromRootProperties();
 		int num = _selectedProfile?.SectorCount ?? 8;
 		WheelProfile wheelProfile = new WheelProfile
 		{
@@ -2861,9 +3139,12 @@ public partial class SettingsWindow : Window
 			{
 				Type = "Hotkey",
 				Name = $"动作 {i + 1}",
-				Parameter = ""
+				Parameter = "",
+				SubActions = new List<ActionItem>()
 			});
 		}
+		wheelProfile.EnsureLayers();
+		wheelProfile.SyncRootPropertiesFromActiveLayer();
 		ConfigManager.CurrentConfig.Profiles.Add(wheelProfile);
 		ConfigManager.SaveConfig();
 
@@ -2881,6 +3162,7 @@ public partial class SettingsWindow : Window
 		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
 		{
 			string newName = inputDialog.InputText.Trim();
+			_selectedProfile?.SyncActiveLayerFromRootProperties();
 			int num = _selectedProfile?.SectorCount ?? 8;
 			WheelProfile wheelProfile = new WheelProfile
 			{
@@ -2894,9 +3176,12 @@ public partial class SettingsWindow : Window
 				{
 					Type = "Hotkey",
 					Name = $"动作 {i + 1}",
-					Parameter = ""
+					Parameter = "",
+					SubActions = new List<ActionItem>()
 				});
 			}
+			wheelProfile.EnsureLayers();
+			wheelProfile.SyncRootPropertiesFromActiveLayer();
 			ConfigManager.CurrentConfig.Profiles.Add(wheelProfile);
 			ConfigManager.SaveConfig();
 
@@ -3011,12 +3296,23 @@ public partial class SettingsWindow : Window
 		var profiles = ConfigManager.CurrentConfig?.Profiles;
 		if (profiles == null || profiles.Count == 0) return;
 
+		if (_selectedProfile != null && _selectedProfile != profileToSelect)
+		{
+			_selectedProfile.SyncActiveLayerFromRootProperties();
+		}
+
 		if (profileToSelect == null || !profiles.Contains(profileToSelect))
 		{
 			profileToSelect = profiles.FirstOrDefault(p => p.ProcessName.Equals("Global", StringComparison.OrdinalIgnoreCase))
 				?? profiles.FirstOrDefault();
 		}
 		_selectedProfile = profileToSelect;
+		if (_selectedProfile != null)
+		{
+			_selectedProfile.EnsureLayers();
+			_selectedProfile.SyncRootPropertiesFromActiveLayer();
+		}
+		RefreshLayersUi();
 
 		_isUpdatingUi = true;
 		try
@@ -3046,6 +3342,8 @@ public partial class SettingsWindow : Window
 				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
 			}
 
+			_selectedSlotIndex = 0;
+			_selectedSubActionIndex = null;
 			RefreshSlots();
 			UpdateFocusEditorUi();
 		}
@@ -3124,8 +3422,13 @@ public partial class SettingsWindow : Window
 		if (_isUpdatingUi) return;
 		if (MappingsProfileComboBox.SelectedItem is WheelProfile profile)
 		{
+			if (_selectedProfile != null && _selectedProfile != profile)
+			{
+				_selectedProfile.SyncActiveLayerFromRootProperties();
+			}
 			_selectedProfile = profile;
 			_selectedProfile.EnsureLayers();
+			_selectedProfile.SyncRootPropertiesFromActiveLayer();
 			RefreshLayersUi();
 			_isUpdatingUi = true;
 			try
@@ -3137,9 +3440,16 @@ public partial class SettingsWindow : Window
 				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = profile.SectorCount == 4;
 				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = profile.SectorCount == 8;
 				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = profile.SectorCount == 12;
+				_selectedSlotIndex = 0;
+				_selectedSubActionIndex = null;
+				if (MappingsTier1SegmentRadio != null)
+				{
+					MappingsTier1SegmentRadio.IsChecked = true;
+				}
 				RefreshSlots();
 				UpdateFocusEditorUi();
 				RenderMappingsWheelPreview();
+				RenderLiveWheelPreview();
 			}
 			finally
 			{
@@ -3179,9 +3489,12 @@ public partial class SettingsWindow : Window
 	private void LayerSelectComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
 		if (_isUpdatingUi || _selectedProfile == null) return;
-		if (LayerSelectComboBox.SelectedIndex < 0 || LayerSelectComboBox.SelectedIndex >= _selectedProfile.Layers.Count) return;
+		int newIdx = LayerSelectComboBox.SelectedIndex;
+		if (newIdx < 0 || newIdx >= _selectedProfile.Layers.Count) return;
 
-		_selectedProfile.ActiveLayerIndex = LayerSelectComboBox.SelectedIndex;
+		// 切换前先将当前层改动写回旧层，彻底避免层与层之间配置相互覆盖与丢失
+		_selectedProfile.SyncActiveLayerFromRootProperties();
+		_selectedProfile.ActiveLayerIndex = newIdx;
 		_selectedProfile.SyncRootPropertiesFromActiveLayer();
 
 		bool oldUpdating = _isUpdatingUi;
@@ -3201,6 +3514,10 @@ public partial class SettingsWindow : Window
 			RefreshSlots();
 			UpdateFocusEditorUi();
 			RenderMappingsWheelPreview();
+			if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+			{
+				RenderLiveWheelPreview();
+			}
 		}
 		finally
 		{
@@ -3218,27 +3535,60 @@ public partial class SettingsWindow : Window
 	{
 		if (_selectedProfile == null) return;
 		_selectedProfile.EnsureLayers();
+		_selectedProfile.SyncActiveLayerFromRootProperties();
 
 		int nextNum = _selectedProfile.Layers.Count + 1;
+		int sectorCount = _selectedProfile.SectorCount is 4 or 8 or 12 ? _selectedProfile.SectorCount : 8;
 		WheelLayer newLayer = new WheelLayer
 		{
 			Name = $"第 {nextNum} 层",
-			SectorCount = 8,
+			SectorCount = sectorCount,
 			EnableCenterAction = false,
 			Actions = new List<ActionItem>()
 		};
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < sectorCount; i++)
 		{
-			newLayer.Actions.Add(new ActionItem { Type = "", Name = "", Parameter = "" });
+			newLayer.Actions.Add(new ActionItem
+			{
+				Type = "Hotkey",
+				Name = $"动作 {i + 1}",
+				Parameter = "",
+				SubActions = new List<ActionItem>()
+			});
 		}
 		_selectedProfile.Layers.Add(newLayer);
 		_selectedProfile.ActiveLayerIndex = _selectedProfile.Layers.Count - 1;
 		_selectedProfile.SyncRootPropertiesFromActiveLayer();
 
 		RefreshLayersUi();
-		RefreshSlots();
-		UpdateFocusEditorUi();
-		RenderMappingsWheelPreview();
+
+		bool oldUpdating = _isUpdatingUi;
+		try
+		{
+			_isUpdatingUi = true;
+			int count = _selectedProfile.SectorCount;
+			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
+			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
+			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+
+			_selectedSlotIndex = 0;
+			_selectedSubActionIndex = null;
+			RefreshSlots();
+			UpdateFocusEditorUi();
+			RenderMappingsWheelPreview();
+			if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+			{
+				RenderLiveWheelPreview();
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = oldUpdating;
+		}
+
 		ScheduleAutoSave();
 	}
 
@@ -3246,6 +3596,7 @@ public partial class SettingsWindow : Window
 	{
 		if (_selectedProfile == null) return;
 		_selectedProfile.EnsureLayers();
+		_selectedProfile.SyncActiveLayerFromRootProperties();
 
 		WheelLayer curLayer = _selectedProfile.GetActiveLayer();
 		WheelLayer clonedLayer = curLayer.Clone();
@@ -3256,9 +3607,34 @@ public partial class SettingsWindow : Window
 		_selectedProfile.SyncRootPropertiesFromActiveLayer();
 
 		RefreshLayersUi();
-		RefreshSlots();
-		UpdateFocusEditorUi();
-		RenderMappingsWheelPreview();
+
+		bool oldUpdating = _isUpdatingUi;
+		try
+		{
+			_isUpdatingUi = true;
+			int count = _selectedProfile.SectorCount;
+			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
+			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
+			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+
+			_selectedSlotIndex = 0;
+			_selectedSubActionIndex = null;
+			RefreshSlots();
+			UpdateFocusEditorUi();
+			RenderMappingsWheelPreview();
+			if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+			{
+				RenderLiveWheelPreview();
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = oldUpdating;
+		}
+
 		ScheduleAutoSave();
 	}
 
@@ -3303,9 +3679,34 @@ public partial class SettingsWindow : Window
 			_selectedProfile.SyncRootPropertiesFromActiveLayer();
 
 			RefreshLayersUi();
-			RefreshSlots();
-			UpdateFocusEditorUi();
-			RenderMappingsWheelPreview();
+
+			bool oldUpdating = _isUpdatingUi;
+			try
+			{
+				_isUpdatingUi = true;
+				int count = _selectedProfile.SectorCount;
+				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
+				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
+				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+
+				_selectedSlotIndex = 0;
+				_selectedSubActionIndex = null;
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+				if (AppearanceSettingsGrid != null && AppearanceSettingsGrid.Visibility == Visibility.Visible)
+				{
+					RenderLiveWheelPreview();
+				}
+			}
+			finally
+			{
+				_isUpdatingUi = oldUpdating;
+			}
+
 			ScheduleAutoSave();
 		}
 	}
@@ -3339,6 +3740,7 @@ public partial class SettingsWindow : Window
 	private void DuplicateProfileBtn_Click(object sender, RoutedEventArgs e)
 	{
 		if (_selectedProfile == null) return;
+		_selectedProfile.SyncActiveLayerFromRootProperties();
 		InputDialog inputDialog = new InputDialog("复制配置方案", "请输入新配置方案名称（如程序名或工作流名）：", _selectedProfile.ProcessName + " - 副本", (string input) =>
 		{
 			if (string.IsNullOrWhiteSpace(input)) return (IsValid: false, ErrorMessage: "方案名称不能为空！");
@@ -3349,6 +3751,8 @@ public partial class SettingsWindow : Window
 		{
 			string newName = inputDialog.InputText.Trim();
 			WheelProfile newProfile = _selectedProfile.Clone(newName);
+			newProfile.EnsureLayers();
+			newProfile.SyncRootPropertiesFromActiveLayer();
 			ConfigManager.CurrentConfig.Profiles.Add(newProfile);
 			ConfigManager.SaveConfig();
 
@@ -3358,27 +3762,50 @@ public partial class SettingsWindow : Window
 
 	private void MappingsSectorCountRadio_Checked(object sender, RoutedEventArgs e)
 	{
-		if (_isUpdatingUi || _selectedProfile == null) return;
+		if (_isUpdatingUi || _isChangingSectorCount || _selectedProfile == null) return;
 		int count = 8;
 		if (MappingsSectorCount4Radio != null && MappingsSectorCount4Radio.IsChecked == true) count = 4;
 		else if (MappingsSectorCount12Radio != null && MappingsSectorCount12Radio.IsChecked == true) count = 12;
 
-		_selectedProfile.SectorCount = count;
-		_selectedProfile.SyncActiveLayerFromRootProperties();
-		_isUpdatingUi = true;
+		if (_selectedProfile.SectorCount == count) return;
+
+		_isChangingSectorCount = true;
 		try
 		{
-			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-			RefreshSlots();
-			UpdateFocusEditorUi();
-			RenderMappingsWheelPreview();
-			ScheduleAutoSave();
+			int oldCount = _selectedProfile.SectorCount;
+			_selectedProfile.Actions = MigrateActionsBetweenSectorCounts(_selectedProfile.Actions, oldCount, count);
+			_selectedProfile.SectorCount = count;
+			_selectedProfile.SyncActiveLayerFromRootProperties();
+
+			_isUpdatingUi = true;
+			try
+			{
+				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
+				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
+				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
+
+				if (_selectedSlotIndex >= count) _selectedSlotIndex = 0;
+				_selectedSubActionIndex = null;
+
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+				ScheduleAutoSave();
+			}
+			finally
+			{
+				_isUpdatingUi = false;
+			}
+
+			if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+			{
+				ScheduleLiveWheelPreviewRender();
+			}
+			SyncUiToConfigAndSave();
 		}
 		finally
 		{
-			_isUpdatingUi = false;
+			_isChangingSectorCount = false;
 		}
 	}
 
@@ -3548,6 +3975,9 @@ public partial class SettingsWindow : Window
 				_ => Directions8
 			};
 
+			ActionItem? primaryAction = (_selectedSlotIndex >= 0 && profile.Actions != null && _selectedSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedSlotIndex] : null;
+			bool isTier2NoSubActions = (MappingsTier2SegmentRadio?.IsChecked == true && _selectedSlotIndex >= 0 && (primaryAction?.SubActions == null || primaryAction.SubActions.Count == 0));
+
 			if (_selectedSlotIndex == -1)
 			{
 				// Center Core
@@ -3560,11 +3990,34 @@ public partial class SettingsWindow : Window
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Visible;
 				if (EnableCenterActionCheckBox != null) EnableCenterActionCheckBox.IsChecked = profile.EnableCenterAction;
 				if (FocusSubActionsBorder != null) FocusSubActionsBorder.Visibility = Visibility.Collapsed;
+				if (FocusTier2EmptyNoticeBorder != null) FocusTier2EmptyNoticeBorder.Visibility = Visibility.Collapsed;
+				if (FocusNameAndIconBorder != null) FocusNameAndIconBorder.Visibility = Visibility.Visible;
+				if (FocusActionTypeAndParamsBorder != null) FocusActionTypeAndParamsBorder.Visibility = Visibility.Visible;
 				if (CenterPatternPriorityTip != null)
 				{
 					bool hasCustom = IconHelper.HasCustomCenterPattern(ConfigManager.CurrentConfig);
 					CenterPatternPriorityTip.Visibility = (hasCustom && profile.EnableCenterAction) ? Visibility.Visible : Visibility.Collapsed;
 				}
+			}
+			else if (isTier2NoSubActions)
+			{
+				// 二级级联模式但尚未添加任何子动作：展示空状态引导卡片，不误改配置，不渲染虚假子扇区
+				if (FocusSlotBadgeBorder != null) FocusSlotBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
+				if (FocusSlotBadgeText != null) FocusSlotBadgeText.Text = "🌟";
+				string parentDir = (_selectedSlotIndex >= 0 && _selectedSlotIndex < directions.Length) ? directions[_selectedSlotIndex] : $"{_selectedSlotIndex + 1}";
+				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = $"扇区 {_selectedSlotIndex + 1} [{parentDir}] 级联子动作";
+				if (FocusSlotTagText != null) FocusSlotTagText.Text = "二级级联 (未添加)";
+				if (FocusSlotSubtitleText != null) FocusSlotSubtitleText.Text = "当前扇区尚未配置二级级联子动作，点击【➕ 添加第 1 个二级子动作】以创建";
+				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Visible;
+				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
+				if (CenterPatternPriorityTip != null) CenterPatternPriorityTip.Visibility = Visibility.Collapsed;
+				if (FocusTier2EmptyNoticeBorder != null) FocusTier2EmptyNoticeBorder.Visibility = Visibility.Visible;
+				if (FocusNameAndIconBorder != null) FocusNameAndIconBorder.Visibility = Visibility.Collapsed;
+				if (FocusActionTypeAndParamsBorder != null) FocusActionTypeAndParamsBorder.Visibility = Visibility.Collapsed;
+				if (FocusInheritIconBorder != null) FocusInheritIconBorder.Visibility = Visibility.Collapsed;
+				if (FocusSubActionsBorder != null) FocusSubActionsBorder.Visibility = Visibility.Visible;
+				RefreshFocusSubActionsChips();
+				return;
 			}
 			else if (_selectedSubActionIndex.HasValue)
 			{
@@ -3578,6 +4031,9 @@ public partial class SettingsWindow : Window
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Visible;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
 				if (CenterPatternPriorityTip != null) CenterPatternPriorityTip.Visibility = Visibility.Collapsed;
+				if (FocusTier2EmptyNoticeBorder != null) FocusTier2EmptyNoticeBorder.Visibility = Visibility.Collapsed;
+				if (FocusNameAndIconBorder != null) FocusNameAndIconBorder.Visibility = Visibility.Visible;
+				if (FocusActionTypeAndParamsBorder != null) FocusActionTypeAndParamsBorder.Visibility = Visibility.Visible;
 				if (FocusSubActionsBorder != null) FocusSubActionsBorder.Visibility = Visibility.Collapsed;
 			}
 			else
@@ -3593,6 +4049,9 @@ public partial class SettingsWindow : Window
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Collapsed;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
 				if (CenterPatternPriorityTip != null) CenterPatternPriorityTip.Visibility = Visibility.Collapsed;
+				if (FocusTier2EmptyNoticeBorder != null) FocusTier2EmptyNoticeBorder.Visibility = Visibility.Collapsed;
+				if (FocusNameAndIconBorder != null) FocusNameAndIconBorder.Visibility = Visibility.Visible;
+				if (FocusActionTypeAndParamsBorder != null) FocusActionTypeAndParamsBorder.Visibility = Visibility.Visible;
 				if (FocusSubActionsBorder != null) FocusSubActionsBorder.Visibility = Visibility.Visible;
 				RefreshFocusSubActionsChips();
 			}
@@ -3985,6 +4444,14 @@ public partial class SettingsWindow : Window
 			Parameter = "",
 			IconKey = ""
 		});
+		_selectedSubActionIndex = primaryAction.SubActions.Count - 1;
+		if (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked != true)
+		{
+			_isUpdatingUi = true;
+			try { MappingsTier2SegmentRadio.IsChecked = true; }
+			finally { _isUpdatingUi = false; }
+		}
+		UpdateFocusEditorUi();
 		RefreshFocusSubActionsChips();
 		RefreshSlots();
 		RenderMappingsWheelPreview();
@@ -5143,25 +5610,14 @@ public partial class SettingsWindow : Window
 				var action = profile.Actions[_selectedSlotIndex];
 				if (action.SubActions != null && action.SubActions.Count > 0)
 				{
-					if (!_selectedSubActionIndex.HasValue)
-					{
-						_selectedSubActionIndex = 0;
-						UpdateFocusEditorUi();
-					}
+					_selectedSubActionIndex = 0;
 				}
 				else
 				{
-					for (int i = 0; i < profile.Actions.Count; i++)
-					{
-						if (profile.Actions[i].SubActions != null && profile.Actions[i].SubActions.Count > 0)
-						{
-							_selectedSlotIndex = i;
-							_selectedSubActionIndex = 0;
-							UpdateFocusEditorUi();
-							break;
-						}
-					}
+					// 当前选中的主扇区尚无二级动作：绝不自动新增子扇区，保持未配置状态
+					_selectedSubActionIndex = null;
 				}
+				UpdateFocusEditorUi();
 			}
 		}
 		RenderMappingsWheelPreview();
@@ -5850,10 +6306,12 @@ public partial class SettingsWindow : Window
 				}
 
 				// 3. Draw SubActions (Icons only, NO TEXT!)
-				if (action?.SubActions != null && action.SubActions.Count > 0 && (isTier2Mode || isParentSlot))
+				bool isFanMode = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+				bool shouldShowSub = !isFanMode ? true : (isTier2Mode || isParentSlot);
+
+				if (action?.SubActions != null && action.SubActions.Count > 0 && shouldShowSub)
 				{
 					// 功能配置界面 (Tab 2) 统一强制采用外圈同心子环布局，彻底杜绝蜂窝扇展开时的相互遮挡与混乱堆叠；显示数量严格匹配当前二级菜单样式上限（蜂窝扇最多3个，外圈子环最多4个）
-					bool isFanMode = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
 					int maxSubCount = isFanMode ? 3 : 4;
 					int subCount = Math.Min(maxSubCount, action.SubActions.Count);
 					double subSweep = sweepAngle / subCount;
@@ -6056,7 +6514,8 @@ public partial class SettingsWindow : Window
 				double sweep = 360.0 / sectorCount;
 				int slot = (int)Math.Floor((angleDeg + sweep / 2.0) / sweep) % sectorCount;
 
-				bool isSubVisible = isTier2Mode || (_selectedSlotIndex == slot);
+				bool isFanMode = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+				bool isSubVisible = !isFanMode || isTier2Mode || (_selectedSlotIndex == slot);
 				if (isSubVisible && dist <= outerR + 50.0)
 				{
 					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
@@ -6982,6 +7441,16 @@ public partial class SettingsWindow : Window
 			{
 				RenderLiveWheelPreview();
 			}
+		}
+	}
+
+	private void Tier2Expander_ExpandedCollapsed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi) return;
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
 		}
 	}
 
@@ -9318,7 +9787,8 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
-		bool flag = sender == Tier2ConfigSegmentRadio || (sender == null && ((Tier2ConfigSegmentRadio?.IsChecked == true)));
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		bool flag = isFan && (sender == Tier2ConfigSegmentRadio || (sender == null && ((Tier2ConfigSegmentRadio?.IsChecked == true))));
 		_selectedLayoutTier = flag ? 2 : 1;
 		if (!flag)
 		{
@@ -9363,29 +9833,68 @@ public partial class SettingsWindow : Window
 			{
 				Tier2ConfigSegmentRadio.IsChecked = flag;
 			}
-			if (Tier1DimensionsPanel != null)
+			if (isFan)
 			{
-				Tier1DimensionsPanel.Visibility = (flag ? Visibility.Collapsed : Visibility.Visible);
+				if (Tier1DimensionsPanel != null)
+				{
+					Tier1DimensionsPanel.Visibility = (flag ? Visibility.Collapsed : Visibility.Visible);
+				}
+				if (Tier2DimensionsExpanderBorder != null)
+				{
+					Tier2DimensionsExpanderBorder.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
+					if (Tier2DimensionsExpander != null && flag)
+					{
+						Tier2DimensionsExpander.IsExpanded = true;
+					}
+				}
+				if (Tier1ThemePanel != null)
+				{
+					Tier1ThemePanel.Visibility = (flag ? Visibility.Collapsed : Visibility.Visible);
+				}
+				if (Tier2ThemeExpanderBorder != null)
+				{
+					Tier2ThemeExpanderBorder.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
+					if (Tier2ThemeExpander != null && flag)
+					{
+						Tier2ThemeExpander.IsExpanded = true;
+					}
+				}
+				if (VisualThemeCardTitleText != null)
+				{
+					VisualThemeCardTitleText.Text = (flag ? "轮盘视觉风格与色彩配置 (二级级联轮盘)" : "轮盘视觉风格与色彩配置 (一级主轮盘)");
+				}
+				if (DimensionsCardTitleText != null)
+				{
+					DimensionsCardTitleText.Text = (flag ? "几何形态与尺寸微调 (二级级联轮盘)" : "几何形态与尺寸微调 (一级主轮盘)");
+				}
 			}
-			if (Tier2DimensionsPanel != null)
+			else
 			{
-				Tier2DimensionsPanel.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (Tier1ThemePanel != null)
-			{
-				Tier1ThemePanel.Visibility = (flag ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (Tier2ThemePanel != null)
-			{
-				Tier2ThemePanel.Visibility = ((!flag) ? Visibility.Collapsed : Visibility.Visible);
-			}
-			if (VisualThemeCardTitleText != null)
-			{
-				VisualThemeCardTitleText.Text = (flag ? "轮盘视觉风格与色彩配置 (二级级联轮盘)" : "轮盘视觉风格与色彩配置 (一级主轮盘)");
-			}
-			if (DimensionsCardTitleText != null)
-			{
-				DimensionsCardTitleText.Text = (flag ? "几何形态与尺寸微调 (二级级联轮盘)" : "几何形态与尺寸微调 (一级主轮盘)");
+				// 外圈子环形态（!isFan）：所有扇区默认全部展开外圈子环，左侧同时提供主轮盘与二级子环微调折叠栏
+				if (Tier1DimensionsPanel != null)
+				{
+					Tier1DimensionsPanel.Visibility = Visibility.Visible;
+				}
+				if (Tier2DimensionsExpanderBorder != null)
+				{
+					Tier2DimensionsExpanderBorder.Visibility = Visibility.Visible;
+				}
+				if (Tier1ThemePanel != null)
+				{
+					Tier1ThemePanel.Visibility = Visibility.Visible;
+				}
+				if (Tier2ThemeExpanderBorder != null)
+				{
+					Tier2ThemeExpanderBorder.Visibility = Visibility.Visible;
+				}
+				if (VisualThemeCardTitleText != null)
+				{
+					VisualThemeCardTitleText.Text = "轮盘视觉风格与色彩配置";
+				}
+				if (DimensionsCardTitleText != null)
+				{
+					DimensionsCardTitleText.Text = "几何形态与尺寸微调";
+				}
 			}
 		}
 		finally
@@ -10658,7 +11167,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.0"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.1"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -10908,7 +11417,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.0"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.1"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");
@@ -12020,6 +12529,14 @@ public partial class SettingsWindow : Window
 			_previewStyleRenderer.RenderDecorations(LiveWheelPreviewCanvas, grid, num, num2, num8, num10, 1);
 			int num19 = ((wheelProfile.SectorCount > 0) ? wheelProfile.SectorCount : 8);
 			double num20 = 360.0 / (double)num19;
+			int totalActualSubActions = 0;
+			if (wheelProfile.Actions != null)
+			{
+				foreach (var a in wheelProfile.Actions)
+				{
+					if (a?.SubActions != null) totalActualSubActions += a.SubActions.Count;
+				}
+			}
 			for (int num21 = 0; num21 < num19; num21++)
 			{
 				double num22 = (double)num21 * num20;
@@ -12408,13 +12925,13 @@ public partial class SettingsWindow : Window
 				System.Windows.Controls.Panel.SetZIndex(grid2, 10);
 				LiveWheelPreviewCanvas.Children.Add(grid2);
 
-				bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
-				if (!enableMultiTier || !isTier2Mode || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
+				if (!enableMultiTier || wheelProfile.Actions == null || num21 >= wheelProfile.Actions.Count || wheelProfile.Actions[num21] == null)
 				{
 					continue;
 				}
 
-				// 用户需求 4：二级轮盘子盘太多时，画布中出现互相遮挡，将外观与形态定制中的二级轮盘画布预览渲染改为只显示选中的一级轮盘的子盘
+				bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+
 				int targetSelectedParent = _selectedLayoutSlotIndex >= 0
 					? _selectedLayoutSlotIndex
 					: (_selectedSlotIndex >= 0 ? _selectedSlotIndex : 0);
@@ -12422,22 +12939,46 @@ public partial class SettingsWindow : Window
 				{
 					targetSelectedParent = 0;
 				}
-				if (num21 != targetSelectedParent)
+
+				ActionItem actionItem = wheelProfile.Actions[num21];
+
+				List<ActionItem>? subActionsList = null;
+				if (actionItem.SubActions != null && actionItem.SubActions.Count > 0)
+				{
+					subActionsList = actionItem.SubActions;
+				}
+				else if (totalActualSubActions == 0)
+				{
+					// 全方案完全未配置任何实际二级动作时，仅当用户主动展开左侧二级尺寸/配色折叠栏（或蜂窝扇二级模式）时，
+					// 为当前选中的单个主扇区提供3项预览，方便微调视觉效果；正常浏览时绝不全量虚构填充全部扇区
+					bool isTier2Editing = (Tier2ThemeExpander?.IsExpanded == true || Tier2DimensionsExpander?.IsExpanded == true || (isFan && Tier2ConfigSegmentRadio?.IsChecked == true));
+					if (isTier2Editing && num21 == targetSelectedParent)
+					{
+						subActionsList = new List<ActionItem>
+						{
+							new ActionItem { Name = "子动作 1", Type = "Hotkey" },
+							new ActionItem { Name = "子动作 2", Type = "Hotkey" },
+							new ActionItem { Name = "子动作 3", Type = "Hotkey" }
+						};
+					}
+				}
+
+				if (subActionsList == null || subActionsList.Count == 0)
 				{
 					continue;
 				}
 
-				ActionItem actionItem = wheelProfile.Actions[num21];
-				List<ActionItem> subActionsList = (actionItem.SubActions != null && actionItem.SubActions.Count > 0)
-					? actionItem.SubActions
-					: new List<ActionItem>
+				if (isFan)
+				{
+					// 蜂窝扇形态保持现状：仅在切换至二级配置时展开，且仅展开当前选中的单个扇区以消除重叠遮挡
+					bool isTier2Mode = (Tier2ConfigSegmentRadio != null && Tier2ConfigSegmentRadio.IsChecked == true);
+					if (!isTier2Mode || num21 != targetSelectedParent)
 					{
-						new ActionItem { Name = "子动作 1", Type = "Hotkey" },
-						new ActionItem { Name = "子动作 2", Type = "Hotkey" },
-						new ActionItem { Name = "子动作 3", Type = "Hotkey" }
-					};
+						continue;
+					}
+				}
+				// 外圈子环形态（!isFan）：有实际子动作的扇区自动完整展开外圈子环，无子动作的扇区不虚构多余子盘
 
-				bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
 				int count = subActionsList.Count;
 				int activeCount = isFan ? Math.Min(3, count) : count;
 				double num35 = num20 / (double)count;
@@ -13222,6 +13763,12 @@ public partial class SettingsWindow : Window
 		{
 			string val = (SubmenuStyleComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Wheel";
 			ConfigManager.CurrentConfig.SubmenuStyle = val;
+			bool isFan = string.Equals(val, "Fan", StringComparison.OrdinalIgnoreCase);
+			if (LivePreviewTierSegmentBorder != null)
+			{
+				LivePreviewTierSegmentBorder.Visibility = isFan ? Visibility.Visible : Visibility.Collapsed;
+			}
+			TierDimensionRadio_Checked(Tier1ConfigSegmentRadio, new RoutedEventArgs());
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
 			{

@@ -10,82 +10,249 @@ public class SubSlotViewModel : INotifyPropertyChanged
 {
 	public int IndexNumber { get; set; }
 
-	public ActionItem Action { get; set; }
+	public ActionItem Action { get; set; } = new ActionItem();
+
+	private bool _isExpanded = true;
+	public bool IsExpanded
+	{
+		get => _isExpanded;
+		set
+		{
+			if (_isExpanded != value)
+			{
+				_isExpanded = value;
+				OnPropertyChanged(nameof(IsExpanded));
+				OnPropertyChanged(nameof(ExpandToggleText));
+				OnPropertyChanged(nameof(ExpandToggleArrow));
+			}
+		}
+	}
+
+	public string ExpandToggleText => IsExpanded ? "收起配置" : "展开配置";
+	public string ExpandToggleArrow => IsExpanded ? "▲" : "▼";
+
+	private bool _canMoveUp;
+	public bool CanMoveUp
+	{
+		get => _canMoveUp;
+		set
+		{
+			if (_canMoveUp != value)
+			{
+				_canMoveUp = value;
+				OnPropertyChanged(nameof(CanMoveUp));
+			}
+		}
+	}
+
+	private bool _canMoveDown;
+	public bool CanMoveDown
+	{
+		get => _canMoveDown;
+		set
+		{
+			if (_canMoveDown != value)
+			{
+				_canMoveDown = value;
+				OnPropertyChanged(nameof(CanMoveDown));
+			}
+		}
+	}
 
 	public string Name
 	{
-		get
-		{
-			return Action.Name ?? "";
-		}
+		get => Action.Name ?? "";
 		set
 		{
 			if (Action.Name != value)
 			{
 				Action.Name = value;
-				OnPropertyChanged("Name");
+				OnPropertyChanged(nameof(Name));
 			}
 		}
 	}
 
 	public string Type
 	{
-		get
-		{
-			if (!string.IsNullOrEmpty(Action.Type))
-			{
-				return Action.Type;
-			}
-			return "Hotkey";
-		}
+		get => !string.IsNullOrEmpty(Action.Type) ? Action.Type : "Hotkey";
 		set
 		{
-			if (!(Action.Type != value) || string.IsNullOrEmpty(value))
+			if (Action.Type != value && !string.IsNullOrEmpty(value))
 			{
-				return;
-			}
-			Action.Type = value;
-			if ((value == "Folder" || value == "OpenFolder") && string.IsNullOrEmpty(IconKey))
-			{
-				IconKey = "Folder";
-				if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+				Action.Type = value;
+				if ((value == "Folder" || value == "OpenFolder") && string.IsNullOrEmpty(IconKey))
 				{
-					Name = "打开文件夹";
+					IconKey = "Folder";
+					if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+					{
+						Name = "打开文件夹";
+					}
 				}
-			}
-			if ((value == "WebUrl" || value == "Url") && string.IsNullOrEmpty(IconKey))
-			{
-				IconKey = "Globe";
-				if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+				if ((value == "WebUrl" || value == "Url") && string.IsNullOrEmpty(IconKey))
 				{
-					Name = "打开网址";
+					IconKey = "Globe";
+					if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+					{
+						Name = "打开网址";
+					}
 				}
+				if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作")))
+				{
+					Name = "切换窗口";
+				}
+				if (value == "SwitchWindow" && string.IsNullOrWhiteSpace(Action.Parameter))
+				{
+					NthWindowIndex = "1";
+				}
+				if (value == "Tile" && string.IsNullOrEmpty(IconKey) && string.IsNullOrEmpty(InheritAppIconPath))
+				{
+					IconKey = "Tile";
+				}
+				NotifyAllPropertiesChanged();
 			}
-			if (value == "SwitchWindow" && (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作")))
-			{
-				Name = "切换窗口";
-			}
-			if (value == "SwitchWindow" && string.IsNullOrWhiteSpace(Action.Parameter))
-			{
-				NthWindowIndex = "1";
-			}
-			if (value == "Tile" && string.IsNullOrEmpty(IconKey) && string.IsNullOrEmpty(InheritAppIconPath))
-			{
-				IconKey = "Tile"; // 默认使用平铺四宫格 logo
-			}
-			OnPropertyChanged("Type");
-			OnPropertyChanged("IsHotkeyType");
-			OnPropertyChanged("IsLaunchType");
-			OnPropertyChanged("IsWebUrlType");
-			OnPropertyChanged("IsFolderType");
-			OnPropertyChanged("IsSystemType");
-			OnPropertyChanged("IsCommandType");
-			OnPropertyChanged("IsSwitchWindowType");
-			OnPropertyChanged("IsTileType");
 		}
 	}
 
+	public List<ActionTypeItem> AggregatedActionTypes => SlotViewModel.AggregatedActionTypes;
+
+	public string AggregatedType
+	{
+		get
+		{
+			string t = Type;
+			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
+			{
+				return "WindowManager";
+			}
+			if (t == "ScreenOcr") return "Ocr";
+			if (t == "App") return "Launch";
+			if (t == "Url") return "WebUrl";
+			if (t == "OpenFolder") return "Folder";
+			return t;
+		}
+		set
+		{
+			if (string.IsNullOrEmpty(value)) return;
+			if (value == "WindowManager")
+			{
+				if (!IsWindowManagerType)
+				{
+					Type = "Tile";
+					if (string.IsNullOrEmpty(Parameter)) Parameter = "2L";
+				}
+			}
+			else
+			{
+				Type = value;
+			}
+			NotifyAllPropertiesChanged();
+		}
+	}
+
+	public bool IsHotkeyType => Type == "Hotkey";
+
+	public bool IsLaunchType => Type == "Launch" || Type == "App";
+
 	public bool IsWebUrlType => Type == "WebUrl" || Type == "Url";
+
+	public bool IsFolderType => Type == "Folder" || Type == "OpenFolder";
+
+	public bool IsCommandType => Type == "Command";
+
+	public bool IsSystemType => Type == "System";
+
+	public bool IsSwitchWindowType => Type == "SwitchWindow";
+
+	public bool IsTileType => Type == "Tile";
+
+	public bool IsOcrType => Type == "Ocr" || Type == "ScreenOcr";
+
+	public bool IsShellToolType => Type == "ShellTool";
+
+	public bool IsWindowManagerType =>
+		Type == "Tile" || Type == "ToggleTopmost" || Type == "MoveMonitor" ||
+		Type == "WindowOpacity" || Type == "SwitchWindow" || Type == "WindowManager";
+
+	public List<ActionTypeOption> WindowManagerSubModes => new List<ActionTypeOption>
+	{
+		new ActionTypeOption { Tag = "Tile", DisplayText = "🔲 平铺窗口排布" },
+		new ActionTypeOption { Tag = "TileCycle", DisplayText = "🔄 循环切换平铺" },
+		new ActionTypeOption { Tag = "TileCycleBack", DisplayText = "⬅️ 反向循环平铺" },
+		new ActionTypeOption { Tag = "TileRestore", DisplayText = "⏪ 还原平铺快照" },
+		new ActionTypeOption { Tag = "ToggleTopmost", DisplayText = "📌 窗口置顶 / 取消置顶" },
+		new ActionTypeOption { Tag = "MoveMonitor", DisplayText = "🖥️ 移到下一显示器" },
+		new ActionTypeOption { Tag = "WindowOpacity", DisplayText = "👁️ 窗口透明度调节" },
+		new ActionTypeOption { Tag = "SwitchWindow", DisplayText = "🗂️ 任务栏切换 (Win+N)" }
+	};
+
+	public string WindowManagerSubMode
+	{
+		get
+		{
+			if (Type == "ToggleTopmost") return "ToggleTopmost";
+			if (Type == "MoveMonitor") return "MoveMonitor";
+			if (Type == "WindowOpacity") return "WindowOpacity";
+			if (Type == "SwitchWindow") return "SwitchWindow";
+			if (Type == "Tile")
+			{
+				if (Parameter == WindowTiler.CycleParam) return "TileCycle";
+				if (Parameter == WindowTiler.CycleBackParam) return "TileCycleBack";
+				if (Parameter == WindowTiler.RestoreParam) return "TileRestore";
+				return "Tile";
+			}
+			return "Tile";
+		}
+		set
+		{
+			if (value == "ToggleTopmost") { Type = "ToggleTopmost"; Parameter = ""; }
+			else if (value == "MoveMonitor") { Type = "MoveMonitor"; Parameter = ""; }
+			else if (value == "WindowOpacity") { Type = "WindowOpacity"; if (string.IsNullOrEmpty(Parameter)) Parameter = "80"; }
+			else if (value == "SwitchWindow") { Type = "SwitchWindow"; if (string.IsNullOrEmpty(Parameter)) Parameter = "1"; }
+			else if (value == "TileCycle") { Type = "Tile"; Parameter = WindowTiler.CycleParam; }
+			else if (value == "TileCycleBack") { Type = "Tile"; Parameter = WindowTiler.CycleBackParam; }
+			else if (value == "TileRestore") { Type = "Tile"; Parameter = WindowTiler.RestoreParam; }
+			else if (value == "Tile") { Type = "Tile"; if (string.IsNullOrEmpty(Parameter) || Parameter.StartsWith("__")) Parameter = "2L"; }
+			NotifyAllPropertiesChanged();
+		}
+	}
+
+	public bool IsTileSubMode => Type == "Tile" && Parameter != WindowTiler.CycleParam && Parameter != WindowTiler.CycleBackParam && Parameter != WindowTiler.RestoreParam;
+	public bool IsCycleSubMode => Type == "Tile" && (Parameter == WindowTiler.CycleParam || Parameter == WindowTiler.CycleBackParam);
+	public bool IsRestoreSubMode => Type == "Tile" && Parameter == WindowTiler.RestoreParam;
+	public bool IsTopmostSubMode => Type == "ToggleTopmost";
+	public bool IsMoveMonitorSubMode => Type == "MoveMonitor";
+	public bool IsOpacitySubMode => Type == "WindowOpacity";
+	public bool IsSwitchWindowSubMode => Type == "SwitchWindow";
+
+	public double WindowOpacityValue
+	{
+		get
+		{
+			if (double.TryParse(Parameter, out double v)) return Math.Clamp(v, 30, 100);
+			return 80;
+		}
+		set
+		{
+			Parameter = Math.Round(value).ToString();
+			OnPropertyChanged(nameof(WindowOpacityValue));
+			OnPropertyChanged(nameof(WindowOpacityLabel));
+			OnPropertyChanged(nameof(SummaryText));
+		}
+	}
+	public string WindowOpacityLabel => $"{Math.Round(WindowOpacityValue)}%";
+
+	public bool RunAsStandardUser
+	{
+		get => Action.RunAsStandardUser;
+		set
+		{
+			if (Action.RunAsStandardUser != value)
+			{
+				Action.RunAsStandardUser = value;
+				OnPropertyChanged(nameof(RunAsStandardUser));
+			}
+		}
+	}
 
 	public string BrowserChoice
 	{
@@ -95,10 +262,13 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			if (Action.BrowserChoice != value)
 			{
 				Action.BrowserChoice = value;
-				OnPropertyChanged("BrowserChoice");
+				OnPropertyChanged(nameof(BrowserChoice));
+				OnPropertyChanged(nameof(IsCustomBrowser));
 			}
 		}
 	}
+
+	public bool IsCustomBrowser => string.Equals(BrowserChoice, "Custom", StringComparison.OrdinalIgnoreCase);
 
 	public string BrowserPath
 	{
@@ -108,79 +278,74 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			if (Action.BrowserPath != value)
 			{
 				Action.BrowserPath = value;
-				OnPropertyChanged("BrowserPath");
+				OnPropertyChanged(nameof(BrowserPath));
 			}
 		}
 	}
 
 	public string Parameter
 	{
-		get
-		{
-			return Action.Parameter ?? "";
-		}
+		get => Action.Parameter ?? "";
 		set
 		{
 			if (Action.Parameter != value)
 			{
 				Action.Parameter = value;
-				OnPropertyChanged("Parameter");
+				OnPropertyChanged(nameof(Parameter));
+				OnPropertyChanged(nameof(SummaryText));
+				OnPropertyChanged(nameof(SelectedSystemPreset));
+				OnPropertyChanged(nameof(TileLayout));
+				OnPropertyChanged(nameof(NthWindowIndex));
+				OnPropertyChanged(nameof(WindowOpacityValue));
+				OnPropertyChanged(nameof(WindowOpacityLabel));
+				OnPropertyChanged(nameof(ShellToolTitle));
 			}
 		}
 	}
 
 	public string Arguments
 	{
-		get
-		{
-			return Action.Arguments ?? "";
-		}
+		get => Action.Arguments ?? "";
 		set
 		{
 			if (Action.Arguments != value)
 			{
 				Action.Arguments = value;
-				OnPropertyChanged("Arguments");
+				OnPropertyChanged(nameof(Arguments));
 			}
 		}
 	}
 
 	public string IconKey
 	{
-		get
-		{
-			return Action.IconKey ?? "";
-		}
+		get => Action.IconKey ?? "";
 		set
 		{
 			if (Action.IconKey != value)
 			{
 				Action.IconKey = value;
-				OnPropertyChanged("IconKey");
-				OnPropertyChanged("IconDisplayText");
-				OnPropertyChanged("HasVectorIcon");
-				OnPropertyChanged("ShowVectorIcon");
-				OnPropertyChanged("VectorIconData");
+				OnPropertyChanged(nameof(IconKey));
+				OnPropertyChanged(nameof(IconDisplayText));
+				OnPropertyChanged(nameof(HasVectorIcon));
+				OnPropertyChanged(nameof(ShowVectorIcon));
+				OnPropertyChanged(nameof(VectorIconData));
 			}
 		}
 	}
 
 	public string CustomIconSvg
 	{
-		get
-		{
-			return Action.CustomIconSvg ?? "";
-		}
+		get => Action.CustomIconSvg ?? "";
 		set
 		{
 			if (Action.CustomIconSvg != value)
 			{
 				Action.CustomIconSvg = value;
-				OnPropertyChanged("CustomIconSvg");
-				OnPropertyChanged("IconDisplayText");
-				OnPropertyChanged("HasVectorIcon");
-				OnPropertyChanged("ShowVectorIcon");
-				OnPropertyChanged("VectorIconData");
+				OnPropertyChanged(nameof(CustomIconSvg));
+				OnPropertyChanged(nameof(IconDisplayText));
+				OnPropertyChanged(nameof(HasVectorIcon));
+				OnPropertyChanged(nameof(ShowVectorIcon));
+				OnPropertyChanged(nameof(VectorIconData));
 			}
 		}
 	}
@@ -198,6 +363,7 @@ public class SubSlotViewModel : INotifyPropertyChanged
 				OnPropertyChanged(nameof(InheritedAppIcon));
 				OnPropertyChanged(nameof(ShowVectorIcon));
 				OnPropertyChanged(nameof(IconDisplayText));
+				OnPropertyChanged(nameof(InheritStatusLabel));
 			}
 		}
 	}
@@ -230,6 +396,26 @@ public class SubSlotViewModel : INotifyPropertyChanged
 				return "自定义SVG";
 			}
 			return "图标...";
+		}
+	}
+
+	public string InheritStatusLabel
+	{
+		get
+		{
+			if (HasInheritedAppIcon)
+			{
+				try
+				{
+					string fn = System.IO.Path.GetFileName(InheritAppIconPath);
+					return !string.IsNullOrEmpty(fn) ? fn : "已关联程序图标";
+				}
+				catch
+				{
+					return "已关联程序图标";
+				}
+			}
+			return "未关联 (显示默认动作图标)";
 		}
 	}
 
@@ -275,69 +461,44 @@ public class SubSlotViewModel : INotifyPropertyChanged
 
 	public string SelectedSystemPreset
 	{
-		get
-		{
-			return Parameter;
-		}
+		get => Parameter;
 		set
 		{
-			if (!(Parameter != value) || string.IsNullOrEmpty(value))
+			if (Parameter != value && !string.IsNullOrEmpty(value))
 			{
-				return;
-			}
-			Parameter = value;
-			SystemPresetItem systemPresetItem = SlotViewModel.SystemPresetList.FirstOrDefault((SystemPresetItem p) => p.Key == value);
-			if (systemPresetItem != null)
-			{
-				if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+				Parameter = value;
+				SystemPresetItem systemPresetItem = SlotViewModel.SystemPresetList.FirstOrDefault((SystemPresetItem p) => p.Key == value);
+				if (systemPresetItem != null)
 				{
-					Name = systemPresetItem.DefaultName;
+					if (string.IsNullOrEmpty(Name) || Name.StartsWith("子动作"))
+					{
+						Name = systemPresetItem.DefaultName;
+					}
+					if (string.IsNullOrEmpty(IconKey))
+					{
+						IconKey = systemPresetItem.DefaultIconKey;
+					}
 				}
-				if (string.IsNullOrEmpty(IconKey))
-				{
-					IconKey = systemPresetItem.DefaultIconKey;
-				}
+				OnPropertyChanged(nameof(SelectedSystemPreset));
+				OnPropertyChanged(nameof(Parameter));
+				OnPropertyChanged(nameof(SummaryText));
 			}
-			OnPropertyChanged("SelectedSystemPreset");
-			OnPropertyChanged("Parameter");
 		}
 	}
 
-	public bool IsHotkeyType => Type == "Hotkey";
-
-	public bool IsLaunchType
+	public string ShellToolTitle
 	{
 		get
 		{
-			if (!(Type == "Launch"))
+			if (IsShellToolType && !string.IsNullOrEmpty(Parameter))
 			{
-				return Type == "App";
+				var tool = ShellActionPickerWindow.ShellTools?.FirstOrDefault(t => t.Id == Parameter || string.Equals(t.Verb, Parameter, StringComparison.OrdinalIgnoreCase));
+				if (tool != null) return tool.Name;
 			}
-			return true;
+			return "未挑选功能 (点击挑选)";
 		}
 	}
 
-	public bool IsFolderType
-	{
-		get
-		{
-			if (!(Type == "Folder"))
-			{
-				return Type == "OpenFolder";
-			}
-			return true;
-		}
-	}
-
-	public bool IsSystemType => Type == "System";
-
-	public bool IsCommandType => Type == "Command";
-
-	public bool IsSwitchWindowType => Type == "SwitchWindow";
-
-	public bool IsTileType => Type == "Tile";
-
-	/// <summary>平铺布局下拉（key → 显示名）。</summary>
 	public List<ActionTypeOption> TileLayoutOptions
 	{
 		get
@@ -356,30 +517,23 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		}
 	}
 
-	/// <summary>平铺布局（写入 Parameter）。</summary>
 	public string TileLayout
 	{
-		get
-		{
-			return Action.Parameter ?? "";
-		}
+		get => Action.Parameter ?? "";
 		set
 		{
 			if (Action.Parameter != value)
 			{
 				Action.Parameter = value;
-				OnPropertyChanged("TileLayout");
+				OnPropertyChanged(nameof(TileLayout));
+				OnPropertyChanged(nameof(SummaryText));
 			}
 		}
 	}
 
-	/// <summary>任务栏第 N 个窗口的序号（1~20，仅数字）。</summary>
 	public string NthWindowIndex
 	{
-		get
-		{
-			return Action.Parameter ?? "";
-		}
+		get => Action.Parameter ?? "";
 		set
 		{
 			string digits = string.IsNullOrEmpty(value) ? "" : new string(value.Where(char.IsDigit).ToArray());
@@ -391,31 +545,132 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			if (Action.Parameter != digits)
 			{
 				Action.Parameter = digits;
-				OnPropertyChanged("NthWindowIndex");
+				OnPropertyChanged(nameof(NthWindowIndex));
+				OnPropertyChanged(nameof(SummaryText));
 			}
 		}
 	}
 
-	/// <summary>Localized terminal options for Command actions.</summary>
 	public List<ActionTypeItem> Terminals => SlotViewModel.LocalizedTerminals;
 
 	public string CommandTerminal
 	{
-		get
-		{
-			return Action.CommandTerminal ?? "cmd";
-		}
+		get => Action.CommandTerminal ?? "cmd";
 		set
 		{
 			if (Action.CommandTerminal != value && !string.IsNullOrEmpty(value))
 			{
 				Action.CommandTerminal = value;
-				OnPropertyChanged("CommandTerminal");
+				OnPropertyChanged(nameof(CommandTerminal));
 			}
 		}
 	}
 
 	public List<ActionTypeItem> ActionTypes => SlotViewModel.LocalizedActionTypes;
+
+	public string TypeBadgeText
+	{
+		get
+		{
+			if (IsHotkeyType) return "⌨️ 快捷热键";
+			if (IsLaunchType) return "🚀 启动程序";
+			if (IsWebUrlType) return "🌐 打开网址";
+			if (IsFolderType) return "📁 打开文件夹";
+			if (IsCommandType) return "💻 运行命令";
+			if (IsWindowManagerType)
+			{
+				if (Type == "ToggleTopmost") return "📌 窗口置顶";
+				if (Type == "MoveMonitor") return "🖥️ 移到下一屏";
+				if (Type == "WindowOpacity") return "👁️ 窗口透明度";
+				if (Type == "SwitchWindow") return "🗂️ 切换任务栏";
+				return "🔲 平铺窗口";
+			}
+			if (IsSystemType) return "⚙️ 系统控制";
+			if (IsOcrType) return "✂️ 截屏识字";
+			if (IsShellToolType) return "⚡ 右键工具";
+			return Type;
+		}
+	}
+
+	public string SummaryText
+	{
+		get
+		{
+			if (IsHotkeyType) return string.IsNullOrWhiteSpace(Parameter) ? "(未录入快捷键)" : Parameter;
+			if (IsLaunchType) return string.IsNullOrWhiteSpace(Parameter) ? "(未选择程序)" : System.IO.Path.GetFileName(Parameter);
+			if (IsWebUrlType) return string.IsNullOrWhiteSpace(Parameter) ? "(未输入网址)" : Parameter;
+			if (IsFolderType) return string.IsNullOrWhiteSpace(Parameter) ? "(未选择文件夹)" : System.IO.Path.GetFileName(Parameter);
+			if (IsCommandType) return string.IsNullOrWhiteSpace(Parameter) ? "(未输入命令)" : Parameter;
+			if (IsWindowManagerType)
+			{
+				if (Type == "ToggleTopmost") return "置顶 / 取消置顶";
+				if (Type == "MoveMonitor") return "移至下一显示器";
+				if (Type == "WindowOpacity") return $"不透明度: {Parameter}%";
+				if (Type == "SwitchWindow") return $"任务栏 #{Parameter} 槽位";
+				if (Parameter == WindowTiler.CycleParam) return "循环切换平铺";
+				if (Parameter == WindowTiler.CycleBackParam) return "反向循环平铺";
+				if (Parameter == WindowTiler.RestoreParam) return "还原平铺快照";
+				return WindowTiler.LayoutDisplayName(Parameter ?? "2L");
+			}
+			if (IsSystemType) return SlotViewModel.SystemPresetList.FirstOrDefault(p => p.Key == Parameter)?.DisplayName ?? Parameter;
+			if (IsOcrType) return "Windows 本地 / 离线原生 OCR";
+			if (IsShellToolType) return ShellToolTitle;
+			return Parameter ?? "";
+		}
+	}
+
+	public void NotifyAllPropertiesChanged()
+	{
+		OnPropertyChanged(nameof(Name));
+		OnPropertyChanged(nameof(Type));
+		OnPropertyChanged(nameof(AggregatedType));
+		OnPropertyChanged(nameof(Parameter));
+		OnPropertyChanged(nameof(Arguments));
+		OnPropertyChanged(nameof(IconKey));
+		OnPropertyChanged(nameof(CustomIconSvg));
+		OnPropertyChanged(nameof(InheritAppIconPath));
+		OnPropertyChanged(nameof(HasInheritedAppIcon));
+		OnPropertyChanged(nameof(InheritedAppIcon));
+		OnPropertyChanged(nameof(ShowVectorIcon));
+		OnPropertyChanged(nameof(VectorIconData));
+		OnPropertyChanged(nameof(IconDisplayText));
+		OnPropertyChanged(nameof(InheritStatusLabel));
+		OnPropertyChanged(nameof(IsHotkeyType));
+		OnPropertyChanged(nameof(IsLaunchType));
+		OnPropertyChanged(nameof(IsWebUrlType));
+		OnPropertyChanged(nameof(IsFolderType));
+		OnPropertyChanged(nameof(IsSystemType));
+		OnPropertyChanged(nameof(IsCommandType));
+		OnPropertyChanged(nameof(IsSwitchWindowType));
+		OnPropertyChanged(nameof(IsTileType));
+		OnPropertyChanged(nameof(IsOcrType));
+		OnPropertyChanged(nameof(IsShellToolType));
+		OnPropertyChanged(nameof(IsWindowManagerType));
+		OnPropertyChanged(nameof(WindowManagerSubMode));
+		OnPropertyChanged(nameof(IsTileSubMode));
+		OnPropertyChanged(nameof(IsCycleSubMode));
+		OnPropertyChanged(nameof(IsRestoreSubMode));
+		OnPropertyChanged(nameof(IsTopmostSubMode));
+		OnPropertyChanged(nameof(IsMoveMonitorSubMode));
+		OnPropertyChanged(nameof(IsOpacitySubMode));
+		OnPropertyChanged(nameof(IsSwitchWindowSubMode));
+		OnPropertyChanged(nameof(WindowOpacityValue));
+		OnPropertyChanged(nameof(WindowOpacityLabel));
+		OnPropertyChanged(nameof(RunAsStandardUser));
+		OnPropertyChanged(nameof(BrowserChoice));
+		OnPropertyChanged(nameof(IsCustomBrowser));
+		OnPropertyChanged(nameof(BrowserPath));
+		OnPropertyChanged(nameof(SelectedSystemPreset));
+		OnPropertyChanged(nameof(TileLayout));
+		OnPropertyChanged(nameof(NthWindowIndex));
+		OnPropertyChanged(nameof(CommandTerminal));
+		OnPropertyChanged(nameof(ShellToolTitle));
+		OnPropertyChanged(nameof(TypeBadgeText));
+		OnPropertyChanged(nameof(SummaryText));
+		OnPropertyChanged(nameof(IsExpanded));
+		OnPropertyChanged(nameof(ExpandToggleText));
+		OnPropertyChanged(nameof(ExpandToggleArrow));
+	}
 
 	public event PropertyChangedEventHandler? PropertyChanged;
 

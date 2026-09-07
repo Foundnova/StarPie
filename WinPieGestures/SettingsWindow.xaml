@@ -659,12 +659,12 @@
           </Button>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.0&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.1&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.0" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -723,7 +723,7 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Name="TriggerRecorderTitleText" Text="轮盘唤醒触发按键 &amp; 组合键录制" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                  <TextBlock Name="TriggerRecorderDescText" Text="支持鼠标所有按键（右键/中键/侧键1/侧键2/左键）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键一键物理录制绑定。绑定鼠标左键后长按可唤醒轮盘，单机左键保持系统正常点击。未触发手势的轻点将自动放行原生按键点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
+                  <TextBlock Name="TriggerRecorderDescText" Text="支持鼠标所有按键（右键/中键/侧键1/侧键2/左键）与键盘单键（如 CapsLock、波浪键~、空格、字母键、F区键等）及组合键一键物理录制绑定。绑定鼠标左键后长按可唤醒轮盘，单机左键保持系统正常点击。未触发手势的轻点将自动放行原生按键点击。建议避免将常用功能按键绑定为触发按键。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
                   <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto" />
@@ -1496,176 +1496,180 @@
                         <TextBlock Name="HighlightGlowOpacityLabel" Grid.Column="1" Text="85%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                     </StackPanel>
-                    <StackPanel Name="Tier2ThemePanel" Visibility="Collapsed">
-                      <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
-                        <TextBlock Text="🌟 当前正在单独定制二级级联轮盘专属视觉风格与色彩，支持与一级主轮盘自由组合！" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
-                      </Border>
-                      <TextBlock Text="二级轮盘视觉风格 (Sub Wheel Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                      <ComboBox Name="SubWheelUiStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="SubWheelUiStyleComboBox_SelectionChanged">
-                        <ComboBoxItem Content="跟随一级主轮盘风格 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                        <ComboBoxItem Content="经典圆环 (Classic Ring)" Tag="ClassicRing" />
-                        <ComboBoxItem Content="极简扇区 (Clean Sectors)" Tag="CleanSectors" />
-                        <ComboBoxItem Content="液态毛玻璃 (Glassmorphism)" Tag="Glassmorphism" />
-                      </ComboBox>
-                      <TextBlock Text="二级轮盘配色方案 (Sub Wheel Theme):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                      <ComboBox Name="SubWheelThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,6" SelectionChanged="SubWheelThemeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="跟随一级主轮盘配色 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                        <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System" />
-                        <ComboBoxItem Content="深色模式 (Dark)" Tag="Dark" />
-                        <ComboBoxItem Content="浅色模式 (Light)" Tag="Light" />
-                        <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
-                        <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
-                        <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
-                      </ComboBox>
-                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
-                        <Button Name="NewSubCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewSubCustomColorPresetButton_Click" />
-                        <Button Name="RenameSubCustomColorPresetButton" Content="✏️ 重命名预设" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="重命名当前选中的自定义配色方案预设" Click="RenameSubCustomColorPresetButton_Click" />
-                        <Button Name="DeleteSubCustomColorPresetButton" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="删除当前选中的自定义配色方案预设" Click="DeleteSubCustomColorPresetButton_Click" />
-                      </StackPanel>
-                      <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16,12" Margin="0,0,0,12">
-                        <UIElement.Effect>
-                          <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
-                        </UIElement.Effect>
-                        <Expander Name="SubCustomColorExpander" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0">
-                          <HeaderedContentControl.Header>
-                            <StackPanel Margin="0,2,0,2">
-                              <TextBlock Name="SubCustomColorsExpanderTitleText" Text="🎨 二级轮盘高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                              <TextBlock Name="SubCustomColorsExpanderDescText" Text="展开后可精准微调二级扇区底色、高亮光晕、边框线条、文字等各项色彩。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
-                            </StackPanel>
-                          </HeaderedContentControl.Header>
-                          <StackPanel Margin="0,12,0,4">
-                            <TextBlock Text="自定义十六进制色彩 (色盘调色 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
-                            <Grid Margin="0,0,0,6">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <TextBlock Text="扇区底色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                              <TextBox Name="SubCustomSectorBgTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
-                              <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomSectorBg" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                                <Border Name="SubCustomSectorBgPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                              </Button>
-                              <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomSectorBg" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <TextBlock Text="扇区边框:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                              <TextBox Name="SubCustomSectorBorderTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
-                              <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomSectorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                                <Border Name="SubCustomSectorBorderPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                              </Button>
-                              <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomSectorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <TextBlock Text="高亮底色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                              <TextBox Name="SubCustomHighlightBgTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
-                              <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomHighlightBg" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                                <Border Name="SubCustomHighlightBgPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                              </Button>
-                              <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomHighlightBg" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <TextBlock Text="高亮边框:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                              <TextBox Name="SubCustomHighlightBorderTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
-                              <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomHighlightBorder" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                                <Border Name="SubCustomHighlightBorderPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                              </Button>
-                              <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomHighlightBorder" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="68" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <TextBlock Text="文字颜色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                              <TextBox Name="SubCustomTextTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
-                              <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                                <Border Name="SubCustomTextPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                              </Button>
-                              <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                            </Grid>
-                            <Grid Margin="0,6,0,0">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                              </Grid.ColumnDefinitions>
-                              <Button Name="SaveSubPresetChangesButton" Content="💾 保存当前配色修改" Style="{StaticResource ModernButtonStyle}" Height="30" FontWeight="Medium" ToolTip="将当前调整的颜色直接保存到正在使用的二级配色预设中" Click="SaveSubPresetChangesButton_Click" />
-                              <Button Name="SaveAsNewSubPresetButton" Grid.Column="1" Content="➕ 另存为新预设..." Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" ToolTip="将当前调整的颜色另存为一个全新的独立配色预设" Click="SaveAsNewSubPresetButton_Click" />
-                              <Button Name="DeleteSubPresetInPanelButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="删除当前选中的自定义配色方案预设" Click="DeleteSubCustomColorPresetButton_Click" />
-                            </Grid>
+                    <Border Name="Tier2ThemeExpanderBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,8,0,0">
+                      <Expander Name="Tier2ThemeExpander" Header="🌐 二级级联轮盘视觉风格与配色 (展开定制)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
+                        <StackPanel Name="Tier2ThemePanel" Margin="0,8,0,0">
+                          <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
+                            <TextBlock Text="🌟 当前正在单独定制二级级联轮盘专属视觉风格与色彩，支持与一级主轮盘自由组合！" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
+                          </Border>
+                          <TextBlock Text="二级轮盘视觉风格 (Sub Wheel Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                          <ComboBox Name="SubWheelUiStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="SubWheelUiStyleComboBox_SelectionChanged">
+                            <ComboBoxItem Content="跟随一级主轮盘风格 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="经典圆环 (Classic Ring)" Tag="ClassicRing" />
+                            <ComboBoxItem Content="极简扇区 (Clean Sectors)" Tag="CleanSectors" />
+                            <ComboBoxItem Content="液态毛玻璃 (Glassmorphism)" Tag="Glassmorphism" />
+                          </ComboBox>
+                          <TextBlock Text="二级轮盘配色方案 (Sub Wheel Theme):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                          <ComboBox Name="SubWheelThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,6" SelectionChanged="SubWheelThemeComboBox_SelectionChanged">
+                            <ComboBoxItem Content="跟随一级主轮盘配色 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System" />
+                            <ComboBoxItem Content="深色模式 (Dark)" Tag="Dark" />
+                            <ComboBoxItem Content="浅色模式 (Light)" Tag="Light" />
+                            <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
+                            <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
+                            <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
+                          </ComboBox>
+                          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
+                            <Button Name="NewSubCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewSubCustomColorPresetButton_Click" />
+                            <Button Name="RenameSubCustomColorPresetButton" Content="✏️ 重命名预设" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="重命名当前选中的自定义配色方案预设" Click="RenameSubCustomColorPresetButton_Click" />
+                            <Button Name="DeleteSubCustomColorPresetButton" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="删除当前选中的自定义配色方案预设" Click="DeleteSubCustomColorPresetButton_Click" />
                           </StackPanel>
-                        </Expander>
-                      </Border>
-                      <TextBlock Text="二级轮盘高亮边缘光晕 (Sub Highlight Glow):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,4" />
-                      <ComboBox Name="SubHighlightGlowPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,8" SelectionChanged="SubHighlightGlowPresetComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🔘 跟随一级主轮盘光晕 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                        <ComboBoxItem Content="🌈 跟随二级主题高亮色 (Auto / Follow Sub Theme)" Tag="Auto" />
-                        <ComboBoxItem Content="💜 丁香晶紫 (Lilac Violet #A855F7)" Tag="Lilac" />
-                        <ComboBoxItem Content="💙 冰川湛蓝 (Glacial Blue #3B82F6)" Tag="Blue" />
-                        <ComboBoxItem Content="💚 翡翠荧绿 (Emerald Green #10B981)" Tag="Emerald" />
-                        <ComboBoxItem Content="💖 樱花粉晕 (Sakura Rose #EC4899)" Tag="Rose" />
-                        <ComboBoxItem Content="🧡 琥珀金光 (Amber Gold #F59E0B)" Tag="Amber" />
-                        <ComboBoxItem Content="🔴 珊瑚赤光 (Coral Red #EF4444)" Tag="Red" />
-                        <ComboBoxItem Content="⚪ 冰魄纯白 (Pure Ice White #FFFFFF)" Tag="White" />
-                        <ComboBoxItem Content="🚫 关闭边缘光晕 (Disable Glow)" Tag="None" />
-                        <ComboBoxItem Content="🎨 自定义光晕颜色 (Custom Glow Color)" Tag="Custom" />
-                      </ComboBox>
-                      <Grid Name="SubCustomHighlightGlowPanel" Visibility="Collapsed" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="68" />
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="光晕色值:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                        <TextBox Name="SubHighlightGlowColorTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubHighlightGlowColorTextBox_TextChanged" />
-                        <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取光晕颜色" Tag="SubHighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
-                          <Border Name="SubHighlightGlowColorPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
-                        </Button>
-                        <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取光晕颜色" Tag="SubHighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
-                      </Grid>
-                      <TextBlock Text="光晕弥散半径 (Glow Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="45" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubHighlightGlowRadiusSlider" Minimum="8" Maximum="48" Value="24" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubHighlightGlowRadiusSlider_ValueChanged" />
-                        <TextBlock Name="SubHighlightGlowRadiusLabel" Grid.Column="1" Text="24 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <TextBlock Text="光晕不透明度 (Glow Opacity):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="45" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubHighlightGlowOpacitySlider" Minimum="0" Maximum="100" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubHighlightGlowOpacitySlider_ValueChanged" />
-                        <TextBlock Name="SubHighlightGlowOpacityLabel" Grid.Column="1" Text="85%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <Button Name="ResetSubThemeButton" Content="🔄 恢复与一级轮盘相同主题" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,4,0,0" Click="ResetSubThemeButton_Click" />
-                    </StackPanel>
+                          <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16,12" Margin="0,0,0,12">
+                            <UIElement.Effect>
+                              <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                            </UIElement.Effect>
+                            <Expander Name="SubCustomColorExpander" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0">
+                              <HeaderedContentControl.Header>
+                                <StackPanel Margin="0,2,0,2">
+                                  <TextBlock Name="SubCustomColorsExpanderTitleText" Text="🎨 二级轮盘高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                  <TextBlock Name="SubCustomColorsExpanderDescText" Text="展开后可精准微调二级扇区底色、高亮光晕、边框线条、文字等各项色彩。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                                </StackPanel>
+                              </HeaderedContentControl.Header>
+                              <StackPanel Margin="0,12,0,4">
+                                <TextBlock Text="自定义十六进制色彩 (色盘调色 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="68" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBlock Text="扇区底色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                  <TextBox Name="SubCustomSectorBgTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
+                                  <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomSectorBg" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                                    <Border Name="SubCustomSectorBgPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                                  </Button>
+                                  <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomSectorBg" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="68" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBlock Text="扇区边框:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                  <TextBox Name="SubCustomSectorBorderTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
+                                  <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomSectorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                                    <Border Name="SubCustomSectorBorderPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                                  </Button>
+                                  <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomSectorBorder" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="68" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBlock Text="高亮底色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                  <TextBox Name="SubCustomHighlightBgTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
+                                  <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomHighlightBg" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                                    <Border Name="SubCustomHighlightBgPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                                  </Button>
+                                  <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomHighlightBg" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="68" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBlock Text="高亮边框:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                  <TextBox Name="SubCustomHighlightBorderTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
+                                  <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomHighlightBorder" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                                    <Border Name="SubCustomHighlightBorderPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                                  </Button>
+                                  <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomHighlightBorder" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="68" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <TextBlock Text="文字颜色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                  <TextBox Name="SubCustomTextTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubCustomColorTextBox_TextChanged" />
+                                  <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SubCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                                    <Border Name="SubCustomTextPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                                  </Button>
+                                  <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SubCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                                </Grid>
+                                <Grid Margin="0,6,0,0">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <Button Name="SaveSubPresetChangesButton" Content="💾 保存当前配色修改" Style="{StaticResource ModernButtonStyle}" Height="30" FontWeight="Medium" ToolTip="将当前调整的颜色直接保存到正在使用的二级配色预设中" Click="SaveSubPresetChangesButton_Click" />
+                                  <Button Name="SaveAsNewSubPresetButton" Grid.Column="1" Content="➕ 另存为新预设..." Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" ToolTip="将当前调整的颜色另存为一个全新的独立配色预设" Click="SaveAsNewSubPresetButton_Click" />
+                                  <Button Name="DeleteSubPresetInPanelButton" Grid.Column="2" Content="🗑️ 删除预设" Style="{StaticResource ModernButtonStyle}" Height="30" Margin="6,0,0,0" Padding="10,0" Visibility="Collapsed" ToolTip="删除当前选中的自定义配色方案预设" Click="DeleteSubCustomColorPresetButton_Click" />
+                                </Grid>
+                              </StackPanel>
+                            </Expander>
+                          </Border>
+                          <TextBlock Text="二级轮盘高亮边缘光晕 (Sub Highlight Glow):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,4" />
+                          <ComboBox Name="SubHighlightGlowPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,8" SelectionChanged="SubHighlightGlowPresetComboBox_SelectionChanged">
+                            <ComboBoxItem Content="🔘 跟随一级主轮盘光晕 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="🌈 跟随二级主题高亮色 (Auto / Follow Sub Theme)" Tag="Auto" />
+                            <ComboBoxItem Content="💜 丁香晶紫 (Lilac Violet #A855F7)" Tag="Lilac" />
+                            <ComboBoxItem Content="💙 冰川湛蓝 (Glacial Blue #3B82F6)" Tag="Blue" />
+                            <ComboBoxItem Content="💚 翡翠荧绿 (Emerald Green #10B981)" Tag="Emerald" />
+                            <ComboBoxItem Content="💖 樱花粉晕 (Sakura Rose #EC4899)" Tag="Rose" />
+                            <ComboBoxItem Content="🧡 琥珀金光 (Amber Gold #F59E0B)" Tag="Amber" />
+                            <ComboBoxItem Content="🔴 珊瑚赤光 (Coral Red #EF4444)" Tag="Red" />
+                            <ComboBoxItem Content="⚪ 冰魄纯白 (Pure Ice White #FFFFFF)" Tag="White" />
+                            <ComboBoxItem Content="🚫 关闭边缘光晕 (Disable Glow)" Tag="None" />
+                            <ComboBoxItem Content="🎨 自定义光晕颜色 (Custom Glow Color)" Tag="Custom" />
+                          </ComboBox>
+                          <Grid Name="SubCustomHighlightGlowPanel" Visibility="Collapsed" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="68" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="光晕色值:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <TextBox Name="SubHighlightGlowColorTextBox" Grid.Column="1" Height="28" Margin="0,0,6,0" TextChanged="SubHighlightGlowColorTextBox_TextChanged" />
+                            <Button Grid.Column="2" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取光晕颜色" Tag="SubHighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click">
+                              <Border Name="SubHighlightGlowColorPreview" Width="20" Height="20" CornerRadius="3" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" />
+                            </Button>
+                            <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取光晕颜色" Tag="SubHighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                          </Grid>
+                          <TextBlock Text="光晕弥散半径 (Glow Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="45" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubHighlightGlowRadiusSlider" Minimum="8" Maximum="48" Value="24" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubHighlightGlowRadiusSlider_ValueChanged" />
+                            <TextBlock Name="SubHighlightGlowRadiusLabel" Grid.Column="1" Text="24 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <TextBlock Text="光晕不透明度 (Glow Opacity):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="45" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubHighlightGlowOpacitySlider" Minimum="0" Maximum="100" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubHighlightGlowOpacitySlider_ValueChanged" />
+                            <TextBlock Name="SubHighlightGlowOpacityLabel" Grid.Column="1" Text="85%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <Button Name="ResetSubThemeButton" Content="🔄 恢复与一级轮盘相同主题" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,4,0,0" Click="ResetSubThemeButton_Click" />
+                        </StackPanel>
+                      </Expander>
+                    </Border>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
@@ -1730,57 +1734,61 @@
                         <TextBlock Name="CoreRadiusLabel" Grid.Column="1" Text="50" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                     </StackPanel>
-                    <StackPanel Name="Tier2DimensionsPanel" Visibility="Collapsed">
-                      <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
-                        <TextBlock Text="🌟 当前正在单独调节二级级联轮盘专属尺寸，与一级轮盘完全独立互不影响。" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
-                      </Border>
-                      <TextBlock Text="二级轮盘整体外径 (Sub Outer Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="50" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelOuterRadiusSlider" Minimum="120" Maximum="480" Value="210" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
-                        <TextBlock Name="SubWheelOuterRadiusLabel" Grid.Column="1" Text="210 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <TextBlock Text="二级与一级轮盘间距 (Gap):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="50" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelInnerGapSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelInnerGapSlider_ValueChanged" />
-                        <TextBlock Name="SubWheelInnerGapLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <TextBlock Text="二级扇区边缘平滑倒角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="50" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelCornerRadiusSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelCornerRadiusSlider_ValueChanged" />
-                        <TextBlock Name="SubWheelCornerRadiusLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <TextBlock Text="二级轮盘图标尺寸 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,8">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="50" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelIconSizeSlider" Minimum="10" Maximum="32" Value="18" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelIconSizeSlider_ValueChanged" />
-                        <TextBlock Name="SubWheelIconSizeLabel" Grid.Column="1" Text="18 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <TextBlock Text="二级轮盘字体字号 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <Grid Margin="0,2,0,10">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="50" />
-                        </Grid.ColumnDefinitions>
-                        <Slider Name="SubWheelFontSizeSlider" Minimum="7" Maximum="16" Value="9.5" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelFontSizeSlider_ValueChanged" />
-                        <TextBlock Name="SubWheelFontSizeLabel" Grid.Column="1" Text="9.5 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                      </Grid>
-                      <Button Name="ResetSubDimensionsButton" Content="🔄 恢复二级轮盘默认尺寸" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,4,0,0" Click="ResetSubDimensionsButton_Click" />
-                    </StackPanel>
+                    <Border Name="Tier2DimensionsExpanderBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,8,0,0">
+                      <Expander Name="Tier2DimensionsExpander" Header="🌐 二级级联轮盘几何形态与尺寸 (展开微调)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
+                        <StackPanel Name="Tier2DimensionsPanel" Margin="0,8,0,0">
+                          <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+                            <TextBlock Text="🌟 当前正在单独调节二级级联轮盘专属尺寸，与一级轮盘完全独立互不影响。" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
+                          </Border>
+                          <TextBlock Text="二级轮盘整体外径 (Sub Outer Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubWheelOuterRadiusSlider" Minimum="120" Maximum="480" Value="210" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelOuterRadiusLabel" Grid.Column="1" Text="210 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <TextBlock Text="二级与一级轮盘间距 (Gap):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubWheelInnerGapSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelInnerGapSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelInnerGapLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <TextBlock Text="二级扇区边缘平滑倒角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubWheelCornerRadiusSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelCornerRadiusSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelCornerRadiusLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <TextBlock Text="二级轮盘图标尺寸 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubWheelIconSizeSlider" Minimum="10" Maximum="32" Value="18" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelIconSizeSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelIconSizeLabel" Grid.Column="1" Text="18 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <TextBlock Text="二级轮盘字体字号 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <Grid Margin="0,2,0,10">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <Slider Name="SubWheelFontSizeSlider" Minimum="7" Maximum="16" Value="9.5" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelFontSizeSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelFontSizeLabel" Grid.Column="1" Text="9.5 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          </Grid>
+                          <Button Name="ResetSubDimensionsButton" Content="🔄 恢复二级轮盘默认尺寸" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" HorizontalAlignment="Left" Cursor="Hand" Margin="0,4,0,0" Click="ResetSubDimensionsButton_Click" />
+                        </StackPanel>
+                      </Expander>
+                    </Border>
                   </StackPanel>
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
@@ -2211,7 +2219,7 @@
                   </Grid>
                   <TextBlock Text="💡 移动鼠标至下方轮盘可实时测试高亮与磁吸手感" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
 
-                  <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,6,0,2">
+                  <Border Name="LivePreviewTierSegmentBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,6,0,2">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -2463,8 +2471,17 @@
                       </StackPanel>
                     </Border>
 
+                    <!-- 暂无二级子动作提示卡片 (仅当切换至二级级联且未添加任何子动作时显示) -->
+                    <Border Name="FocusTier2EmptyNoticeBorder" Visibility="Collapsed" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20,16" Margin="0,0,0,12">
+                      <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="🌟 当前主扇区尚未配置二级级联子动作" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="向外划动此扇区时可展开二级子菜单。支持添加 1~4 个二级子动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,12" />
+                        <Button Content="➕ 添加第 1 个二级子动作" Style="{StaticResource PrimaryButtonStyle}" Height="32" Padding="16,0" HorizontalAlignment="Center" Click="FocusAddSubActionBtn_Click" />
+                      </StackPanel>
+                    </Border>
+
                     <!-- 模块 1：图标与显示名称配置 -->
-                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
+                    <Border Name="FocusNameAndIconBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
                       <Grid>
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="70" />
@@ -2488,7 +2505,7 @@
                     </Border>
 
                     <!-- 模块 2：触发动作类型选择与参数配置 -->
-                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                    <Border Name="FocusActionTypeAndParamsBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                       <StackPanel>
                         <Grid Margin="0,0,0,10">
                           <Grid.ColumnDefinitions>
@@ -3268,7 +3285,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.0 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.1 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3286,7 +3303,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.0" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.1" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -3628,7 +3645,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.0" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3644,11 +3661,11 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.7.0 简单模式层级精简 &amp; 中心核圆动作图标呼出修复 &amp; 体验提纯" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🎯 【简单模式层级精简提纯】：将「鼠标手势 (Mouse Gestures)」独立卡片、「外甩取消自定义动作」、「屏幕边缘呼出防溢出」与「紧凑全览列表」切换器全面纳入高级全星模式，简单模式更加聚焦直观；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🌟 【中心核圆动作图标呼出修复】：彻底打通轮盘中心动作图标渲染通路，无论是自定义矢量 SVG、关联外部程序图标或内置图标，在实际呼出轮盘与画布中均能完美一致呈现并支持琥珀光晕高亮；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 📋 【动作分段视图模式收纳】：在简单模式下默认锁定高效直观的画布联动精调视图，收起列表分段切换，杜绝多余视图干扰；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• ⚡ 【全域平滑过渡与性能守护】：持续保持 0 内存泄漏与 &lt;16ms 极速呼出，给创作者带来无与伦比的跟手手感。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.7.1 连续步进快捷键支持 &amp; 外圈子环全展开 &amp; 触发防冲突提示" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• ⌨️ 【连续步进击键优化】：重构快捷键执行引擎，支持办公软件中如 Alt+H+V+F 连续步进快捷键（KeyTips / 菜单层级），支持逗号与加号分隔连续击键；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🔘 【外圈子环全展开预览】：轮盘样式为外圈子环时，交互画布默认将所有扇区的二级子环全部展开预览，移除冗余的一二级切换按钮；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 💡 【触发按键防冲突提示】：在触发按键说明中增加防冲突建议提示，帮助用户避开日常高频按键；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【平稳体验守护】：保持极低内存占用与流畅跟手体验。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -3657,6 +3674,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.7.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="连续步进快捷键支持 &amp; 外圈子环全展开 &amp; 触发防冲突提示" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="快捷键引擎支持多键顺序步进派发（如 Alt+H+V+F）；外圈子环画布默认全展开并精简一二级按钮；触发按键增加防冲突提示。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-07" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>
