@@ -318,6 +318,62 @@ public static class I18n
 			[LanguageCode.En] = "Enable Outer Escape Cancel (Recommended)",
 			[LanguageCode.Ja] = "外側スワイプキャンセルを有効化 (推奨)"
 		};
+		dictionary["VolumeDragTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "音量拖距调音 (Volume Drag-Adjust)",
+			[LanguageCode.ZhTw] = "音量拖距調音 (Volume Drag-Adjust)",
+			[LanguageCode.En] = "Volume Drag-Adjust",
+			[LanguageCode.Ja] = "音量ドラッグ調整 (Volume Drag-Adjust)"
+		};
+		dictionary["VolumeDragDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "长按音量加/减扇区向外拖出可连续调音，以下距离参数实时生效，无需重启。",
+			[LanguageCode.ZhTw] = "長按音量加/減扇區向外拖出可連續調音，以下距離參數即時生效，無需重啟。",
+			[LanguageCode.En] = "Drag outward from a volume +/- sector to adjust continuously; the distance options below apply live without restart.",
+			[LanguageCode.Ja] = "音量+/-セクターから外側へドラッグして連続調整。以下の距離パラメータは再起動不要で即時反映されます。"
+		};
+		dictionary["VolumeCancelRatioTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "缩回取消系数 (Cancel Hysteresis):",
+			[LanguageCode.ZhTw] = "縮回取消係數 (Cancel Hysteresis):",
+			[LanguageCode.En] = "Return-to-center cancel ratio (Hysteresis):",
+			[LanguageCode.Ja] = "中心復帰キャンセル係数 (Hysteresis):"
+		};
+		dictionary["VolumeCancelRatioDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "调音时缩回到触发距离的百分之多少以下即取消并恢复原音量。值越大越不易被边缘抖动误回收（默认 60%）。",
+			[LanguageCode.ZhTw] = "調音時縮回到觸發距離的百分之多少以下即取消並恢復原音量。值越大越不易被邊緣抖動誤回收（預設 60%）。",
+			[LanguageCode.En] = "Cancel and restore the original volume once you drag back below this share of the trigger distance. Higher resists edge jitter (default 60%).",
+			[LanguageCode.Ja] = "トリガー距離のこの割合まで戻すとキャンセルして元の音量に戻します。値が大きいほど端の揺れによる誤収斂ににくくなります（既定60%）。"
+		};
+		dictionary["VolumeFlickFarTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "甩出取消距离下限 (Flick Far):",
+			[LanguageCode.ZhTw] = "甩出取消距離下限 (Flick Far):",
+			[LanguageCode.En] = "Flick-out cancel distance floor (Flick Far):",
+			[LanguageCode.Ja] = "スワイプキャンセル距離下限 (Flick Far):"
+		};
+		dictionary["VolumeFlickFarDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "仅当光标已远于该距离时，快速甩动才会取消调音，防止近距离拖动被误判为甩出。",
+			[LanguageCode.ZhTw] = "僅當光標已遠於該距離時，快速甩動才會取消調音，防止近距離拖動被誤判為甩出。",
+			[LanguageCode.En] = "A fast flick only cancels once the pointer is beyond this distance, avoiding short drags being read as a flick.",
+			[LanguageCode.Ja] = "カーソルがこの距離を超えて初めて高速スワイプでキャンセル。近距離ドラッグの誤判定を防ぎます。"
+		};
+		dictionary["VolumeFlickJumpTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "甩动跳变阈值 (Flick Jump):",
+			[LanguageCode.ZhTw] = "甩動跳變閾值 (Flick Jump):",
+			[LanguageCode.En] = "Per-frame flick jump threshold (Flick Jump):",
+			[LanguageCode.Ja] = "フレームあたりスワイプ跳変閾値 (Flick Jump):"
+		};
+		dictionary["VolumeFlickJumpDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "一帧之内光标移动超过该距离才算快速甩动。值越大越不容易触发甩出取消。",
+			[LanguageCode.ZhTw] = "一幀之內光標移動超過該距離才算快速甩動。值越大越不容易觸發甩出取消。",
+			[LanguageCode.En] = "Movement beyond this distance within one frame counts as a fast flick. Larger values make flick-cancel less likely.",
+			[LanguageCode.Ja] = "1フレーム内の移動がこの距離を超えると高速スワイプと判定。値が大きいほどスワイプキャンセルは起きにくくなります。"
+		};
 		dictionary["IconPickerImport"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "➕ 导入自定义图标...",

@@ -53,6 +53,7 @@
         <StackPanel Name="CoreSelectionTextPanel" Width="150" Margin="6" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
           <TextBlock Name="CoreSelectionText" Foreground="#FFFFFFFF" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="54" Effect="{StaticResource TextShadow}" />
         </StackPanel>
+        <TextBlock Name="CoreVolumeText" Text="🔊 50%" Foreground="#FFFFFFFF" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="NoWrap" Margin="6" Visibility="Collapsed" IsHitTestVisible="False" Effect="{StaticResource TextShadow}" />
       </Grid>
     </Canvas>
   </Grid>
