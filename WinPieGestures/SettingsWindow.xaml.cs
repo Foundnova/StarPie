@@ -37,7 +37,7 @@ public partial class SettingsWindow : Window
 
 	private const double SidebarCollapsedWidth = 68.0;
 
-	private bool _isSidebarCollapsed = true;
+	private bool _isSidebarCollapsed = false;
 
 	private int _selectedLayoutTier = 1; // 1: 主轮盘, 2: 二级级联轮盘
 
@@ -511,6 +511,22 @@ public partial class SettingsWindow : Window
 		{
 			AboutVersionBadgeText.Text = text;
 		}
+		try
+		{
+			double maxAllowedWidth = SystemParameters.WorkArea.Width * 0.96;
+			double maxAllowedHeight = SystemParameters.WorkArea.Height * 0.96;
+			if (base.Width > maxAllowedWidth && maxAllowedWidth >= base.MinWidth)
+			{
+				base.Width = maxAllowedWidth;
+			}
+			if (base.Height > maxAllowedHeight && maxAllowedHeight >= base.MinHeight)
+			{
+				base.Height = maxAllowedHeight;
+			}
+		}
+		catch
+		{
+		}
 		_isUpdatingUi = false;
 
 		// 若为桌面正常呼起或单测环境（非静默参数），立即就绪完整 UI；若为开机自启/静默启动，延迟至首次唤起加载
@@ -696,10 +712,7 @@ public partial class SettingsWindow : Window
 			MappingsProfileComboBox.SelectedItem = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
 		}
 		UpdateProfileToolbarButtonStates();
-		if (FocusActionTypeComboBox != null && FocusActionTypeComboBox.ItemsSource == null)
-		{
-			FocusActionTypeComboBox.ItemsSource = SlotViewModel.AggregatedActionTypes;
-		}
+		UpdateFocusActionTypeItemsSource();
 		if (FocusTileLayoutComboBox != null && FocusTileLayoutComboBox.ItemsSource == null)
 		{
 			FocusTileLayoutComboBox.ItemsSource = SlotViewModel.StaticTileLayoutOptions;
@@ -1414,16 +1427,18 @@ public partial class SettingsWindow : Window
 		}
 		if (Tab3_MemoryCardBorder != null)
 		{
-			Tab3_MemoryCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+			Tab3_MemoryCardBorder.Visibility = Visibility.Visible;
 		}
 		if (Tab3_BackupCardBorder != null)
 		{
-			Tab3_BackupCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+			Tab3_BackupCardBorder.Visibility = Visibility.Visible;
 		}
 		if (Tab3_LogsCardBorder != null)
 		{
 			Tab3_LogsCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
 		}
+
+		UpdateFocusActionTypeItemsSource();
 
 		// 5. 顶部状态微标与提示文本
 		if (ConfigModeStatusIcon != null)
@@ -2113,6 +2128,7 @@ public partial class SettingsWindow : Window
 		{
 			AdvancedPageSubheader.Text = I18n.T("AdvancedPageSubheader");
 		}
+		UpdateFocusActionTypeItemsSource();
 		App.RefreshTrayMenu();
 	}
 
@@ -4110,6 +4126,7 @@ public partial class SettingsWindow : Window
 			if (FocusActionTypeComboBox != null)
 			{
 				string targetTag = isWindowManager ? "WindowManager" : type;
+				UpdateFocusActionTypeItemsSource(targetTag);
 				if (FocusActionTypeComboBox.ItemsSource is IEnumerable<ActionTypeItem> typeItems)
 				{
 					var match = typeItems.FirstOrDefault(ti => string.Equals(ti.Tag, targetTag, StringComparison.OrdinalIgnoreCase));
@@ -4642,6 +4659,52 @@ public partial class SettingsWindow : Window
 			RefreshSlots();
 			RenderMappingsWheelPreview();
 			ScheduleAutoSave();
+		}
+	}
+
+	private void UpdateFocusActionTypeItemsSource(string? currentTag = null)
+	{
+		if (FocusActionTypeComboBox == null) return;
+		bool isSimple = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
+		var allTypes = SlotViewModel.AggregatedActionTypes;
+		List<ActionTypeItem> targetList;
+		if (isSimple)
+		{
+			targetList = allTypes.Where(t =>
+				(t.Tag != "Command" && t.Tag != "WindowManager") ||
+				(currentTag != null && string.Equals(t.Tag, currentTag, StringComparison.OrdinalIgnoreCase))
+			).ToList();
+		}
+		else
+		{
+			targetList = allTypes;
+		}
+
+		if (FocusActionTypeComboBox.ItemsSource is List<ActionTypeItem> currentList &&
+			currentList.Count == targetList.Count &&
+			currentList.Select(x => x.Tag).SequenceEqual(targetList.Select(x => x.Tag)))
+		{
+			return;
+		}
+
+		var prevSelectedTag = (FocusActionTypeComboBox.SelectedItem as ActionTypeItem)?.Tag ?? currentTag;
+		bool oldUpdating = _isUpdatingFocusUi;
+		try
+		{
+			_isUpdatingFocusUi = true;
+			FocusActionTypeComboBox.ItemsSource = targetList;
+			if (prevSelectedTag != null)
+			{
+				var match = targetList.FirstOrDefault(t => string.Equals(t.Tag, prevSelectedTag, StringComparison.OrdinalIgnoreCase));
+				if (match != null)
+				{
+					FocusActionTypeComboBox.SelectedItem = match;
+				}
+			}
+		}
+		finally
+		{
+			_isUpdatingFocusUi = oldUpdating;
 		}
 	}
 

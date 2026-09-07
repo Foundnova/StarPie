@@ -2700,10 +2700,10 @@ public static class I18n
 		};
 		dictionary["ConfigModeProHint"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "已全量开放字体排版、平铺高级参数、OCR接口、内存管理与系统日志等专家功能",
-			[LanguageCode.ZhTw] = "已全量開放字型排版、平鋪進階參數、OCR介面、記憶體管理與系統日誌等專家功能",
-			[LanguageCode.En] = "Full access to fonts, window tiling regex, OCR APIs, memory trimming and runtime logs",
-			[LanguageCode.Ja] = "フォント、ウィンドウ分割詳細、OCR API、メモリ管理、ログなどの全機能を利用できます"
+			[LanguageCode.ZhCn] = "已全量开放运行命令、窗口管理、字体排版、平铺高级参数、OCR接口与系统日志等专家功能",
+			[LanguageCode.ZhTw] = "已全量開放運行命令、視窗管理、字型排版、平鋪進階參數、OCR介面與系統日誌等專家功能",
+			[LanguageCode.En] = "Full access to commands, window management, fonts, tiling parameters, OCR APIs and runtime logs",
+			[LanguageCode.Ja] = "コマンド実行、ウィンドウ管理、フォント、分割詳細、OCR API、システムログなどの全機能を利用できます"
 		};
 		dictionary["SidebarModeSimple"] = new Dictionary<LanguageCode, string>
 		{
