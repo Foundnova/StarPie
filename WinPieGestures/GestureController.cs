@@ -43,6 +43,16 @@ public class GestureController
 
 	private bool _mouseTriggerDown;
 
+	// ---- 键盘触发穿透模式 ----
+	// 触发键 KeyDown/KeyUp 一律原生放行，仅用持握时长+拖动阈值唤出轮盘。
+	// _kbTriggerWaiting 区分"键盘触发正在等待阈值"与鼠标触发的等待态（后者仍需吞键）。
+	private volatile bool _kbTriggerWaiting;
+
+	// 触发键按下时刻（Environment.TickCount64），用于 200ms 持握门槛，防止快速敲击+甩动误唤轮盘。
+	private long _kbTriggerDownTick;
+
+	private const int KeyboardTriggerMinHoldMs = 200;
+
 	// ---- 鼠标手势（画轨迹识别；延迟分段缓冲：短段过滤 + 相邻同向合并 + 完全匹配才触发）----
 	private bool _gestureMode;
 
@@ -148,6 +158,7 @@ public class GestureController
 
 	private void CancelGestureTracking()
 	{
+		_kbTriggerWaiting = false;
 		lock (_uiUpdateSync)
 		{
 			_gestureVersion++;
@@ -1013,9 +1024,21 @@ public class GestureController
 		ModifierKeys modifiers = e.Modifiers;
 		if ((!triggerConfig.RequireCtrl || ((((int)modifiers & 2))) != 0) && (!triggerConfig.RequireShift || ((((int)modifiers & 4))) != 0) && (!triggerConfig.RequireAlt || ((((int)modifiers & 1))) != 0) && (!triggerConfig.RequireWin || ((((int)modifiers & 8))) != 0) && (triggerConfig.VkCode == 0 || IsModifierKey(triggerConfig.VkCode) || e.VkCode == triggerConfig.VkCode))
 		{
-			if (_isWaitingForThreshold || _isGestureActive)
+			if (_isGestureActive)
 			{
+				// 轮盘激活期间吞掉触发键的自动重复，防止连发漏进前台应用。
 				e.Handled = true;
+				return;
+			}
+			if (_isWaitingForThreshold && !_kbTriggerWaiting)
+			{
+				// 鼠标触发正在等待阈值，保持原有吞键语义。
+				e.Handled = true;
+				return;
+			}
+			if (_kbTriggerWaiting)
+			{
+				// 键盘触发等待期（含自动重复）：穿透放行，原生输入零干扰。
 				return;
 			}
 			if (CheckIsIsolated(out string _))
@@ -1034,7 +1057,9 @@ public class GestureController
 			BeginGestureTracking();
 			_isWaitingForThreshold = true;
 			_isGestureActive = false;
-			e.Handled = true;
+			_kbTriggerWaiting = true;
+			_kbTriggerDownTick = Environment.TickCount64;
+			// 穿透模式：不吞键，原生 KeyDown 立即到达前台应用。
 		}
 	}
 
@@ -1072,25 +1097,17 @@ public class GestureController
 		}
 		if (_isWaitingForThreshold)
 		{
+			// 穿透模式：轻点（未达拖动阈值）时 Down/Up 均已原生放行，
+			// 直接取消跟踪即可，无需吞键补发。
 			CancelGestureTracking();
 			_isWaitingForThreshold = false;
-			uint vk = ((triggerConfig.VkCode != 0) ? triggerConfig.VkCode : e.VkCode);
-			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-			{
-				_keyboardHook?.ReplayKeyPress(vk);
-			}, DispatcherPriority.Normal, Array.Empty<object>());
-			e.Handled = true;
 		}
 		else
 		{
 			if (!_isGestureActive)
 			{
-				uint vk = ((triggerConfig.VkCode != 0) ? triggerConfig.VkCode : e.VkCode);
-				((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
-				{
-					_keyboardHook?.ReplayKeyPress(vk);
-				}, DispatcherPriority.Normal, Array.Empty<object>());
-				e.Handled = true;
+				// 穿透模式：无手势进行，Down 从未被吞，KeyUp 原生放行。
+				_kbTriggerWaiting = false;
 				return;
 			}
 			var finalState = EndActiveGesture();
@@ -1146,7 +1163,9 @@ public class GestureController
 					ActionExecutor.EnqueueAction(targetAction);
 				}
 			}, DispatcherPriority.Normal, Array.Empty<object>());
-			e.Handled = true;
+			// 穿透模式：激活前的 Down 已原生放行，KeyUp 放行与其配对，
+			// 避免前台应用按键状态卡死。
+			e.Handled = false;
 		}
 	}
 
@@ -1197,6 +1216,13 @@ public class GestureController
 			double dragThreshold = ConfigManager.CurrentConfig.DragThreshold;
 			if (num3 >= dragThreshold * dragThreshold)
 			{
+				if (_kbTriggerWaiting && Environment.TickCount64 - _kbTriggerDownTick < KeyboardTriggerMinHoldMs)
+				{
+					// 穿透模式持握门槛：触发键按下未满 200ms 不唤出轮盘，
+					// 快速敲击/甩动按普通按键处理；位移持续累积，满门槛后自然激活。
+					return;
+				}
+				_kbTriggerWaiting = false;
 				_isWaitingForThreshold = false;
 				_isGestureActive = true;
 				CancelLongPressTimer(); // 拖动先于长按触发
@@ -1227,6 +1253,7 @@ public class GestureController
 						AppLogger.LogError("ShowRadialUI failed in Hook_OnMouseMove", ex);
 						_isWaitingForThreshold = true;
 						_isGestureActive = false;
+						_kbTriggerWaiting = false;
 					}
 				}, DispatcherPriority.Normal, Array.Empty<object>());
 			}
