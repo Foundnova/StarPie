@@ -1,0 +1,115 @@
+name: Clean Up Beta Releases
+
+on:
+  schedule:
+    # Every Sunday at 04:00 UTC (12:00 Asia/Hong_Kong).
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-retention
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Retain Final Beta After Stable Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Remove superseded beta releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $releaseJson = (& gh release list --repo $env:GH_REPO --limit 1000 --json tagName,isDraft,isPrerelease,publishedAt | Out-String)
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to list GitHub releases (exit code $LASTEXITCODE)"
+          }
+
+          $releases = @($releaseJson | ConvertFrom-Json)
+          $cutoff = [DateTimeOffset]::UtcNow.AddDays(-7)
+          $stablePattern = '^v(?<baseVersion>\d+\.\d+\.\d+)$'
+          $eligibleStableCount = 0
+          $deletedCount = 0
+          $failures = [System.Collections.Generic.List[string]]::new()
+          $summaryLines = [System.Collections.Generic.List[string]]::new()
+          $summaryLines.Add("## Beta release retention")
+          $summaryLines.Add("")
+          $summaryLines.Add("Cutoff: $($cutoff.ToString('u'))")
+          $summaryLines.Add("")
+
+          $stableReleases = @($releases | Where-Object {
+            -not $_.isDraft -and
+            -not $_.isPrerelease -and
+            $_.tagName -match $stablePattern -and
+            -not [string]::IsNullOrWhiteSpace($_.publishedAt)
+          })
+
+          foreach ($stable in $stableReleases) {
+            $stableMatch = [regex]::Match($stable.tagName, $stablePattern)
+            if (-not $stableMatch.Success) {
+              continue
+            }
+
+            $publishedAt = [DateTimeOffset]::Parse($stable.publishedAt).ToUniversalTime()
+            if ($publishedAt -gt $cutoff) {
+              continue
+            }
+
+            $eligibleStableCount++
+            $baseVersion = $stableMatch.Groups['baseVersion'].Value
+            $betaPattern = "^v$([regex]::Escape($baseVersion))-beta\.(?<number>\d+)$"
+            $betaReleases = [System.Collections.Generic.List[object]]::new()
+
+            foreach ($release in $releases) {
+              if ($release.isDraft -or -not $release.isPrerelease) {
+                continue
+              }
+
+              $betaMatch = [regex]::Match($release.tagName, $betaPattern)
+              if ($betaMatch.Success) {
+                $betaReleases.Add([pscustomobject]@{
+                  TagName = $release.tagName
+                  Number = [long]$betaMatch.Groups['number'].Value
+                })
+              }
+            }
+
+            $orderedBetas = @($betaReleases | Sort-Object Number -Descending)
+            if ($orderedBetas.Count -eq 0) {
+              $summaryLines.Add("- $($stable.tagName): no matching beta releases")
+              continue
+            }
+
+            $finalBeta = $orderedBetas[0]
+            $summaryLines.Add("- $($stable.tagName): retained final beta $($finalBeta.TagName)")
+
+            foreach ($beta in @($orderedBetas | Select-Object -Skip 1)) {
+              Write-Host "Deleting beta release $($beta.TagName); Git tag will be retained."
+              & gh release delete $beta.TagName --repo $env:GH_REPO --yes
+              if ($LASTEXITCODE -eq 0) {
+                $deletedCount++
+                $summaryLines.Add("  - Deleted release $($beta.TagName); retained tag")
+              }
+              else {
+                $failures.Add($beta.TagName)
+                $summaryLines.Add("  - Failed to delete release $($beta.TagName)")
+              }
+            }
+          }
+
+          if ($eligibleStableCount -eq 0) {
+            $summaryLines.Add("No stable releases have been published for at least 7 days.")
+          }
+
+          $summaryLines.Add("")
+          $summaryLines.Add("Deleted beta releases: $deletedCount")
+          $summaryLines | Add-Content $env:GITHUB_STEP_SUMMARY
+
+          if ($failures.Count -gt 0) {
+            throw "Failed to delete beta releases: $($failures -join ', ')"
+          }
