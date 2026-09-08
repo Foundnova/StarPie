@@ -80,7 +80,7 @@ public sealed class TrayController : IDisposable
 		};
 
 		ToolStripMenuItem versionItem = new ToolStripMenuItem(
-			"StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.2-beta.2"))
+			"StarPie v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2"))
 		{
 			Enabled = false,
 			Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),

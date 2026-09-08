@@ -502,7 +502,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.2-beta.2");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -1302,7 +1302,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.2-beta.2"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 	}
@@ -7672,11 +7672,11 @@ public partial class SettingsWindow : Window
 			{
 				if (!string.IsNullOrEmpty(text))
 				{
-					return "⌨\ufe0f " + text.TrimEnd(' ', '+') + " (长按拖动)";
+					return "⌨️ " + text.TrimEnd(' ', '+') + " (长按 / 拖动)";
 				}
-				return "\ud83d\uddb1\ufe0f 鼠标右键 (Right Button)";
+				return "🖱️ 鼠标右键 (Right Button)";
 			}
-			return text + "⌨\ufe0f " + text2 + " (长按拖动)";
+			return text + "⌨️ " + text2 + " (长按 / 拖动)";
 		}
 		string text3 = trigger.MouseButton switch
 		{
@@ -11811,7 +11811,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.2-beta.2"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -12061,7 +12061,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.2-beta.2"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.3-beta.2"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");

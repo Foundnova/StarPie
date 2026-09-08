@@ -430,25 +430,30 @@ public class MouseHook
 					return 1; // 手势等已接管该按键：拦截原生事件
 				}
 			}
-			string text2 = ConfigManager.CurrentConfig?.Trigger?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
-			bool num2 = flag && text == text2;
-			bool flag3 = flag2 && text == text2;
-			if (num2)
+			var triggerConfig = ConfigManager.CurrentConfig?.Trigger;
+			bool isMouseTrigger = triggerConfig == null || string.Equals(triggerConfig.TriggerType, "Mouse", StringComparison.OrdinalIgnoreCase);
+			if (isMouseTrigger)
 			{
-				MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
-				OnTriggerButtonDown?.Invoke(this, e4);
-				if (e4.Handled)
+				string text2 = triggerConfig?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+				bool num2 = flag && string.Equals(text, text2, StringComparison.OrdinalIgnoreCase);
+				bool flag3 = flag2 && string.Equals(text, text2, StringComparison.OrdinalIgnoreCase);
+				if (num2)
 				{
-					return 1;
+					MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+					OnTriggerButtonDown?.Invoke(this, e4);
+					if (e4.Handled)
+					{
+						return 1;
+					}
 				}
-			}
-			else if (flag3)
-			{
-				MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
-				OnTriggerButtonUp?.Invoke(this, e5);
-				if (e5.Handled)
+				else if (flag3)
 				{
-					return 1;
+					MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+					OnTriggerButtonUp?.Invoke(this, e5);
+					if (e5.Handled)
+					{
+						return 1;
+					}
 				}
 			}
 		}

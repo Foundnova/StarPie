@@ -136,7 +136,7 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
-		AppLogger.LogInfo($"=== StarPie v1.7.2-beta.2 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
+		AppLogger.LogInfo($"=== StarPie v1.7.3-beta.2 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try

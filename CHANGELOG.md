@@ -4,6 +4,57 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.7.3-beta.2] - 2026-09-08
+
+### 全按键长按原地呼出无缝支持 (Universal Long-Press Trigger for All Mouse & Keyboard Keys)
+1. **彻底消除键盘与辅助侧键长按需滑动的交互痛点**：
+   - **析因**：此前长按呼出定时器（`LongPressTimerCallback`）设计上仅监听了 `_mouseTriggerDown` 状态，并且仅在鼠标左右键钩子中启动了定时器。对于配置为键盘单键（如 `Caps Lock`、`F1~F12`、字母键等）或鼠标辅助侧键（`XButton1` / `XButton2`）、滚轮中键的触发场景，低级钩子未能启动定时器或在回调中被 `!_mouseTriggerDown` 条件拦截，导致轮盘必须依赖物理光标移动超过 `DragThreshold`（默认 10px）才能被动唤醒；
+   - **解决方案**：
+     - 重构 `GestureController` 长按定时器状态机：在 `KeyboardHook_OnKeyDown` 中，若开启 `LongPressTrigger`，立即启动长按定时器；在 `KeyboardHook_OnKeyUp` 中优雅撤销定时器，确保轻点打字时 100% 原生穿透；
+     - 重构 `LongPressTimerCallback` 条件判断：兼容 `_mouseTriggerDown` 与 `_kbTriggerWaiting` 两种等待态，长按达到预设时长（如 450ms）后自动在当前光标最新物理位置调用 `ShowRadialUI`，并同步触发 `ProcessMove` 与 `ApplyPendingHighlight` 极坐标高亮匹配，彻底实现「按住不动原地直接弹出轮盘」；
+     - 优化 `MouseHook` 侧键与中键判定：增加 `TriggerType == "Mouse"` 守护并采用大小写不敏感匹配，确保 `XButton1`、`XButton2`、`MiddleButton` 触发与长按体验一致且丝滑。
+
+### 黑名单与修饰键隔离彻底原生穿透与按键状态守护 (Non-Destructive Isolation & Modifier KeyUp Guard)
+1. **彻底根除 Maya 等黑名单软件中 `Ctrl/Alt/Shift + 右键` 快捷键失效**：
+   - **析因**：
+     - 当用户在 Maya、3ds Max、Blender 等专业软件中使用 `Alt + 右键`（视图平移/缩放）或 `Ctrl + 右键`（标记菜单）时，由于右键被配置为 StarPie 触发键，底层钩子在命中黑名单或修饰键抑制（`CheckIsIsolated`）分支时，错误地调用了 `CancelGestureTracking()`；
+     - `CancelGestureTracking()` 内部无条件调用了 `ActionExecutor.ReleaseStuckModifiers()`，该方法直接向系统底层强制注入了所有 11 个修饰键（Ctrl、Alt、Shift、Win）的 `KEYEVENTF_KEYUP` 伪造抬起脉冲；
+     - 导致前台宿主软件（如 Maya）瞬间接收到虚假的“修饰键已松开”事件，使得用户的组合快捷键被强行截断甚至失效，必须退出 StarPie 才能恢复正常操作；
+   - **解决方案**：
+     - **隔离模式零副作用纯原生穿透**：在 `GestureController` 的鼠标和键盘触发按下事件中，当检测到前台处于黑名单或修饰键隔离状态时，**坚决移除** `CancelGestureTracking()` 调用，不向系统注入任何按键脉冲，让硬件按键完全原汁原味穿透至目标程序；
+     - **物理按键状态探测守卫 (GetAsyncKeyState Physical Guard)**：重构 `ActionExecutor.ReleaseStuckModifiers()`，在向系统注入 `KEYEVENTF_KEYUP` 前，通过 Win32 API `GetAsyncKeyState((int)mod)` 实时检测该按键的物理硬件状态。若用户当前正物理按住该修饰键（高位为 1），直接跳过不予干预，杜绝任何情况下向系统发送伪造的释放事件；
+     - **修饰键触发防自锁优化**：优化 `CheckIsIsolated` 逻辑，若当前配置的触发方式本身就要求特定修饰键（如 `Ctrl + 右键`），自动豁免该修饰键抑制，避免自身配置发生死锁。
+
+---
+
+## [v1.7.2-beta.5] - 2026-09-08
+
+### 早期版本配置文件无损自愈导入与扇区守护 (Early Config Non-Destructive Import & Sector Guard)
+1. **彻底根治早期配置文件导入后扇区丢失与错位**：
+   - **析因**：早期版本（如 v1.0~v1.6.9）在配置 4 扇区时，JSON 中可能仍保留 8 个历史槽位。新版本在 UI 刷新（`RefreshSlots`）或层级校验（`EnsureLayers`）中，误将 `Actions.Count != SectorCount` 判定为用户主动切换扇区数，触发了极坐标几何投影迁移算法（`MigrateActionsBetweenSectorCounts`），按 0/2/4/6 间隔抽取槽位，导致南、北两个有效扇区（原索引 1、3）被直接遗弃，并在未配置方位填充了垃圾数据；
+   - **解决方案**：
+     - 在 `EnsureLayers` 与 `RefreshSlots` 中，严禁在配置加载/刷新阶段调用极坐标空间重构；若 `Actions.Count > SectorCount`，无损直接截取前 `SectorCount` 个有效动作；
+     - 极坐标重构迁移算法 `MigrateActionsBetweenSectorCounts` 仅保留在用户于控制台 UI 明确主动切换 4/8/12 扇区单选框时触发；
+     - 修复 `ImportConfigButton_Click` 中 `_selectedProfile` 未先置空的引用滞留问题，导入成功后全面触发 `ReloadThemePresets`、`RefreshSlots`、`UpdateFocusEditorUi`、`RenderMappingsWheelPreview` 与 `RenderLiveWheelPreview` 全链路即时刷新；
+     - 移除 `ConfigManager.LoadConfig` 中此前对全局方案 slot 0 与 slot 6 强制篡改注入默认子菜单的破坏性代码，彻底尊重用户的个人配置偏好。
+
+### 自定义贴图与关联程序图标内嵌记忆包含 (Embedded Custom Icons & Assets Persistence)
+1. **配置文件 Base64 资产自包含与跨设备零依赖漫游**：
+   - **问题**：中心核心圆自定义贴图（`CoreCustomImagePath`）、用户导入的自定义图标（`custom:...`）以及关联程序继承图标（`InheritAppIconPath`）以往仅在配置中保存本地文件物理绝对路径。当配置文件导出并迁移至新设备、新系统或其他用户电脑导入时，因物理路径缺失导致图标和贴图全部失效变为空白；
+   - **解决方案**：
+     - 在 `AppConfig` 数据模型中新增 `EmbeddedCustomIcons` 记忆字典（Key 为资产标识/路径，Value 为 Base64 编码流）；
+     - **导出/保存前自动化打包 (PackEmbeddedAssets)**：在 `ConfigManager.SaveConfig()` 与 `ConfigManager.ExportConfig()` 序列化前，自动扫描中心贴图、取消动作、方案各层所有槽位与子动作的图标/贴图资源；若图片体积超过 1.5MB 则自动智能等比缩放至 512px 规避配置膨胀，将其转为 Base64 记忆包含在配置文件中；
+     - **导入与加载时自动解包与内存流直读双重兜底 (UnpackEmbeddedAssets & In-Memory Fallback)**：
+       - 导入配置时自动将内嵌资产无损释放至本机的 `%LOCALAPPDATA%\StarPie\CustomIcons` 目录并自愈更新路径；
+       - `IconHelper.GetCustomImageSource`、`IconHelper.GetIcon`、`RadialWindow` 渲染引擎与控制台两大实时预览画布全面接入内嵌记忆兜底，即使目标机物理文件尚未落盘或缺失，亦能直接从 Base64 内存流解码加载，实现 100% 完美无损显示。
+
+### 扇区有效性判定与全局继承判定优化 (Action Configuration Health & Global Fallback)
+1. **完善 `IsActionConfigured` 判定逻辑**：
+   - 补充 `IconKey`、`CustomIconSvg` 与非默认自定义标题判定，避免具有自定义图标或名称的动作被误判为未配置而丢失；
+   - 全局方案（Global Profile）自身针对非 None 动作不再返回 null，彻底消除轮盘扇区意外显示「未设置」的缺陷。
+
+---
+
 ## [v1.7.2-beta.2] - 2026-09-08
 
 ### 扇区全局方案级联继承与动态映射 (Global Profile Inheritance & Dynamic Mapping)

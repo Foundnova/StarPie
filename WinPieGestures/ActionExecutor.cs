@@ -1415,10 +1415,16 @@ public static class ActionExecutor
 		try
 		{
 			// 智能解卡自愈：强制下发 KeyUp 清空系统粘滞状态（双通道 SendInput + keybd_event 注入）
+			// 核心守卫：若用户手指物理上正在按着该修饰键（GetAsyncKeyState & 0x8000 != 0），绝不可注销抬起，杜绝破坏前台应用（如 Maya、Photoshop、Blender）的原生组合键
 			ushort[] modifiers = new ushort[] { 162, 163, 17, 160, 161, 16, 164, 165, 18, 91, 92 };
 			List<INPUT> upInputs = new List<INPUT>();
 			foreach (ushort mod in modifiers)
 			{
+				if ((GetAsyncKeyState((int)mod) & 0x8000) != 0)
+				{
+					// 用户物理手指正在按压此修饰键，保持物理按下，跳过注销
+					continue;
+				}
 				upInputs.Add(CreateKeyInput(mod, down: false));
 				uint flags = KEYEVENTF_KEYUP;
 				if (mod == 91 || mod == 92 || mod == 165 || mod == 163)

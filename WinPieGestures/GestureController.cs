@@ -649,10 +649,11 @@ public class GestureController
 			isProcessIsolated = isBlacklisted;
 		}
 
+		TriggerConfig? triggerConfig = ConfigManager.CurrentConfig.Trigger;
 		ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
-		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && currentModifiers.HasFlag(ModifierKeys.Control);
-		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && currentModifiers.HasFlag(ModifierKeys.Shift);
-		bool disableAlt = ConfigManager.CurrentConfig.DisableOnAlt && currentModifiers.HasFlag(ModifierKeys.Alt);
+		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && currentModifiers.HasFlag(ModifierKeys.Control) && !(triggerConfig?.RequireCtrl == true);
+		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && currentModifiers.HasFlag(ModifierKeys.Shift) && !(triggerConfig?.RequireShift == true);
+		bool disableAlt = ConfigManager.CurrentConfig.DisableOnAlt && currentModifiers.HasFlag(ModifierKeys.Alt) && !(triggerConfig?.RequireAlt == true);
 		bool isModifierSuppressed = disableCtrl | disableShift | disableAlt;
 
 		bool isFullScreenSuppressed = false;
@@ -700,7 +701,7 @@ public class GestureController
 		{
 			if (CheckIsIsolated(out string _))
 			{
-				CancelGestureTracking();
+				// 隔离模式与黑名单（如 Maya）：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()，杜绝注入虚假 KeyUp 破坏物理按键
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				_mouseTriggerDown = false;
@@ -1105,7 +1106,9 @@ public class GestureController
 			}
 			_longPressTimer = null;
 		}
-		if (!_mouseTriggerDown || !_isWaitingForThreshold || _isGestureActive)
+		bool isMouseWaiting = _mouseTriggerDown && _isWaitingForThreshold;
+		bool isKbWaiting = _kbTriggerWaiting && _isWaitingForThreshold;
+		if ((!isMouseWaiting && !isKbWaiting) || _isGestureActive)
 		{
 			return;
 		}
@@ -1113,6 +1116,15 @@ public class GestureController
 		{
 			_isWaitingForThreshold = false;
 			_isGestureActive = true;
+			if (isKbWaiting)
+			{
+				_kbTriggerWaiting = false;
+				GetCursorPos(out var lpPoint);
+				_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
+				var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
+				_currentDpiScaleX = scaleX;
+				_currentDpiScaleY = scaleY;
+			}
 			string processName = ActiveWindowHelper.GetActiveWindowProcessName();
 			WheelProfile profile = ConfigManager.GetProfileForProcess(processName);
 			long gestureVersion = GetCurrentGestureVersion();
@@ -1127,8 +1139,9 @@ public class GestureController
 					}
 					if (ShowRadialUI(startPoint, profile, gestureVersion))
 					{
+						ProcessMove(startPoint);
 						ApplyPendingHighlight();
-					ApplyVolumePreview();
+						ApplyVolumePreview();
 					}
 				}
 				catch (Exception ex)
@@ -1383,9 +1396,11 @@ public class GestureController
 			}
 			if (CheckIsIsolated(out string _))
 			{
-				CancelGestureTracking();
+				// 隔离模式与黑名单：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
+				_kbTriggerWaiting = false;
+				CancelLongPressTimer();
 				e.Handled = false;
 				return;
 			}
@@ -1399,6 +1414,10 @@ public class GestureController
 			_isGestureActive = false;
 			_kbTriggerWaiting = true;
 			_kbTriggerDownTick = Environment.TickCount64;
+			if (ConfigManager.CurrentConfig.LongPressTrigger)
+			{
+				StartLongPressTimer();
+			}
 			// 穿透模式：不吞键，原生 KeyDown 立即到达前台应用。
 		}
 	}
@@ -1435,12 +1454,14 @@ public class GestureController
 		{
 			return;
 		}
+		CancelLongPressTimer();
 		if (_isWaitingForThreshold)
 		{
-			// 穿透模式：轻点（未达拖动阈值）时 Down/Up 均已原生放行，
+			// 穿透模式：轻点（未达长按或拖动阈值）时 Down/Up 均已原生放行，
 			// 直接取消跟踪即可，无需吞键补发。
-			CancelGestureTracking();
+			_kbTriggerWaiting = false;
 			_isWaitingForThreshold = false;
+			_isGestureActive = false;
 		}
 		else
 		{
