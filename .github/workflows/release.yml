@@ -146,3 +146,61 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub Release creation failed with exit code $LASTEXITCODE"
           }
+
+      - name: Retain latest three beta releases
+        if: ${{ contains(github.ref_name, '-beta.') }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<baseVersion>\d+\.\d+\.\d+)-beta\.\d+$') {
+            throw "Unexpected beta tag format: $env:GITHUB_REF_NAME"
+          }
+
+          $baseVersion = $Matches.baseVersion
+          $betaPattern = "^v$([regex]::Escape($baseVersion))-beta\.(?<number>\d+)$"
+          $releaseJson = (& gh release list --repo $env:GH_REPO --limit 1000 --json tagName,isDraft,isPrerelease | Out-String)
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to list GitHub releases (exit code $LASTEXITCODE)"
+          }
+
+          $releases = @($releaseJson | ConvertFrom-Json)
+          $betaReleases = [System.Collections.Generic.List[object]]::new()
+
+          foreach ($release in $releases) {
+            if ($release.isDraft -or -not $release.isPrerelease) {
+              continue
+            }
+
+            $betaMatch = [regex]::Match($release.tagName, $betaPattern)
+            if ($betaMatch.Success) {
+              $betaReleases.Add([pscustomobject]@{
+                TagName = $release.tagName
+                Number = [long]$betaMatch.Groups['number'].Value
+              })
+            }
+          }
+
+          $orderedBetas = @($betaReleases | Sort-Object Number -Descending)
+          $retainedBetas = @($orderedBetas | Select-Object -First 3)
+          $expiredBetas = @($orderedBetas | Select-Object -Skip 3)
+
+          Write-Host "Retaining beta releases: $($retainedBetas.TagName -join ', ')"
+          if ($expiredBetas.Count -eq 0) {
+            Write-Host "No superseded beta releases need to be deleted."
+            exit 0
+          }
+
+          $failures = [System.Collections.Generic.List[string]]::new()
+          foreach ($beta in $expiredBetas) {
+            Write-Host "Deleting beta release $($beta.TagName); Git tag will be retained."
+            & gh release delete $beta.TagName --repo $env:GH_REPO --yes
+            if ($LASTEXITCODE -ne 0) {
+              $failures.Add($beta.TagName)
+            }
+          }
+
+          if ($failures.Count -gt 0) {
+            throw "Failed to delete beta releases: $($failures -join ', ')"
+          }
