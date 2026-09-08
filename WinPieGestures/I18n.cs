@@ -1872,6 +1872,20 @@ public static class I18n
 			[LanguageCode.En] = "Center Font Family:",
 			[LanguageCode.Ja] = "中央フォント:"
 		};
+		dictionary["SettingsUiScale"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔍 界面缩放",
+			[LanguageCode.ZhTw] = "🔍 介面縮放",
+			[LanguageCode.En] = "🔍 UI Scale",
+			[LanguageCode.Ja] = "🔍 表示拡大率"
+		};
+		dictionary["SettingsUiScaleTip"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "调节设置控制台界面整体缩放比例 (80% ~ 200%)，高分屏下可放大文字与控件。窗口尺寸保持不变，内容变大后由页面滚动承接；也可随时使用 Ctrl + / Ctrl - 调节，Ctrl 0 复位。",
+			[LanguageCode.ZhTw] = "調整設定控制台介面整體縮放比例 (80% ~ 200%)，高解析度螢幕下可放大文字與控件。視窗尺寸保持不變，內容變大後由頁面捲動承接；亦可隨時使用 Ctrl + / Ctrl - 調整，Ctrl 0 復位。",
+			[LanguageCode.En] = "Scale the whole settings console between 80% and 200% for better readability on high-resolution screens. The window size stays untouched - enlarged content simply scrolls. Ctrl + / Ctrl - adjusts it anytime, and Ctrl 0 resets.",
+			[LanguageCode.Ja] = "設定画面全体の表示拡大率を 80%〜200% で調整できます。高解像度画面での文字・控件の視認性向上に。ウィンドウサイズは変更されず、拡大した内容はスクロールして表示します。Ctrl + / Ctrl - ですぐに調整、Ctrl 0 でリセット。"
+		};
 		dictionary["CoreFontSize"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "中心文字大小 (Core Font Size):",
