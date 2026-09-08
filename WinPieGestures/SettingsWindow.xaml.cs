@@ -1047,6 +1047,14 @@ public partial class SettingsWindow : Window
 			CoreTextColorTextBox.Text = ConfigManager.CurrentConfig.CoreTextColor ?? "#FFFFFFFF";
 			UpdateColorPreviewBorder(CoreTextColorPreview, CoreTextColorTextBox.Text);
 		}
+		if (CoreTextColorAutoCheckBox != null)
+		{
+			CoreTextColorAutoCheckBox.IsChecked = ConfigManager.CurrentConfig.CoreTextColorAuto;
+		}
+		if (CoreTextColorRowGrid != null)
+		{
+			CoreTextColorRowGrid.IsEnabled = !ConfigManager.CurrentConfig.CoreTextColorAuto;
+		}
 		if (EnableMultiTierCheckBox != null)
 		{
 			EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
@@ -1910,6 +1918,10 @@ public partial class SettingsWindow : Window
 		if (CoreTextColorTitleText != null)
 		{
 			CoreTextColorTitleText.Text = I18n.T("CoreTextColor");
+		}
+		if (CoreTextColorAutoCheckBox != null)
+		{
+			CoreTextColorAutoCheckBox.Content = I18n.T("CoreTextColorAuto");
 		}
 		if (ShowSelectedActionTextCheckBox != null)
 		{
@@ -9769,6 +9781,26 @@ public partial class SettingsWindow : Window
 		ScheduleAutoSave();
 	}
 
+	private void CoreTextColorAutoCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		bool auto = CoreTextColorAutoCheckBox != null && CoreTextColorAutoCheckBox.IsChecked == true;
+		ConfigManager.CurrentConfig.CoreTextColorAuto = auto;
+		if (CoreTextColorRowGrid != null)
+		{
+			CoreTextColorRowGrid.IsEnabled = !auto;
+		}
+		Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+		if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+		{
+			RenderLiveWheelPreview();
+		}
+		ScheduleAutoSave();
+	}
+
 	private void CoreFontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
 	{
 		if (CoreFontSizeSlider != null && CoreFontSizeLabel != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
@@ -13172,7 +13204,10 @@ public partial class SettingsWindow : Window
 			double previewCoreFontSize = (ConfigManager.CurrentConfig?.CoreFontSize > 0.0)
 				? ConfigManager.CurrentConfig.CoreFontSize
 				: Math.Max(8.0, Math.Min(16.0, num10 / 4.0));
-			Brush previewCoreTextBrush = (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
+			// 预览与实轮盘共用同一取色规则：自动模式跟随配色主题的文字笔刷，只有关闭自动后才采用手动指定色。
+			// 否则默认值 #FFFFFFFF 非空，预览永远画白字，白底白字会在预览里原样复现。
+			bool previewCoreTextAuto = ConfigManager.CurrentConfig == null || ConfigManager.CurrentConfig.CoreTextColorAuto;
+			Brush previewCoreTextBrush = (!previewCoreTextAuto && !string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
 				? CreateBrushFromHexSafe(ConfigManager.CurrentConfig.CoreTextColor, _previewTextBrush)
 				: _previewTextBrush;
 			string previewCoreFontFamily = (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreFontFamily))

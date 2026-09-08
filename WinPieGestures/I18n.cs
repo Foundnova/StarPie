@@ -1879,6 +1879,13 @@ public static class I18n
 			[LanguageCode.En] = "Center Font Size:",
 			[LanguageCode.Ja] = "中央フォントサイズ:"
 		};
+		dictionary["CoreTextColorAuto"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "自动适应配色主题 (Auto Contrast)",
+			[LanguageCode.ZhTw] = "自動適應配色主題 (Auto Contrast)",
+			[LanguageCode.En] = "Auto Contrast",
+			[LanguageCode.Ja] = "配色テーマに自動追従 (Auto Contrast)"
+		};
 		dictionary["CoreTextColor"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "中心文字颜色 (Core Text Color):",

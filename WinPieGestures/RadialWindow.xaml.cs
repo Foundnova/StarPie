@@ -332,6 +332,8 @@ public partial class RadialWindow : Window
 
 	private Brush _textColorBrush;
 
+	private static readonly Dictionary<string, double> _coreImageLuminanceCache = new Dictionary<string, double>();
+
 	private Brush _coreBgBrush;
 
 	private Brush _coreBorderBrush;
@@ -535,6 +537,93 @@ public partial class RadialWindow : Window
 		UpdateCenterIconVisuals();
 	}
 
+	private static SolidColorBrush TintBrush(Brush brush, byte alpha)
+	{
+		SolidColorBrush solid = brush as SolidColorBrush;
+		Color color = (solid != null) ? solid.Color : Colors.White;
+		return new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
+	}
+
+	private static bool IsBrushDark(Brush brush)
+	{
+		SolidColorBrush solid = brush as SolidColorBrush;
+		if (solid == null)
+		{
+			return false;
+		}
+		Color color = solid.Color;
+		double luminance = 0.2126 * (color.R / 255.0) + 0.7152 * (color.G / 255.0) + 0.0722 * (color.B / 255.0);
+		return luminance < 0.5;
+	}
+
+	/// <summary>中心文字取色：手动模式用配置指定色；自动模式跟随配色主题笔刷，中心铺图时改按图片平均亮度取对比色。</summary>
+	private Brush ResolveCoreTextBrush(double? coreImageLuminance)
+	{
+		AppConfig config = ConfigManager.CurrentConfig;
+		if (config != null && !config.CoreTextColorAuto && !string.IsNullOrWhiteSpace(config.CoreTextColor))
+		{
+			try
+			{
+				return new SolidColorBrush((Color)ColorConverter.ConvertFromString(config.CoreTextColor));
+			}
+			catch
+			{
+			}
+		}
+		if (coreImageLuminance.HasValue)
+		{
+			return (coreImageLuminance.Value < 0.5)
+				? new SolidColorBrush(Color.FromRgb(248, 250, 252))
+				: new SolidColorBrush(Color.FromRgb(15, 23, 42));
+		}
+		return _textColorBrush ?? Brushes.White;
+	}
+
+	/// <summary>缩略解码后取样中心背景图平均亮度(0~1)，按路径+写入时间缓存，避免每次弹出轮盘重复解码。</summary>
+	private static double? GetImageAverageLuminance(string path)
+	{
+		try
+		{
+			string key = path + "|" + File.GetLastWriteTimeUtc(path).Ticks;
+			double cached;
+			if (_coreImageLuminanceCache.TryGetValue(key, out cached))
+			{
+				return cached;
+			}
+			BitmapImage thumb = new BitmapImage();
+			thumb.BeginInit();
+			thumb.UriSource = new Uri(path, UriKind.Absolute);
+			thumb.DecodePixelWidth = 24;
+			thumb.CacheOption = BitmapCacheOption.OnLoad;
+			thumb.EndInit();
+			FormatConvertedBitmap converted = new FormatConvertedBitmap(thumb, PixelFormats.Bgra32, null, 0.0);
+			int width = converted.PixelWidth;
+			int height = converted.PixelHeight;
+			if (width <= 0 || height <= 0)
+			{
+				return null;
+			}
+			byte[] pixels = new byte[width * height * 4];
+			converted.CopyPixels(pixels, width * 4, 0);
+			double sum = 0.0;
+			for (int i = 0; i + 3 < pixels.Length; i += 4)
+			{
+				sum += 0.2126 * (pixels[i + 2] / 255.0) + 0.7152 * (pixels[i + 1] / 255.0) + 0.0722 * (pixels[i] / 255.0);
+			}
+			double luminance = sum / (width * height);
+			if (_coreImageLuminanceCache.Count > 32)
+			{
+				_coreImageLuminanceCache.Clear();
+			}
+			_coreImageLuminanceCache[key] = luminance;
+			return luminance;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
 	private void InitializeThemeAndStyle()
 	{
 		string text = ConfigManager.CurrentConfig.Theme ?? "System";
@@ -634,6 +723,7 @@ public partial class RadialWindow : Window
 		CoreEllipse.Fill = _coreBgBrush;
 		CoreEllipse.Stroke = _coreBorderBrush;
 		string text = ConfigManager.CurrentConfig.CoreBgImagePath ?? "";
+		double? coreImageLuminance = null;
 		if (!string.IsNullOrEmpty(text) && File.Exists(text))
 		{
 			try
@@ -644,13 +734,17 @@ public partial class RadialWindow : Window
 					Stretch = ParseStretch(ConfigManager.CurrentConfig.CoreBgStretch),
 					Opacity = ConfigManager.CurrentConfig.CoreBgOpacity
 				};
+				coreImageLuminance = GetImageAverageLuminance(text);
 			}
 			catch
 			{
 			}
 		}
-		CoreTitle.Foreground = _textColorBrush;
-		CoreExitIcon.Fill = _textColorBrush;
+		Brush centerTextBrush = ResolveCoreTextBrush(coreImageLuminance);
+		Effect coreTextShadow = IsBrushDark(centerTextBrush) ? null : (Effect)base.Resources["TextShadow"];
+		CoreTitle.Foreground = TintBrush(centerTextBrush, 208);
+		CoreSubtitle.Foreground = TintBrush(centerTextBrush, 128);
+		CoreExitIcon.Fill = centerTextBrush;
 		CoreExitIcon.Width = coreRadius * 0.42;
 		CoreExitIcon.Height = coreRadius * 0.42;
 		CoreTitle.FontSize = Math.Max(8.0, coreRadius / 5.0);
@@ -678,21 +772,10 @@ public partial class RadialWindow : Window
 			{
 			}
 		}
-		if (!string.IsNullOrWhiteSpace(ConfigManager.CurrentConfig?.CoreTextColor))
-		{
-			try
-			{
-				CoreSelectionText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(ConfigManager.CurrentConfig.CoreTextColor));
-			}
-			catch
-			{
-				CoreSelectionText.Foreground = _textColorBrush;
-			}
-		}
-		else
-		{
-			CoreSelectionText.Foreground = _textColorBrush;
-		}
+		CoreSelectionText.Foreground = centerTextBrush;
+		CoreSelectionText.Effect = coreTextShadow;
+		CoreVolumeText.Foreground = centerTextBrush;
+		CoreVolumeText.Effect = coreTextShadow;
 		CoreSelectionOverlay.Fill = CreateFrostedCoreBrush(_coreBgBrush);
 		Panel.SetZIndex(CoreSelectionOverlay, 20);
 		Panel.SetZIndex(CoreSelectionTextPanel, 21);
