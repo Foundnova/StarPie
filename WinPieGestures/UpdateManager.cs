@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -15,11 +16,122 @@ using System.Xml.Linq;
 
 namespace WinPieGestures;
 
+internal sealed class ReleaseVersion : IComparable<ReleaseVersion>
+{
+	private readonly string[] _prereleaseIdentifiers;
+
+	private ReleaseVersion(int major, int minor, int patch, string[] prereleaseIdentifiers)
+	{
+		Major = major;
+		Minor = minor;
+		Patch = patch;
+		_prereleaseIdentifiers = prereleaseIdentifiers;
+	}
+
+	public int Major { get; }
+	public int Minor { get; }
+	public int Patch { get; }
+	public bool IsPrerelease => _prereleaseIdentifiers.Length > 0;
+	public Version CoreVersion => new Version(Major, Minor, Patch);
+
+	public static bool TryParse(string? value, out ReleaseVersion? version)
+	{
+		version = null;
+		if (string.IsNullOrWhiteSpace(value)) return false;
+
+		string clean = value.Trim().TrimStart('v', 'V');
+		int metadataIndex = clean.IndexOf('+');
+		if (metadataIndex >= 0) clean = clean.Substring(0, metadataIndex);
+
+		string[] versionParts = clean.Split(new[] { '-' }, 2, StringSplitOptions.None);
+		string[] coreParts = versionParts[0].Split('.');
+		if (coreParts.Length != 3 ||
+			!int.TryParse(coreParts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int major) ||
+			!int.TryParse(coreParts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int minor) ||
+			!int.TryParse(coreParts[2], NumberStyles.None, CultureInfo.InvariantCulture, out int patch))
+		{
+			return false;
+		}
+
+		string[] prereleaseIdentifiers = Array.Empty<string>();
+		if (versionParts.Length == 2)
+		{
+			if (string.IsNullOrWhiteSpace(versionParts[1])) return false;
+			prereleaseIdentifiers = versionParts[1].Split('.');
+			if (prereleaseIdentifiers.Any(string.IsNullOrWhiteSpace)) return false;
+		}
+
+		version = new ReleaseVersion(major, minor, patch, prereleaseIdentifiers);
+		return true;
+	}
+
+	public static ReleaseVersion FromAssemblyVersion(Version version)
+	{
+		return new ReleaseVersion(
+			Math.Max(version.Major, 0),
+			Math.Max(version.Minor, 0),
+			Math.Max(version.Build, 0),
+			Array.Empty<string>());
+	}
+
+	public int CompareTo(ReleaseVersion? other)
+	{
+		if (other == null) return 1;
+
+		int comparison = Major.CompareTo(other.Major);
+		if (comparison == 0) comparison = Minor.CompareTo(other.Minor);
+		if (comparison == 0) comparison = Patch.CompareTo(other.Patch);
+		if (comparison != 0) return comparison;
+
+		if (!IsPrerelease && !other.IsPrerelease) return 0;
+		if (!IsPrerelease) return 1;
+		if (!other.IsPrerelease) return -1;
+
+		int sharedLength = Math.Min(_prereleaseIdentifiers.Length, other._prereleaseIdentifiers.Length);
+		for (int i = 0; i < sharedLength; i++)
+		{
+			string left = _prereleaseIdentifiers[i];
+			string right = other._prereleaseIdentifiers[i];
+			bool leftIsNumber = long.TryParse(left, NumberStyles.None, CultureInfo.InvariantCulture, out long leftNumber);
+			bool rightIsNumber = long.TryParse(right, NumberStyles.None, CultureInfo.InvariantCulture, out long rightNumber);
+
+			if (leftIsNumber && rightIsNumber)
+			{
+				comparison = leftNumber.CompareTo(rightNumber);
+			}
+			else if (leftIsNumber)
+			{
+				comparison = -1;
+			}
+			else if (rightIsNumber)
+			{
+				comparison = 1;
+			}
+			else
+			{
+				comparison = string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+			}
+
+			if (comparison != 0) return comparison;
+		}
+
+		return _prereleaseIdentifiers.Length.CompareTo(other._prereleaseIdentifiers.Length);
+	}
+
+	public override string ToString()
+	{
+		string core = $"{Major}.{Minor}.{Patch}";
+		return IsPrerelease ? $"{core}-{string.Join(".", _prereleaseIdentifiers)}" : core;
+	}
+}
+
 public class ReleaseInfo
 {
 	public string TagName { get; set; } = "";
 
 	public Version? ParsedVersion { get; set; }
+
+	internal ReleaseVersion? ComparableVersion { get; set; }
 
 	public string Title { get; set; } = "";
 
@@ -105,6 +217,21 @@ public class UpdateManager
 		return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 6, 8);
 	}
 
+	private ReleaseVersion GetCurrentReleaseVersion()
+	{
+		Assembly assembly = Assembly.GetExecutingAssembly();
+		string? informationalVersion = assembly
+			.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+			.InformationalVersion;
+
+		if (ReleaseVersion.TryParse(informationalVersion, out ReleaseVersion? parsedVersion) && parsedVersion != null)
+		{
+			return parsedVersion;
+		}
+
+		return ReleaseVersion.FromAssemblyVersion(GetCurrentVersion());
+	}
+
 	public string GetProxiedDownloadUrl(string rawUrl, string proxySource, string customProxy = "")
 	{
 		if (string.IsNullOrWhiteSpace(rawUrl)) return "";
@@ -167,7 +294,7 @@ public class UpdateManager
 							ReleaseInfo? rel = ParseReleaseElement(item);
 							if (rel == null) continue;
 
-							if (bestRelease == null || (rel.ParsedVersion != null && bestRelease.ParsedVersion != null && rel.ParsedVersion > bestRelease.ParsedVersion))
+							if (IsBetterRelease(rel, bestRelease))
 							{
 								bestRelease = rel;
 							}
@@ -177,7 +304,7 @@ public class UpdateManager
 					else if (root.ValueKind == JsonValueKind.Object)
 					{
 						ReleaseInfo? rel = ParseReleaseElement(root);
-						if (rel != null) return rel;
+						if (rel != null && (isBetaChannel || !rel.IsPrerelease)) return rel;
 					}
 				}
 				catch (Exception ex)
@@ -266,7 +393,7 @@ public class UpdateManager
 			if (entries == null) return null;
 
 			ReleaseInfo? bestRelease = null;
-			Version currentVer = GetCurrentVersion();
+			ReleaseVersion currentVer = GetCurrentReleaseVersion();
 
 			foreach (var entry in entries)
 			{
@@ -297,10 +424,12 @@ public class UpdateManager
 
 				if (string.IsNullOrEmpty(tag)) continue;
 
-				Version? parsedVer = ParseVersionFromTag(tag);
-				if (parsedVer == null) continue;
+				ReleaseVersion? releaseVersion = ParseReleaseVersionFromTag(tag);
+				if (releaseVersion == null) continue;
+				Version parsedVer = releaseVersion.CoreVersion;
 
-				bool isPrerelease = tag.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
+				bool isPrerelease = releaseVersion.IsPrerelease ||
+					tag.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
 									tag.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
 									tag.Contains("rc", StringComparison.OrdinalIgnoreCase) ||
 									title.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
@@ -319,23 +448,24 @@ public class UpdateManager
 				string body = ConvertHtmlToMarkdown(contentHtml);
 
 				string htmlUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/tag/{tag}";
-				bool isNewer = parsedVer > currentVer;
+				bool isNewer = releaseVersion.CompareTo(currentVer) > 0;
 
 				var rel = new ReleaseInfo
 				{
 					TagName = tag,
 					ParsedVersion = parsedVer,
+					ComparableVersion = releaseVersion,
 					Title = string.IsNullOrWhiteSpace(title) ? tag : title,
 					Body = body,
 					PublishedAt = publishedAt != default ? publishedAt : DateTime.Now,
-					IsPrerelease = isPrerelease,
+					IsPrerelease = isPrerelease || releaseVersion?.IsPrerelease == true,
 					HtmlUrl = htmlUrl,
 					IsNewerVersion = isNewer,
 					StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",
 					LightweightAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Lightweight-win-x64.zip"
 				};
 
-				if (bestRelease == null || (rel.ParsedVersion != null && bestRelease.ParsedVersion != null && rel.ParsedVersion > bestRelease.ParsedVersion))
+				if (IsBetterRelease(rel, bestRelease))
 				{
 					bestRelease = rel;
 				}
@@ -369,18 +499,20 @@ public class UpdateManager
 
 	private ReleaseInfo CreateSynthesizedReleaseInfo(string tag, string sourceTitle)
 	{
-		Version? parsedVer = ParseVersionFromTag(tag);
-		Version currentVer = GetCurrentVersion();
-		bool isNewer = parsedVer != null && parsedVer > currentVer;
+		ReleaseVersion? releaseVersion = ParseReleaseVersionFromTag(tag);
+		Version? parsedVer = releaseVersion?.CoreVersion;
+		ReleaseVersion currentVer = GetCurrentReleaseVersion();
+		bool isNewer = releaseVersion != null && releaseVersion.CompareTo(currentVer) > 0;
 
 		return new ReleaseInfo
 		{
 			TagName = tag,
 			ParsedVersion = parsedVer,
+			ComparableVersion = releaseVersion,
 			Title = $"StarPie {tag}",
 			Body = $"（通过 {sourceTitle} 探测到最新版本，详细更新日志请查看 GitHub Releases 页面）",
 			PublishedAt = DateTime.Now,
-			IsPrerelease = tag.Contains("beta", StringComparison.OrdinalIgnoreCase) || tag.Contains("alpha", StringComparison.OrdinalIgnoreCase),
+			IsPrerelease = releaseVersion?.IsPrerelease == true,
 			HtmlUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/tag/{tag}",
 			IsNewerVersion = isNewer,
 			StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",
@@ -399,18 +531,20 @@ public class UpdateManager
 			bool isPrerelease = elem.TryGetProperty("prerelease", out JsonElement preElem) && preElem.GetBoolean();
 			DateTime publishedAt = elem.TryGetProperty("published_at", out JsonElement pubElem) && pubElem.TryGetDateTime(out DateTime dt) ? dt : DateTime.Now;
 
-			Version? parsedVer = ParseVersionFromTag(tagName);
-			Version currentVer = GetCurrentVersion();
-			bool isNewer = parsedVer != null && parsedVer > currentVer;
+			ReleaseVersion? releaseVersion = ParseReleaseVersionFromTag(tagName);
+			Version? parsedVer = releaseVersion?.CoreVersion;
+			ReleaseVersion currentVer = GetCurrentReleaseVersion();
+			bool isNewer = releaseVersion != null && releaseVersion.CompareTo(currentVer) > 0;
 
 			ReleaseInfo info = new ReleaseInfo
 			{
 				TagName = tagName,
 				ParsedVersion = parsedVer,
+				ComparableVersion = releaseVersion,
 				Title = string.IsNullOrWhiteSpace(title) ? tagName : title,
 				Body = body,
 				PublishedAt = publishedAt,
-				IsPrerelease = isPrerelease,
+				IsPrerelease = isPrerelease || releaseVersion?.IsPrerelease == true,
 				HtmlUrl = htmlUrl,
 				IsNewerVersion = isNewer
 			};
@@ -445,20 +579,23 @@ public class UpdateManager
 		}
 	}
 
+	private static ReleaseVersion? ParseReleaseVersionFromTag(string tag)
+	{
+		return ReleaseVersion.TryParse(tag, out ReleaseVersion? version) ? version : null;
+	}
+
 	public static Version? ParseVersionFromTag(string tag)
 	{
-		if (string.IsNullOrWhiteSpace(tag)) return null;
-		string clean = tag.Trim().TrimStart('v', 'V');
-		int dashIdx = clean.IndexOf('-');
-		if (dashIdx > 0)
-		{
-			clean = clean.Substring(0, dashIdx);
-		}
-		if (Version.TryParse(clean, out Version? ver))
-		{
-			return ver;
-		}
-		return null;
+		return ParseReleaseVersionFromTag(tag)?.CoreVersion;
+	}
+
+	private static bool IsBetterRelease(ReleaseInfo candidate, ReleaseInfo? currentBest)
+	{
+		if (candidate.ComparableVersion == null) return false;
+		if (currentBest?.ComparableVersion == null) return true;
+
+		int comparison = candidate.ComparableVersion.CompareTo(currentBest.ComparableVersion);
+		return comparison > 0 || (comparison == 0 && candidate.PublishedAt > currentBest.PublishedAt);
 	}
 
 	public async Task DownloadAssetAsync(string downloadUrl, string destinationZipPath, IProgress<UpdateProgressInfo>? progress, CancellationToken ct)
