@@ -130,7 +130,7 @@ namespace WinPieGestures
 
             try
             {
-                int sectorCount = SectorCount is 4 or 8 or 12 ? SectorCount : 8;
+                int sectorCount = WheelProfile.IsValidSectorCount(SectorCount) ? SectorCount : 8;
                 int selectedIndex = PositionIndex % sectorCount;
                 if (selectedIndex < 0)
                 {

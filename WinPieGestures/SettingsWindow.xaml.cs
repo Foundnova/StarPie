@@ -47,13 +47,29 @@ public partial class SettingsWindow : Window
 
 	private string GetDirectionDisplayName(int index, int totalCount)
 	{
-		string[] dirArray = totalCount switch
-		{
-			4 => Directions4,
-			12 => Directions12,
-			_ => Directions8,
-		};
+		string[] dirArray = ResolveDirectionNames(totalCount);
 		return (index >= 0 && index < dirArray.Length) ? dirArray[index] : $"扇区 {index + 1}";
+	}
+
+	/// <summary>
+	/// 解析指定档位下每个方位的显示名称：预设档 4/8/12 沿用既有方位文案；自定义档按等分角生成
+	/// 本地化占位名「方位 N（角度°）」（自定义档无东南西北钟表惯用名，仅以序号 + 绝对极角标识）。
+	/// </summary>
+	private static string[] ResolveDirectionNames(int sectorCount)
+	{
+		switch (sectorCount)
+		{
+			case 4: return Directions4;
+			case 8: return Directions8;
+			case 12: return Directions12;
+		}
+		string customFormat = I18n.T("SectorCustomDirLabel");
+		string[] names = new string[sectorCount];
+		for (int i = 0; i < sectorCount; i++)
+		{
+			names[i] = string.Format(customFormat, i + 1, Math.Round(i * 360.0 / sectorCount));
+		}
+		return names;
 	}
 
 	private ActionItem? GetCurrentEditingAction()
@@ -495,6 +511,10 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		_isUpdatingFocusUi = true;
 		InitializeComponent();
+		// 自定义方位数量下拉候选项：4–12 内除预设档 4/8/12 外的全部值（升序）
+		List<int> customSectorCountOptions = BuildCustomSectorCountOptions();
+		SectorCountCustomCombo.ItemsSource = customSectorCountOptions;
+		MappingsSectorCountCustomCombo.ItemsSource = customSectorCountOptions;
 		try
 		{
 			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
@@ -1279,9 +1299,7 @@ public partial class SettingsWindow : Window
 		if (_selectedProfile != null)
 		{
 			ProfilesListBox.SelectedItem = _selectedProfile;
-			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
+			ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 		}
 
 		// System Update Settings
@@ -2012,6 +2030,14 @@ public partial class SettingsWindow : Window
 		{
 			SectorCount12Radio.Content = I18n.T("SectorCount12");
 		}
+		if (SectorCountCustomRadio != null)
+		{
+			SectorCountCustomRadio.Content = I18n.T("SectorCountCustom");
+		}
+		if (MappingsSectorCountCustomRadio != null)
+		{
+			MappingsSectorCountCustomRadio.Content = I18n.T("SectorCountCustom");
+		}
 		if (AdvancedPageHeader != null)
 		{
 			AdvancedPageHeader.Text = I18n.T("AdvancedHeader");
@@ -2314,12 +2340,7 @@ public partial class SettingsWindow : Window
 			_isUpdatingUi = true;
 			try
 			{
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
+				ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 				RefreshSlots();
 				UpdateFocusEditorUi();
 				RenderMappingsWheelPreview();
@@ -2715,21 +2736,7 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		try
 		{
-			if (SectorCount4Radio != null)
-			{
-				SectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-			}
-			if (SectorCount8Radio != null)
-			{
-				SectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-			}
-			if (SectorCount12Radio != null)
-			{
-				SectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
-			}
-			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = _selectedProfile.SectorCount == 4;
-			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = _selectedProfile.SectorCount == 8;
-			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = _selectedProfile.SectorCount == 12;
+			ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 			if (MappingsProfileComboBox != null && MappingsProfileComboBox.SelectedItem != _selectedProfile)
 			{
 				MappingsProfileComboBox.SelectedItem = _selectedProfile;
@@ -2788,12 +2795,7 @@ public partial class SettingsWindow : Window
 				profile.SectorCount = count;
 			}
 
-			string[] directions = count switch
-			{
-				4 => Directions4,
-				12 => Directions12,
-				_ => Directions8
-			};
+			string[] directions = ResolveDirectionNames(count);
 
 			profile.Actions ??= new List<ActionItem>();
 			if (profile.Actions.Count > count)
@@ -2872,12 +2874,120 @@ public partial class SettingsWindow : Window
 
 	private static int NormalizeSectorCount(int sectorCount)
 	{
-		return sectorCount is 4 or 8 or 12 ? sectorCount : 8;
+		return WheelProfile.IsValidSectorCount(sectorCount) ? sectorCount : 8;
 	}
 
 	/// <summary>
-	/// 在不同扇区数量 (4键、8键、12键) 切换时，根据绝对极坐标空间方位进行智能几何方位映射继承。
-	/// 保证东 (0° / 右)、南 (90° / 下)、西 (180° / 左)、北 (270° / 上) 等正交方位 100% 物理对齐，杜绝索引位移倒置。
+	/// 自定义方位数量下拉框的候选项列表（4–12 内除 4/8/12 预设档外的全部值，升序）。
+	/// </summary>
+	private static List<int> BuildCustomSectorCountOptions()
+	{
+		List<int> options = new List<int>();
+		for (int c = WheelProfile.MinSectorCount; c <= WheelProfile.MaxSectorCount; c++)
+		{
+			if (c != 4 && c != 8 && c != 12)
+			{
+				options.Add(c);
+			}
+		}
+		return options;
+	}
+
+	/// <summary>
+	/// 两处扇区数量卡片的唯一 UI 回填入口：按实际档位同步手势页与 Mappings 页的三个单选 + 自定义下拉的
+	/// 勾选/启用/选中值，杜绝双页控件手工交叉镜像导致的接线错误。必须在 _isUpdatingUi 保护内调用。
+	/// </summary>
+	private void ApplySectorCountSelectionToUi(int sectorCount)
+	{
+		bool isPreset = sectorCount == 4 || sectorCount == 8 || sectorCount == 12;
+		if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = sectorCount == 4;
+		if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = sectorCount == 8;
+		if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = sectorCount == 12;
+		if (SectorCountCustomRadio != null) SectorCountCustomRadio.IsChecked = !isPreset;
+		if (SectorCountCustomCombo != null)
+		{
+			SectorCountCustomCombo.IsEnabled = !isPreset;
+			if (!isPreset) SectorCountCustomCombo.SelectedItem = sectorCount;
+		}
+		if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = sectorCount == 4;
+		if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = sectorCount == 8;
+		if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = sectorCount == 12;
+		if (MappingsSectorCountCustomRadio != null) MappingsSectorCountCustomRadio.IsChecked = !isPreset;
+		if (MappingsSectorCountCustomCombo != null)
+		{
+			MappingsSectorCountCustomCombo.IsEnabled = !isPreset;
+			if (!isPreset) MappingsSectorCountCustomCombo.SelectedItem = sectorCount;
+		}
+	}
+
+	/// <summary>
+	/// 从单选组 + 自定义下拉的当前状态解析目标档位：预设单选命中返回对应值；
+	/// 自定义单选命中且下拉有选中值返回该值；自定义单选命中但下拉无值返回 null（仅启用下拉，不切换档位）。
+	/// </summary>
+	private static int? ResolveSectorCountFromControls(
+		bool radio4, bool radio8, bool radio12, bool radioCustom, int? customComboValue)
+	{
+		if (radio4) return 4;
+		if (radio8) return 8;
+		if (radio12) return 12;
+		if (radioCustom) return customComboValue;
+		return 8;
+	}
+
+	/// <summary>
+	/// 扇区数量切换的共享执行路径（两处单选 handler 与两处自定义下拉 handler 收敛于此）：
+	/// 迁移动作 → 写入方案 → 同步活跃层 → 双页控件回填 → 槽位/聚焦/预览刷新 → 配置保存。
+	/// 返回 false 表示档位未变化（无需任何处理）。
+	/// </summary>
+	private bool ApplySectorCountChange(int sectorCount)
+	{
+		if (_selectedProfile == null || _selectedProfile.SectorCount == sectorCount)
+		{
+			return false;
+		}
+
+		_isChangingSectorCount = true;
+		try
+		{
+			int oldSectorCount = _selectedProfile.SectorCount;
+			_selectedProfile.Actions = MigrateActionsBetweenSectorCounts(_selectedProfile.Actions, oldSectorCount, sectorCount);
+			_selectedProfile.SectorCount = sectorCount;
+			_selectedProfile.SyncActiveLayerFromRootProperties();
+
+			_isUpdatingUi = true;
+			try
+			{
+				ApplySectorCountSelectionToUi(sectorCount);
+
+				if (_selectedSlotIndex >= sectorCount) _selectedSlotIndex = 0;
+				_selectedSubActionIndex = null;
+
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+			}
+			finally
+			{
+				_isUpdatingUi = false;
+			}
+
+			if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
+			{
+				ScheduleLiveWheelPreviewRender();
+			}
+			SyncUiToConfigAndSave();
+			return true;
+		}
+		finally
+		{
+			_isChangingSectorCount = false;
+		}
+	}
+
+	/// <summary>
+	/// 在不同扇区数量（4键、8键、12键预设档与 5/6/7/9/10/11 自定义档）切换时，根据绝对极坐标空间方位进行智能几何方位映射继承。
+	/// 保证东 (0° / 右)、南 (90° / 下)、西 (180° / 左)、北 (270° / 上) 等正交方位 100% 物理对齐，杜绝索引位移倒置；
+	/// 4/8/12 之间的切换沿用 beta8 手写精确映射，涉及自定义档的组合走通用极角就近映射（语义与预设分支一致）。
 	/// </summary>
 	public static List<ActionItem> MigrateActionsBetweenSectorCounts(List<ActionItem>? sourceActions, int oldSectorCount, int newSectorCount)
 	{
@@ -3019,9 +3129,47 @@ public partial class SettingsWindow : Window
 		}
 		else
 		{
+			// 通用档位（自定义 5/6/7/9/10/11 与动作数自愈等组合）：
+			// 沿用上方预设分支确立的绝对极坐标语义 —— 东 (0°) 恒为第 0 位，每个旧方位按扇区中心绝对极角
+			// 就近落入新等分位（角度平局取更低的新索引）；多个旧方位挤入同一新方位时，
+			// 优先保留「已实际配置」的动作（与 12->8 分支的 PickPreferred 规则一致，平局取更低旧索引），落选动作丢弃。
+			double NormalizeAngleDelta(double delta)
+			{
+				delta %= 360.0;
+				if (delta > 180.0) delta -= 360.0;
+				if (delta < -180.0) delta += 360.0;
+				return delta;
+			}
+
+			// 先为每个旧方位找最近的等分位（就近对齐规则与上方预设分支一致）
+			List<int>[] sourceGroups = new List<int>[newSectorCount];
+			for (int j = 0; j < oldSectorCount; j++)
+			{
+				double oldAngle = j * 360.0 / oldSectorCount;
+				int bestTarget = 0;
+				double bestDistance = double.MaxValue;
+				for (int i = 0; i < newSectorCount; i++)
+				{
+					double distance = Math.Abs(NormalizeAngleDelta(oldAngle - i * 360.0 / newSectorCount));
+					if (distance < bestDistance - 1e-9)
+					{
+						bestDistance = distance;
+						bestTarget = i;
+					}
+				}
+				(sourceGroups[bestTarget] ??= new List<int>()).Add(j);
+			}
+
 			for (int i = 0; i < newSectorCount; i++)
 			{
-				result.Add(GetSource(i) ?? CreateDefaultPreset(newSectorCount, i));
+				List<int>? group = sourceGroups[i];
+				ActionItem? chosen = null;
+				if (group != null)
+				{
+					chosen = group.Select(GetSource).FirstOrDefault(a => a != null && (!string.IsNullOrWhiteSpace(a.Parameter) || !string.IsNullOrWhiteSpace(a.InheritAppIconPath) || (a.SubActions != null && a.SubActions.Count > 0)))
+						?? GetSource(group[0]);
+				}
+				result.Add(chosen ?? CreateDefaultPreset(newSectorCount, i));
 			}
 		}
 
@@ -3102,61 +3250,38 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
-		int sectorCount = 8;
-		if (SectorCount4Radio?.IsChecked == true)
+		int? sectorCount = ResolveSectorCountFromControls(
+			SectorCount4Radio?.IsChecked == true,
+			SectorCount8Radio?.IsChecked == true,
+			SectorCount12Radio?.IsChecked == true,
+			SectorCountCustomRadio?.IsChecked == true,
+			SectorCountCustomCombo?.SelectedItem as int?);
+		if (sectorCount == null)
 		{
-			sectorCount = 4;
-		}
-		else if (SectorCount8Radio?.IsChecked == true)
-		{
-			sectorCount = 8;
-		}
-		else if (SectorCount12Radio?.IsChecked == true)
-		{
-			sectorCount = 12;
-		}
-
-		if (_selectedProfile.SectorCount == sectorCount)
-		{
+			// 自定义单选已勾选但下拉尚未选择数值：仅启用下拉供选择，不切换档位
+			if (SectorCountCustomCombo != null)
+			{
+				SectorCountCustomCombo.IsEnabled = true;
+			}
+			if (MappingsSectorCountCustomCombo != null)
+			{
+				MappingsSectorCountCustomCombo.IsEnabled = true;
+			}
 			return;
 		}
 
-		_isChangingSectorCount = true;
-		try
+		ApplySectorCountChange(sectorCount.Value);
+	}
+
+	private void SectorCountCustomCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || _isChangingSectorCount || SectorCountCustomRadio?.IsChecked != true)
 		{
-			int oldSectorCount = _selectedProfile.SectorCount;
-			_selectedProfile.Actions = MigrateActionsBetweenSectorCounts(_selectedProfile.Actions, oldSectorCount, sectorCount);
-			_selectedProfile.SectorCount = sectorCount;
-			_selectedProfile.SyncActiveLayerFromRootProperties();
-
-			_isUpdatingUi = true;
-			try
-			{
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = sectorCount == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = sectorCount == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = sectorCount == 12;
-
-				if (_selectedSlotIndex >= sectorCount) _selectedSlotIndex = 0;
-				_selectedSubActionIndex = null;
-
-				RefreshSlots();
-				UpdateFocusEditorUi();
-				RenderMappingsWheelPreview();
-			}
-			finally
-			{
-				_isUpdatingUi = false;
-			}
-
-			if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
-			{
-				ScheduleLiveWheelPreviewRender();
-			}
-			SyncUiToConfigAndSave();
+			return;
 		}
-		finally
+		if (SectorCountCustomCombo?.SelectedItem is int customCount && WheelProfile.IsValidSectorCount(customCount))
 		{
-			_isChangingSectorCount = false;
+			ApplySectorCountChange(customCount);
 		}
 	}
 
@@ -3722,13 +3847,7 @@ public partial class SettingsWindow : Window
 
 			if (_selectedProfile != null)
 			{
-				int count = _selectedProfile.SectorCount;
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+				ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 			}
 
 			_selectedSlotIndex = 0;
@@ -3771,9 +3890,7 @@ public partial class SettingsWindow : Window
 				{
 					MappingsProfileComboBox.SelectedItem = _selectedProfile;
 				}
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = _selectedProfile?.SectorCount == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = _selectedProfile?.SectorCount == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = _selectedProfile?.SectorCount == 12;
+				ApplySectorCountSelectionToUi(_selectedProfile?.SectorCount ?? 8);
 				RefreshSlots();
 				UpdateFocusEditorUi();
 				RenderMappingsWheelPreview();
@@ -3795,9 +3912,7 @@ public partial class SettingsWindow : Window
 				{
 					ProfilesListBox.SelectedItem = _selectedProfile;
 				}
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = _selectedProfile?.SectorCount == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = _selectedProfile?.SectorCount == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = _selectedProfile?.SectorCount == 12;
+				ApplySectorCountSelectionToUi(_selectedProfile?.SectorCount ?? 8);
 				RefreshSlots();
 			}
 			finally
@@ -3824,12 +3939,7 @@ public partial class SettingsWindow : Window
 			try
 			{
 				if (ProfilesListBox != null) ProfilesListBox.SelectedItem = profile;
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = profile.SectorCount == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = profile.SectorCount == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = profile.SectorCount == 12;
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = profile.SectorCount == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = profile.SectorCount == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = profile.SectorCount == 12;
+				ApplySectorCountSelectionToUi(profile.SectorCount);
 				_selectedSlotIndex = 0;
 				_selectedSubActionIndex = null;
 				if (MappingsTier1SegmentRadio != null)
@@ -3892,13 +4002,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			_isUpdatingUi = true;
-			int count = _selectedProfile.SectorCount;
-			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
-			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
-			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+			ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 
 			_selectedSlotIndex = 0;
 			_selectedSubActionIndex = null;
@@ -3929,7 +4033,7 @@ public partial class SettingsWindow : Window
 		_selectedProfile.SyncActiveLayerFromRootProperties();
 
 		int nextNum = _selectedProfile.Layers.Count + 1;
-		int sectorCount = _selectedProfile.SectorCount is 4 or 8 or 12 ? _selectedProfile.SectorCount : 8;
+		int sectorCount = WheelProfile.IsValidSectorCount(_selectedProfile.SectorCount) ? _selectedProfile.SectorCount : 8;
 		WheelLayer newLayer = new WheelLayer
 		{
 			Name = $"第 {nextNum} 层",
@@ -3957,13 +4061,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			_isUpdatingUi = true;
-			int count = _selectedProfile.SectorCount;
-			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
-			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
-			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+			ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 
 			_selectedSlotIndex = 0;
 			_selectedSubActionIndex = null;
@@ -4003,13 +4101,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			_isUpdatingUi = true;
-			int count = _selectedProfile.SectorCount;
-			if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-			if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-			if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-			if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
-			if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
-			if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+			ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 
 			_selectedSlotIndex = 0;
 			_selectedSubActionIndex = null;
@@ -4075,13 +4167,7 @@ public partial class SettingsWindow : Window
 			try
 			{
 				_isUpdatingUi = true;
-				int count = _selectedProfile.SectorCount;
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-				if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.IsChecked = count == 4;
-				if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.IsChecked = count == 8;
-				if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.IsChecked = count == 12;
+				ApplySectorCountSelectionToUi(_selectedProfile.SectorCount);
 
 				_selectedSlotIndex = 0;
 				_selectedSubActionIndex = null;
@@ -4164,49 +4250,38 @@ public partial class SettingsWindow : Window
 	private void MappingsSectorCountRadio_Checked(object sender, RoutedEventArgs e)
 	{
 		if (_isUpdatingUi || _isChangingSectorCount || _selectedProfile == null) return;
-		int count = 8;
-		if (MappingsSectorCount4Radio != null && MappingsSectorCount4Radio.IsChecked == true) count = 4;
-		else if (MappingsSectorCount12Radio != null && MappingsSectorCount12Radio.IsChecked == true) count = 12;
-
-		if (_selectedProfile.SectorCount == count) return;
-
-		_isChangingSectorCount = true;
-		try
+		int? count = ResolveSectorCountFromControls(
+			MappingsSectorCount4Radio?.IsChecked == true,
+			MappingsSectorCount8Radio?.IsChecked == true,
+			MappingsSectorCount12Radio?.IsChecked == true,
+			MappingsSectorCountCustomRadio?.IsChecked == true,
+			MappingsSectorCountCustomCombo?.SelectedItem as int?);
+		if (count == null)
 		{
-			int oldCount = _selectedProfile.SectorCount;
-			_selectedProfile.Actions = MigrateActionsBetweenSectorCounts(_selectedProfile.Actions, oldCount, count);
-			_selectedProfile.SectorCount = count;
-			_selectedProfile.SyncActiveLayerFromRootProperties();
-
-			_isUpdatingUi = true;
-			try
+			// 自定义单选已勾选但下拉尚未选择数值：仅启用下拉供选择，不切换档位
+			if (MappingsSectorCountCustomCombo != null)
 			{
-				if (SectorCount4Radio != null) SectorCount4Radio.IsChecked = count == 4;
-				if (SectorCount8Radio != null) SectorCount8Radio.IsChecked = count == 8;
-				if (SectorCount12Radio != null) SectorCount12Radio.IsChecked = count == 12;
-
-				if (_selectedSlotIndex >= count) _selectedSlotIndex = 0;
-				_selectedSubActionIndex = null;
-
-				RefreshSlots();
-				UpdateFocusEditorUi();
-				RenderMappingsWheelPreview();
-				ScheduleAutoSave();
+				MappingsSectorCountCustomCombo.IsEnabled = true;
 			}
-			finally
+			if (SectorCountCustomCombo != null)
 			{
-				_isUpdatingUi = false;
+				SectorCountCustomCombo.IsEnabled = true;
 			}
-
-			if (AppearanceSettingsGrid?.Visibility == Visibility.Visible)
-			{
-				ScheduleLiveWheelPreviewRender();
-			}
-			SyncUiToConfigAndSave();
+			return;
 		}
-		finally
+
+		ApplySectorCountChange(count.Value);
+	}
+
+	private void MappingsSectorCountCustomCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || _isChangingSectorCount || MappingsSectorCountCustomRadio?.IsChecked != true)
 		{
-			_isChangingSectorCount = false;
+			return;
+		}
+		if (MappingsSectorCountCustomCombo?.SelectedItem is int customCount && WheelProfile.IsValidSectorCount(customCount))
+		{
+			ApplySectorCountChange(customCount);
 		}
 	}
 
@@ -4385,12 +4460,7 @@ public partial class SettingsWindow : Window
 
 			WheelProfile profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault() ?? new WheelProfile();
 			int sectorCount = profile.SectorCount > 0 ? profile.SectorCount : 8;
-			string[] directions = sectorCount switch
-			{
-				4 => Directions4,
-				12 => Directions12,
-				_ => Directions8
-			};
+			string[] directions = ResolveDirectionNames(sectorCount);
 
 			ActionItem? primaryAction = (_selectedSlotIndex >= 0 && profile.Actions != null && _selectedSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedSlotIndex] : null;
 			bool isTier2NoSubActions = (MappingsTier2SegmentRadio?.IsChecked == true && _selectedSlotIndex >= 0 && (primaryAction?.SubActions == null || primaryAction.SubActions.Count == 0));
@@ -6623,12 +6693,7 @@ public partial class SettingsWindow : Window
 			MappingsWheelPreviewCanvas.Children.Add(coreGrid);
 
 			// 2. Draw Sectors (Icon-Only, Clean Aesthetic Style matching Appearance tab)
-			string[] directions = sectorCount switch
-			{
-				4 => Directions4,
-				12 => Directions12,
-				_ => Directions8
-			};
+			string[] directions = ResolveDirectionNames(sectorCount);
 
 			bool isTier2Mode = (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked == true);
 
@@ -6703,7 +6768,7 @@ public partial class SettingsWindow : Window
 				double baseIconSize = (action != null && action.CustomIconSize.HasValue && action.CustomIconSize.Value > 0.0)
 					? action.CustomIconSize.Value
 					: ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
-				double sectorRatio = sectorCount switch { 4 => 1.25, 12 => 0.85, _ => 1.0 };
+				double sectorRatio = RadialWindow.InterpolateBySectorAngle(360.0 / sectorCount, 1.25, 1.0, 0.85);
 				double iconSize = Math.Max(15.0, Math.Min(28.0, baseIconSize * 1.15 * sectorRatio * scaleFactor));
 
 				FrameworkElement? iconElement = null;
