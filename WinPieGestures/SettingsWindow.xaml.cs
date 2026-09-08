@@ -979,6 +979,33 @@ public partial class SettingsWindow : Window
 			}
 		}
 
+		if (VolumeCancelRatioSlider != null)
+		{
+			VolumeCancelRatioSlider.Value = ((ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio > 0.0) ? ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio : 0.6);
+			if (VolumeCancelRatioValueText != null)
+			{
+				VolumeCancelRatioValueText.Text = $"{VolumeCancelRatioSlider.Value * 100.0:0}%";
+			}
+		}
+
+		if (VolumeFlickFarSlider != null)
+		{
+			VolumeFlickFarSlider.Value = ((ConfigManager.CurrentConfig.VolumeFlickFarDistance > 0.0) ? ConfigManager.CurrentConfig.VolumeFlickFarDistance : 360.0);
+			if (VolumeFlickFarValueText != null)
+			{
+				VolumeFlickFarValueText.Text = $"{VolumeFlickFarSlider.Value:0} px";
+			}
+		}
+
+		if (VolumeFlickJumpSlider != null)
+		{
+			VolumeFlickJumpSlider.Value = ((ConfigManager.CurrentConfig.VolumeFlickCancelDistance > 0.0) ? ConfigManager.CurrentConfig.VolumeFlickCancelDistance : 120.0);
+			if (VolumeFlickJumpValueText != null)
+			{
+				VolumeFlickJumpValueText.Text = $"{VolumeFlickJumpSlider.Value:0} px";
+			}
+		}
+
 		// Shapes & Layouts
 		SetComboBoxSelectedValue(ShapeComboBox, ConfigManager.CurrentConfig.Shape);
 		RefreshLayoutOptionsUi();
@@ -1383,6 +1410,10 @@ public partial class SettingsWindow : Window
 		{
 			Tab0_ScreenEdgeCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
 		}
+		if (Tab0_VolumeDragCardBorder != null)
+		{
+			Tab0_VolumeDragCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
 
 		// 2. Tab 1 外观与形态: 隐藏独立字体选择与文字位置偏移
 		if (Tab1_FontFamilyPanel != null)
@@ -1778,6 +1809,38 @@ public partial class SettingsWindow : Window
 		if (OuterEscapeDistanceDescText != null)
 		{
 			OuterEscapeDistanceDescText.Text = I18n.T("OuterEscapeDistanceDesc");
+		}
+		if (VolumeDragTitleText != null)
+		{
+			VolumeDragTitleText.Text = I18n.T("VolumeDragTitle");
+		}
+		if (VolumeDragDescText != null)
+		{
+			VolumeDragDescText.Text = I18n.T("VolumeDragDesc");
+		}
+		if (VolumeCancelRatioLabel != null)
+		{
+			VolumeCancelRatioLabel.Text = I18n.T("VolumeCancelRatioTitle");
+		}
+		if (VolumeCancelRatioDesc != null)
+		{
+			VolumeCancelRatioDesc.Text = I18n.T("VolumeCancelRatioDesc");
+		}
+		if (VolumeFlickFarLabel != null)
+		{
+			VolumeFlickFarLabel.Text = I18n.T("VolumeFlickFarTitle");
+		}
+		if (VolumeFlickFarDesc != null)
+		{
+			VolumeFlickFarDesc.Text = I18n.T("VolumeFlickFarDesc");
+		}
+		if (VolumeFlickJumpLabel != null)
+		{
+			VolumeFlickJumpLabel.Text = I18n.T("VolumeFlickJumpTitle");
+		}
+		if (VolumeFlickJumpDesc != null)
+		{
+			VolumeFlickJumpDesc.Text = I18n.T("VolumeFlickJumpDesc");
 		}
 		if (NewCustomColorPresetButton != null)
 		{
@@ -10102,6 +10165,39 @@ public partial class SettingsWindow : Window
 			double num = Math.Round(e.NewValue);
 			ConfigManager.CurrentConfig.SubWheelTriggerDistance = num;
 			SubWheelTriggerDistanceValueText.Text = $"{num:0} px";
+			ScheduleAutoSave();
+		}
+	}
+
+	private void VolumeCancelRatioSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (VolumeCancelRatioValueText != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
+		{
+			double num = ((e.NewValue >= 0.2) ? e.NewValue : 0.6);
+			ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio = num;
+			VolumeCancelRatioValueText.Text = $"{num * 100.0:0}%";
+			ScheduleAutoSave();
+		}
+	}
+
+	private void VolumeFlickFarSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (VolumeFlickFarValueText != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
+		{
+			double num = Math.Round(e.NewValue);
+			ConfigManager.CurrentConfig.VolumeFlickFarDistance = num;
+			VolumeFlickFarValueText.Text = $"{num:0} px";
+			ScheduleAutoSave();
+		}
+	}
+
+	private void VolumeFlickJumpSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (VolumeFlickJumpValueText != null && ConfigManager.CurrentConfig != null && !_isUpdatingUi)
+		{
+			double num = Math.Round(e.NewValue);
+			ConfigManager.CurrentConfig.VolumeFlickCancelDistance = num;
+			VolumeFlickJumpValueText.Text = $"{num:0} px";
 			ScheduleAutoSave();
 		}
 	}

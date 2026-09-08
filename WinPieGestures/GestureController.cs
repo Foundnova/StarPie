@@ -113,6 +113,42 @@ public class GestureController
 
 	private long _pendingGestureVersion;
 
+	// ---- 音量"拖距调音"（次级轮盘）：音量加/减扇区越过子轮盘触发距离后，
+	//      以拖出距离增量映射系统音量并实时写盘；外甩取消恢复基准音量 ----
+	private bool _volumeAdjustActive;
+
+	private bool _volumeGestureTookOver;
+
+	private float _volumeBaseline = -1f;
+
+	private double _volumeBaselineDist;
+
+	private float _volumeLastPercent = -1f;
+
+	// Last system OSD (volume flyout) refresh tick; throttled to avoid flicker on fast drags
+	private long _volumeLastOsdTick;
+
+	// Sector locked at the moment the volume adjust takes over. Once active, small angle
+	// drift into a neighbouring (non-volume) sector must never cancel the ongoing adjust.
+	private int _volumeLockedSector = -1;
+	// Distance of the previous processed frame while adjusting. A sudden large
+	// positive jump is treated as an intentional flick-out and cancels to baseline.
+	private double _volumeFlickPrevDist = -1.0;
+	// Latches true when this gesture was cancelled by a flick-out. A cancelled gesture
+	// must not re-enter adjust while the trigger button is still held, otherwise the
+	// volume snaps back to baseline and is immediately dragged again in the same press.
+	private bool _volumeFlickCancelled;
+	// Over-travel past a pinned 0%/100% volume: -1.0 while not pinned. Once the clamp
+	// kicks in this stores the travel at that instant, so a continued outward drag
+	// beyond the over-travel cancel distance aborts the gesture and restores baseline.
+	private double _volumeMaxedOutDist = -1.0;
+
+	private bool _volumePreviewScheduled;
+
+	private int _pendingVolumePercent = -1;
+
+	private long _pendingVolumePreviewVersion;
+
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool GetCursorPos(out POINT lpPoint);
@@ -152,6 +188,19 @@ public class GestureController
 			_selectedSubSectorIndex = -1;
 			_lastEscapedState = false;
 			_lastShowSubTier = false;
+			_volumeAdjustActive = false;
+			_volumeGestureTookOver = false;
+			_volumeBaseline = -1f;
+			_volumeBaselineDist = 0.0;
+			_volumeLastPercent = -1f;
+			_volumeLastOsdTick = 0L;
+			_volumeLockedSector = -1;
+			_volumeFlickPrevDist = -1.0;
+			_volumeFlickCancelled = false;
+			_volumeMaxedOutDist = -1.0;
+			_volumePreviewScheduled = false;
+			_pendingVolumePercent = -1;
+			_pendingVolumePreviewVersion = 0L;
 			return _gestureVersion;
 		}
 	}
@@ -291,6 +340,269 @@ public class GestureController
 		}
 		radialWindow.SetOuterEscapeState(targetEscape);
 		radialWindow.HighlightSector(targetSector, targetSubSector, targetShowSubTier);
+	}
+
+	// 判断指定扇区是否为系统音量加/减动作（用于外甩豁免：音量扇区在任意拖距都可调音）
+	private bool IsVolumeSector(int sectorIndex)
+	{
+		if (_activeProfile == null || sectorIndex < 0 || sectorIndex >= _activeProfile.Actions.Count)
+		{
+			return false;
+		}
+		ActionItem? action = _activeProfile.Actions[sectorIndex];
+		if (action == null)
+		{
+			return false;
+		}
+		bool isSystem = string.Equals(action.Type, "System", StringComparison.OrdinalIgnoreCase);
+		return isSystem && (string.Equals(action.Parameter, "volumeup", StringComparison.OrdinalIgnoreCase)
+			|| string.Equals(action.Parameter, "volumedown", StringComparison.OrdinalIgnoreCase));
+	}
+	// 音量"拖距调音"：当前扇区为音量加/减且拖距越过子轮盘触发距离时接管为距离映射调音。
+	// 以进入时的系统音量为基准，拖出距离增量映射音量（加音量向外=升，减音量向外=降），
+	// 实时写系统音量；外甩取消或缩回触发距离内恢复基准音量。
+	// 返回 true 表示本帧已接管音量调节（调用方应屏蔽二级子轮盘）。
+	private bool ProcessVolumeAdjust(double dist, int sectorIndex, bool isEscaped, double subWheelTriggerDistance)
+	{
+		// Sector lock: once adjusting, keep the sector that started the adjust so angle drift
+		// into a neighbouring non-volume sector cannot cancel a long drag. The cancel rule
+		// below (escape or return inside the hysteresis radius) is the only way out.
+		int refSector = (_volumeAdjustActive && _volumeLockedSector >= 0) ? _volumeLockedSector : sectorIndex;
+		if (refSector < 0)
+		{
+			if (_volumeAdjustActive)
+			{
+				_volumeAdjustActive = false;
+				_volumeLockedSector = -1;
+				_volumeFlickPrevDist = -1.0;
+				QueueVolumePreview(-1, GetCurrentGestureVersion());
+			}
+		return false;
+		}
+		ActionItem? action = (_activeProfile != null && refSector < _activeProfile.Actions.Count)
+			? _activeProfile.Actions[refSector]
+			: null;
+		bool isSystem = action != null && string.Equals(action.Type, "System", StringComparison.OrdinalIgnoreCase);
+		bool isUp = isSystem && string.Equals(action.Parameter, "volumeup", StringComparison.OrdinalIgnoreCase);
+		bool isDown = isSystem && string.Equals(action.Parameter, "volumedown", StringComparison.OrdinalIgnoreCase);
+		if (!isUp && !isDown)
+		{
+			if (_volumeAdjustActive)
+			{
+				_volumeAdjustActive = false;
+				_volumeFlickPrevDist = -1.0;
+				QueueVolumePreview(-1, GetCurrentGestureVersion());
+			}
+			return false;
+		}
+		int direction = isUp ? 1 : -1;
+		// 距离判定阈值来自设置界面（外观 → 音量拖距调音），带默认值兜底以防配置损坏：
+		// cancelRatio = 缩回取消迟滞系数；flickFar = 甩出取消距离下限；flickJump = 单帧跳变阈值。
+		double cancelRatio = (ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio > 0.0
+			&& ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio < 1.0)
+			? ConfigManager.CurrentConfig.VolumeCancelHysteresisRatio
+			: 0.6;
+		double flickFar = (ConfigManager.CurrentConfig.VolumeFlickFarDistance > 0.0)
+			? ConfigManager.CurrentConfig.VolumeFlickFarDistance
+			: 360.0;
+		double flickJump = (ConfigManager.CurrentConfig.VolumeFlickCancelDistance > 0.0)
+			? ConfigManager.CurrentConfig.VolumeFlickCancelDistance
+			: 120.0;
+		// Cancel rule: outer-swipe escape, or return inside the trigger radius. Once adjusting,
+		// a tighter 60% hysteresis radius applies so small returns or edge jitter never snap volume back.
+		bool insideCancelRadius = _volumeAdjustActive
+			? dist < subWheelTriggerDistance * cancelRatio
+			: dist < subWheelTriggerDistance;
+		// Intentional flick-out: while adjusting, a single-frame distance jump beyond
+		// the configured jump threshold while already past the configured far distance
+		// counts as flicking away to cancel. Steady drags never trip it, preserving the
+		// check8 immunity to angle drift that used to kill long drags.
+		bool volumeFlickOut = false;
+		if (_volumeAdjustActive && _volumeFlickPrevDist >= 0.0)
+		{
+			volumeFlickOut = dist > flickFar
+			    && dist - _volumeFlickPrevDist > flickJump;
+			_volumeFlickPrevDist = dist;
+		}
+		// A flick-out / over-travel cancel latched this gesture. Re-arm it only once
+		// the pointer clearly returns (back inside 2x the trigger radius): the user can
+		// then keep adjusting on the way back out. While the pointer stays far out the
+		// latch holds, so the volume cannot snap back and re-drag around the cancel point.
+		if (!_volumeAdjustActive && _volumeFlickCancelled && dist < subWheelTriggerDistance * 2.0)
+		{
+			_volumeFlickCancelled = false;
+			_volumeMaxedOutDist = -1.0;
+		}
+		if (isEscaped || insideCancelRadius || volumeFlickOut)
+		{
+			// 外甩取消或缩回触发距离内：恢复基准音量并退出调音模式（本手势仍视为已接管，松手不再执行单步动作）
+			if (_volumeAdjustActive)
+			{
+				_volumeAdjustActive = false;
+				_volumeGestureTookOver = true;
+				if (volumeFlickOut)
+				{
+					_volumeFlickCancelled = true;
+				}
+				_volumeFlickPrevDist = -1.0;
+				_volumeLockedSector = -1;
+				_volumeMaxedOutDist = -1.0;
+				if (_volumeBaseline >= 0f)
+				{
+					SystemVolume.SetVolume(_volumeBaseline);
+				}
+				QueueVolumePreview(-1, GetCurrentGestureVersion());
+			}
+			return false;
+		}
+		if (!_volumeAdjustActive && !_volumeFlickCancelled)
+		{
+			// 首次越过触发距离：记录基准音量与基准拖距，进入调音模式
+			if (!SystemVolume.TryGetVolume(out _volumeBaseline))
+			{
+				return false;
+			}
+			// 基线拖距固定为触发距离：从越过触发距离那一刻起算拖距，首帧不额外吃掉拖距
+			_volumeBaselineDist = dist; // first enter (dist~trigger) matches the old fixed baseline; a mid-return re-enter starts from travel=0
+			_volumeGestureTookOver = true;
+			_volumeAdjustActive = true;
+			_volumeLastPercent = -1f;
+			_volumeLastOsdTick = 0L;
+			_volumeLockedSector = sectorIndex;
+			_volumeFlickPrevDist = dist;
+			_volumeMaxedOutDist = -1.0;
+			// Wake the native volume flyout so the system OSD shows while this gesture adjusts
+			SystemVolume.ShowOsd(_volumeBaseline, isUp);
+		}
+		// A cancelled or latched gesture must not fall through into the incremental map:
+		// active is already false here, so bail out instead of dragging on stale baseline.
+		if (!_volumeAdjustActive)
+		{
+			return false;
+		}
+		// 增量映射：满程 200px 拖距映射 ±100%（约 2px/1%），灵敏度为原 285px 的约 1.4 倍；
+		// 按整数百分比写盘，避免高频 COM 调用
+		double travel = Math.Max(0.0, dist - _volumeBaselineDist);
+		double fullTravel = 200.0;
+		double delta = Math.Clamp(travel / fullTravel, 0.0, 1.0);
+		int baselinePercent = (int)Math.Round(_volumeBaseline * 100.0, MidpointRounding.AwayFromZero);
+		int targetPercent = Math.Clamp(baselinePercent + (int)Math.Round(delta * 100.0, MidpointRounding.AwayFromZero) * direction, 0, 100);
+		// Volume pinned at 0%/100% while still dragging outward: meter the over-travel
+		// and cancel the whole gesture (restore baseline) once it passes the threshold.
+		bool pinnedAtEdge = (targetPercent <= 0 && direction < 0) || (targetPercent >= 100 && direction > 0);
+		if (pinnedAtEdge)
+		{
+			if (_volumeMaxedOutDist < 0.0)
+			{
+				_volumeMaxedOutDist = travel;
+			}
+			else if (travel - _volumeMaxedOutDist > 150.0)
+			{
+				_volumeAdjustActive = false;
+				_volumeFlickCancelled = true;
+				_volumeFlickPrevDist = -1.0;
+				_volumeLockedSector = -1;
+				_volumeMaxedOutDist = -1.0;
+				if (_volumeBaseline >= 0f)
+				{
+					SystemVolume.SetVolume(_volumeBaseline);
+				}
+				QueueVolumePreview(-1, GetCurrentGestureVersion());
+				return false;
+			}
+		}
+		else
+		{
+			_volumeMaxedOutDist = -1.0;
+		}
+		if (targetPercent != _volumeLastPercent)
+		{
+			_volumeLastPercent = targetPercent;
+			SystemVolume.SetVolume(targetPercent / 100f);
+			// Throttled OSD refresh: at most one key inject per 180ms keeps the flyout from strobing
+			long nowTick = Environment.TickCount64;
+			if (nowTick - _volumeLastOsdTick >= 180L)
+			{
+				_volumeLastOsdTick = nowTick;
+				SystemVolume.ShowOsd(targetPercent / 100f, isUp);
+			}
+			QueueVolumePreview(targetPercent, GetCurrentGestureVersion());
+		}
+		return true;
+	}
+
+	// 音量预览节流：与高亮更新同锁、同 Render 优先级，覆盖式单挂起（模式见 QueueHighlightUpdate）
+	private void QueueVolumePreview(int percent, long gestureVersion)
+	{
+		bool shouldSchedule;
+		lock (_uiUpdateSync)
+		{
+			if (!_isGestureActive || gestureVersion != _gestureVersion)
+			{
+				return;
+			}
+			if (percent == _pendingVolumePercent)
+			{
+				return;
+			}
+			_pendingVolumePercent = percent;
+			_pendingVolumePreviewVersion = gestureVersion;
+			shouldSchedule = !_volumePreviewScheduled;
+			_volumePreviewScheduled = true;
+		}
+
+		if (!shouldSchedule)
+		{
+			return;
+		}
+
+		try
+		{
+			Application.Current.Dispatcher.BeginInvoke((Action)ApplyVolumePreview, DispatcherPriority.Render);
+		}
+		catch
+		{
+			lock (_uiUpdateSync)
+			{
+				if (_pendingVolumePreviewVersion == gestureVersion)
+				{
+					_volumePreviewScheduled = false;
+				}
+			}
+		}
+	}
+
+	private void ApplyVolumePreview()
+	{
+		int percent;
+		long previewVersion;
+		RadialWindow? radialWindow;
+		lock (_uiUpdateSync)
+		{
+			if (!_volumePreviewScheduled)
+			{
+				return;
+			}
+			percent = _pendingVolumePercent;
+			previewVersion = _pendingVolumePreviewVersion;
+			if (!_isGestureActive || previewVersion != _gestureVersion)
+			{
+				_volumePreviewScheduled = false;
+				return;
+			}
+			radialWindow = _radialWindow;
+			if (radialWindow == null)
+			{
+				return;
+			}
+			_volumePreviewScheduled = false;
+		}
+
+		if (!IsCurrentGesture(previewVersion) || !ReferenceEquals(_radialWindow, radialWindow))
+		{
+			return;
+		}
+		radialWindow.SetVolumePreview(percent, percent >= 0);
 	}
 
 	private bool CheckIsIsolated(out string processName)
@@ -813,6 +1125,7 @@ public class GestureController
 					if (ShowRadialUI(startPoint, profile, gestureVersion))
 					{
 						ApplyPendingHighlight();
+					ApplyVolumePreview();
 					}
 				}
 				catch (Exception ex)
@@ -881,9 +1194,37 @@ public class GestureController
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
 			bool isEscaped = finalState.IsEscaped;
+			bool volumeTookOver = _volumeGestureTookOver;
+			float volumeBaseline = _volumeBaseline;
+			// 手势结束：同步复位音量接管状态，杜绝 took/active/baseline 残留污染下一手势
+			// （BeginGestureTracking 也已复位，双保险覆盖所有触发路径）
+			_volumeAdjustActive = false;
+			_volumeGestureTookOver = false;
+			_volumeBaseline = -1f;
+			_volumeBaselineDist = 0.0;
+			_volumeLastPercent = -1f;
+			_volumeLastOsdTick = 0L;
+			_volumeLockedSector = -1;
+			_volumeFlickPrevDist = -1.0;
+			_volumeFlickCancelled = false;
+			_volumeMaxedOutDist = -1.0;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
+				if (volumeTookOver)
+				{
+					// 本手势已接管音量调节：外甩取消则恢复基准音量，正常松手保持最终音量；
+					// 隐藏音量预览并跳过全部动作执行（不再注入单键音量键）
+					if (isEscaped && volumeBaseline >= 0f)
+					{
+						SystemVolume.SetVolume(volumeBaseline);
+					}
+					endedWindow?.SetVolumePreview(-1, isActive: false);
+				}
 				CloseGestureWindow(endedWindow);
+				if (volumeTookOver)
+				{
+					return;
+				}
 				ActionItem? targetAction = null;
 				if (!isEscaped)
 				{
@@ -1116,9 +1457,35 @@ public class GestureController
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
 			bool isEscaped = finalState.IsEscaped;
+			bool volumeTookOver = _volumeGestureTookOver;
+			float volumeBaseline = _volumeBaseline;
+			_volumeAdjustActive = false;
+			_volumeGestureTookOver = false;
+			_volumeBaseline = -1f;
+			_volumeBaselineDist = 0.0;
+			_volumeLastPercent = -1f;
+			_volumeLastOsdTick = 0L;
+			_volumeLockedSector = -1;
+			_volumeFlickPrevDist = -1.0;
+			_volumeFlickCancelled = false;
+			_volumeMaxedOutDist = -1.0;
 			((DispatcherObject)Application.Current).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 			{
+				if (volumeTookOver)
+				{
+					// 本手势已接管音量调节：外甩取消则恢复基准音量，正常松手保持最终音量；
+					// 隐藏音量预览并跳过全部动作执行（不再注入单键音量键）
+					if (isEscaped && volumeBaseline >= 0f)
+					{
+						SystemVolume.SetVolume(volumeBaseline);
+					}
+					endedWindow?.SetVolumePreview(-1, isActive: false);
+				}
 				CloseGestureWindow(endedWindow);
+				if (volumeTookOver)
+				{
+					return;
+				}
 				ActionItem? targetAction = null;
 				if (!isEscaped)
 				{
@@ -1246,6 +1613,7 @@ public class GestureController
 						if (ShowRadialUI(center, profile, gestureVersion))
 						{
 							ApplyPendingHighlight();
+						ApplyVolumePreview();
 						}
 					}
 					catch (Exception ex)
@@ -1289,7 +1657,22 @@ public class GestureController
 			bool enableMultiTier = ConfigManager.CurrentConfig.EnableMultiTier;
 			double num8 = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : (wheelRadius * 1.55));
 			double num9 = (enableMultiTier ? (num8 + 20.0) : wheelRadius);
-			if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel)
+			// 角度与初判扇区提前到外甩判定之前：外甩短路需要知道当前指向扇区；
+			// 音量加/减扇区豁免外甩短路，保证"拖距调音"在任意拖距都可调（外甩不再吞掉音量手势）。
+			double num11 = Math.Atan2(num2, num) * (180.0 / Math.PI);
+			if (num11 < 0.0)
+			{
+				num11 += 360.0;
+			}
+			int num12 = _activeProfile?.SectorCount ?? 8;
+			if (num12 <= 0)
+			{
+				num12 = 8;
+			}
+			double num13 = 360.0 / (double)num12;
+			num4 = (int)Math.Floor((num11 + num13 / 2.0) / num13) % num12;
+			bool isVolumeSector = IsVolumeSector(num4) || _volumeAdjustActive;
+			if (ConfigManager.CurrentConfig.EnableOuterEscapeCancel && !isVolumeSector)
 			{
 				double num10 = ((ConfigManager.CurrentConfig.OuterEscapeDistance > 0.0) ? ConfigManager.CurrentConfig.OuterEscapeDistance : (num9 * 1.5));
 				if (num3 > num10)
@@ -1301,19 +1684,6 @@ public class GestureController
 			}
 			if (!flag)
 			{
-				double num11 = Math.Atan2(num2, num) * (180.0 / Math.PI);
-				if (num11 < 0.0)
-				{
-					num11 += 360.0;
-				}
-				int num12 = _activeProfile?.SectorCount ?? 8;
-				if (num12 <= 0)
-				{
-					num12 = 8;
-				}
-				double num13 = 360.0 / (double)num12;
-				num4 = (int)Math.Floor((num11 + num13 / 2.0) / num13) % num12;
-
 				bool isFan = ConfigManager.CurrentConfig.SubmenuStyle == "Fan";
 
 				// 蜂窝扇二级轮盘防抖与扇区保持锁定 (Hysteresis & Parent Sector Lock)
@@ -1377,6 +1747,12 @@ public class GestureController
 					}
 				}
 			}
+		}
+		// 音量"拖距调音"：音量加/减扇区越过子轮盘触发距离即接管为距离映射调音，屏蔽二级子轮盘
+		if (ProcessVolumeAdjust(num3, num4, flag, num7))
+		{
+			flag2 = false;
+			num5 = -1;
 		}
 		QueueHighlightUpdate(num4, num5, flag, flag2, GetCurrentGestureVersion());
 	}

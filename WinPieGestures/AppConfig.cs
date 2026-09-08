@@ -90,6 +90,14 @@ public class AppConfig
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 
 	public double SubWheelTriggerDistance { get; set; } = 95.0;
+	/// <summary>音量拖距调音：缩回中心取消的迟滞系数（触发距离 × 该系数）。越大需缩回越多才取消，防止边缘抖动误取消。</summary>
+	public double VolumeCancelHysteresisRatio { get; set; } = 0.6;
+
+	/// <summary>音量拖距调音：甩出取消的距离下限（px）。低于此距离即使快速移动也不视为甩出。</summary>
+	public double VolumeFlickFarDistance { get; set; } = 360.0;
+
+	/// <summary>音量拖距调音：甩出取消的单帧距离跳变阈值（px）。超过此值视为快速甩动。</summary>
+	public double VolumeFlickCancelDistance { get; set; } = 120.0;
 
 	public double SubWheelOuterRadius { get; set; } = 210.0;
 

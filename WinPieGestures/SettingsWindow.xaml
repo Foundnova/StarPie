@@ -837,6 +837,36 @@
                     <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
                     <TextBlock Name="SubWheelTriggerDistDesc" Text="调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                   </StackPanel>
+                  <Border Name="Tab0_VolumeDragCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,8,0,0" SnapsToDevicePixels="True" UseLayoutRounding="True">
+                    <StackPanel>
+                      <TextBlock Name="VolumeDragTitleText" Text="音量拖距调音 (Volume Drag-Adjust)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="VolumeDragDescText" Text="长按音量加/减扇区向外拖出可连续调音，以下距离参数实时生效，无需重启。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
+                      <StackPanel Name="VolumeCancelRatioPanel" Margin="0,2,0,0">
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Name="VolumeCancelRatioLabel" Text="缩回取消系数 (Cancel Hysteresis):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeCancelRatioValueText" Text="60%" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="VolumeCancelRatioSlider" Minimum="0.2" Maximum="0.9" SmallChange="0.05" LargeChange="0.1" Value="0.6" ValueChanged="VolumeCancelRatioSlider_ValueChanged" />
+                        <TextBlock Name="VolumeCancelRatioDesc" Text="调音时缩回到触发距离的百分之多少以下即取消并恢复原音量。值越大越不易被边缘抖动误回收（默认 60%）。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <StackPanel Name="VolumeFlickFarPanel" Margin="0,10,0,0">
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Name="VolumeFlickFarLabel" Text="甩出取消距离下限 (Flick Far):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeFlickFarValueText" Text="360 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="VolumeFlickFarSlider" Minimum="200" Maximum="800" SmallChange="10" LargeChange="50" Value="360" ValueChanged="VolumeFlickFarSlider_ValueChanged" />
+                        <TextBlock Name="VolumeFlickFarDesc" Text="仅当光标已远于该距离时，快速甩动才会取消调音，防止近距离拖动被误判为甩出。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <StackPanel Name="VolumeFlickJumpPanel" Margin="0,10,0,0">
+                        <Grid Margin="0,0,0,4">
+                          <TextBlock Name="VolumeFlickJumpLabel" Text="甩动跳变阈值 (Flick Jump):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeFlickJumpValueText" Text="120 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Slider Name="VolumeFlickJumpSlider" Minimum="60" Maximum="300" SmallChange="5" LargeChange="20" Value="120" ValueChanged="VolumeFlickJumpSlider_ValueChanged" />
+                        <TextBlock Name="VolumeFlickJumpDesc" Text="一帧之内光标移动超过该距离才算快速甩动。值越大越不容易触发甩出取消。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Name="Tab0_MouseGesturesCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">

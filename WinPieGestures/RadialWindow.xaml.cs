@@ -632,6 +632,7 @@ public partial class RadialWindow : Window
 			? ConfigManager.CurrentConfig.CoreFontSize
 			: Math.Max(8.0, Math.Min(16.0, coreRadius / 4.0));
 		CoreSelectionText.FontSize = coreFontSize;
+		CoreVolumeText.FontSize = coreFontSize;
 		if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig?.CoreFontFamily))
 		{
 			try
@@ -1644,6 +1645,26 @@ public partial class RadialWindow : Window
 		}
 		((Freezable)streamGeometry).Freeze();
 		return streamGeometry;
+	}
+
+	/// <summary>音量"拖距调音"实时预览：isActive=true 显示中心百分比，否则隐藏并恢复选中动作文字。</summary>
+	public void SetVolumePreview(int percent, bool isActive)
+	{
+		if (isActive)
+		{
+			CoreVolumeText.Text = "🔊 " + percent + "%";
+			CoreVolumeText.Visibility = Visibility.Visible;
+			Panel.SetZIndex(CoreVolumeText, 22);
+			// 调音期间隐藏选中动作遮罩层，避免与音量百分比重叠
+			CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+			CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+			return;
+		}
+		CoreVolumeText.Visibility = Visibility.Collapsed;
+		if (_currentHighlightedSector >= 0)
+		{
+			UpdateCoreSelectionDisplay(_currentHighlightedSector, _currentHighlightedSubSector);
+		}
 	}
 
 	public void SetOuterEscapeState(bool isEscaped)
