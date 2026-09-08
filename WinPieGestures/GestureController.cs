@@ -208,12 +208,15 @@ public class GestureController
 	private void CancelGestureTracking()
 	{
 		_kbTriggerWaiting = false;
+		_isWaitingForThreshold = false;
+		_isGestureActive = false;
 		lock (_uiUpdateSync)
 		{
 			_gestureVersion++;
 			_highlightUpdateScheduled = false;
 			_pendingGestureVersion = _gestureVersion;
 		}
+		HideRadialUI();
 		ActionExecutor.ReleaseStuckModifiers();
 	}
 
@@ -607,7 +610,7 @@ public class GestureController
 
 	private bool CheckIsIsolated(out string processName)
 	{
-		processName = ActiveWindowHelper.GetActiveWindowProcessName();
+		processName = ActiveWindowHelper.GetActiveWindowInfo(out nint fgHwnd);
 		string cleanProcess = (processName ?? "").Trim().ToLowerInvariant();
 
 		bool isWhitelisted = false;
@@ -655,7 +658,7 @@ public class GestureController
 		bool isFullScreenSuppressed = false;
 		if (ConfigManager.CurrentConfig.DisableOnFullScreen)
 		{
-			if (!isWhitelisted && FullScreenHelper.IsActiveWindowFullScreen())
+			if (!isWhitelisted && FullScreenHelper.IsActiveWindowFullScreen(fgHwnd, cleanProcess))
 			{
 				isFullScreenSuppressed = true;
 			}
@@ -1226,30 +1229,15 @@ public class GestureController
 					return;
 				}
 				ActionItem? targetAction = null;
-				if (!isEscaped)
+				if (!isEscaped && finalProfile != null)
 				{
-					if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
+					if (finalSector >= 0)
 					{
-						ActionItem actionItem = finalProfile.Actions[finalSector];
-						if (actionItem != null)
-						{
-							if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
-							{
-								ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
-								if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
-								{
-									targetAction = actionItem2;
-								}
-							}
-							if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
-							{
-								targetAction = actionItem;
-							}
-						}
+						targetAction = finalProfile.GetEffectiveAction(finalSector, finalSubSector);
 					}
-					else if (finalProfile != null && finalSector == -1 && finalProfile.EnableCenterAction && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					else if (finalSector == -1)
 					{
-						targetAction = finalProfile.CenterAction;
+						targetAction = finalProfile.GetEffectiveCenterAction();
 					}
 				}
 				if (targetAction == null)
@@ -1311,6 +1299,17 @@ public class GestureController
 
 	private void KeyboardHook_OnKeyDown(object? sender, GlobalKeyEventArgs e)
 	{
+		if (_isGestureActive || _radialWindow != null)
+		{
+			// ESC 按键即刻取消手势轮盘并吞键，防止干扰前台应用
+			if (e.VkCode == 27)
+			{
+				CancelGestureTracking();
+				e.Handled = true;
+				return;
+			}
+		}
+
 		if (_isGestureActive && _radialWindow != null && _activeProfile != null)
 		{
 			_activeProfile.EnsureLayers();
@@ -1487,30 +1486,15 @@ public class GestureController
 					return;
 				}
 				ActionItem? targetAction = null;
-				if (!isEscaped)
+				if (!isEscaped && finalProfile != null)
 				{
-					if (finalProfile != null && finalSector >= 0 && finalSector < finalProfile.Actions.Count)
+					if (finalSector >= 0)
 					{
-						ActionItem actionItem = finalProfile.Actions[finalSector];
-						if (actionItem != null)
-						{
-							if (finalSubSector >= 0 && actionItem.SubActions != null && finalSubSector < actionItem.SubActions.Count)
-							{
-								ActionItem actionItem2 = actionItem.SubActions[finalSubSector];
-								if (actionItem2 != null && !string.IsNullOrEmpty(actionItem2.Type))
-								{
-									targetAction = actionItem2;
-								}
-							}
-							if (targetAction == null && !string.IsNullOrEmpty(actionItem.Type))
-							{
-								targetAction = actionItem;
-							}
-						}
+						targetAction = finalProfile.GetEffectiveAction(finalSector, finalSubSector);
 					}
-					else if (finalProfile != null && finalSector == -1 && finalProfile.EnableCenterAction && finalProfile.CenterAction != null && !string.IsNullOrEmpty(finalProfile.CenterAction.Type))
+					else if (finalSector == -1)
 					{
-						targetAction = finalProfile.CenterAction;
+						targetAction = finalProfile.GetEffectiveCenterAction();
 					}
 				}
 				if (targetAction == null)
@@ -1808,6 +1792,21 @@ public class GestureController
 		{
 			newWindow.Show();
 
+			lock (_uiUpdateSync)
+			{
+				if (!_isGestureActive || !ReferenceEquals(_radialWindow, newWindow))
+				{
+					try
+					{
+						newWindow.CloseFast();
+					}
+					catch
+					{
+					}
+					return false;
+				}
+			}
+
 			// 屏幕边缘防溢出校准：如果窗口由于贴边或居中策略调整了物理中心，同步校正手势起点与光标位置
 			Point actualCenter = newWindow.ActualPhysicalCenter;
 			if (Math.Abs(actualCenter.X - _startPoint.X) > 1.0 || Math.Abs(actualCenter.Y - _startPoint.Y) > 1.0)
@@ -1836,7 +1835,7 @@ public class GestureController
 			}
 			try
 			{
-				newWindow.Close();
+				newWindow.CloseFast();
 			}
 			catch
 			{
@@ -1857,7 +1856,17 @@ public class GestureController
 		{
 			try
 			{
-				windowToClose.Close();
+				if (windowToClose.Dispatcher.CheckAccess())
+				{
+					windowToClose.CloseFast();
+				}
+				else
+				{
+					windowToClose.Dispatcher.BeginInvoke((Action)(() =>
+					{
+						try { windowToClose.CloseFast(); } catch { }
+					}), DispatcherPriority.Send);
+				}
 			}
 			catch
 			{
@@ -1886,7 +1895,17 @@ public class GestureController
 		// completed gesture's stale window and leave the newer one untouched.
 		try
 		{
-			gestureWindow.Close();
+			if (gestureWindow.Dispatcher.CheckAccess())
+			{
+				gestureWindow.CloseFast();
+			}
+			else
+			{
+				gestureWindow.Dispatcher.BeginInvoke((Action)(() =>
+				{
+					try { gestureWindow.CloseFast(); } catch { }
+				}), DispatcherPriority.Send);
+			}
 		}
 		catch
 		{

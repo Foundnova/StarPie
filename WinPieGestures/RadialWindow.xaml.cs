@@ -201,20 +201,47 @@ public partial class RadialWindow : Window
 		{
 			if (msg == WM_DPICHANGED)
 			{
-				PositionWindowOnTargetMonitor();
+				// 严禁标记 handled = true！必须允许 WPF HwndSource 内部更新 VisualTree 的 DPI 缩放矩阵
 				Dispatcher.BeginInvoke(new Action(() =>
 				{
+					PositionWindowOnTargetMonitor();
 					CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
 				}), DispatcherPriority.Render);
-				handled = true;
 			}
 			return IntPtr.Zero;
+		}
+
+		protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+		{
+			base.OnDpiChanged(oldDpi, newDpi);
+			PositionWindowOnTargetMonitor();
+			Dispatcher.BeginInvoke(new Action(() =>
+			{
+				CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+			}), DispatcherPriority.Render);
+		}
+
+		/// <summary>
+		/// 极速同步销毁窗口，清除任何正在运行的透明度动画与可见性，杜绝外甩或取消时半透明残影滞留桌面
+		/// </summary>
+		public void CloseFast()
+		{
+			try
+			{
+				BeginAnimation(UIElement.OpacityProperty, null);
+				Visibility = Visibility.Collapsed;
+				Close();
+			}
+			catch
+			{
+			}
 		}
 
 	protected override void OnClosed(EventArgs e)
 	{
 		try
 		{
+			BeginAnimation(UIElement.OpacityProperty, null);
 			if (PresentationSource.FromVisual(this) is HwndSource source)
 			{
 				source.RemoveHook(WndProc);
@@ -477,6 +504,14 @@ public partial class RadialWindow : Window
 		_centerPoint = ComputeClampedPhysicalCenter(centerPoint, _wheelCanvasSize);
 		ActualPhysicalCenter = _centerPoint;
 
+		ScreenContext screenCtx = ScreenHelper.GetScreenContextAtPoint(_centerPoint);
+		double scaleX = Math.Max(0.1, screenCtx.DpiScale.DpiScaleX);
+		double scaleY = Math.Max(0.1, screenCtx.DpiScale.DpiScaleY);
+
+		WindowStartupLocation = WindowStartupLocation.Manual;
+		this.Left = (_centerPoint.X / scaleX) - (_wheelCanvasSize / 2.0);
+		this.Top = (_centerPoint.Y / scaleY) - (_wheelCanvasSize / 2.0);
+
 		base.Width = _wheelCanvasSize;
 		base.Height = _wheelCanvasSize;
 		MainGrid.Width = _wheelCanvasSize;
@@ -712,26 +747,43 @@ public partial class RadialWindow : Window
 			{
 				customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
 			}
-			bool flag = customIconItem != null && !customIconItem.IsSvg && File.Exists(customIconItem.FilePath);
-			bool flag2 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
+			bool flag = customIconItem != null && !customIconItem.IsSvg && (File.Exists(customIconItem.FilePath) || IconHelper.GetCustomImageSource(customIconItem.Key) != null);
+			bool flag2 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && (File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath) || IconHelper.GetCustomImageSource("core:image") != null || IconHelper.GetCustomImageSource(ConfigManager.CurrentConfig.CoreCustomImagePath) != null);
 			bool isImagePattern = ((text2 == "Image") | flag) || (flag2 && text2 != "Custom" && text2 != "Exit");
-			string? text3 = (flag ? customIconItem?.FilePath : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
+			string? text3 = (flag ? (customIconItem?.FilePath ?? customIconItem?.Key) : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
 
-			if (isImagePattern && !string.IsNullOrEmpty(text3) && File.Exists(text3))
+			ImageSource? loadedCoreImgSource = null;
+			if (isImagePattern && !string.IsNullOrEmpty(text3))
+			{
+				if (File.Exists(text3))
+				{
+					try
+					{
+						BitmapImage bitmapImage = new BitmapImage();
+						bitmapImage.BeginInit();
+						bitmapImage.UriSource = new Uri(text3, UriKind.Absolute);
+						bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+						bitmapImage.EndInit();
+						((Freezable)bitmapImage).Freeze();
+						loadedCoreImgSource = bitmapImage;
+					}
+					catch { }
+				}
+				if (loadedCoreImgSource == null)
+				{
+					loadedCoreImgSource = IconHelper.GetCustomImageSource(text3) ?? IconHelper.GetCustomImageSource("core:image");
+				}
+			}
+
+			if (loadedCoreImgSource != null)
 			{
 				try
 				{
-					BitmapImage bitmapImage = new BitmapImage();
-					bitmapImage.BeginInit();
-					bitmapImage.UriSource = new Uri(text3, UriKind.Absolute);
-					bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-					bitmapImage.EndInit();
-					((Freezable)bitmapImage).Freeze();
 					double num10 = coreRadius * 1.85;
 					CoreCustomImageEllipse.Width = num10;
 					CoreCustomImageEllipse.Height = num10;
 					CoreCustomImageEllipse.RenderTransform = null;
-					ImageBrush imageBrush = new ImageBrush(bitmapImage)
+					ImageBrush imageBrush = new ImageBrush(loadedCoreImgSource)
 					{
 						Stretch = Stretch.UniformToFill,
 						AlignmentX = AlignmentX.Center,
@@ -780,10 +832,9 @@ public partial class RadialWindow : Window
 			}
 		}
 
-		// 2. 若未配置或未开启自定义图案，且启用了中心核圆动作，则展示动作功能图标（绝不附加自定义图片的缩放和偏移，必须严格正中居中）
-		if (!centerRendered && _profile != null && _profile.EnableCenterAction && _profile.CenterAction != null)
+		ActionItem? centerAction = _profile?.GetEffectiveCenterAction();
+		if (!centerRendered && centerAction != null)
 		{
-			ActionItem centerAction = _profile.CenterAction;
 			double actionIconDim = coreRadius * 0.48; // 正中居中尺寸
 			double actionImgDim = coreRadius * 0.95;
 
@@ -1276,7 +1327,7 @@ public partial class RadialWindow : Window
 				VerticalAlignment = VerticalAlignment.Center
 			};
 			grid.Children.Add(stackPanel);
-			ActionItem? currentAction = (i < _profile.Actions.Count) ? _profile.Actions[i] : null;
+			ActionItem? currentAction = _profile.GetEffectiveAction(i);
 			string sectorLayout = text;
 			if (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.LayoutMode) && currentAction.LayoutMode != "Inherit")
 			{
@@ -1562,6 +1613,10 @@ public partial class RadialWindow : Window
 					stackPanel.Children.Add(textElement);
 				}
 			}
+			if (currentAction?.IsInherited == true)
+			{
+				stackPanel.Opacity = 0.88;
+			}
 			Canvas.SetLeft(grid, num7 - grid.Width / 2.0);
 			Canvas.SetTop(grid, num8 - grid.Height / 2.0);
 			Panel.SetZIndex(grid, 10);
@@ -1775,11 +1830,11 @@ public partial class RadialWindow : Window
 	{
 		if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan") { RenderFanSubtier(parentIndex); return; }
 		ClearSubTier();
-		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.Actions.Count)
+		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.SectorCount)
 		{
 			return;
 		}
-		ActionItem actionItem = _profile.Actions[parentIndex];
+		ActionItem? actionItem = _profile.GetEffectiveAction(parentIndex);
 		if (actionItem == null || actionItem.SubActions == null || actionItem.SubActions.Count == 0)
 		{
 			return;
@@ -2482,14 +2537,14 @@ public partial class RadialWindow : Window
 	{
 		bool shouldShow = ConfigManager.CurrentConfig?.ShowSelectedActionText == true && mainIndex >= 0;
 		string selectedName = string.Empty;
-		if (shouldShow && mainIndex < _profile.Actions.Count)
+		if (shouldShow && mainIndex < _profile.SectorCount)
 		{
-			ActionItem action = _profile.Actions[mainIndex];
+			ActionItem? action = _profile.GetEffectiveAction(mainIndex);
 			if (subIndex >= 0 && action?.SubActions != null && subIndex < action.SubActions.Count)
 			{
 				selectedName = SelectionDisplayName(action.SubActions[subIndex]);
 			}
-			if (string.IsNullOrWhiteSpace(selectedName))
+			if (string.IsNullOrWhiteSpace(selectedName) && action != null)
 			{
 				selectedName = SelectionDisplayName(action);
 			}
@@ -2747,11 +2802,11 @@ public partial class RadialWindow : Window
 	private void RenderFanSubtier(int parentIndex)
 	{
 		ClearSubTier();
-		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.Actions.Count)
+		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.SectorCount)
 		{
 			return;
 		}
-		ActionItem actionItem = _profile.Actions[parentIndex];
+		ActionItem? actionItem = _profile.GetEffectiveAction(parentIndex);
 		if (actionItem == null || actionItem.SubActions == null || actionItem.SubActions.Count == 0)
 		{
 			return;

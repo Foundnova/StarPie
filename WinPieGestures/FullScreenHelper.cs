@@ -53,15 +53,31 @@ public static class FullScreenHelper
 	[DllImport("user32.dll", SetLastError = true)]
 	private static extern int GetWindowLong(nint hWnd, int nIndex);
 
-	public static bool IsActiveWindowFullScreen()
+	private static nint _cachedHwnd = IntPtr.Zero;
+	private static bool _cachedFullScreen = false;
+	private static long _cachedTick = 0;
+	private static readonly object _lock = new object();
+
+	public static bool IsActiveWindowFullScreen(nint knownForegroundWindow = 0, string? knownProcessName = null)
 	{
-		nint foregroundWindow = GetForegroundWindow();
+		nint foregroundWindow = knownForegroundWindow != IntPtr.Zero ? knownForegroundWindow : GetForegroundWindow();
 		if (foregroundWindow == IntPtr.Zero)
 		{
 			return false;
 		}
+
+		long now = Environment.TickCount64;
+		lock (_lock)
+		{
+			if (foregroundWindow == _cachedHwnd && (now - _cachedTick) < 150)
+			{
+				return _cachedFullScreen;
+			}
+		}
+
 		if (foregroundWindow == GetShellWindow() || foregroundWindow == GetDesktopWindow())
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 
@@ -84,10 +100,11 @@ public static class FullScreenHelper
 		    string.Equals(className, "ScreenCaptureWnd", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(className, "CChatRoomScreenCaptureWnd", StringComparison.OrdinalIgnoreCase))
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 
-		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		string activeProc = knownProcessName ?? ActiveWindowHelper.GetActiveWindowProcessName();
 		if (string.Equals(activeProc, "explorer.exe", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(activeProc, "screenclippinghost.exe", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(activeProc, "snippingtool.exe", StringComparison.OrdinalIgnoreCase) ||
@@ -102,35 +119,46 @@ public static class FullScreenHelper
 		    string.Equals(activeProc, "searchhost.exe", StringComparison.OrdinalIgnoreCase) ||
 		    string.Equals(activeProc, "textinputhost.exe", StringComparison.OrdinalIgnoreCase))
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 
 		if (!GetWindowRect(foregroundWindow, out var lpRect))
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 		nint hMonitor = MonitorFromWindow(foregroundWindow, 2u);
 		if (hMonitor == IntPtr.Zero)
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 		MONITORINFO lpmi = default(MONITORINFO);
 		lpmi.cbSize = Marshal.SizeOf(lpmi);
 		if (!GetMonitorInfo(hMonitor, ref lpmi))
 		{
+			lock (_lock) { _cachedHwnd = foregroundWindow; _cachedFullScreen = false; _cachedTick = now; }
 			return false;
 		}
 
+		bool isFs = false;
 		if (lpRect.Left <= lpmi.rcMonitor.Left && lpRect.Top <= lpmi.rcMonitor.Top && lpRect.Right >= lpmi.rcMonitor.Right && lpRect.Bottom >= lpmi.rcMonitor.Bottom)
 		{
 			// 检查是否为透明/分层窗口 (如截屏工具遮罩、透明悬浮窗、HUD等)，这类窗口绝非独占全屏游戏
 			int exStyle = GetWindowLong(foregroundWindow, GWL_EXSTYLE);
-			if ((exStyle & WS_EX_LAYERED) != 0 || (exStyle & WS_EX_TRANSPARENT) != 0)
+			if ((exStyle & WS_EX_LAYERED) == 0 && (exStyle & WS_EX_TRANSPARENT) == 0)
 			{
-				return false;
+				isFs = true;
 			}
-			return true;
 		}
-		return false;
+
+		lock (_lock)
+		{
+			_cachedHwnd = foregroundWindow;
+			_cachedFullScreen = isFs;
+			_cachedTick = now;
+		}
+		return isFs;
 	}
 }

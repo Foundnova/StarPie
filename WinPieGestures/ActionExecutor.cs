@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -1186,23 +1187,20 @@ public static class ActionExecutor
 			{
 				try
 				{
-					Type? shellType = Type.GetTypeFromProgID("Shell.Application");
-					if (shellType != null)
+					string workDir = "";
+					if (File.Exists(text))
 					{
-						dynamic shell = Activator.CreateInstance(shellType);
-						string workDir = "";
-						if (File.Exists(text))
-						{
-							workDir = Path.GetDirectoryName(text) ?? "";
-						}
-						shell.ShellExecute(text, arguments ?? "", workDir, "open", 1);
-						AppLogger.LogInfo($"Launched '{text}' with Shell standard user integrity via Shell.Application");
+						workDir = Path.GetDirectoryName(text) ?? "";
+					}
+					if (TryLaunchUnelevatedViaExplorer(text, arguments ?? "", workDir))
+					{
+						AppLogger.LogInfo($"Launched '{text}' with Explorer standard user integrity via IShellDispatch2 (de-elevated)");
 						return;
 					}
 				}
 				catch (Exception exShell)
 				{
-					AppLogger.LogInfo($"Shell.Application launch failed for '{text}', falling back to Process.Start: {exShell.Message}");
+					AppLogger.LogWarn($"Unelevated launch failed for '{text}', falling back to Process.Start: {exShell.Message}");
 				}
 			}
 
@@ -1273,6 +1271,63 @@ public static class ActionExecutor
 				AppLogger.LogError($"Process.Start failed for '{text}' with args '{arguments}'", ex);
 				throw;
 			}
+		}
+	}
+
+	/// <summary>
+	/// Issue #58: 当 StarPie 以管理员提权运行时，通过 Windows 资源管理器 (explorer.exe) 桌面 Shell 中转以标准普通用户权限 (Medium Integrity) 启动外部程序。
+	/// 解决以普通权限启动失效、终端仍带管理员盾牌、以及因 UIPI 隔离无法拖入外部文件的问题。
+	/// </summary>
+	public static bool TryLaunchUnelevatedViaExplorer(string path, string arguments, string workingDir)
+	{
+		try
+		{
+			Type? shellType = Type.GetTypeFromProgID("Shell.Application");
+			if (shellType == null) return false;
+
+			object? shell = Activator.CreateInstance(shellType);
+			if (shell == null) return false;
+
+			object? windows = shellType.InvokeMember("Windows", BindingFlags.InvokeMethod, null, shell, null);
+			if (windows == null) return false;
+
+			// SWC_DESKTOP = 8, SWFO_NEEDDISPATCH = 1
+			object[] args = new object[] { 0, Type.Missing, 8, 0, 1 };
+			ParameterModifier[] modifiers = new ParameterModifier[1];
+			modifiers[0] = new ParameterModifier(5);
+			modifiers[0][3] = true;
+
+			object? desktop = windows.GetType().InvokeMember(
+				"FindWindowSW",
+				BindingFlags.InvokeMethod,
+				null,
+				windows,
+				args,
+				modifiers,
+				null,
+				null);
+
+			if (desktop == null) return false;
+
+			object? doc = desktop.GetType().InvokeMember("Document", BindingFlags.GetProperty, null, desktop, null);
+			if (doc == null) return false;
+
+			object? app = doc.GetType().InvokeMember("Application", BindingFlags.GetProperty, null, doc, null);
+			if (app == null) return false;
+
+			app.GetType().InvokeMember(
+				"ShellExecute",
+				BindingFlags.InvokeMethod,
+				null,
+				app,
+				new object[] { path, arguments ?? "", workingDir ?? "", "open", 1 });
+
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"TryLaunchUnelevatedViaExplorer failed for '{path}': {ex.Message}");
+			return false;
 		}
 	}
 

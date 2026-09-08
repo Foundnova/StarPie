@@ -89,175 +89,17 @@ public static class ConfigManager
 					ReadCommentHandling = JsonCommentHandling.Skip
 				};
 				CurrentConfig = JsonSerializer.Deserialize<AppConfig>(json, options) ?? CreateDefaultConfig();
+				IconHelper.UnpackEmbeddedAssets(CurrentConfig);
+				EnsureConfigHealth(CurrentConfig);
 				AppLogger.LogInfo($"Loaded configuration from '{ConfigPath}'");
 			}
 			else
 			{
 				CurrentConfig = CreateDefaultConfig();
+				EnsureConfigHealth(CurrentConfig);
 				SaveConfig();
 				AppLogger.LogInfo($"Created and saved default configuration at '{ConfigPath}'");
 			}
-			AppConfig currentConfig = CurrentConfig;
-			if (currentConfig.BlacklistedProcesses == null)
-			{
-				AppConfig appConfig = currentConfig;
-				List<string> obj = new List<string> { "mstsc.exe", "paint.exe" };
-				List<string> list = obj;
-				appConfig.BlacklistedProcesses = obj;
-			}
-			currentConfig = CurrentConfig;
-			if (currentConfig.WhitelistedProcesses == null)
-			{
-				List<string> list = (currentConfig.WhitelistedProcesses = new List<string>());
-			}
-			if (string.IsNullOrEmpty(CurrentConfig.IsolationMode))
-			{
-				CurrentConfig.IsolationMode = "Blacklist";
-			}
-			if (CurrentConfig.Profiles != null)
-			{
-				foreach (WheelProfile profile in CurrentConfig.Profiles)
-				{
-					if (profile == null) continue;
-					profile.EnsureLayers();
-					if (profile.Actions != null)
-					{
-						foreach (ActionItem action in profile.Actions)
-						{
-							if (action != null && action.SubActions == null)
-							{
-								action.SubActions = new List<ActionItem>();
-							}
-						}
-					}
-					if (profile.Layers != null)
-					{
-						foreach (WheelLayer layer in profile.Layers)
-						{
-							if (layer.Actions != null)
-							{
-								foreach (ActionItem action in layer.Actions)
-								{
-									if (action != null && action.SubActions == null)
-									{
-										action.SubActions = new List<ActionItem>();
-									}
-								}
-							}
-						}
-					}
-					profile.SyncRootPropertiesFromActiveLayer();
-				}
-				WheelProfile wheelProfile = CurrentConfig.Profiles.FirstOrDefault((WheelProfile p) => string.Equals(p.ProcessName, "Global", StringComparison.OrdinalIgnoreCase));
-				if (wheelProfile != null && wheelProfile.Actions != null && wheelProfile.Actions.Sum((ActionItem a) => a.SubActions?.Count ?? 0) == 0)
-				{
-					if (wheelProfile.Actions.Count > 0 && wheelProfile.Actions[0] != null)
-					{
-						wheelProfile.Actions[0].SubActions = new List<ActionItem>
-						{
-							new ActionItem
-							{
-								Type = "Hotkey",
-								Name = "复制",
-								Parameter = "Ctrl+C",
-								IconKey = "Copy"
-							},
-							new ActionItem
-							{
-								Type = "Hotkey",
-								Name = "剪切",
-								Parameter = "Ctrl+X",
-								IconKey = "Cut"
-							},
-							new ActionItem
-							{
-								Type = "Hotkey",
-								Name = "粘贴",
-								Parameter = "Ctrl+V",
-								IconKey = "Paste"
-							},
-							new ActionItem
-							{
-								Type = "Hotkey",
-								Name = "全选",
-								Parameter = "Ctrl+A",
-								IconKey = "Edit"
-							}
-						};
-					}
-					if (wheelProfile.Actions.Count > 6 && wheelProfile.Actions[6] != null)
-					{
-						wheelProfile.Actions[6].SubActions = new List<ActionItem>
-						{
-							new ActionItem
-							{
-								Type = "Launch",
-								Name = "记事本",
-								Parameter = "notepad.exe",
-								IconKey = "Code"
-							},
-							new ActionItem
-							{
-								Type = "System",
-								Name = "计算器",
-								Parameter = "Calculator",
-								IconKey = "Code"
-							},
-							new ActionItem
-							{
-								Type = "System",
-								Name = "任务管理器",
-								Parameter = "TaskManager",
-								IconKey = "Terminal"
-							}
-						};
-					}
-					// 回落默认配置时禁止自动落盘：否则会立刻用默认值覆盖掉用户尚可恢复的配置文件
-					if (!IsFallbackConfig)
-					{
-						SaveConfig();
-					}
-				}
-			}
-			// 自动自愈此前版本中因初始事件误改写的槽位动作（保留有效程序路径，但动作被误写为 Tile / 2L）
-			if (CurrentConfig.Profiles != null)
-			{
-				bool healedAny = false;
-				foreach (WheelProfile profile in CurrentConfig.Profiles)
-				{
-					if (profile?.Actions == null) continue;
-					foreach (ActionItem action in profile.Actions)
-					{
-						if (action == null) continue;
-						if (action.Type == "Tile" && action.Parameter == "2L" &&
-							!string.IsNullOrWhiteSpace(action.InheritAppIconPath) &&
-							(action.InheritAppIconPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-							 action.InheritAppIconPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ||
-							 action.InheritAppIconPath.Contains("\\") || action.InheritAppIconPath.Contains("/")) &&
-							(action.Name != null && action.Name.Contains("平铺")))
-						{
-							action.Type = "Launch";
-							action.Parameter = action.InheritAppIconPath;
-							try
-							{
-								string baseName = Path.GetFileNameWithoutExtension(action.InheritAppIconPath);
-								if (!string.IsNullOrWhiteSpace(baseName))
-								{
-									action.Name = baseName;
-								}
-							}
-							catch { }
-							healedAny = true;
-						}
-					}
-				}
-				if (healedAny && !IsFallbackConfig)
-				{
-					SaveConfig();
-					AppLogger.LogInfo("Successfully auto-healed corrupted slot action(s) to Launch application.");
-				}
-			}
-			EnsureTriggerHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
 			_ = System.Threading.Tasks.Task.Run(async () =>
@@ -278,8 +120,119 @@ public static class ConfigManager
 			BackupCorruptConfig();
 			IsFallbackConfig = true;
 			CurrentConfig = CreateDefaultConfig();
+			EnsureConfigHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
 		}
+	}
+
+	public static void EnsureConfigHealth(AppConfig currentConfig)
+	{
+		if (currentConfig == null) return;
+		if (currentConfig.BlacklistedProcesses == null)
+		{
+			currentConfig.BlacklistedProcesses = new List<string> { "mstsc.exe", "paint.exe" };
+		}
+		if (currentConfig.WhitelistedProcesses == null)
+		{
+			currentConfig.WhitelistedProcesses = new List<string>();
+		}
+		if (string.IsNullOrEmpty(currentConfig.IsolationMode))
+		{
+			currentConfig.IsolationMode = "Blacklist";
+		}
+		currentConfig.Profiles ??= new List<WheelProfile>();
+		if (currentConfig.Profiles.Count == 0)
+		{
+			currentConfig.Profiles.Add(new WheelProfile
+			{
+				ProcessName = "Global",
+				SectorCount = 8,
+				Actions = new List<ActionItem>()
+			});
+		}
+
+		// 确保 Global 方案位于首位
+		int globalIndex = currentConfig.Profiles.FindIndex((WheelProfile p) => string.Equals(p.ProcessName, "Global", StringComparison.OrdinalIgnoreCase));
+		if (globalIndex < 0)
+		{
+			currentConfig.Profiles.Insert(0, new WheelProfile
+			{
+				ProcessName = "Global",
+				SectorCount = 8,
+				Actions = new List<ActionItem>()
+			});
+		}
+		else if (globalIndex > 0)
+		{
+			var gp = currentConfig.Profiles[globalIndex];
+			currentConfig.Profiles.RemoveAt(globalIndex);
+			currentConfig.Profiles.Insert(0, gp);
+		}
+
+		foreach (WheelProfile profile in currentConfig.Profiles)
+		{
+			if (profile == null) continue;
+			profile.EnsureLayers();
+			if (profile.Actions != null)
+			{
+				foreach (ActionItem action in profile.Actions)
+				{
+					if (action != null && action.SubActions == null)
+					{
+						action.SubActions = new List<ActionItem>();
+					}
+				}
+			}
+			if (profile.Layers != null)
+			{
+				foreach (WheelLayer layer in profile.Layers)
+				{
+					if (layer.Actions != null)
+					{
+						foreach (ActionItem action in layer.Actions)
+						{
+							if (action != null && action.SubActions == null)
+							{
+								action.SubActions = new List<ActionItem>();
+							}
+						}
+					}
+				}
+			}
+			profile.SyncRootPropertiesFromActiveLayer();
+		}
+
+		// 自动自愈此前版本中因初始事件误改写的槽位动作（保留有效程序路径，但动作被误写为 Tile / 2L）
+		foreach (WheelProfile profile in currentConfig.Profiles)
+		{
+			if (profile?.Actions == null) continue;
+			foreach (ActionItem action in profile.Actions)
+			{
+				if (action == null) continue;
+				if (action.Type == "Tile" && action.Parameter == "2L" &&
+					!string.IsNullOrWhiteSpace(action.InheritAppIconPath) &&
+					(action.InheritAppIconPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+					 action.InheritAppIconPath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ||
+					 action.InheritAppIconPath.Contains("\\") || action.InheritAppIconPath.Contains("/")) &&
+					(action.Name != null && action.Name.Contains("平铺")))
+				{
+					action.Type = "Launch";
+					action.Parameter = action.InheritAppIconPath;
+					try
+					{
+						string baseName = Path.GetFileNameWithoutExtension(action.InheritAppIconPath);
+						if (!string.IsNullOrWhiteSpace(baseName))
+						{
+							action.Name = baseName;
+						}
+					}
+					catch { }
+				}
+			}
+			profile.SyncActiveLayerFromRootProperties();
+		}
+
+		EnsureTriggerHealth(currentConfig);
 	}
 
 	// 返回是否保存成功，调用方据此决定提示文案，避免无条件宣称“已保存”。
@@ -290,6 +243,17 @@ public static class ConfigManager
 			if (!Directory.Exists(AppDataFolder))
 			{
 				Directory.CreateDirectory(AppDataFolder);
+			}
+			if (CurrentConfig != null)
+			{
+				if (CurrentConfig.Profiles != null)
+				{
+					foreach (var p in CurrentConfig.Profiles)
+					{
+						p?.SyncRootPropertiesFromActiveLayer();
+					}
+				}
+				IconHelper.PackEmbeddedAssets(CurrentConfig);
 			}
 			JsonSerializerOptions options = new JsonSerializerOptions
 			{
@@ -324,8 +288,68 @@ public static class ConfigManager
 		{
 			return GetGlobalProfile();
 		}
-		string lowerProc = processName.ToLower();
-		return CurrentConfig.Profiles.Find((WheelProfile p) => p.ProcessName.ToLower() == lowerProc) ?? GetGlobalProfile();
+		string cleanProc = processName.Trim().ToLowerInvariant();
+		string cleanBase = cleanProc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+			? cleanProc.Substring(0, cleanProc.Length - 4)
+			: cleanProc;
+
+		if (CurrentConfig?.Profiles != null)
+		{
+			// 1. 优先在所有非 Global 的专属方案中匹配绑定的程序情景
+			foreach (WheelProfile profile in CurrentConfig.Profiles)
+			{
+				if (profile == null || string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+
+				// 检查 BoundProcesses 字段（支持逗号/分号/空格分隔多个进程）
+				if (!string.IsNullOrWhiteSpace(profile.BoundProcesses))
+				{
+					string[] tokens = profile.BoundProcesses.Split(new[] { ',', ';', '|', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+					foreach (string token in tokens)
+					{
+						string target = token.Trim().ToLowerInvariant();
+						string targetBase = target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+							? target.Substring(0, target.Length - 4)
+							: target;
+
+						if (target == cleanProc || targetBase == cleanBase)
+						{
+							return profile;
+						}
+					}
+				}
+
+				// 回退检查 ProcessName 字段
+				string pProc = profile.ProcessName.Trim().ToLowerInvariant();
+				string pBase = pProc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+					? pProc.Substring(0, pProc.Length - 4)
+					: pProc;
+
+				if (pProc == cleanProc || pBase == cleanBase)
+				{
+					return profile;
+				}
+
+				// 检查 DisplayName 字段（若用户将显示名称直接设为了目标程序名或进程名）
+				if (!string.IsNullOrWhiteSpace(profile.DisplayName))
+				{
+					string dProc = profile.DisplayName.Trim().ToLowerInvariant();
+					string dBase = dProc.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+						? dProc.Substring(0, dProc.Length - 4)
+						: dProc;
+
+					if (dProc == cleanProc || dBase == cleanBase)
+					{
+						return profile;
+					}
+				}
+			}
+		}
+
+		// 2. 无专属方案匹配时兜底回落至 Global
+		return GetGlobalProfile();
 	}
 
 	public static WheelProfile GetGlobalProfile()
@@ -552,6 +576,17 @@ public static class ConfigManager
 	{
 		try
 		{
+			if (CurrentConfig != null)
+			{
+				if (CurrentConfig.Profiles != null)
+				{
+					foreach (var p in CurrentConfig.Profiles)
+					{
+						p?.SyncRootPropertiesFromActiveLayer();
+					}
+				}
+				IconHelper.PackEmbeddedAssets(CurrentConfig);
+			}
 			JsonSerializerOptions options = new JsonSerializerOptions
 			{
 				WriteIndented = true
@@ -560,8 +595,9 @@ public static class ConfigManager
 			File.WriteAllText(targetFilePath, contents);
 			return true;
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			AppLogger.LogError("Failed to export config to '" + targetFilePath + "'", ex);
 			return false;
 		}
 	}
@@ -574,17 +610,26 @@ public static class ConfigManager
 			{
 				return false;
 			}
-			AppConfig appConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(sourceFilePath));
+			JsonSerializerOptions options = new JsonSerializerOptions
+			{
+				PropertyNameCaseInsensitive = true,
+				AllowTrailingCommas = true,
+				ReadCommentHandling = JsonCommentHandling.Skip
+			};
+			AppConfig? appConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(sourceFilePath), options);
 			if (appConfig != null)
 			{
+				IconHelper.UnpackEmbeddedAssets(appConfig);
+				EnsureConfigHealth(appConfig);
 				CurrentConfig = appConfig;
-				EnsureTriggerHealth(CurrentConfig);
+				I18n.SetLanguage(CurrentConfig.Language);
 				SaveConfig();
 				return true;
 			}
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			AppLogger.LogError("Failed to import config from '" + sourceFilePath + "'", ex);
 		}
 		return false;
 	}

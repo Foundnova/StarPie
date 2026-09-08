@@ -659,12 +659,12 @@
           </Button>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.1&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.2-beta.2&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.2-beta.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -786,7 +786,7 @@
                     <TextBlock Text="一级轮盘呼出触发位移 (Drag Threshold):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <TextBlock Name="ThresholdValueLabel" Text="25 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
-                  <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" Value="25" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
+                  <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
                   <TextBlock Text="按住触发键移动超过此距离后呼出手势轮盘。距离越小越灵敏，过小可能造成按键微抖误触。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,14" />
 
                   <!-- 2. 核心圆死区唤醒灵敏度 -->
@@ -796,7 +796,7 @@
                         <TextBlock Text="🎯 核心圆唤醒与死区灵敏度 (Core Deadzone Radius):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                         <TextBlock Name="CoreDeadzoneValueLabel" Text="35 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <Slider Name="CoreDeadzoneSlider" Minimum="10" Maximum="100" Value="35" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreDeadzoneSlider_ValueChanged" />
+                      <Slider Name="CoreDeadzoneSlider" Minimum="10" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreDeadzoneSlider_ValueChanged" />
                       <TextBlock Text="调节呼出轮盘后光标停留在中心核心圆触发核心动作或静默取消的有效半径。数值较小时轻划即可命中扇区，数值较大时中心判定区更宽容，更易触发中心核圆动作或防手抖取消。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                     </StackPanel>
                   </Border>
@@ -2372,23 +2372,26 @@
                     <Grid.RowDefinitions>
                       <RowDefinition Height="Auto" />
                       <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     
-                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="当前配置方案:" VerticalAlignment="Center" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
-                      <ComboBox Name="MappingsProfileComboBox" Grid.Column="1" MinWidth="130" Style="{StaticResource FlatComboBoxStyle}" Height="30" DisplayMemberPath="ProcessName" SelectionChanged="MappingsProfileComboBox_SelectionChanged" VerticalAlignment="Center" />
+                      <ComboBox Name="MappingsProfileComboBox" Grid.Column="1" MinWidth="130" Style="{StaticResource FlatComboBoxStyle}" Height="30" DisplayMemberPath="DisplayTitle" SelectionChanged="MappingsProfileComboBox_SelectionChanged" VerticalAlignment="Center" />
                       
                       <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                        <Button Name="DuplicateProfileBtn" Content="📑 复制方案" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="复制当前方案的所有配置到新程序或工作流" Click="DuplicateProfileBtn_Click" />
-                        <Button Name="AddProfileBtn2" Content="➕ 新增" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="添加新的轮盘配置方案（点击可选择从程序添加或自定义命名）" Click="AddProfileBtn2_Click">
+                        <Button Name="DuplicateProfileBtn" Content="📑 复制方案" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="将当前方案的所有动作与多层配置复制为新程序方案" Click="DuplicateProfileBtn_Click" />
+                        <Button Name="AddProfileBtn2" Content="➕ 新增" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="添加新的轮盘配置方案（点击可选择从程序添加、捕捉窗口或自定义命名）" Click="AddProfileBtn2_Click">
                           <Button.ContextMenu>
                             <ContextMenu Style="{StaticResource ModernContextMenuStyle}">
                               <MenuItem Header="🖥️ 从已安装软件中添加 (专属程序配置)..." Style="{StaticResource ModernMenuItemStyle}" Click="AddProfileButton_Click" />
+                              <MenuItem Header="🎯 捕捉运行中窗口添加 (专属程序配置)..." Style="{StaticResource ModernMenuItemStyle}" Click="AddProfileByCapture_Click" />
+                              <MenuItem Header="📁 浏览本地程序文件添加 (.exe / .lnk)..." Style="{StaticResource ModernMenuItemStyle}" Click="AddProfileByBrowse_Click" />
                               <MenuItem Header="✏️ 新建自定义名称方案 (工作流/模式配置)..." Style="{StaticResource ModernMenuItemStyle}" Click="AddCustomProfileButton_Click" />
                             </ContextMenu>
                           </Button.ContextMenu>
@@ -2398,11 +2401,44 @@
                       </StackPanel>
                     </Grid>
 
-                    <Border Grid.Row="1" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
+                    <!-- 程序情景绑定卡片 (Profile Context Binding Card) -->
+                    <Border Name="ProfileBindingCardBorder" Grid.Row="1" Background="{DynamicResource WindowBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,8">
+                      <StackPanel>
+                        <!-- 1. Global 模式说明 -->
+                        <Grid Name="ProfileGlobalHintPanel">
+                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🌐" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="全局通用基础方案：当活动前台程序未配置专属轮盘时，手势将自动应用此全局方案。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Grid>
+
+                        <!-- 2. 专属程序模式绑定面板 -->
+                        <StackPanel Name="ProfileCustomBindingPanel" Visibility="Collapsed">
+                          <Grid>
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="Auto" />
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="🎯 绑定程序情景:" VerticalAlignment="Center" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                            <TextBox Name="ProfileBoundProcessesTextBox" Grid.Column="1" Height="28" FontSize="11" VerticalContentAlignment="Center" ToolTip="目标程序进程名（如 photoshop.exe 或 code.exe）。支持以英文逗号分隔多个进程。" TextChanged="ProfileBoundProcessesTextBox_TextChanged" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                              <Button Name="ProfileCaptureWindowBtn" Content="🎯 捕捉窗口..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="直接点击桌面上运行中的目标软件窗口，自动识别并绑定其进程" Click="ProfileCaptureWindowBtn_Click" />
+                              <Button Name="ProfilePickProgramBtn" Content="🖥️ 软件库..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" Margin="0,0,4,0" ToolTip="从已安装的软件列表中选择程序并绑定" Click="ProfilePickProgramBtn_Click" />
+                              <Button Name="ProfileBrowseExeBtn" Content="📁 浏览..." Style="{StaticResource ModernButtonStyle}" Height="28" Padding="8,0" ToolTip="浏览选取本地可执行程序文件 (.exe / .lnk)" Click="ProfileBrowseExeBtn_Click" />
+                            </StackPanel>
+                          </Grid>
+                          <TextBlock Text="💡 提示：在此程序处于前台活跃状态时唤起轮盘将自动应用本方案。支持以英文逗号分隔多个进程名 (例如 chrome.exe, msedge.exe)。" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="2" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
                       <Grid>
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="Auto" />
                           <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="扇区方位数量:" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,12,0" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -2410,6 +2446,7 @@
                           <RadioButton Name="MappingsSectorCount8Radio" GroupName="MappingsSectorCountGroup" Content="8 键全向方位 (推荐)" Margin="0,0,20,0" IsChecked="True" Checked="MappingsSectorCountRadio_Checked" />
                           <RadioButton Name="MappingsSectorCount12Radio" GroupName="MappingsSectorCountGroup" Content="12 键钟表方位" Checked="MappingsSectorCountRadio_Checked" />
                         </StackPanel>
+                        <CheckBox Name="EnableGlobalInheritanceCheckBox" Grid.Column="2" Content="🌐 继承全局方案未配置槽位" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" ToolTip="当专属程序方案中的某个扇区未配置动作时，自动级联继承并执行全局方案对应方位的动作" Checked="EnableGlobalInheritanceCheckBox_Changed" Unchecked="EnableGlobalInheritanceCheckBox_Changed" />
                       </Grid>
                     </Border>
                   </Grid>
@@ -2437,6 +2474,9 @@
                           <TextBlock Name="FocusSlotTitleText" Text="扇区 1 [向上] (North)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
                           <Border Name="FocusSlotTagBorder" CornerRadius="4" Background="{DynamicResource NavTabActiveBgBrush}" Padding="6,2" VerticalAlignment="Center">
                             <TextBlock Name="FocusSlotTagText" Text="一级主扇区" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                          </Border>
+                          <Border Name="FocusSlotInheritedBadge" Visibility="Collapsed" CornerRadius="4" Background="#183B82F6" BorderBrush="#803B82F6" BorderThickness="1" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip="当前槽位在专属方案中未配置，已自动继承全局方案同向动作">
+                            <TextBlock Text="🌐 全局继承" FontSize="10.5" FontWeight="SemiBold" Foreground="#3B82F6" />
                           </Border>
                         </StackPanel>
                         <TextBlock Name="FocusSlotSubtitleText" Text="点击右侧轮盘直接选中扇区，或使用右侧按钮切换槽位" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
@@ -2542,10 +2582,12 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
                           <TextBlock Text="触发动作类型:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
                           <ComboBox Name="FocusActionTypeComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectionChanged="FocusActionTypeComboBox_SelectionChanged" />
-                          <Button Name="FocusTestActionBtn" Grid.Column="2" Content="▶ 测试触发" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="10,0" Margin="8,0,0,0" Click="FocusTestActionBtn_Click" />
+                          <Button Name="FocusRestoreInheritBtn" Grid.Column="2" Content="🌐 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="8,0,0,0" Visibility="Collapsed" ToolTip="清除当前槽位的专属覆写，恢复继承全局方案对应方位的动作" Click="FocusRestoreInheritBtn_Click" />
+                          <Button Name="FocusTestActionBtn" Grid.Column="3" Content="▶ 测试触发" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="10,0" Margin="8,0,0,0" Click="FocusTestActionBtn_Click" />
                         </Grid>
 
                         <!-- 动态参数面板容器 -->
@@ -2983,7 +3025,7 @@
                     <StackPanel>
                       <TextBlock Text="当前配置方案 (Profile)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <TextBlock Text="选择或新建针对特定程序（如 Chrome、VS Code）或特定工作流的轮盘配置方案（支持双击重命名）。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" />
-                      <ListBox Name="ProfilesListBox" Height="100" DisplayMemberPath="ProcessName" SelectionChanged="ProfilesListBox_SelectionChanged" MouseDoubleClick="ProfilesListBox_MouseDoubleClick" />
+                      <ListBox Name="ProfilesListBox" Height="100" DisplayMemberPath="DisplayTitle" SelectionChanged="ProfilesListBox_SelectionChanged" MouseDoubleClick="ProfilesListBox_MouseDoubleClick" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="15,0,0,0">
                       <Button Name="AddProfileButton" Content="➕ 新增专属程序配置" Style="{StaticResource PrimaryButtonStyle}" Height="30" Margin="0,0,0,5" ToolTip="从已安装软件或开始菜单中选择程序创建专属配置" Click="AddProfileButton_Click" />
@@ -3315,7 +3357,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.1 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.2-beta.2 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3333,7 +3375,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.1" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.2-beta.2" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -3675,7 +3717,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.2-beta.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3691,11 +3733,12 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.7.1 连续步进快捷键支持 &amp; 外圈子环全展开 &amp; 触发防冲突提示" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• ⌨️ 【连续步进击键优化】：重构快捷键执行引擎，支持办公软件中如 Alt+H+V+F 连续步进快捷键（KeyTips / 菜单层级），支持逗号与加号分隔连续击键；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 🔘 【外圈子环全展开预览】：轮盘样式为外圈子环时，交互画布默认将所有扇区的二级子环全部展开预览，移除冗余的一二级切换按钮；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• 💡 【触发按键防冲突提示】：在触发按键说明中增加防冲突建议提示，帮助用户避开日常高频按键；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                  <TextBlock Text="• ⚡ 【平稳体验守护】：保持极低内存占用与流畅跟手体验。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  <TextBlock Text="v1.7.2-beta.2 扇区全局方案级联继承 &amp; 多屏跨缩放Bug根治 &amp; 幽灵虚影消除 &amp; 底层防丢键优化" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🌐 【专属方案级联继承全局】：当专属程序方案中的扇区未配置动作时，自动级联继承并执行全局方案对应方位的动作；画布提供半透明视觉反馈，聚焦卡片支持一键恢复继承；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🖥️ 【多屏混合DPI显示Bug彻底根治】：重构跨屏幕坐标变换与 DPI 感知策略，消除二次缩放冲突，彻底根治副屏呼出轮盘只显示 3/4 区域与巨大化截断；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 👻 【消除外甩脱离桌面幽灵虚影】：重构窗口关闭与透明度动画释放时序，引入 CloseFast() 机制，杜绝取消手势后半透明残影残留桌面；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🛡️ 【底层钩子高频防丢键】：引入 150ms 窗口句柄与全屏进程探测缓存，大幅减轻 Win32 低级钩子回调负担，彻底解决高频右键连击丢键；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【平稳体验守护】：支持按 ESC 立即取消轮盘，保持极低内存占用与流畅跟手体验。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
@@ -3704,6 +3747,23 @@
                 </UIElement.Effect>
                 <StackPanel>
                   <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <TextBlock Text="v1.7.2-b2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                        <TextBlock Text="扇区全局方案级联继承 &amp; 多屏跨缩放Bug根治 &amp; 幽灵虚影消除 &amp; 底层防丢键优化" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" />
+                        <TextBlock Text="未配置槽位自动级联继承全局方案；彻底根治多屏混合 DPI 轮盘巨大截断缺陷；解除外甩残影；HWND 缓存防护低级钩子防丢键。" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="2026-09-08" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                    </Grid>
+                  </Border>
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>

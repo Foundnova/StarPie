@@ -55,12 +55,17 @@ public class ActionItem
 	/// <summary>独立文字垂直偏移覆盖：null 表示继承全局</summary>
 	public double? CustomTextOffsetY { get; set; } = null;
 
+	/// <summary>运行时标记：是否继承自 Global 全局方案动作（不持久化到 JSON）</summary>
+	[System.Text.Json.Serialization.JsonIgnore]
+	public bool IsInherited { get; set; }
+
 	public List<ActionItem> SubActions { get; set; } = new List<ActionItem>();
 
 	public ActionItem Clone()
 	{
 		ActionItem clone = new ActionItem
 		{
+			IsInherited = this.IsInherited,
 			Type = this.Type,
 			Name = this.Name,
 			Parameter = this.Parameter,

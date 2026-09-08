@@ -4,6 +4,40 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.7.2-beta.2] - 2026-09-08
+
+### 扇区全局方案级联继承与动态映射 (Global Profile Inheritance & Dynamic Mapping)
+1. **未配置槽位智能级联继承全局方案**：
+   - 解决以往为每个应用程序（如 Photoshop、Edge、CAD 等）创建专属方案时，未配置的空白扇区或中心核圆沦为废键的问题；
+   - 当专属方案中的主扇区或中心核圆未配置动作时，自动级联继承全局方案（Global Profile）对应方位的动作，并无缝参与手势调度与执行；
+   - **4/8/12 极角对齐映射算法**：即使专属方案扇区数（如 4 键）与全局方案扇区数（如 8 键或 12 键）不一致，通过极坐标几何方位归一化对齐（`GetEffectiveAction`），自动就近继承最贴合物理方位的全局动作，保持盲操肌肉记忆确定性。
+2. **继承状态无损隔离与一键恢复继承**：
+   - 全局配置新增 `EnableGlobalInheritance` 开关（默认开启），并在控制台 Tab 2 方案管理卡片提供即时开关；
+   - 继承动作在内存中以 `ActionItem.IsInherited` 标记，**严禁**将继承数据反向持久化写入专属方案 JSON 中，确保专属配置文件纯净无污染，具备完全的向下兼容与动态自愈能力；
+   - 在控制台外观与动作实时预览画布中，继承动作呈现半透明微光（0.55/0.65 Opacity），清晰区分独立覆写与全局继承；
+   - 动作聚焦精调卡片增加 `[🌐 全局继承]` 蓝色高亮微标，并在覆写后提供 `[ 🌐 恢复继承全局 ]` 按钮，支持一键清空覆写重新继承。
+
+### 多屏跨分辨率与不同 DPI 缩放截断彻底根治 (Per-Monitor V2 Multi-DPI Display Fixes)
+1. **根除跨屏 Double-Scaling 缩放冲突与截断**：
+   - 析因：此前低级窗口过程 `WndProc` 中拦截 `WM_DPICHANGED` 并标记 `handled = true`，阻断了 WPF 内部 `HwndSource` 视觉树尺寸更新，导致与手动修改 `Width/Height` 产生 Double-Scaling 缩放冲突。在主屏 2K(150%) 与副屏 1080P(100%) 之间切换时，导致轮盘仅显示 3/4、图标巨大、右下角截断且无法选中；
+   - 解决方案：移除 `WM_DPICHANGED` 的 `handled = true` 拦截，交由 WPF 框架原生处理视觉树尺寸；在 `RadialWindow` 创建阶段直接按光标所在屏幕物理坐标与 DPI 计算 DIP 尺寸并以 `WindowStartupLocation.Manual` 精确创建；
+   - 重写 `OnDpiChanged` 自动监听 DPI 变化并重新物理校准窗口居中位置，彻底根治跨屏、跨 DPI 缩放时的巨大化与截断缺陷。
+
+### 外甩脱离幽灵虚影彻底消除与手势生命周期自愈 (Outer Escape Ghosting Fix & CloseFast)
+1. **根除外甩脱离半透明残影死锁桌面**：
+   - 析因：外甩脱离触发时启动了 `Opacity = 0.38` 的 DoubleAnimation。当用户高速甩出并快速松开按键时，UI 线程 Dispatcher 队列竞争导致旧窗口在未清除动画状态下被设为 Hidden，残留半透明虚影死锁在桌面；
+   - 解决方案：`RadialWindow` 新增 `CloseFast()` 极速销毁方法，显式调用 `BeginAnimation(OpacityProperty, null)` 剥离透明度动画，即刻收起 Visibility 并彻底关闭窗口；
+   - 在 `GestureController.HideRadialUI()`、`CloseGestureWindow()` 与 `ShowRadialUI()` 中加入状态自愈与 `CloseFast()` 调度，确保任何异常竞争下都不会残留虚影。
+
+### 底层钩子性能优化与 ESC 取消手势 (Low-Level Hook Optimization & ESC Cancel)
+1. **150ms HWND/全屏状态缓存避免游戏丢键与卡顿**：
+   - 在 `ActiveWindowHelper` 与 `FullScreenHelper` 中引入基于 `Stopwatch` 的 150ms 线程安全前台 HWND 与进程名称缓存；
+   - 避免在用户高频移动鼠标或连击点击时密集调用 Win32 `GetForegroundWindow` 与进程枚举，大幅释放底层钩子（`WH_MOUSE_LL`）CPU 负担，彻底消除竞技游戏中的丢键与轻微卡顿风险；
+2. **ESC 键即刻退出轮盘手势**：
+   - 全局低级键盘钩子支持按 `ESC` 键即刻取消手势、收回轮盘并吞掉按键，为误触或临时放弃提供最自然的撤销操作。
+
+---
+
 ## [v1.7.1] - 2026-09-08
 
 ### 音量拖距连续调音与原生按键穿透 (Volume Drag-Adjust & Trigger Key Passthrough - PR #73 & #78)

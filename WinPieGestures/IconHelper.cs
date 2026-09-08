@@ -898,6 +898,35 @@ public static class IconHelper
 		catch (Exception)
 		{
 		}
+
+		// 回退：若本地文件不存在或提取失败，尝试从内嵌记忆库 EmbeddedCustomIcons 解码加载
+		try
+		{
+			var embedded = ConfigManager.CurrentConfig?.EmbeddedCustomIcons;
+			if (embedded != null && embedded.Count > 0)
+			{
+				string fullKey = "appicon:" + text;
+				string fnKey = "appicon:" + Path.GetFileName(text);
+				if (embedded.TryGetValue(fullKey, out string? base64) || embedded.TryGetValue(fnKey, out base64))
+				{
+					if (!string.IsNullOrEmpty(base64))
+					{
+						byte[] bytes = Convert.FromBase64String(base64);
+						using var ms = new MemoryStream(bytes);
+						BitmapImage bmp = new BitmapImage();
+						bmp.BeginInit();
+						bmp.CacheOption = BitmapCacheOption.OnLoad;
+						bmp.StreamSource = ms;
+						bmp.EndInit();
+						((Freezable)bmp).Freeze();
+						_iconCache[text] = bmp;
+						return bmp;
+					}
+				}
+			}
+		}
+		catch { }
+
 		return null;
 	}
 
@@ -1228,6 +1257,12 @@ public static class IconHelper
 		return false;
 	}
 
+	public static void ClearCache()
+	{
+		_cachedCustomIcons = null;
+		_iconCache.Clear();
+	}
+
 	public static ImageSource? GetCustomImageSource(string iconKeyOrPath)
 	{
 		if (string.IsNullOrWhiteSpace(iconKeyOrPath))
@@ -1239,7 +1274,7 @@ public static class IconHelper
 			string text = iconKeyOrPath;
 			if (iconKeyOrPath.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
 			{
-				CustomIconItem customIconItem = GetCustomIcons().FirstOrDefault((CustomIconItem i) => i.Key == iconKeyOrPath);
+				CustomIconItem customIconItem = GetCustomIcons().FirstOrDefault((CustomIconItem i) => string.Equals(i.Key, iconKeyOrPath, StringComparison.OrdinalIgnoreCase));
 				if (customIconItem != null)
 				{
 					text = customIconItem.FilePath;
@@ -1255,10 +1290,313 @@ public static class IconHelper
 				((Freezable)bitmapImage).Freeze();
 				return bitmapImage;
 			}
+
+			// 回退：若本地文件不存在，尝试从配置内嵌记忆库中查找并解码
+			var embedded = ConfigManager.CurrentConfig?.EmbeddedCustomIcons;
+			if (embedded != null && embedded.Count > 0)
+			{
+				string? base64 = null;
+				if (embedded.TryGetValue(iconKeyOrPath, out string? v1)) base64 = v1;
+				else if (iconKeyOrPath.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					string k = iconKeyOrPath.Substring(7);
+					foreach (var kvp in embedded)
+					{
+						if (kvp.Key.Contains(k, StringComparison.OrdinalIgnoreCase))
+						{
+							base64 = kvp.Value;
+							break;
+						}
+					}
+				}
+				else if (embedded.TryGetValue("core:image", out string? v2)) base64 = v2;
+				else
+				{
+					string fn = Path.GetFileName(iconKeyOrPath);
+					if (!string.IsNullOrEmpty(fn) && embedded.TryGetValue(fn, out string? v3)) base64 = v3;
+				}
+
+				if (!string.IsNullOrEmpty(base64) && !base64.TrimStart().StartsWith("<svg", StringComparison.OrdinalIgnoreCase))
+				{
+					byte[] bytes = Convert.FromBase64String(base64);
+					return LoadBitmapFromBytes(bytes);
+				}
+			}
 		}
 		catch
 		{
 		}
 		return null;
 	}
+
+	private static BitmapImage? LoadBitmapFromBytes(byte[] bytes)
+	{
+		try
+		{
+			using var ms = new MemoryStream(bytes);
+			BitmapImage bmp = new BitmapImage();
+			bmp.BeginInit();
+			bmp.CacheOption = BitmapCacheOption.OnLoad;
+			bmp.StreamSource = ms;
+			bmp.EndInit();
+			((Freezable)bmp).Freeze();
+			return bmp;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// 扫描并打包所有自定义图片、自定义图标与应用程序提取图标至内嵌字典中，
+	/// 实现配置文件自包含跨机器无损迁移记忆。
+	/// </summary>
+	public static void PackEmbeddedAssets(AppConfig? config)
+	{
+		if (config == null) return;
+		config.EmbeddedCustomIcons ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+		void EmbedFile(string key, string filePath)
+		{
+			if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(filePath)) return;
+			try
+			{
+				if (File.Exists(filePath))
+				{
+					string ext = Path.GetExtension(filePath).ToLowerInvariant();
+					if (ext == ".svg")
+					{
+						string content = File.ReadAllText(filePath);
+						config.EmbeddedCustomIcons[key] = content;
+					}
+					else
+					{
+						byte[] bytes = File.ReadAllBytes(filePath);
+						if (bytes.Length > 1500000)
+						{
+							bytes = ResizeImageToMaxDimension(bytes, 512) ?? bytes;
+						}
+						config.EmbeddedCustomIcons[key] = Convert.ToBase64String(bytes);
+					}
+				}
+			}
+			catch { }
+		}
+
+		void EmbedAppIcon(string exePath)
+		{
+			if (string.IsNullOrWhiteSpace(exePath)) return;
+			string trimmed = exePath.Trim().Trim('"');
+			string fullKey = "appicon:" + trimmed;
+			string fnKey = "appicon:" + Path.GetFileName(trimmed);
+			if (File.Exists(trimmed))
+			{
+				try
+				{
+					BitmapSource? icon = GetIcon(trimmed);
+					if (icon != null)
+					{
+						using var ms = new MemoryStream();
+						var encoder = new PngBitmapEncoder();
+						encoder.Frames.Add(BitmapFrame.Create(icon));
+						encoder.Save(ms);
+						string base64 = Convert.ToBase64String(ms.ToArray());
+						config.EmbeddedCustomIcons[fullKey] = base64;
+						config.EmbeddedCustomIcons[fnKey] = base64;
+					}
+				}
+				catch { }
+			}
+		}
+
+		void ScanAction(ActionItem? action)
+		{
+			if (action == null) return;
+			if (!string.IsNullOrWhiteSpace(action.IconKey) && action.IconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+			{
+				var item = GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, action.IconKey, StringComparison.OrdinalIgnoreCase));
+				if (item != null && !string.IsNullOrEmpty(item.FilePath) && File.Exists(item.FilePath))
+				{
+					EmbedFile(action.IconKey, item.FilePath);
+				}
+			}
+			if (!string.IsNullOrWhiteSpace(action.InheritAppIconPath))
+			{
+				EmbedAppIcon(action.InheritAppIconPath);
+			}
+			if (action.SubActions != null)
+			{
+				foreach (var sub in action.SubActions)
+				{
+					ScanAction(sub);
+				}
+			}
+		}
+
+		// 1. 中心核心图案与自定义图标
+		if (!string.IsNullOrWhiteSpace(config.CoreCustomImagePath))
+		{
+			EmbedFile("core:image", config.CoreCustomImagePath);
+			EmbedFile(config.CoreCustomImagePath, config.CoreCustomImagePath);
+			EmbedFile(Path.GetFileName(config.CoreCustomImagePath), config.CoreCustomImagePath);
+		}
+		if (!string.IsNullOrWhiteSpace(config.CoreCustomIconKey) && config.CoreCustomIconKey.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+		{
+			var item = GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, config.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
+			if (item != null && !string.IsNullOrEmpty(item.FilePath) && File.Exists(item.FilePath))
+			{
+				EmbedFile(config.CoreCustomIconKey, item.FilePath);
+			}
+		}
+
+		// 2. 取消动作
+		ScanAction(config.CancelAction);
+
+		// 3. 所有方案动作与各层级动作
+		if (config.Profiles != null)
+		{
+			foreach (var profile in config.Profiles)
+			{
+				if (profile == null) continue;
+				ScanAction(profile.CenterAction);
+				if (profile.Actions != null)
+				{
+					foreach (var act in profile.Actions)
+					{
+						ScanAction(act);
+					}
+				}
+				if (profile.Layers != null)
+				{
+					foreach (var layer in profile.Layers)
+					{
+						if (layer == null) continue;
+						ScanAction(layer.CenterAction);
+						if (layer.Actions != null)
+						{
+							foreach (var act in layer.Actions)
+							{
+								ScanAction(act);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// 解包配置文件中的内嵌自定义图标与图片至本机 CustomIcons 目录，保证多端同步与二次配置无损显示。
+	/// </summary>
+	public static void UnpackEmbeddedAssets(AppConfig? config)
+	{
+		if (config?.EmbeddedCustomIcons == null || config.EmbeddedCustomIcons.Count == 0) return;
+		try
+		{
+			string customIconsDir = GetCustomIconsDirectory();
+			bool unpackedAny = false;
+
+			foreach (var kvp in config.EmbeddedCustomIcons)
+			{
+				string key = kvp.Key;
+				string data = kvp.Value;
+				if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(data)) continue;
+
+				if (key.StartsWith("custom:", StringComparison.OrdinalIgnoreCase))
+				{
+					string fileBase = key.Substring(7).Trim();
+					if (string.IsNullOrEmpty(fileBase)) continue;
+
+					var existing = Directory.GetFiles(customIconsDir, fileBase + ".*");
+					if (existing.Length == 0)
+					{
+						if (data.TrimStart().StartsWith("<svg", StringComparison.OrdinalIgnoreCase) ||
+						    data.TrimStart().StartsWith("<path", StringComparison.OrdinalIgnoreCase))
+						{
+							string targetSvg = Path.Combine(customIconsDir, fileBase + ".svg");
+							File.WriteAllText(targetSvg, data);
+							unpackedAny = true;
+						}
+						else
+						{
+							try
+							{
+								byte[] bytes = Convert.FromBase64String(data);
+								string ext = DetectImageExtension(bytes);
+								string targetPath = Path.Combine(customIconsDir, fileBase + ext);
+								File.WriteAllBytes(targetPath, bytes);
+								unpackedAny = true;
+							}
+							catch { }
+						}
+					}
+				}
+				else if (key == "core:image" || string.Equals(key, config.CoreCustomImagePath, StringComparison.OrdinalIgnoreCase) ||
+				         key == Path.GetFileName(config.CoreCustomImagePath ?? ""))
+				{
+					if (!string.IsNullOrEmpty(config.CoreCustomImagePath) && !File.Exists(config.CoreCustomImagePath))
+					{
+						try
+						{
+							byte[] bytes = Convert.FromBase64String(data);
+							string ext = DetectImageExtension(bytes);
+							string localCorePath = Path.Combine(customIconsDir, "imported_core_image_" + DateTime.Now.ToString("yyyyMMdd") + ext);
+							if (!File.Exists(localCorePath))
+							{
+								File.WriteAllBytes(localCorePath, bytes);
+							}
+							config.CoreCustomImagePath = localCorePath;
+							unpackedAny = true;
+						}
+						catch { }
+					}
+				}
+			}
+
+			if (unpackedAny)
+			{
+				ClearCache();
+			}
+		}
+		catch { }
+	}
+
+	private static byte[]? ResizeImageToMaxDimension(byte[] inputBytes, int maxDimension)
+	{
+		try
+		{
+			using var msIn = new MemoryStream(inputBytes);
+			var decoder = BitmapDecoder.Create(msIn, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+			var frame = decoder.Frames[0];
+			if (frame.PixelWidth <= maxDimension && frame.PixelHeight <= maxDimension)
+			{
+				return inputBytes;
+			}
+			double scale = Math.Min((double)maxDimension / frame.PixelWidth, (double)maxDimension / frame.PixelHeight);
+			var transformed = new TransformedBitmap(frame, new ScaleTransform(scale, scale));
+			using var msOut = new MemoryStream();
+			var encoder = new PngBitmapEncoder();
+			encoder.Frames.Add(BitmapFrame.Create(transformed));
+			encoder.Save(msOut);
+			return msOut.ToArray();
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static string DetectImageExtension(byte[] bytes)
+	{
+		if (bytes.Length >= 4)
+		{
+			if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return ".png";
+			if (bytes[0] == 0xFF && bytes[1] == 0xD8) return ".jpg";
+			if (bytes[0] == 0x42 && bytes[1] == 0x4D) return ".bmp";
+			if (bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0x01 && bytes[3] == 0x00) return ".ico";
+		}
+		return ".png";
+	}
 }
+
