@@ -37,22 +37,27 @@ jobs:
         shell: pwsh
         run: |
           $tag = $env:GITHUB_REF_NAME
-          if ($tag -notmatch '^v(?<baseVersion>\d+\.\d+\.\d+)(?<prerelease>-beta\d+)?$') {
-            throw "Release tag must use vX.Y.Z or vX.Y.Z-betaN format: $tag"
+          if ($tag -notmatch '^v(?<baseVersion>\d+\.\d+\.\d+)(?<prerelease>-beta\.\d+)?$') {
+            throw "Release tag must use vX.Y.Z or vX.Y.Z-beta.N format: $tag"
           }
 
           $baseVersion = $Matches.baseVersion
           $prereleaseSuffix = $Matches.prerelease
-          $expectedProjectVersion = "${baseVersion}${prereleaseSuffix}"
           $expectedFourPartVersion = "${baseVersion}.0"
           [xml]$project = Get-Content "WinPieGestures/WinPieGestures.csproj"
 
           $projectVersion = [string]$project.Project.PropertyGroup.Version
+          $projectBaseVersion = ($projectVersion -split '-', 2)[0]
           $assemblyVersion = [string]$project.Project.PropertyGroup.AssemblyVersion
           $fileVersion = [string]$project.Project.PropertyGroup.FileVersion
 
-          if ($projectVersion -ne $expectedProjectVersion) {
-            throw "Version mismatch: tag=$expectedProjectVersion Version=$projectVersion"
+          if ([string]::IsNullOrEmpty($prereleaseSuffix)) {
+            if ($projectVersion -ne $baseVersion) {
+              throw "Version mismatch: stable tag=$baseVersion Version=$projectVersion"
+            }
+          }
+          elseif ($projectBaseVersion -ne $baseVersion) {
+            throw "Version mismatch: beta tag base=$baseVersion Version=$projectVersion"
           }
           if ($assemblyVersion -ne $expectedFourPartVersion) {
             throw "AssemblyVersion mismatch: expected=$expectedFourPartVersion actual=$assemblyVersion"
@@ -132,7 +137,7 @@ jobs:
           $releaseArguments += $assets
           $releaseArguments += @("--verify-tag", "--generate-notes", "--title", "StarPie $env:GITHUB_REF_NAME")
 
-          if ($env:GITHUB_REF_NAME -match '^v\d+\.\d+\.\d+-beta\d+$') {
+          if ($env:GITHUB_REF_NAME -match '^v\d+\.\d+\.\d+-beta\.\d+$') {
             $releaseArguments += "--prerelease"
             Write-Host "Publishing GitHub pre-release: $env:GITHUB_REF_NAME"
           }
