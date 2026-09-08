@@ -1998,6 +1998,13 @@ public static class I18n
 			[LanguageCode.En] = "Console Theme",
 			[LanguageCode.Ja] = "コントロールパネルテーマ"
 		};
+		dictionary["ThemeCustom"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "\ud83c\udfa8 自定义配色 (Custom Colors)",
+			[LanguageCode.ZhTw] = "\ud83c\udfa8 自定義配色 (Custom Colors)",
+			[LanguageCode.En] = "\ud83c\udfa8 Custom Colors",
+			[LanguageCode.Ja] = "\ud83c\udfa8 カスタム配色"
+		};
 		dictionary["ThemeSystem"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "\ud83d\udda5\ufe0f 跟随 Windows 系统 (Auto)",

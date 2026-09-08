@@ -1847,6 +1847,14 @@ public partial class SettingsWindow : Window
 		{
 			VolumeFlickJumpDesc.Text = I18n.T("VolumeFlickJumpDesc");
 		}
+		if (ThemeCustomItem != null)
+		{
+			ThemeCustomItem.Content = I18n.T("ThemeCustom");
+		}
+		if (SubThemeCustomItem != null)
+		{
+			SubThemeCustomItem.Content = I18n.T("ThemeCustom");
+		}
 		if (NewCustomColorPresetButton != null)
 		{
 			NewCustomColorPresetButton.Content = I18n.T("NewCustomPresetButton");
@@ -8076,6 +8084,10 @@ public partial class SettingsWindow : Window
 		}
 		string text = tag?.ToString() ?? "FollowPrimary";
 		ConfigManager.CurrentConfig.SubWheelTheme = text;
+		if (text == "Custom" && SubCustomColorExpander != null)
+		{
+			SubCustomColorExpander.IsExpanded = true;
+		}
 		ConfigManager.CurrentConfig.UseIndependentSubWheelTheme = text != "FollowPrimary" || ConfigManager.CurrentConfig.SubWheelUiStyle != "FollowPrimary";
 		bool flag = text.StartsWith("CustomPreset_");
 		if (RenameSubCustomColorPresetButton != null)
@@ -8630,6 +8642,10 @@ public partial class SettingsWindow : Window
 		}
 		string text = tag?.ToString() ?? "System";
 		ConfigManager.CurrentConfig.Theme = text;
+		if (text == "Custom" && CustomColorExpander != null)
+		{
+			CustomColorExpander.IsExpanded = true;
+		}
 		bool flag = text.StartsWith("CustomPreset_");
 		if (RenameCustomColorPresetButton != null)
 		{
