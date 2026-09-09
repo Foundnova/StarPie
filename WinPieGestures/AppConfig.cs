@@ -208,6 +208,9 @@ public class AppConfig
 
 	public string CoreTextColor { get; set; } = "#FFFFFFFF";
 
+	/// <summary>中心文字是否自动跟随配色主题取对比色；关闭后才使用 CoreTextColor 的手动指定色。</summary>
+	public bool CoreTextColorAuto { get; set; } = true;
+
 	public string CoreTitle { get; set; } = "StarPie";
 
 	public string CoreSubtitle { get; set; } = "RMB Drag";

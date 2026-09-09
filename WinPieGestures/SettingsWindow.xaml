@@ -2061,8 +2061,9 @@
                             <Slider Name="CoreFontSizeSlider" Minimum="8" Maximum="24" Value="13.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreFontSizeSlider_ValueChanged" />
                             <TextBlock Name="CoreFontSizeLabel" Grid.Column="1" Text="13.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
+                          <CheckBox Name="CoreTextColorAutoCheckBox" Content="自动适应配色主题 (Auto Contrast)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="CoreTextColorAutoCheckBox_Changed" Unchecked="CoreTextColorAutoCheckBox_Changed" />
                           <TextBlock Name="CoreTextColorTitleText" Text="中心文字颜色 (Core Text Color):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
-                          <Grid Margin="0,0,0,6">
+                          <Grid Name="CoreTextColorRowGrid" Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="28" />
                               <ColumnDefinition Width="*" />
