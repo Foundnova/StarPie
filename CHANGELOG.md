@@ -6,13 +6,20 @@
 
 ## [v1.7.3-beta.4] - 2026-09-09
 
-### 4–12 任意自定义轮盘方位数量支持 (Arbitrary 4–12 Sector Count Support)
-1. **打破固定 4/8/12 扇区硬编码限制**：
-   - 彻底解除以往仅限 4、8、12 扇区的局限，支持 4~12 任意自定义扇区数量（如 5 键、6 键、7 键、9 键、10 键、11 键等），完美适配 3D CAD/三维建模等专业用户对 6 键手势轮盘的刚性习惯与肌肉记忆；
-   - 扇区数量调整时智能保留原有方位动作，未使用的多余槽位安全隐藏，防止配置篡改与意外覆盖；
-   - 交互画布与微缩方位指示器（`WheelPositionIndicator`）全面支持任意 N 扇区实时极角划分与动态渲染。
-2. **扇区角度连续插值公式修复 (Continuous Angle Interpolation Fix)**：
-   - 修复 `RadialWindow.xaml.cs` 中 `InterpolateBySectorAngle` 在 45°~90° 区间的数学插值方向颠倒 bug，确保 4~12 键在所有角度下的内外径、倒角、图标与字体大小平滑单调过渡，彻底消灭 5/6/7 键在 45.1° 临界点时的形变跳变与尺寸突变。
+### 架构与内存深度优化 (Architecture & Memory Optimization)
+1. **透明轮盘 HWND 进程级复用与防闪烁 (Reusable Radial HWND & Anti-Flicker, PR #91 / PR #93)**：
+   - 手势呼出改用单 HWND 常驻复用机制，手势结束仅隐藏内容层（`MainGrid.Visibility = Hidden` 并重置透明度），仅在配置修订时重建视觉树，消除重复创建透明窗体带来的原生句柄累积；
+   - 在隐藏状态下完成配置刷新与位置校准，下一渲染帧直接平滑淡入缩放，彻底消除 DWM 重新显示透明窗口时的上一帧闪烁；
+   - 引入 `_isPresented` 双向生命周期守卫与单次 Render 周期调度，消除两级嵌套 `BeginInvoke` 带来的 32ms 冗余调度延迟，严格恪守 < 16ms 极速呼出红线；彻底防御极速盲操甩动手势下延迟入场动画在手势结束后误唤醒导致的「桌面幽灵轮盘」；
+   - 修复外甩脱离取消时的透明度过渡动画，移除 `From = Opacity` 硬编码，使鼠标移出/缩回轮盘边缘时的半透明呼吸过渡丝滑平顺。
+2. **任务栏状态预取按需调度 (Taskbar Prefetch On-Demand)**：
+   - 在 `GestureController` 中新增方案动作预检判定 `ProfileRequiresTaskbarPrefetch()`。仅当当前轮盘方案的主动作或二级子动作中明确包含 `SwitchWindow`、`Taskbar`、`Tile` 等窗口调度动作时才触发预取；纯快捷键、命令、网址与文件夹等手势方案彻底绕过 UIAutomation COM 扫描与线程积压，保持底层极致轻量与零泄漏。
+3. **自动更新与管理员提权静默启动自愈 (Silent Launch on Update & Elevation)**：
+   - 在 `UpdateManager` 的自解压安装守护脚本与 `App.xaml.cs` 的 `RestartElevated()` 中显式追加 `--silent` 启动参数，使得更新与提权后程序 100% 保持在纯托盘静默后台守护态（15MB~30MB 物理内存驻留），杜绝意外弹出或膨胀。
+4. **旧版配置 Base64 嵌入数据自动洗涤 (Legacy Base64 Data Purge & Sanitization)**：
+   - 在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除历史残留的大对象堆（LOH）异常字符串并自动持久化干净配置，杜绝历史配置导致的内存暗病。
+5. **设置窗口关闭释放深度修剪 (Deep Working Set Trim on Console Release)**：
+   - 用户关闭设置窗口 30 秒后进入延迟完全释放流程，除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
 
 ### 任务栏与系统托盘物理点击原生透传守护 (Taskbar & System Tray Native Passthrough, 根治 Issue #92)
 1. **物理坐标智能识别与原生绝对透传**：
@@ -21,31 +28,13 @@
 2. **设置窗口后台隐藏时显式退出任务栏**：
    - 在 `SettingsWindow` 隐藏后台与完全释放时显式将 `ShowInTaskbar` 设为 `false`，呼出时置为 `true`，彻底消除 Windows Explorer 任务栏代理窗口句柄脱节与固定图标右键失灵。
 
-### 内存按需轻量驻留与透明轮盘单 HWND 复用 (Memory & Reusable Radial HWND)
-1. **任务栏状态预取按需调度 (Taskbar Prefetch On-Demand)**：
-   - 在 `GestureController` 中新增方案动作预检判定 `ProfileRequiresTaskbarPrefetch()`。仅当当前轮盘方案的主动作或二级子动作中明确包含 `SwitchWindow`、`Taskbar`、`Tile` 等窗口调度动作时才触发预取；纯快捷键、命令、网址与文件夹等手势方案彻底绕过 UIAutomation COM 扫描与线程积压，保持底层极致轻量与零泄漏。
-2. **自动更新与管理员提权静默启动自愈 (Silent Launch on Update & Elevation)**：
-   - 在 `UpdateManager` 的自解压安装守护脚本与 `App.xaml.cs` 的 `RestartElevated()` 中显式追加 `--silent` 启动参数，使得更新与提权后程序 100% 保持在纯托盘静默后台守护态（15MB~30MB 物理内存驻留），杜绝意外弹出或膨胀。
-3. **旧版配置 Base64 嵌入数据自动洗涤 (Legacy Base64 Data Purge & Sanitization)**：
-   - 在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除历史残留的大对象堆（LOH）异常字符串并自动持久化干净配置，杜绝历史配置导致的内存暗病。
-4. **设置窗口关闭释放深度修剪 (Deep Working Set Trim on Console Release)**：
-   - 用户关闭设置窗口 30 秒后进入延迟完全释放流程，除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
-5. **透明轮盘 HWND 单例复用与按需重建 (Reusable Radial HWND)**：
-   - `GestureController` 全程复用单个 `RadialWindow/HWND`，手势结束仅执行 generation-safe `Dismiss/Hide`，仅在进程退出或窗口异常失效时真正 `Close`；引入 `ConfigManager.ConfigurationRevision`，配置、方案或活动层变化时才重建扇区视觉树，普通呼出仅重置高亮、更新物理中心与 DPI；
-   - **竞态守护**：为每次呈现绑定 `PresentationVersion`，旧手势排队中的关闭与音量预览回调不得隐藏或污染新手势；应用退出时由 `GestureController.Dispose()` 统一注销 Hook 事件并销毁复用窗口；
-   - **压力验证**：同一透明 HWND 连续 1200 次呼出/隐藏后句柄保持稳定无泄漏；连续 100 次配置修订重建时视觉子项数量恒定，句柄无累积。
-
-### 社区协同与体验提升 (Community PRs Integrated)
+### 界面与体验调优 (UI & Customization)
 1. **控制台支持 80%~200% 全局界面缩放 (Settings UI Scaling, PR #87)**：
    - 设置界面新增全局缩放滑块（80% ~ 200%），支持 4K/高分屏或小尺寸屏幕自由缩放控制台 UI。
 2. **中心文字自适应配色修复 (Center Text Auto Contrast, PR #88)**：
    - 修复浅色主题下中心文字在浅色背景上白字白底对比度不足缺陷，动态检测背景亮度自适应深浅文本色。
 3. **补回「自定义配色」主题入口 (Custom Color Theme Entry, PR #89)**：
    - 补齐一二级主题下拉选单中的自定义配色方案入口，使高级自定义色彩能够无损实时生效与切换。
-4. **复用轮盘呼出防闪烁与呈现时序优化 (Anti-Flicker & Presentation Pipeline, PR #93 & 架构优化)**：
-   - 保持透明 HWND 常驻，手势结束仅隐藏 `MainGrid` 内容层（`Visibility = Hidden` 并重置 `Opacity = 0.0`），彻底消除 DWM 重新显示透明窗口时闪出上一轮合成帧的瑕疵；
-   - 引入 `_isPresented` 双向生命周期守卫与单次 Render 周期调度，消除两级嵌套 `BeginInvoke` 带来的 32ms 冗余调度延迟，严格恪守 < 16ms 极速呼出红线；彻底防御极速盲操甩动手势下延迟入场动画在手势结束后误唤醒导致的「桌面幽灵轮盘」；
-   - 修复外甩脱离取消时的透明度过渡动画，移除 `From = Opacity` 硬编码，使鼠标移出/缩回轮盘边缘时的半透明呼吸过渡丝滑平顺。
 
 ---
 

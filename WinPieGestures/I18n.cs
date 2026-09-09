@@ -789,10 +789,10 @@ public static class I18n
 		};
 		dictionary["SectorCountOptionDesc"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "切换手势轮盘的切分数量。4 键最快最不易误触，8 键为标准全能方位，12 键适合功能密集场景；也可勾选「自定义」在 4–12 键范围内选择任意方位数量。",
-			[LanguageCode.ZhTw] = "切換手勢輪盤的切分數量。4 鍵最快最不易誤觸，8 鍵為標準全能方位，12 鍵適合功能密集場景；也可勾選「自訂」在 4–12 鍵範圍內選擇任意方位數量。",
-			[LanguageCode.En] = "Switch sector counts: 4-way for fast blind flicks, 8-way for balanced productivity, 12-way for high-density actions — or pick any custom count from 4 to 12.",
-			[LanguageCode.Ja] = "セクター数を切り替えます。4キー（誤操作防止）、8キー（標準全方位）、12キー（高密度機能）。4〜12キーの範囲で「カスタム」の任意の数も選択できます。"
+			[LanguageCode.ZhCn] = "切换手势轮盘的切分数量。4 键最快最不易误触，8 键为标准全能方位，12 键适合功能密集场景。",
+			[LanguageCode.ZhTw] = "切換手勢輪盤的切分數量。4 鍵最快最不易誤觸，8 鍵為標準全能方位，12 鍵適合功能密集場景。",
+			[LanguageCode.En] = "Switch sector counts: 4-way for fast blind flicks, 8-way for balanced productivity, 12-way for high-density actions.",
+			[LanguageCode.Ja] = "セクター数を切り替えます。4キー（誤操作防止）、8キー（標準全方位）、12キー（高密度機能）。"
 		};
 		dictionary["SectorActionListTitle"] = new Dictionary<LanguageCode, string>
 		{
@@ -2102,20 +2102,6 @@ public static class I18n
 			[LanguageCode.ZhTw] = "12 鍵 (鐘錶錶盤 / Clock Dial 12-Way)",
 			[LanguageCode.En] = "12 Sectors (Clock Dial 12-Way)",
 			[LanguageCode.Ja] = "12キー (時計盤12方位)"
-		};
-		dictionary["SectorCountCustom"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "自定义:",
-			[LanguageCode.ZhTw] = "自訂:",
-			[LanguageCode.En] = "Custom:",
-			[LanguageCode.Ja] = "カスタム:"
-		};
-		dictionary["SectorCustomDirLabel"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "方位 {0}（{1}°）",
-			[LanguageCode.ZhTw] = "方位 {0}（{1}°）",
-			[LanguageCode.En] = "Direction {0} ({1}°)",
-			[LanguageCode.Ja] = "方向 {0}（{1}°）"
 		};
 		dictionary["ActionTypeHotkey"] = new Dictionary<LanguageCode, string>
 		{

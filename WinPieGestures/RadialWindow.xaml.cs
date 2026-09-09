@@ -1566,27 +1566,6 @@ public partial class RadialWindow : Window
 		}
 	}
 
-	/// <summary>
-	/// 按扇区角（360°/方位数）在 4 键 (90°) / 8 键 (45°) / 12 键 (30°) 三个锚点之间做分段线性插值，
-	/// 推导自定义档位的装饰尺寸；4/8/12 档精确命中锚点原值，预设档渲染逐像素不变。
-	/// </summary>
-	internal static double InterpolateBySectorAngle(double sectorAngle, double at4, double at8, double at12)
-	{
-		if (sectorAngle <= 30.0)
-		{
-			return at12;
-		}
-		if (sectorAngle >= 90.0)
-		{
-			return at4;
-		}
-		if (sectorAngle <= 45.0)
-		{
-			return at12 + (at8 - at12) * ((sectorAngle - 30.0) / 15.0);
-		}
-		return at8 + (at4 - at8) * ((sectorAngle - 45.0) / 45.0);
-	}
-
 	private void RenderSectors()
 	{
 		int sectorCount = _profile.SectorCount;
@@ -1641,9 +1620,18 @@ public partial class RadialWindow : Window
 			_sectorPaths.Add(path);
 			_sectorTransforms.Add(translateTransform);
 			_sectorAngles.Add(num5);
-			double sectorAngle = 360.0 / sectorCount;
-			double width2 = InterpolateBySectorAngle(sectorAngle, 124.0, 100.0, 66.0);
-			double height = InterpolateBySectorAngle(sectorAngle, 76.0, 68.0, 52.0);
+			double width2 = sectorCount switch
+			{
+				4 => 124.0, 
+				12 => 66.0, 
+				_ => 100.0, 
+			};
+			double height = sectorCount switch
+			{
+				4 => 76.0, 
+				12 => 52.0, 
+				_ => 68.0, 
+			};
 			TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
 			Grid grid = new Grid
 			{
@@ -1698,7 +1686,12 @@ public partial class RadialWindow : Window
 				double baseIconSize = (currentAction != null && currentAction.CustomIconSize.HasValue && currentAction.CustomIconSize.Value > 0.0)
 					? currentAction.CustomIconSize.Value
 					: ((ConfigManager.CurrentConfig.SectorIconSize > 0.0) ? ConfigManager.CurrentConfig.SectorIconSize : 20.0);
-				double num10 = InterpolateBySectorAngle(sectorAngle, 1.2, 1.0, 0.82);
+				double num10 = sectorCount switch
+				{
+					4 => 1.2, 
+					12 => 0.82, 
+					_ => 1.0, 
+				};
 				double num11 = ((sectorLayout == "IconOnly") ? (baseIconSize * 1.35) : baseIconSize) * num10;
 				if (!string.IsNullOrEmpty(text5))
 				{
@@ -1826,20 +1819,20 @@ public partial class RadialWindow : Window
 					? currentAction.CustomFontSize.Value
 					: ((ConfigManager.CurrentConfig.SectorFontSize > 0.0) ? ConfigManager.CurrentConfig.SectorFontSize : 11.0);
 				double num13 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.0) : baseFontSize);
-				// 字号上下限按扇区角分档：≥72° 用 4 键宽松规则，≤36° 用 12 键紧凑规则，其余走 8 键规则
-				if (sectorAngle >= 72.0)
+				switch (sectorCount)
 				{
-					num13 = Math.Max(num13, 12.0);
-				}
-				else if (sectorAngle <= 36.0)
-				{
+				case 12:
 					num13 = Math.Min(num13, 10.0);
+					break;
+				case 4:
+					num13 = Math.Max(num13, 12.0);
+					break;
 				}
 
 				// 文字长度与语言弹性自适应 (Auto Font-Fit)
 				int charLen = text2.Length;
 				bool isPureAscii = text2.All(c => c < 128);
-				if (sectorAngle <= 36.0)
+				if (sectorCount == 12)
 				{
 					if (charLen > 8 || (isPureAscii && charLen > 7))
 					{
@@ -1850,7 +1843,7 @@ public partial class RadialWindow : Window
 						num13 = Math.Max(8.2, num13 * 0.90);
 					}
 				}
-				else if (sectorAngle < 72.0)
+				else if (sectorCount == 8)
 				{
 					if (charLen > 12 || (isPureAscii && charLen > 10))
 					{
@@ -1861,7 +1854,7 @@ public partial class RadialWindow : Window
 						num13 = Math.Max(9.2, num13 * 0.92);
 					}
 				}
-				else
+				else // 4 键
 				{
 					if (charLen > 14)
 					{
@@ -1869,7 +1862,12 @@ public partial class RadialWindow : Window
 					}
 				}
 
-				double maxWidth = InterpolateBySectorAngle(sectorAngle, 128.0, 102.0, 68.0);
+				double maxWidth = sectorCount switch
+				{
+					4 => 128.0, 
+					12 => 68.0, 
+					_ => 102.0, 
+				};
 				string sectorFont = (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.CustomFontFamily))
 					? currentAction.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");

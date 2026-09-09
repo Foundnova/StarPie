@@ -506,74 +506,7 @@ def test_v133_sector_count_4_8_12_adaptation_and_streamlined_shapes(app):
     global_prof = next((p for p in profiles if p.get("ProcessName") == "Global"), profiles[0])
     assert global_prof.get("SectorCount") == 12, f"Global profile SectorCount should be 12, got {global_prof.get('SectorCount')}"
 
-    # 5. v1.7.2: custom sector count via the 4th radio + combo (both pages)
-    custom_radio = win.child_window(auto_id="MappingsSectorCountCustomRadio", control_type="RadioButton")
-    custom_combo = win.child_window(auto_id="MappingsSectorCountCustomCombo", control_type="ComboBox")
-    assert custom_radio.exists(timeout=3), "MappingsSectorCountCustomRadio should exist"
-    assert custom_combo.exists(timeout=3), "MappingsSectorCountCustomCombo should exist"
 
-    # gesture-page (list view) custom controls: v1.7.2-beta.2 defaults to Simple mode which
-    # hides the view-mode switcher and the legacy list view — switch to Pro mode first
-    pro_mode_radio = win.child_window(auto_id="ConfigModeProRadio", control_type="RadioButton")
-    if pro_mode_radio.exists(timeout=2) and not pro_mode_radio.is_selected():
-        pro_mode_radio.select()
-        time.sleep(0.5)
-    list_mode_radio = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode_radio.exists(timeout=2):
-        list_mode_radio.select()
-        time.sleep(0.4)
-    gesture_custom_radio = win.child_window(auto_id="SectorCountCustomRadio", control_type="RadioButton")
-    gesture_custom_combo = win.child_window(auto_id="SectorCountCustomCombo", control_type="ComboBox")
-    assert gesture_custom_radio.exists(timeout=3), "SectorCountCustomRadio should exist (Pro+list view)"
-    assert gesture_custom_combo.exists(timeout=3), "SectorCountCustomCombo should exist (Pro+list view)"
-
-    # back to canvas view for the custom count flow (canvas radios drive the profile)
-    canvas_mode_radio = win.child_window(auto_id="MappingsViewModeCanvasRadio", control_type="RadioButton")
-    if canvas_mode_radio.exists(timeout=2):
-        canvas_mode_radio.select()
-        time.sleep(0.4)
-
-    custom_radio.select()
-    time.sleep(0.4)
-
-    # select 6-key option in the mappings custom combo
-    custom_combo.select(1)  # options: 5, 6, 7, 9, 10, 11
-    time.sleep(0.5)
-
-    save_btn.invoke()
-    try:
-        dialog = Desktop(backend="uia").window(class_name="#32770")
-        if dialog.exists(timeout=3):
-            ok_btn = dialog.child_window(control_type="Button")
-            ok_btn.invoke()
-    except Exception:
-        pass
-    time.sleep(0.8)
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
-    profiles = config.get("Profiles", [])
-    global_prof = next((p for p in profiles if p.get("ProcessName") == "Global"), profiles[0])
-    assert global_prof.get("SectorCount") == 6, f"Global profile SectorCount should be 6 after custom selection, got {global_prof.get('SectorCount')}"
-
-    # 6. round-trip: back to 8-key preset, custom combo disabled again
-    radio8.select()
-    time.sleep(0.4)
-    save_btn.invoke()
-    try:
-        dialog = Desktop(backend="uia").window(class_name="#32770")
-        if dialog.exists(timeout=3):
-            ok_btn = dialog.child_window(control_type="Button")
-            ok_btn.invoke()
-    except Exception:
-        pass
-    time.sleep(0.8)
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
-    profiles = config.get("Profiles", [])
-    global_prof = next((p for p in profiles if p.get("ProcessName") == "Global"), profiles[0])
-    assert global_prof.get("SectorCount") == 8, f"Global profile SectorCount should be back to 8, got {global_prof.get('SectorCount')}"
 
 
 def test_v134_memory_autosave_and_theme_persistence(app):
