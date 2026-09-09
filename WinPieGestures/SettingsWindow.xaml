@@ -1379,6 +1379,7 @@
                         <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
                         <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
                         <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
+                        <ComboBoxItem Name="ThemeCustomItem" Content="🎨 自定义配色 (Custom Colors)" Tag="Custom" />
                       </ComboBox>
                       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
                         <Button Name="NewCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewCustomColorPresetButton_Click" />
@@ -1548,6 +1549,7 @@
                             <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
                             <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
                             <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
+                            <ComboBoxItem Name="SubThemeCustomItem" Content="🎨 自定义配色 (Custom Colors)" Tag="Custom" />
                           </ComboBox>
                           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
                             <Button Name="NewSubCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewSubCustomColorPresetButton_Click" />
