@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -20,6 +21,7 @@ namespace WinPieGestures;
 public static class OcrManager
 {
 	private static readonly HttpClient s_httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+	private static string? s_lastEngineLanguage;
 
 	/// <summary>打开 OCR 多引擎与接口设置弹窗</summary>
 	public static void ShowSettingsDialog()
@@ -45,10 +47,34 @@ public static class OcrManager
 	{
 		Application.Current?.Dispatcher.Invoke(() =>
 		{
+			Bitmap? fullBitmap = null;
+			int virtualLeft = 0, virtualTop = 0;
 			try
 			{
-				ScreenSnipWindow snip = new ScreenSnipWindow(async bmp =>
+				// 叠层出现前预抓全虚拟屏幕（物理像素，含多显示器），框选后从该位图裁剪，
+				// 彻底避开高 DPI 换算误差与窗口关闭/合成时序污染
+				Rect virtualBounds = ScreenHelper.GetPhysicalVirtualScreenBounds();
+				virtualLeft = (int)Math.Round(virtualBounds.X);
+				virtualTop = (int)Math.Round(virtualBounds.Y);
+				int vw = (int)Math.Round(virtualBounds.Width);
+				int vh = (int)Math.Round(virtualBounds.Height);
+				if (vw > 0 && vh > 0)
 				{
+					fullBitmap = new Bitmap(vw, vh);
+					using (Graphics g = Graphics.FromImage(fullBitmap))
+					{
+						g.CopyFromScreen(virtualLeft, virtualTop, 0, 0, new System.Drawing.Size(vw, vh), CopyPixelOperation.SourceCopy);
+					}
+					AppLogger.LogInfo($"OCR pre-captured virtual screen: origin=({virtualLeft},{virtualTop}) size={vw}x{vh}px");
+				}
+				else
+				{
+					AppLogger.LogWarn($"OCR pre-capture skipped: invalid virtual screen bounds {virtualBounds}");
+				}
+
+				ScreenSnipWindow snip = new ScreenSnipWindow(fullBitmap, virtualLeft, virtualTop, async bmp =>
+				{
+					fullBitmap?.Dispose();
 					if (bmp != null)
 					{
 						await ProcessSnippetAsync(bmp);
@@ -58,6 +84,7 @@ public static class OcrManager
 			}
 			catch (Exception ex)
 			{
+				fullBitmap?.Dispose();
 				AppLogger.LogError("Failed to launch ScreenSnipWindow", ex);
 				MessageBox.Show("启动截屏框选失败: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Warning);
 			}
@@ -67,9 +94,12 @@ public static class OcrManager
 	public static async Task ProcessSnippetAsync(Bitmap bmp)
 	{
 		OcrSettings config = ConfigManager.CurrentConfig?.OcrConfig ?? new OcrSettings();
+		int imageWidth = bmp.Width;
+		int imageHeight = bmp.Height;
 		Stopwatch sw = Stopwatch.StartNew();
 		string recognizedText = "";
 		string engineName = "本地离线引擎";
+		s_lastEngineLanguage = null;
 
 		try
 		{
@@ -93,8 +123,10 @@ public static class OcrManager
 
 			case "Local":
 			default:
-				engineName = "Windows 本地离线引擎";
 				recognizedText = await RecognizeWithLocalWinRtAsync(bmp, config);
+				engineName = string.IsNullOrEmpty(s_lastEngineLanguage)
+					? "Windows 本地离线引擎"
+					: $"Windows 本地离线引擎 ({s_lastEngineLanguage})";
 				break;
 			}
 		}
@@ -110,9 +142,14 @@ public static class OcrManager
 		}
 
 		string latency = $"{sw.ElapsedMilliseconds}ms";
+		AppLogger.LogInfo($"OCR finished: engine='{engineName}', image={imageWidth}x{imageHeight}px, chars={recognizedText.Length}, latency={latency}");
+
+		// 以 "[" 开头的是诊断/提示文本（如「[未识别到有效文字内容]」）：
+		// 仅在结果窗口展示，不参与格式后处理、不覆盖剪贴板、不触发浏览器搜索
+		bool isDiagnostic = recognizedText.StartsWith("[", StringComparison.Ordinal);
 
 		// 格式后处理：去除中文字间多余空格、合并断行
-		if (config.MergeLines && !recognizedText.StartsWith("["))
+		if (!isDiagnostic && config.MergeLines)
 		{
 			recognizedText = PostProcessText(recognizedText, config.RemoveSpacesBetweenCjk);
 		}
@@ -120,7 +157,7 @@ public static class OcrManager
 		// 调度回 UI 线程分发结果
 		Application.Current?.Dispatcher.Invoke(() =>
 		{
-			if (!string.IsNullOrWhiteSpace(recognizedText) && config.AutoCopyToClipboard)
+			if (!isDiagnostic && !string.IsNullOrWhiteSpace(recognizedText) && config.AutoCopyToClipboard)
 			{
 				try
 				{
@@ -137,7 +174,7 @@ public static class OcrManager
 				resWin.Show();
 			}
 
-			if (config.SearchInBrowser && !string.IsNullOrWhiteSpace(recognizedText))
+			if (!isDiagnostic && config.SearchInBrowser && !string.IsNullOrWhiteSpace(recognizedText))
 			{
 				try
 				{
@@ -194,6 +231,18 @@ public static class OcrManager
 		if (engine == null)
 		{
 			return "[提示]: 无法初始化本地 OCR 引擎。建议在 StarPie 动作设置中切换为 AI 视觉大模型 / 云端接口。";
+		}
+
+		// 记录实际生效的识别语言：配置语言缺失时会静默回退，结果界面必须可见，日志必须可查
+		s_lastEngineLanguage = engine.RecognizerLanguage.LanguageTag;
+		if (!string.Equals(s_lastEngineLanguage, langTag, StringComparison.OrdinalIgnoreCase))
+		{
+			string availableTags = string.Join(", ", OcrEngine.AvailableRecognizerLanguages.Select(l => l.LanguageTag));
+			AppLogger.LogWarn($"OCR local engine fell back: configured '{langTag}' unavailable (installed: [{availableTags}]), using '{s_lastEngineLanguage}'");
+		}
+		else
+		{
+			AppLogger.LogInfo($"OCR local engine language: {s_lastEngineLanguage}");
 		}
 
 		SoftwareBitmap softwareBitmap = await ConvertToSoftwareBitmapAsync(bmp);

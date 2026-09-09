@@ -259,6 +259,51 @@ public static class ScreenHelper
 		return new Rect(clampedX, clampedY, desiredPhysicalRect.Width, desiredPhysicalRect.Height);
 	}
 
+	private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+	[DllImport("user32.dll")]
+	private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+	/// <summary>
+	/// 获取全虚拟屏幕的物理像素边界（所有显示器 rcMonitor 的并集，原点可为负）。
+	/// 与 SystemParameters.VirtualScreen*（DIP 值）不同，此结果可直接用于 CopyFromScreen 等物理坐标 API。
+	/// </summary>
+	public static Rect GetPhysicalVirtualScreenBounds()
+	{
+		Rect union = Rect.Empty;
+
+		bool EnumCallback(IntPtr hMonitor, IntPtr hdc, ref RECT rc, IntPtr data)
+		{
+			MONITORINFO mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+			if (GetMonitorInfo(hMonitor, ref mi))
+			{
+				Rect bounds = new Rect(mi.rcMonitor.Left, mi.rcMonitor.Top, mi.rcMonitor.Right - mi.rcMonitor.Left, mi.rcMonitor.Bottom - mi.rcMonitor.Top);
+				union = union.IsEmpty ? bounds : Rect.Union(union, bounds);
+			}
+			return true;
+		}
+
+		try
+		{
+			EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, EnumCallback, IntPtr.Zero);
+		}
+		catch
+		{
+		}
+
+		if (!union.IsEmpty && union.Width > 0 && union.Height > 0)
+		{
+			return union;
+		}
+
+		// 兜底：WPF 系统参数（DIP 值，仅在 100% 缩放或单显示器同 DPI 时精确）
+		return new Rect(
+			SystemParameters.VirtualScreenLeft,
+			SystemParameters.VirtualScreenTop,
+			SystemParameters.VirtualScreenWidth,
+			SystemParameters.VirtualScreenHeight);
+	}
+
 	private static ScreenContext BuildScreenContext(IntPtr hMonitor)
 	{
 		MONITORINFO mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
