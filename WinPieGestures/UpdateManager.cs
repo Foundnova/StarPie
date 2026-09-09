@@ -196,7 +196,7 @@ public class UpdateManager
 		{
 			Timeout = TimeSpan.FromSeconds(15)
 		};
-		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"));
+		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3"));
 	}
 
 	public bool IsCurrentInstallationStandalone()
@@ -246,18 +246,15 @@ public class UpdateManager
 		};
 	}
 
-	public async Task<ReleaseInfo?> CheckForUpdateAsync(string channel = "Stable", string proxySource = "ghfast", string customProxy = "", CancellationToken ct = default)
+	public async Task<List<ReleaseInfo>> FetchAllReleasesAsync(string proxySource = "ghfast", string customProxy = "", CancellationToken ct = default)
 	{
+		List<ReleaseInfo> allReleases = new List<ReleaseInfo>();
 		try
 		{
-			bool isBetaChannel = string.Equals(channel, "Beta", StringComparison.OrdinalIgnoreCase);
-			string apiUrl = isBetaChannel
-				? $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases"
-				: $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
-
+			string apiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=30";
 			string? json = null;
 
-			// Tier 1: 尝试直接访问 GitHub REST API (设置 5 秒快速超时，避免长时间挂起界面)
+			// Tier 1: GitHub REST API (5 秒快速超时)
 			try
 			{
 				using var apiCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -276,7 +273,7 @@ public class UpdateManager
 			}
 			catch (Exception ex)
 			{
-				AppLogger.LogWarn($"Direct GitHub REST API check failed ({ex.Message}), falling back to GitHub Atom feed...");
+				AppLogger.LogWarn($"Direct GitHub REST API fetch failed ({ex.Message}), falling back to GitHub Atom feed...");
 			}
 
 			if (!string.IsNullOrEmpty(json))
@@ -285,26 +282,24 @@ public class UpdateManager
 				{
 					using JsonDocument doc = JsonDocument.Parse(json);
 					JsonElement root = doc.RootElement;
-
-					if (isBetaChannel && root.ValueKind == JsonValueKind.Array)
+					if (root.ValueKind == JsonValueKind.Array)
 					{
-						ReleaseInfo? bestRelease = null;
 						foreach (JsonElement item in root.EnumerateArray())
 						{
 							ReleaseInfo? rel = ParseReleaseElement(item);
-							if (rel == null) continue;
-
-							if (IsBetterRelease(rel, bestRelease))
+							if (rel != null)
 							{
-								bestRelease = rel;
+								allReleases.Add(rel);
 							}
 						}
-						if (bestRelease != null) return bestRelease;
 					}
 					else if (root.ValueKind == JsonValueKind.Object)
 					{
 						ReleaseInfo? rel = ParseReleaseElement(root);
-						if (rel != null && (isBetaChannel || !rel.IsPrerelease)) return rel;
+						if (rel != null)
+						{
+							allReleases.Add(rel);
+						}
 					}
 				}
 				catch (Exception ex)
@@ -314,85 +309,124 @@ public class UpdateManager
 			}
 
 			// Tier 2: 降级至 GitHub 官方 Releases Atom XML Feed
-			// (在 github.com 网页主域名下，免 API 鉴权、无 60 次/小时速率限制，国内用户只要能正常访问 GitHub 网页即可 100% 极速秒通！)
-			try
+			if (allReleases.Count == 0)
 			{
-				using var atomCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-				atomCts.CancelAfter(TimeSpan.FromSeconds(6));
-				string atomUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases.atom";
-				using var atomReq = new HttpRequestMessage(HttpMethod.Get, atomUrl);
-				atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/atom+xml"));
-				atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-				using HttpResponseMessage atomResponse = await _httpClient.SendAsync(atomReq, atomCts.Token).ConfigureAwait(false);
-				if (atomResponse.IsSuccessStatusCode)
+				try
 				{
-					string atomXml = await atomResponse.Content.ReadAsStringAsync(atomCts.Token).ConfigureAwait(false);
-					ReleaseInfo? atomRelease = ParseAtomFeed(atomXml, isBetaChannel);
-					if (atomRelease != null)
+					using var atomCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+					atomCts.CancelAfter(TimeSpan.FromSeconds(6));
+					string atomUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases.atom";
+					using var atomReq = new HttpRequestMessage(HttpMethod.Get, atomUrl);
+					atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/atom+xml"));
+					atomReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+					using HttpResponseMessage atomResponse = await _httpClient.SendAsync(atomReq, atomCts.Token).ConfigureAwait(false);
+					if (atomResponse.IsSuccessStatusCode)
 					{
-						AppLogger.LogInfo($"Successfully checked updates via GitHub Atom Feed: {atomRelease.TagName}");
-						return atomRelease;
+						string atomXml = await atomResponse.Content.ReadAsStringAsync(atomCts.Token).ConfigureAwait(false);
+						allReleases = ParseAllAtomFeed(atomXml);
+						AppLogger.LogInfo($"Successfully fetched {allReleases.Count} releases via GitHub Atom Feed.");
 					}
 				}
-				else
+				catch (Exception ex)
 				{
-					AppLogger.LogWarn($"GitHub Atom feed returned status: {(int)atomResponse.StatusCode}");
+					AppLogger.LogWarn($"GitHub Atom feed fetch failed ({ex.Message}), falling back to latest release redirect probe...");
 				}
-			}
-			catch (Exception ex)
-			{
-				AppLogger.LogWarn($"GitHub Atom feed check failed ({ex.Message}), falling back to latest release redirect probe...");
 			}
 
 			// Tier 3: 降级至 GitHub Releases /latest 网页 302 重定向探测
-			try
+			if (allReleases.Count == 0)
 			{
-				using var redirectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-				redirectCts.CancelAfter(TimeSpan.FromSeconds(5));
-				string latestUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/latest";
-
-				using var handler = new HttpClientHandler { AllowAutoRedirect = false };
-				using var probeClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
-				probeClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"));
-
-				using var req = new HttpRequestMessage(HttpMethod.Head, latestUrl);
-				using var resp = await probeClient.SendAsync(req, redirectCts.Token).ConfigureAwait(false);
-				if ((int)resp.StatusCode is 301 or 302 && resp.Headers.Location != null)
+				try
 				{
-					string loc = resp.Headers.Location.ToString();
-					int tagIdx = loc.LastIndexOf("/tag/", StringComparison.OrdinalIgnoreCase);
-					if (tagIdx >= 0)
+					using var redirectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+					redirectCts.CancelAfter(TimeSpan.FromSeconds(5));
+					string latestUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/latest";
+
+					using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+					using var probeClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+					probeClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.6.8"));
+
+					using var req = new HttpRequestMessage(HttpMethod.Head, latestUrl);
+					using var resp = await probeClient.SendAsync(req, redirectCts.Token).ConfigureAwait(false);
+					if ((int)resp.StatusCode is 301 or 302 && resp.Headers.Location != null)
 					{
-						string tag = loc.Substring(tagIdx + 5).Trim();
-						AppLogger.LogInfo($"Successfully checked update tag via Latest Web Redirect: {tag}");
-						return CreateSynthesizedReleaseInfo(tag, "GitHub Releases 网页探测");
+						string loc = resp.Headers.Location.ToString();
+						int tagIdx = loc.LastIndexOf("/tag/", StringComparison.OrdinalIgnoreCase);
+						if (tagIdx >= 0)
+						{
+							string tag = loc.Substring(tagIdx + 5).Trim();
+							AppLogger.LogInfo($"Successfully checked update tag via Latest Web Redirect: {tag}");
+							allReleases.Add(CreateSynthesizedReleaseInfo(tag, "GitHub Releases 网页探测"));
+						}
 					}
 				}
-			}
-			catch (Exception ex)
-			{
-				AppLogger.LogWarn($"Latest release redirect probe failed: {ex.Message}");
+				catch (Exception ex)
+				{
+					AppLogger.LogWarn($"Latest release redirect probe failed: {ex.Message}");
+				}
 			}
 
-			return null;
+			// 按版本倒序排列（最高/最新排在最前）
+			allReleases.Sort((a, b) =>
+			{
+				if (a.ComparableVersion != null && b.ComparableVersion != null)
+				{
+					return b.ComparableVersion.CompareTo(a.ComparableVersion);
+				}
+				return b.PublishedAt.CompareTo(a.PublishedAt);
+			});
 		}
 		catch (Exception ex)
 		{
-			AppLogger.LogError("CheckForUpdateAsync exception", ex);
-			return null;
+			AppLogger.LogError("FetchAllReleasesAsync error", ex);
+		}
+
+		return allReleases;
+	}
+
+	public ReleaseInfo? GetLatestUpdateRelease(List<ReleaseInfo> allReleases, string channel = "Stable")
+	{
+		bool isBetaChannel = string.Equals(channel, "Beta", StringComparison.OrdinalIgnoreCase);
+		return allReleases.FirstOrDefault(r => isBetaChannel || !r.IsPrerelease);
+	}
+
+	public List<ReleaseInfo> GetRollbackCandidates(List<ReleaseInfo> allReleases, string channel = "Stable")
+	{
+		ReleaseVersion currentVer = GetCurrentReleaseVersion();
+		bool isBetaChannel = string.Equals(channel, "Beta", StringComparison.OrdinalIgnoreCase);
+
+		var previous = allReleases
+			.Where(r => r.ComparableVersion != null && r.ComparableVersion.CompareTo(currentVer) < 0)
+			.ToList();
+
+		if (isBetaChannel)
+		{
+			// 测试版 / Beta 通道：允许回退到最近 5 个历史版本（含测试版与正式版）
+			return previous.Take(5).ToList();
+		}
+		else
+		{
+			// 正式版 / Stable 通道：允许回退到最近 2 个历史正式稳定版（严格过滤 pre-release）
+			return previous.Where(r => !r.IsPrerelease).Take(2).ToList();
 		}
 	}
 
-	public ReleaseInfo? ParseAtomFeed(string xml, bool isBetaChannel)
+	public async Task<ReleaseInfo?> CheckForUpdateAsync(string channel = "Stable", string proxySource = "ghfast", string customProxy = "", CancellationToken ct = default)
 	{
+		var all = await FetchAllReleasesAsync(proxySource, customProxy, ct).ConfigureAwait(false);
+		return GetLatestUpdateRelease(all, channel);
+	}
+
+	public List<ReleaseInfo> ParseAllAtomFeed(string xml)
+	{
+		List<ReleaseInfo> result = new List<ReleaseInfo>();
 		try
 		{
 			XDocument doc = XDocument.Parse(xml);
 			XNamespace ns = "http://www.w3.org/2005/Atom";
 			var entries = doc.Root?.Elements(ns + "entry");
-			if (entries == null) return null;
+			if (entries == null) return result;
 
-			ReleaseInfo? bestRelease = null;
 			ReleaseVersion currentVer = GetCurrentReleaseVersion();
 
 			foreach (var entry in entries)
@@ -430,18 +464,12 @@ public class UpdateManager
 
 				bool isPrerelease = releaseVersion.IsPrerelease ||
 					tag.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
-									tag.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
-									tag.Contains("rc", StringComparison.OrdinalIgnoreCase) ||
-									title.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
-									title.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
-									title.Contains("内测", StringComparison.OrdinalIgnoreCase) ||
-									title.Contains("尝鲜", StringComparison.OrdinalIgnoreCase);
-
-				if (!isBetaChannel && isPrerelease)
-				{
-					// 正式版通道跳过预发布版
-					continue;
-				}
+					tag.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
+					tag.Contains("rc", StringComparison.OrdinalIgnoreCase) ||
+					title.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
+					title.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
+					title.Contains("内测", StringComparison.OrdinalIgnoreCase) ||
+					title.Contains("尝鲜", StringComparison.OrdinalIgnoreCase);
 
 				// 提取更新日志 HTML 并转换为纯文本
 				string contentHtml = entry.Element(ns + "content")?.Value ?? "";
@@ -465,19 +493,20 @@ public class UpdateManager
 					LightweightAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Lightweight-win-x64.zip"
 				};
 
-				if (IsBetterRelease(rel, bestRelease))
-				{
-					bestRelease = rel;
-				}
+				result.Add(rel);
 			}
-
-			return bestRelease;
 		}
 		catch (Exception ex)
 		{
-			AppLogger.LogError("ParseAtomFeed failed", ex);
-			return null;
+			AppLogger.LogError("ParseAllAtomFeed failed", ex);
 		}
+		return result;
+	}
+
+	public ReleaseInfo? ParseAtomFeed(string xml, bool isBetaChannel)
+	{
+		var list = ParseAllAtomFeed(xml);
+		return GetLatestUpdateRelease(list, isBetaChannel ? "Beta" : "Stable");
 	}
 
 	public static string ConvertHtmlToMarkdown(string html)
@@ -568,6 +597,15 @@ public class UpdateManager
 						info.LightweightAssetSize = size;
 					}
 				}
+			}
+
+			if (string.IsNullOrEmpty(info.StandaloneAssetUrl) && !string.IsNullOrEmpty(tagName))
+			{
+				info.StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tagName}/StarPie-{tagName}-Standalone-win-x64.zip";
+			}
+			if (string.IsNullOrEmpty(info.LightweightAssetUrl) && !string.IsNullOrEmpty(tagName))
+			{
+				info.LightweightAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tagName}/StarPie-{tagName}-Lightweight-win-x64.zip";
 			}
 
 			return info;

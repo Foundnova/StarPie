@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace WinPieGestures;
 
@@ -282,7 +284,10 @@ public class AppConfig
 
 	public bool AutoCheckUpdate { get; set; } = true;
 
-	public string UpdateChannel { get; set; } = "Stable";
+	public string UpdateChannel { get; set; } = 
+		System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Contains("beta", System.StringComparison.OrdinalIgnoreCase) == true
+		? "Beta"
+		: "Stable";
 
 	public string UpdateProxySource { get; set; } = "ghproxy";
 

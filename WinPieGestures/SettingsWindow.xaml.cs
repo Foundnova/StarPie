@@ -175,6 +175,8 @@ public partial class SettingsWindow : Window
 	private int _lastHoveredSubIndex = -2;
 
 	private ReleaseInfo? _latestReleaseInfo = null;
+	private List<ReleaseInfo>? _allFetchedReleases = null;
+	private ReleaseInfo? _selectedRollbackRelease = null;
 	private CancellationTokenSource? _downloadCts = null;
 	private readonly CancellationTokenSource _lifetimeCts = new CancellationTokenSource();
 	private string? _downloadedZipPath = null;
@@ -502,7 +504,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.3");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -1302,9 +1304,10 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.3"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
+		UpdateRollbackBadgeAndCandidates();
 	}
 
 	private void UpdateOcrBadgeUi()
@@ -2128,6 +2131,19 @@ public partial class SettingsWindow : Window
 			if (UpdateProxyComboBox.Items[2] is ComboBoxItem itemAk) itemAk.Content = I18n.T("UpdateProxyAkams");
 			if (UpdateProxyComboBox.Items[3] is ComboBoxItem itemDir) itemDir.Content = I18n.T("UpdateProxyDirect");
 		}
+		if (RollbackSectionTitleText != null)
+		{
+			RollbackSectionTitleText.Text = I18n.T("RollbackSectionTitle");
+		}
+		if (RollbackSectionDescText != null)
+		{
+			RollbackSectionDescText.Text = I18n.T("RollbackSectionDesc");
+		}
+		if (StartRollbackBtn != null)
+		{
+			StartRollbackBtn.Content = I18n.T("BtnRollback");
+		}
+		UpdateRollbackBadgeAndCandidates();
 		if (ContributorsHeaderTitle != null)
 		{
 			ContributorsHeaderTitle.Text = I18n.T("ContributorsHeader");
@@ -11724,7 +11740,9 @@ public partial class SettingsWindow : Window
 			// 仅在检查应用更新时同步一次 GitHub 贡献者名单，平时默认离线
 			_ = SyncContributorsFromGitHubAsync();
 
-			ReleaseInfo? rel = await UpdateManager.Instance.CheckForUpdateAsync(channel, proxy, customProxy);
+			_allFetchedReleases = await UpdateManager.Instance.FetchAllReleasesAsync(proxy, customProxy);
+			ReleaseInfo? rel = UpdateManager.Instance.GetLatestUpdateRelease(_allFetchedReleases, channel);
+			UpdateRollbackBadgeAndCandidates();
 
 			if (ConfigManager.CurrentConfig != null)
 			{
@@ -11794,7 +11812,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.2"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.3"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -11976,6 +11994,202 @@ public partial class SettingsWindow : Window
 		{
 			ConfigManager.CurrentConfig.UpdateChannel = item.Tag?.ToString() ?? "Stable";
 			ScheduleAutoSave();
+			UpdateRollbackBadgeAndCandidates();
+		}
+	}
+
+	private void UpdateRollbackBadgeAndCandidates()
+	{
+		if (RollbackCountBadgeText == null || RollbackVersionComboBox == null) return;
+
+		string channel = (UpdateChannelComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString()
+			?? ConfigManager.CurrentConfig?.UpdateChannel
+			?? "Stable";
+		bool isBeta = string.Equals(channel, "Beta", StringComparison.OrdinalIgnoreCase);
+
+		// 1. 更新徽章
+		if (isBeta)
+		{
+			RollbackCountBadgeText.Text = I18n.T("RollbackBadgeBeta");
+			if (RollbackCountBadge != null)
+			{
+				RollbackCountBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 245, 158, 11));
+				RollbackCountBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+			}
+		}
+		else
+		{
+			RollbackCountBadgeText.Text = I18n.T("RollbackBadgeStable");
+			if (RollbackCountBadge != null)
+			{
+				RollbackCountBadge.Background = (System.Windows.Media.Brush)FindResource("NavTabActiveBgBrush");
+				RollbackCountBadgeText.Foreground = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush");
+			}
+		}
+
+		// 2. 更新候选列表
+		RollbackVersionComboBox.Items.Clear();
+		_selectedRollbackRelease = null;
+		if (RollbackDetailCard != null) RollbackDetailCard.Visibility = Visibility.Collapsed;
+		if (StartRollbackBtn != null) StartRollbackBtn.IsEnabled = false;
+
+		if (_allFetchedReleases == null || _allFetchedReleases.Count == 0)
+		{
+			ComboBoxItem emptyItem = new ComboBoxItem
+			{
+				Content = I18n.T("RollbackEmpty"),
+				IsEnabled = false
+			};
+			RollbackVersionComboBox.Items.Add(emptyItem);
+			RollbackVersionComboBox.SelectedIndex = 0;
+			return;
+		}
+
+		var candidates = UpdateManager.Instance.GetRollbackCandidates(_allFetchedReleases, channel);
+		if (candidates.Count == 0)
+		{
+			ComboBoxItem emptyItem = new ComboBoxItem
+			{
+				Content = I18n.T("RollbackEmpty"),
+				IsEnabled = false
+			};
+			RollbackVersionComboBox.Items.Add(emptyItem);
+			RollbackVersionComboBox.SelectedIndex = 0;
+			return;
+		}
+
+		foreach (var rel in candidates)
+		{
+			string typeTag = rel.IsPrerelease ? "测试版" : "正式版";
+			ComboBoxItem item = new ComboBoxItem
+			{
+				Content = $"{rel.TagName}  [{typeTag}] · {rel.PublishedAt:yyyy-MM-dd}",
+				Tag = rel
+			};
+			RollbackVersionComboBox.Items.Add(item);
+		}
+
+		RollbackVersionComboBox.SelectedIndex = 0;
+	}
+
+	private void RollbackVersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (RollbackVersionComboBox == null || RollbackVersionComboBox.SelectedItem is not ComboBoxItem item || item.Tag is not ReleaseInfo rel)
+		{
+			_selectedRollbackRelease = null;
+			if (RollbackDetailCard != null) RollbackDetailCard.Visibility = Visibility.Collapsed;
+			if (StartRollbackBtn != null) StartRollbackBtn.IsEnabled = false;
+			return;
+		}
+
+		_selectedRollbackRelease = rel;
+		if (StartRollbackBtn != null) StartRollbackBtn.IsEnabled = true;
+
+		if (RollbackDetailCard != null) RollbackDetailCard.Visibility = Visibility.Visible;
+		if (RollbackDetailTagText != null) RollbackDetailTagText.Text = rel.TagName;
+		if (RollbackDetailChannelText != null)
+		{
+			RollbackDetailChannelText.Text = rel.IsPrerelease ? "尝鲜测试版 (Pre-release)" : "正式稳定版 (Stable)";
+		}
+		if (RollbackDetailChannelBorder != null)
+		{
+			RollbackDetailChannelBorder.Background = rel.IsPrerelease
+				? new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 245, 158, 11))
+				: new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 16, 185, 129));
+		}
+		if (RollbackDetailDateText != null)
+		{
+			RollbackDetailDateText.Text = $"· 发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm}";
+		}
+		if (RollbackInstallTypeText != null)
+		{
+			RollbackInstallTypeText.Text = UpdateManager.Instance.IsCurrentInstallationStandalone()
+				? "独立免安装单文件版 (Standalone)"
+				: "依赖 .NET 运行时轻量版 (Lightweight)";
+		}
+		if (RollbackChangelogText != null)
+		{
+			RollbackChangelogText.Text = string.IsNullOrWhiteSpace(rel.Body) ? "作者暂未提供此历史版本更新日志说明。" : rel.Body;
+		}
+	}
+
+	private async void StartRollbackBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if (_selectedRollbackRelease == null) return;
+
+		string confirmMsg = string.Format(I18n.T("RollbackConfirmMsg"), _selectedRollbackRelease.TagName);
+		string confirmTitle = I18n.T("RollbackConfirmTitle");
+
+		MessageBoxResult result = MessageBox.Show(confirmMsg, confirmTitle, MessageBoxButton.YesNo, MessageBoxImage.Question);
+		if (result != MessageBoxResult.Yes) return;
+
+		bool isStandalone = UpdateManager.Instance.IsCurrentInstallationStandalone();
+		string? rawAssetUrl = isStandalone ? _selectedRollbackRelease.StandaloneAssetUrl : _selectedRollbackRelease.LightweightAssetUrl;
+
+		if (string.IsNullOrEmpty(rawAssetUrl))
+		{
+			Process.Start(new ProcessStartInfo(_selectedRollbackRelease.HtmlUrl) { UseShellExecute = true });
+			return;
+		}
+
+		string proxy = ConfigManager.CurrentConfig?.UpdateProxySource ?? "ghfast";
+		string customProxy = ConfigManager.CurrentConfig?.CustomProxyUrl ?? "";
+		string downloadUrl = UpdateManager.Instance.GetProxiedDownloadUrl(rawAssetUrl, proxy, customProxy);
+
+		string fileName = isStandalone
+			? $"StarPie-{_selectedRollbackRelease.TagName}-Standalone-win-x64.zip"
+			: $"StarPie-{_selectedRollbackRelease.TagName}-Lightweight-win-x64.zip";
+
+		string destPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "StarPie_Updates", fileName);
+		_downloadedZipPath = destPath;
+
+		if (UpdateNewVersionPanel != null) UpdateNewVersionPanel.Visibility = Visibility.Collapsed;
+		if (RollbackDetailCard != null) RollbackDetailCard.Visibility = Visibility.Collapsed;
+		if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Collapsed;
+		if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Visible;
+
+		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = $"正在高速下载历史版本 {fileName}...";
+		if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = "0%";
+		if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = 0;
+		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = "⚡ 连接下载源中...";
+
+		_downloadCts?.Dispose();
+		_downloadCts = new CancellationTokenSource();
+
+		Progress<UpdateProgressInfo> progress = new Progress<UpdateProgressInfo>(info =>
+		{
+			if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = info.Percent;
+			if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = $"{info.Percent}%";
+			if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = $"⚡ {info.FormattedSpeed}";
+			if (UpdateDownloadSizeText != null) UpdateDownloadSizeText.Text = info.FormattedProgress;
+		});
+
+		try
+		{
+			await UpdateManager.Instance.DownloadAssetAsync(downloadUrl, destPath, progress, _downloadCts.Token);
+
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+			if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Visible;
+
+			if (UpdateStatusBadgeText != null)
+			{
+				UpdateStatusBadgeText.Text = "回退包下载完成 · 就绪安装";
+				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+			}
+			if (UpdateStatusBadge != null)
+			{
+				UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Rollback download failed", ex);
+			if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Collapsed;
+			System.Windows.MessageBox.Show($"下载历史回退包失败：{ex.Message}\n建议切换加速镜像源重试或前往网页下载。", "StarPie 版本回退", MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 	}
 
@@ -12044,7 +12258,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.3-beta.2"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.3-beta.3"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");

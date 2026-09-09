@@ -2593,6 +2593,62 @@ public static class I18n
 			[LanguageCode.En] = "⚡ Mirror 3 (mirror.ghproxy.com)",
 			[LanguageCode.Ja] = "⚡ ミラー 3 (mirror.ghproxy.com)"
 		};
+		dictionary["RollbackSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "历史版本回退 (Version Rollback)",
+			[LanguageCode.ZhTw] = "歷史版本回退 (Version Rollback)",
+			[LanguageCode.En] = "Version Rollback",
+			[LanguageCode.Ja] = "過去バージョンへのロールバック"
+		};
+		dictionary["RollbackSectionDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "若当前版本发生兼容性或配置异常，可选择历史版本一键覆盖回退安装。",
+			[LanguageCode.ZhTw] = "若當前版本發生相容性或設定異常，可選擇歷史版本一鍵覆蓋回退安裝。",
+			[LanguageCode.En] = "If compatibility issues occur, rollback to a prior version with one click.",
+			[LanguageCode.Ja] = "互換性の問題が発生した場合は、ワンクリックで以前のバージョンにロールバックできます。"
+		};
+		dictionary["RollbackBadgeBeta"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🚀 测试版最多回退5个版本",
+			[LanguageCode.ZhTw] = "🚀 測試版最多回退5個版本",
+			[LanguageCode.En] = "🚀 Beta track: up to 5 versions",
+			[LanguageCode.Ja] = "🚀 ベータ版：最大5バージョンまでロールバック可能"
+		};
+		dictionary["RollbackBadgeStable"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌟 正式版最多回退2个版本",
+			[LanguageCode.ZhTw] = "🌟 正式版最多回退2個版本",
+			[LanguageCode.En] = "🌟 Stable track: up to 2 versions",
+			[LanguageCode.Ja] = "🌟 安定版：最大2バージョンまでロールバック可能"
+		};
+		dictionary["BtnRollback"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⬇️ 回退至此版本",
+			[LanguageCode.ZhTw] = "⬇️ 回退至此版本",
+			[LanguageCode.En] = "⬇️ Rollback to this version",
+			[LanguageCode.Ja] = "⬇️ このバージョンにロールバック"
+		};
+		dictionary["RollbackEmpty"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "（暂无可回退历史版本）",
+			[LanguageCode.ZhTw] = "（暫無可回退歷史版本）",
+			[LanguageCode.En] = "(No rollback versions available)",
+			[LanguageCode.Ja] = "（ロールバック可能なバージョンはありません）"
+		};
+		dictionary["RollbackConfirmTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "确认版本回退",
+			[LanguageCode.ZhTw] = "確認版本回退",
+			[LanguageCode.En] = "Confirm Version Rollback",
+			[LanguageCode.Ja] = "ロールバックの確認"
+		};
+		dictionary["RollbackConfirmMsg"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "确定要将 StarPie 回退至版本 {0} 吗？\n\n程序将下载该历史版本安装包并自动覆盖重启。您的自定义手势与按键配置将完整保留。",
+			[LanguageCode.ZhTw] = "確定要將 StarPie 回退至版本 {0} 嗎？\n\n程式將下載該歷史版本安裝包並自動覆蓋重啟。您的自訂手勢與按鍵設定將完整保留。",
+			[LanguageCode.En] = "Are you sure you want to rollback StarPie to version {0}?\n\nThe update package will be downloaded and safely applied upon restart. Your configurations will be preserved.",
+			[LanguageCode.Ja] = "StarPie をバージョン {0} にロールバックしてもよろしいですか？\n\nパッケージをダウンロードして再起動時に適用されます。現在の設定は保持されます。"
+		};
 		dictionary["ContributorsHeader"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "开源贡献者致谢",
