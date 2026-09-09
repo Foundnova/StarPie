@@ -79,6 +79,9 @@ public class AppConfig
 
 	public string AppTheme { get; set; } = "System";
 
+	/// <summary>设置控制台界面整体缩放比例（1.0 = 100%，有效范围 0.8 ~ 2.0，按 5% 步进对齐）。</summary>
+	public double SettingsUiScale { get; set; } = 1.0;
+
 	public string Theme { get; set; } = "System";
 
 	public string UiStyle { get; set; } = "ClassicRing";

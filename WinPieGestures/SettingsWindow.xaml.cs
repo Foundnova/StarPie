@@ -39,6 +39,9 @@ public partial class SettingsWindow : Window
 
 	private bool _isSidebarCollapsed = false;
 
+	/// <summary>设置控制台当前已生效的界面缩放比例，用于按倍率换算窗口尺寸增量。</summary>
+	private double _appliedSettingsUiScale = 1.0;
+
 	private int _selectedLayoutTier = 1; // 1: 主轮盘, 2: 二级级联轮盘
 
 	private int _selectedLayoutSlotIndex = -1;
@@ -529,6 +532,12 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
+		double initialUiScale = NormalizeSettingsUiScale(ConfigManager.CurrentConfig?.SettingsUiScale ?? 1.0);
+		if (UiScaleSlider != null)
+		{
+			UiScaleSlider.Value = initialUiScale * 100.0;
+		}
+		ApplySettingsUiScale(initialUiScale);
 		_isUpdatingUi = false;
 
 		// 若为桌面正常呼起或单测环境（非静默参数），立即就绪完整 UI；若为开机自启/静默启动，延迟至首次唤起加载
@@ -581,6 +590,124 @@ public partial class SettingsWindow : Window
 		Opacity = 1.0;
 	}
 
+	/// <summary>把任意缩放取值规范到 0.8 ~ 2.0，并对齐 5% 步进（与滑块 TickFrequency 一致）。</summary>
+	private double NormalizeSettingsUiScale(double scale)
+	{
+		if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0.0)
+		{
+			scale = 1.0;
+		}
+		return Math.Round(Math.Clamp(scale, 0.8, 2.0) * 20.0) / 20.0;
+	}
+
+	/// <summary>
+	/// 应用设置控制台全局缩放：仅给根节点挂 LayoutTransform，等比放大字号/边距与控件尺寸
+	/// （等同浏览器缩放语义）。窗口尺寸一律不代为调整——大小由用户自己决定，
+	/// 内容超出可视区域时交由侧边栏与各页签内部的滚动条承接，Ctrl 0 可随时复位。
+	/// </summary>
+	private void ApplySettingsUiScale(double scale)
+	{
+		scale = NormalizeSettingsUiScale(scale);
+		if (RootUiScaleTransform != null)
+		{
+			RootUiScaleTransform.ScaleX = scale;
+			RootUiScaleTransform.ScaleY = scale;
+		}
+		_appliedSettingsUiScale = scale;
+		if (SidebarScaleValueText != null)
+		{
+			SidebarScaleValueText.Text = string.Format("{0:0}%", scale * 100.0);
+		}
+	}
+
+	/// <summary>统一的缩放写入口：同步滑块与配置、重排界面并落盘（供快捷键复用）。</summary>
+	private void SetSettingsUiScale(double scale)
+	{
+		if (ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		scale = NormalizeSettingsUiScale(scale);
+		_isUpdatingUi = true;
+		if (UiScaleSlider != null)
+		{
+			UiScaleSlider.Value = scale * 100.0;
+		}
+		_isUpdatingUi = false;
+		ConfigManager.CurrentConfig.SettingsUiScale = scale;
+		ApplySettingsUiScale(scale);
+		ScheduleAutoSave();
+	}
+
+	private void UiScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+		if (UiScaleSlider.IsMouseCaptureWithin)
+		{
+			// 滑块本身也在被缩放的画面里：拖动途中一旦重排，拇指会跑到指针前面，
+			// Slider 再按指针位置反算数值就会往回跳，两者互相追赶表现为持续抖动。
+			// 因此拖动途中只实时回显百分比，真正的重排与落盘留到松手时一次性完成。
+			if (SidebarScaleValueText != null)
+			{
+				SidebarScaleValueText.Text = string.Format("{0:0}%", NormalizeSettingsUiScale(e.NewValue / 100.0) * 100.0);
+			}
+			return;
+		}
+		double scale = NormalizeSettingsUiScale(e.NewValue / 100.0);
+		if (Math.Abs(scale - _appliedSettingsUiScale) < 0.0005)
+		{
+			return;
+		}
+		ConfigManager.CurrentConfig.SettingsUiScale = scale;
+		ApplySettingsUiScale(scale);
+		ScheduleAutoSave();
+	}
+
+	/// <summary>松手后一次性提交缩放，避免拖动途中反复重排造成滑块抖动与指针错位。</summary>
+	private void UiScaleSlider_Commit(object sender, System.Windows.Input.MouseButtonEventArgs e)
+	{
+		if (UiScaleSlider == null)
+		{
+			return;
+		}
+		SetSettingsUiScale(UiScaleSlider.Value / 100.0);
+	}
+
+	private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+	{
+		if (_isRecordingTrigger || ConfigManager.CurrentConfig == null || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+		{
+			return;
+		}
+		// 热键录入框一拿到键盘焦点就进入录制态，而窗口级 PreviewKeyDown 是先于控件的 tunnel，
+		// 不豁免就会把 Ctrl+0 / Ctrl+加 / Ctrl+减 直接吃掉，导致这三个组合键永远录不进去。
+		if (Keyboard.FocusedElement is HotkeyRecorderBox { IsRecording: true })
+		{
+			return;
+		}
+		switch (e.Key)
+		{
+		case Key.Add:
+		case Key.OemPlus:
+			SetSettingsUiScale(_appliedSettingsUiScale + 0.05);
+			e.Handled = true;
+			break;
+		case Key.Subtract:
+		case Key.OemMinus:
+			SetSettingsUiScale(_appliedSettingsUiScale - 0.05);
+			e.Handled = true;
+			break;
+		case Key.D0:
+		case Key.NumPad0:
+			SetSettingsUiScale(1.0);
+			e.Handled = true;
+			break;
+		}
+	}
+
 	private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
 	{
 		_isSidebarCollapsed = !_isSidebarCollapsed;
@@ -612,6 +739,10 @@ public partial class SettingsWindow : Window
 		if (SidebarThemeCollapsedButton != null)
 		{
 			SidebarThemeCollapsedButton.Visibility = isCollapsed ? Visibility.Visible : Visibility.Collapsed;
+		}
+		if (SidebarScalePanel != null)
+		{
+			SidebarScalePanel.Visibility = (isCollapsed ? Visibility.Collapsed : Visibility.Visible);
 		}
 
 		// 底部版本与版权信息：折叠时持续展示，自适应居中对齐
@@ -1060,6 +1191,11 @@ public partial class SettingsWindow : Window
 		if (EnableMultiTierCheckBox != null)
 		{
 			EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
+		}
+		ApplySettingsUiScale(ConfigManager.CurrentConfig.SettingsUiScale);
+		if (UiScaleSlider != null)
+		{
+			UiScaleSlider.Value = _appliedSettingsUiScale * 100.0;
 		}
 
 		// Sub Wheel Themes & Colors
@@ -1981,6 +2117,14 @@ public partial class SettingsWindow : Window
 		if (EnableMultiTierCheckBox != null)
 		{
 			EnableMultiTierCheckBox.Content = I18n.T("EnableMultiTier");
+		}
+		if (SidebarScaleTitleText != null)
+		{
+			SidebarScaleTitleText.Text = I18n.T("SettingsUiScale");
+		}
+		if (UiScaleSlider != null)
+		{
+			UiScaleSlider.ToolTip = I18n.T("SettingsUiScaleTip");
 		}
 		
 		if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
