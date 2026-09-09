@@ -246,11 +246,19 @@ public partial class RadialWindow : Window
 			{
 				source.RemoveHook(WndProc);
 			}
+			_isDisposed = true;
+			StopPresentationAnimations();
 			WheelCanvas?.Children.Clear();
 			_sectorPaths?.Clear();
 			_contentPanels?.Clear();
 			_sectorTransforms?.Clear();
 			_containerTransforms?.Clear();
+			_sectorAngles?.Clear();
+			_subSectorPaths?.Clear();
+			_subContentContainers?.Clear();
+			_subSectorTransforms?.Clear();
+			_subContainerTransforms?.Clear();
+			_subSectorAngles?.Clear();
 			_subTierCache?.Clear();
 		}
 		catch
@@ -292,9 +300,9 @@ public partial class RadialWindow : Window
 
 	private int _activeSubTierParentSector;
 
-	private readonly Point _centerPoint;
+	private Point _centerPoint;
 
-	private readonly WheelProfile _profile;
+	private WheelProfile _profile;
 
 	private readonly List<System.Windows.Shapes.Path> _sectorPaths;
 
@@ -369,6 +377,20 @@ public partial class RadialWindow : Window
 	private Effect? _defaultCoreCustomImageEffect;
 
 	public Point ActualPhysicalCenter { get; private set; }
+
+	public long PresentationVersion { get; private set; }
+
+	private long _renderedConfigurationRevision = -1;
+
+	private WheelProfile? _renderedProfile;
+
+	private int _renderedLayerIndex = -1;
+
+	private long _requestedConfigurationRevision;
+
+	private bool _hasRenderedContent;
+
+	private bool _isDisposed;
 
 	private static Point ComputeClampedPhysicalCenter(Point centerPoint, double canvasSize)
 	{
@@ -468,8 +490,6 @@ public partial class RadialWindow : Window
 
 	public RadialWindow(Point centerPoint, WheelProfile profile)
 	{
-		//IL_00d0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00d1: Unknown result type (might be due to invalid IL or missing references)
 		_currentHighlightedSector = -999;
 		_currentHighlightedSubSector = -1;
 		_activeSubTierParentSector = -1;
@@ -490,51 +510,241 @@ public partial class RadialWindow : Window
 		InitializeComponent();
 		_centerPoint = centerPoint;
 		_profile = profile;
+		_requestedConfigurationRevision = ConfigManager.ConfigurationRevision;
 		InitializeThemeAndStyle();
+		ApplyLayoutFromCurrentConfiguration(centerPoint);
+		CoreTextPanel.Visibility = Visibility.Collapsed;
+		base.Loaded += RadialWindow_Loaded;
+		UpdateProfileLabels();
+		UpdateCenterIconVisuals();
+	}
 
+	/// <summary>
+	/// 复用同一个透明 Window/HWND 呈现新手势。配置修订、方案引用或活动层变化时才重建视觉树；
+	/// 其余呼出只重置交互状态、更新物理中心/DPI 并重新播放入场动画。
+	/// </summary>
+	public void Present(Point centerPoint, WheelProfile profile, long configurationRevision, long presentationVersion)
+	{
+		if (!Dispatcher.CheckAccess())
+		{
+			Dispatcher.Invoke(() => Present(centerPoint, profile, configurationRevision, presentationVersion));
+			return;
+		}
+		if (_isDisposed)
+		{
+			throw new InvalidOperationException("Cannot present a disposed RadialWindow.");
+		}
+
+		bool wasLoaded = IsLoaded;
+		bool needsRebuild = !_hasRenderedContent ||
+			_renderedConfigurationRevision != configurationRevision ||
+			!ReferenceEquals(_renderedProfile, profile) ||
+			_renderedLayerIndex != profile.ActiveLayerIndex;
+
+		_centerPoint = centerPoint;
+		_profile = profile;
+		_requestedConfigurationRevision = configurationRevision;
+		PresentationVersion = presentationVersion;
+		ResetPresentationState();
+		ApplyLayoutFromCurrentConfiguration(centerPoint);
+
+		if (wasLoaded && needsRebuild)
+		{
+			RebuildVisualsFromCurrentConfiguration(configurationRevision);
+		}
+
+		if (!IsVisible)
+		{
+			Show();
+		}
+		PositionWindowOnTargetMonitor();
+		Dispatcher.BeginInvoke(new Action(() =>
+		{
+			if (!_isDisposed && PresentationVersion == presentationVersion)
+			{
+				CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+			}
+		}), DispatcherPriority.Render);
+
+		if (wasLoaded)
+		{
+			StartIntroAnimation();
+		}
+	}
+
+	/// <summary>隐藏当前手势，但保留 Window/HWND 供下一次呼出复用。旧手势的延迟回调不得隐藏新手势。</summary>
+	public void Dismiss(long expectedPresentationVersion)
+	{
+		if (!Dispatcher.CheckAccess())
+		{
+			Dispatcher.BeginInvoke(new Action(() => Dismiss(expectedPresentationVersion)), DispatcherPriority.Send);
+			return;
+		}
+		if (_isDisposed || PresentationVersion != expectedPresentationVersion)
+		{
+			return;
+		}
+		StopPresentationAnimations();
+		ClearSubTier();
+		CoreVolumeText.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		Visibility = Visibility.Collapsed;
+		Hide();
+	}
+
+	private void ApplyLayoutFromCurrentConfiguration(Point requestedCenter)
+	{
 		double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
 		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		bool enableMultiTier = ConfigManager.CurrentConfig.EnableMultiTier;
-		double num = ((ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55);
-		double subMaxR = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0)
+		double ratio = ConfigManager.CurrentConfig.SubWheelRadiusRatio > 1.1
+			? ConfigManager.CurrentConfig.SubWheelRadiusRatio
+			: 1.55;
+		double subMaxR = ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0
 			? ConfigManager.CurrentConfig.SubWheelOuterRadius
-			: (wheelRadius * num);
+			: wheelRadius * ratio;
 		double maxEffectiveR = enableMultiTier ? Math.Max(wheelRadius, subMaxR + 25.0) : wheelRadius;
 		_wheelCanvasSize = maxEffectiveR * 2.0 + 40.0;
 		_canvasCenter = _wheelCanvasSize / 2.0;
 
-		_centerPoint = ComputeClampedPhysicalCenter(centerPoint, _wheelCanvasSize);
+		_centerPoint = ComputeClampedPhysicalCenter(requestedCenter, _wheelCanvasSize);
 		ActualPhysicalCenter = _centerPoint;
-
 		ScreenContext screenCtx = ScreenHelper.GetScreenContextAtPoint(_centerPoint);
 		double scaleX = Math.Max(0.1, screenCtx.DpiScale.DpiScaleX);
 		double scaleY = Math.Max(0.1, screenCtx.DpiScale.DpiScaleY);
-
 		WindowStartupLocation = WindowStartupLocation.Manual;
-		this.Left = (_centerPoint.X / scaleX) - (_wheelCanvasSize / 2.0);
-		this.Top = (_centerPoint.Y / scaleY) - (_wheelCanvasSize / 2.0);
-
-		base.Width = _wheelCanvasSize;
-		base.Height = _wheelCanvasSize;
+		Left = _centerPoint.X / scaleX - _wheelCanvasSize / 2.0;
+		Top = _centerPoint.Y / scaleY - _wheelCanvasSize / 2.0;
+		Width = _wheelCanvasSize;
+		Height = _wheelCanvasSize;
 		MainGrid.Width = _wheelCanvasSize;
 		MainGrid.Height = _wheelCanvasSize;
 		WheelCanvas.Width = _wheelCanvasSize;
 		WheelCanvas.Height = _wheelCanvasSize;
 
-		double length = _canvasCenter - coreRadius;
-		Canvas.SetLeft(CoreGrid, length);
-		Canvas.SetTop(CoreGrid, length);
+		double coreOffset = _canvasCenter - coreRadius;
+		Canvas.SetLeft(CoreGrid, coreOffset);
+		Canvas.SetTop(CoreGrid, coreOffset);
 		CoreGrid.Width = coreRadius * 2.0;
 		CoreGrid.Height = coreRadius * 2.0;
 		Panel.SetZIndex(CoreGrid, 5);
 		OuterEllipse.Width = wheelRadius * 2.0 + 8.0;
 		OuterEllipse.Height = wheelRadius * 2.0 + 8.0;
+	}
 
-		CoreTextPanel.Visibility = Visibility.Collapsed;
-		base.Loaded += RadialWindow_Loaded;
-		CoreTitle.Text = ((profile.ProcessName == "Global") ? I18n.T("CoreGlobalActions") : profile.ProcessName);
-		CoreSubtitle.Text = string.Format(I18n.T("CoreSectorActions"), profile.SectorCount);
-		UpdateCenterIconVisuals();
+	private void UpdateProfileLabels()
+	{
+		CoreTitle.Text = _profile.ProcessName == "Global" ? I18n.T("CoreGlobalActions") : _profile.ProcessName;
+		CoreSubtitle.Text = string.Format(I18n.T("CoreSectorActions"), _profile.SectorCount);
+	}
+
+	private void ResetPresentationState()
+	{
+		StopPresentationAnimations();
+		ResetSectorVisuals();
+		_currentHighlightedSector = -999;
+		_currentHighlightedSubSector = -1;
+		_activeSubTierParentSector = -1;
+		_isOuterEscaped = false;
+		_subTierCache.Clear();
+		ClearSubTier();
+		CoreScale.ScaleX = 1.0;
+		CoreScale.ScaleY = 1.0;
+		CoreVolumeText.Visibility = Visibility.Collapsed;
+		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
+		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
+		LayerIndicatorBadge.Visibility = Visibility.Collapsed;
+		Opacity = 1.0;
+	}
+
+	private void StopPresentationAnimations()
+	{
+		BeginAnimation(UIElement.OpacityProperty, null);
+		MainGrid.BeginAnimation(UIElement.OpacityProperty, null);
+		WindowScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+		WindowScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+		CoreScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+		CoreScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+		_layerBadgeStoryboard?.Stop();
+	}
+
+	private void ResetSectorVisuals()
+	{
+		for (int i = 0; i < _sectorPaths.Count; i++)
+		{
+			System.Windows.Shapes.Path path = _sectorPaths[i];
+			path.BeginAnimation(UIElement.OpacityProperty, null);
+			path.Opacity = 1.0;
+			path.Fill = _defaultSectorBrush;
+			path.Stroke = _sectorBorderBrush;
+			path.StrokeThickness = _borderThickness;
+			Panel.SetZIndex(path, 0);
+			_styleRenderer?.ApplySectorHighlight(path, isHighlighted: false);
+
+			if (i < _sectorTransforms.Count)
+			{
+				TranslateTransform transform = _sectorTransforms[i];
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.X = 0.0;
+				transform.Y = 0.0;
+			}
+			if (i < _containerTransforms.Count)
+			{
+				TranslateTransform transform = _containerTransforms[i];
+				transform.BeginAnimation(TranslateTransform.XProperty, null);
+				transform.BeginAnimation(TranslateTransform.YProperty, null);
+				transform.X = 0.0;
+				transform.Y = 0.0;
+			}
+			if (i < _contentPanels.Count)
+			{
+				StackPanel panel = _contentPanels[i];
+				TextBlock? text = panel.Children.OfType<TextBlock>().FirstOrDefault();
+				System.Windows.Shapes.Path? icon = panel.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault();
+				if (text != null)
+				{
+					text.Foreground = _textColorBrush;
+					text.FontWeight = FontWeights.Medium;
+				}
+				if (icon != null)
+				{
+					icon.Fill = _textColorBrush;
+				}
+			}
+		}
+
+		CoreExitIcon.Fill = _textColorBrush;
+		CoreExitIcon.Visibility = _defaultCoreExitIconVisibility;
+		CoreExitIcon.Opacity = _defaultCoreExitIconOpacity;
+		_styleRenderer?.ApplyExitHighlight(CoreExitIcon, isHighlighted: false);
+		CoreCustomImageEllipse.Visibility = _defaultCoreCustomImageVisibility;
+		CoreCustomImageEllipse.Opacity = _defaultCoreCustomImageOpacity;
+		CoreCustomImageEllipse.Effect = _defaultCoreCustomImageEffect;
+	}
+
+	private void ClearRenderedVisualsForRebuild()
+	{
+		ClearSubTier();
+		List<UIElement> removable = new List<UIElement>();
+		foreach (UIElement child in WheelCanvas.Children)
+		{
+			if (child != CoreGrid && child != OuterEllipse)
+			{
+				removable.Add(child);
+			}
+		}
+		foreach (UIElement child in removable)
+		{
+			WheelCanvas.Children.Remove(child);
+		}
+		_sectorPaths.Clear();
+		_contentPanels.Clear();
+		_sectorTransforms.Clear();
+		_containerTransforms.Clear();
+		_sectorAngles.Clear();
+		_subTierCache.Clear();
 	}
 
 	private static SolidColorBrush TintBrush(Brush brush, byte alpha)
@@ -712,29 +922,41 @@ public partial class RadialWindow : Window
 
 	private void RadialWindow_Loaded(object sender, RoutedEventArgs e)
 	{
-		double wheelRadius = ConfigManager.CurrentConfig.WheelRadius;
-		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
-
+		RebuildVisualsFromCurrentConfiguration(_requestedConfigurationRevision);
 		PositionWindowOnTargetMonitor();
 		Dispatcher.BeginInvoke(new Action(() =>
 		{
-			CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+			if (!_isDisposed)
+			{
+				CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
+			}
 		}), DispatcherPriority.Render);
+		StartIntroAnimation();
+	}
+
+	private void RebuildVisualsFromCurrentConfiguration(long configurationRevision)
+	{
+		InitializeThemeAndStyle();
+		ApplyLayoutFromCurrentConfiguration(_centerPoint);
+		UpdateProfileLabels();
+		ClearRenderedVisualsForRebuild();
+
+		double coreRadius = ConfigManager.CurrentConfig.CoreRadius;
 		CoreEllipse.Fill = _coreBgBrush;
 		CoreEllipse.Stroke = _coreBorderBrush;
-		string text = ConfigManager.CurrentConfig.CoreBgImagePath ?? "";
+		string coreBackgroundPath = ConfigManager.CurrentConfig.CoreBgImagePath ?? "";
 		double? coreImageLuminance = null;
-		if (!string.IsNullOrEmpty(text) && File.Exists(text))
+		if (!string.IsNullOrEmpty(coreBackgroundPath) && File.Exists(coreBackgroundPath))
 		{
 			try
 			{
-				BitmapImage image = new BitmapImage(new Uri(text, UriKind.Absolute));
+				BitmapImage image = new BitmapImage(new Uri(coreBackgroundPath, UriKind.Absolute));
 				CoreEllipse.Fill = new ImageBrush(image)
 				{
 					Stretch = ParseStretch(ConfigManager.CurrentConfig.CoreBgStretch),
 					Opacity = ConfigManager.CurrentConfig.CoreBgOpacity
 				};
-				coreImageLuminance = GetImageAverageLuminance(text);
+				coreImageLuminance = GetImageAverageLuminance(coreBackgroundPath);
 			}
 			catch
 			{
@@ -748,21 +970,19 @@ public partial class RadialWindow : Window
 		CoreExitIcon.Width = coreRadius * 0.42;
 		CoreExitIcon.Height = coreRadius * 0.42;
 		CoreTitle.FontSize = Math.Max(8.0, coreRadius / 5.0);
-			CoreSubtitle.FontSize = Math.Max(6.0, coreRadius / 7.0);
-		bool showCoreIcon = ConfigManager.CurrentConfig.ShowCoreIcon;
-		string text2 = ConfigManager.CurrentConfig.CoreIconType ?? "Exit";
+		CoreSubtitle.FontSize = Math.Max(6.0, coreRadius / 7.0);
 		CoreTitle.Visibility = Visibility.Collapsed;
 		CoreSubtitle.Visibility = Visibility.Collapsed;
 		UpdateCenterIconVisuals();
 		CoreSelectionOverlay.Visibility = Visibility.Collapsed;
 		CoreSelectionTextPanel.Visibility = Visibility.Collapsed;
 		CoreSelectionTextPanel.Width = Math.Max(32.0, Math.Min(coreRadius * 1.75, 180.0));
-		double coreFontSize = (ConfigManager.CurrentConfig?.CoreFontSize > 0.0)
+		double coreFontSize = ConfigManager.CurrentConfig.CoreFontSize > 0.0
 			? ConfigManager.CurrentConfig.CoreFontSize
 			: Math.Max(8.0, Math.Min(16.0, coreRadius / 4.0));
 		CoreSelectionText.FontSize = coreFontSize;
 		CoreVolumeText.FontSize = coreFontSize;
-		if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig?.CoreFontFamily))
+		if (!string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreFontFamily))
 		{
 			try
 			{
@@ -781,31 +1001,34 @@ public partial class RadialWindow : Window
 		Panel.SetZIndex(CoreSelectionTextPanel, 21);
 		RenderStyleDecorations();
 		RenderSectors();
-		Storyboard storyboard = new Storyboard();
+
+		_renderedConfigurationRevision = configurationRevision;
+		_renderedProfile = _profile;
+		_renderedLayerIndex = _profile.ActiveLayerIndex;
+		_hasRenderedContent = true;
+	}
+
+	private void StartIntroAnimation()
+	{
+		StopPresentationAnimations();
+		MainGrid.Opacity = 1.0;
 		BackEase easingFunction = new BackEase
 		{
 			EasingMode = EasingMode.EaseOut,
 			Amplitude = 0.35
 		};
-		DoubleAnimation doubleAnimation = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
+		DoubleAnimation scaleX = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
 		{
 			EasingFunction = easingFunction
 		};
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation, new PropertyPath("RenderTransform.Children[0].ScaleX"));
-		DoubleAnimation doubleAnimation2 = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
+		DoubleAnimation scaleY = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
 		{
 			EasingFunction = easingFunction
 		};
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation2, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation2, new PropertyPath("RenderTransform.Children[0].ScaleY"));
-		DoubleAnimation doubleAnimation3 = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(90.0)));
-		Storyboard.SetTarget((DependencyObject)(object)doubleAnimation3, (DependencyObject)(object)MainGrid);
-		Storyboard.SetTargetProperty((DependencyObject)(object)doubleAnimation3, new PropertyPath(UIElement.OpacityProperty));
-		storyboard.Children.Add(doubleAnimation);
-		storyboard.Children.Add(doubleAnimation2);
-		storyboard.Children.Add(doubleAnimation3);
-		storyboard.Begin();
+		DoubleAnimation opacity = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(90.0)));
+		WindowScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleX);
+		WindowScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleY);
+		MainGrid.BeginAnimation(UIElement.OpacityProperty, opacity);
 	}
 
 	internal void UpdateCenterIconVisuals()
@@ -1132,6 +1355,7 @@ public partial class RadialWindow : Window
 
 		RenderSectors();
 		UpdateCenterIconVisuals();
+		_renderedLayerIndex = layerIndex;
 
 		if (_profile.Layers.Count > 1 && LayerIndicatorBadge != null && LayerIndicatorText != null)
 		{

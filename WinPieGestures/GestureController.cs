@@ -6,7 +6,7 @@ using System.Windows.Threading;
 
 namespace WinPieGestures;
 
-public class GestureController
+public class GestureController : IDisposable
 {
 	private struct POINT
 	{
@@ -220,11 +220,12 @@ public class GestureController
 		ActionExecutor.ReleaseStuckModifiers();
 	}
 
-	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window, bool IsEscaped) EndActiveGesture()
+	private (int Sector, int SubSector, WheelProfile? Profile, RadialWindow? Window, bool IsEscaped, long PresentationVersion) EndActiveGesture()
 	{
 		lock (_uiUpdateSync)
 		{
-			var result = (_selectedSectorIndex, _selectedSubSectorIndex, _activeProfile, _radialWindow, _lastEscapedState);
+			long presentationVersion = _gestureVersion;
+			var result = (_selectedSectorIndex, _selectedSubSectorIndex, _activeProfile, _radialWindow, _lastEscapedState, presentationVersion);
 			_isGestureActive = false;
 			_isWaitingForThreshold = false;
 			_gestureVersion++;
@@ -1210,6 +1211,7 @@ public class GestureController
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
 			bool isEscaped = finalState.IsEscaped;
+			long endedPresentationVersion = finalState.PresentationVersion;
 			bool volumeTookOver = _volumeGestureTookOver;
 			float volumeBaseline = _volumeBaseline;
 			// 手势结束：同步复位音量接管状态，杜绝 took/active/baseline 残留污染下一手势
@@ -1234,9 +1236,12 @@ public class GestureController
 					{
 						SystemVolume.SetVolume(volumeBaseline);
 					}
-					endedWindow?.SetVolumePreview(-1, isActive: false);
+					if (endedWindow?.PresentationVersion == endedPresentationVersion)
+					{
+						endedWindow.SetVolumePreview(-1, isActive: false);
+					}
 				}
-				CloseGestureWindow(endedWindow);
+				CloseGestureWindow(endedWindow, endedPresentationVersion);
 				if (volumeTookOver)
 				{
 					return;
@@ -1312,7 +1317,7 @@ public class GestureController
 
 	private void KeyboardHook_OnKeyDown(object? sender, GlobalKeyEventArgs e)
 	{
-		if (_isGestureActive || _radialWindow != null)
+		if (_isGestureActive)
 		{
 			// ESC 按键即刻取消手势轮盘并吞键，防止干扰前台应用
 			if (e.VkCode == 27)
@@ -1477,6 +1482,7 @@ public class GestureController
 			WheelProfile? finalProfile = finalState.Profile;
 			RadialWindow? endedWindow = finalState.Window;
 			bool isEscaped = finalState.IsEscaped;
+			long endedPresentationVersion = finalState.PresentationVersion;
 			bool volumeTookOver = _volumeGestureTookOver;
 			float volumeBaseline = _volumeBaseline;
 			_volumeAdjustActive = false;
@@ -1499,9 +1505,12 @@ public class GestureController
 					{
 						SystemVolume.SetVolume(volumeBaseline);
 					}
-					endedWindow?.SetVolumePreview(-1, isActive: false);
+					if (endedWindow?.PresentationVersion == endedPresentationVersion)
+					{
+						endedWindow.SetVolumePreview(-1, isActive: false);
+					}
 				}
-				CloseGestureWindow(endedWindow);
+				CloseGestureWindow(endedWindow, endedPresentationVersion);
 				if (volumeTookOver)
 				{
 					return;
@@ -1769,8 +1778,6 @@ public class GestureController
 		profile.SyncRootPropertiesFromActiveLayer();
 		_activeProfile = profile;
 
-		// 动作感知的按需预取：仅当当前轮盘配置中确实包含窗口切换或平铺动作时，才预取任务栏窗口
-		// 普通手势彻底杜绝无谓的 UIAutomation 扫描与线程池开销
 		if (ProfileRequiresTaskbarPrefetch(profile))
 		{
 			try
@@ -1782,58 +1789,29 @@ public class GestureController
 			}
 		}
 
-		// 构造过程可能同步读取缓存图标，必须在手势状态锁外执行。
-		RadialWindow newWindow = new RadialWindow(center, profile);
-		RadialWindow? previousWindow;
+		RadialWindow window;
 		lock (_uiUpdateSync)
 		{
-			if (!_isGestureActive)
+			if (!_isGestureActive || gestureVersion != _gestureVersion)
 			{
-				try
-				{
-					newWindow.Close();
-				}
-				catch
-				{
-				}
 				return false;
 			}
-			previousWindow = _radialWindow;
-			_radialWindow = newWindow;
-		}
-
-		if (previousWindow != null)
-		{
-			try
-			{
-				previousWindow.Close();
-			}
-			catch
-			{
-			}
+			window = _radialWindow ??= new RadialWindow(center, profile);
 		}
 
 		try
 		{
-			newWindow.Show();
-
+			window.Present(center, profile, ConfigManager.ConfigurationRevision, gestureVersion);
 			lock (_uiUpdateSync)
 			{
-				if (!_isGestureActive || !ReferenceEquals(_radialWindow, newWindow))
+				if (!_isGestureActive || gestureVersion != _gestureVersion || !ReferenceEquals(_radialWindow, window))
 				{
-					try
-					{
-						newWindow.CloseFast();
-					}
-					catch
-					{
-					}
+					window.Dismiss(gestureVersion);
 					return false;
 				}
 			}
 
-			// 屏幕边缘防溢出校准：如果窗口由于贴边或居中策略调整了物理中心，同步校正手势起点与光标位置
-			Point actualCenter = newWindow.ActualPhysicalCenter;
+			Point actualCenter = window.ActualPhysicalCenter;
 			if (Math.Abs(actualCenter.X - _startPoint.X) > 1.0 || Math.Abs(actualCenter.Y - _startPoint.Y) > 1.0)
 			{
 				_startPoint = actualCenter;
@@ -1846,21 +1824,20 @@ public class GestureController
 				SetCursorPos((int)Math.Round(actualCenter.X), (int)Math.Round(actualCenter.Y));
 				ProcessMove(actualCenter);
 			}
-
 			return true;
 		}
 		catch
 		{
 			lock (_uiUpdateSync)
 			{
-				if (ReferenceEquals(_radialWindow, newWindow))
+				if (ReferenceEquals(_radialWindow, window))
 				{
 					_radialWindow = null;
 				}
 			}
 			try
 			{
-				newWindow.CloseFast();
+				window.CloseFast();
 			}
 			catch
 			{
@@ -1871,66 +1848,36 @@ public class GestureController
 
 	private void HideRadialUI()
 	{
-		RadialWindow? windowToClose;
+		RadialWindow? window;
+		long presentationVersion;
 		lock (_uiUpdateSync)
 		{
-			windowToClose = _radialWindow;
-			_radialWindow = null;
+			window = _radialWindow;
+			presentationVersion = window?.PresentationVersion ?? -1;
 		}
-		if (windowToClose != null)
+		if (window == null)
 		{
-			try
-			{
-				if (windowToClose.Dispatcher.CheckAccess())
-				{
-					windowToClose.CloseFast();
-				}
-				else
-				{
-					windowToClose.Dispatcher.BeginInvoke((Action)(() =>
-					{
-						try { windowToClose.CloseFast(); } catch { }
-					}), DispatcherPriority.Send);
-				}
-			}
-			catch
-			{
-			}
+			return;
+		}
+		try
+		{
+			window.Dismiss(presentationVersion);
+		}
+		catch
+		{
 		}
 	}
 
-	private void CloseGestureWindow(RadialWindow? gestureWindow)
+	private void CloseGestureWindow(RadialWindow? gestureWindow, long presentationVersion)
 	{
 		if (gestureWindow == null)
 		{
 			return;
 		}
-
-		lock (_uiUpdateSync)
-		{
-			if (ReferenceEquals(_radialWindow, gestureWindow))
-			{
-				_radialWindow = null;
-			}
-		}
-
 		ActionExecutor.ReleaseStuckModifiers();
-
-		// A newer gesture may already own the active window. Close only the
-		// completed gesture's stale window and leave the newer one untouched.
 		try
 		{
-			if (gestureWindow.Dispatcher.CheckAccess())
-			{
-				gestureWindow.CloseFast();
-			}
-			else
-			{
-				gestureWindow.Dispatcher.BeginInvoke((Action)(() =>
-				{
-					try { gestureWindow.CloseFast(); } catch { }
-				}), DispatcherPriority.Send);
-			}
+			gestureWindow.Dismiss(presentationVersion);
 		}
 		catch
 		{
@@ -2013,6 +1960,48 @@ public class GestureController
 		while (angle > 180.0) angle -= 360.0;
 		while (angle < -180.0) angle += 360.0;
 		return angle;
+	}
+
+
+	public void Dispose()
+	{
+		CancelLongPressTimer();
+		_mouseHook.OnTriggerButtonDown -= Hook_OnTriggerButtonDown;
+		_mouseHook.OnTriggerButtonUp -= Hook_OnTriggerButtonUp;
+		_mouseHook.OnMouseMove -= Hook_OnMouseMove;
+		_mouseHook.OnRawMouseButtonEvent -= Hook_OnRawMouseButton;
+		_mouseHook.OnMouseWheel -= Hook_OnMouseWheel;
+		if (_keyboardHook != null)
+		{
+			_keyboardHook.OnKeyDown -= KeyboardHook_OnKeyDown;
+			_keyboardHook.OnKeyUp -= KeyboardHook_OnKeyUp;
+		}
+
+		RadialWindow? window;
+		lock (_uiUpdateSync)
+		{
+			window = _radialWindow;
+			_radialWindow = null;
+			_isGestureActive = false;
+			_highlightUpdateScheduled = false;
+		}
+		if (window != null)
+		{
+			try
+			{
+				if (window.Dispatcher.CheckAccess())
+				{
+					window.CloseFast();
+				}
+				else
+				{
+					window.Dispatcher.Invoke(window.CloseFast);
+				}
+			}
+			catch
+			{
+			}
+		}
 	}
 
 	private static bool ProfileRequiresTaskbarPrefetch(WheelProfile? profile)

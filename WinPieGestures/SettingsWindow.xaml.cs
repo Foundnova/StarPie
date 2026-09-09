@@ -2525,6 +2525,7 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
+		ConfigManager.MarkConfigurationChanged();
 		if (_autoSaveDebounceTimer == null)
 		{
 			_autoSaveDebounceTimer = new DispatcherTimer
