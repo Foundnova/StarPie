@@ -77,6 +77,15 @@ public class WheelProfile : INotifyPropertyChanged
 
 	public int SectorCount { get; set; } = 8;
 
+	/// <summary>轮盘扇区方位数量的合法下界（4 键十字方位）</summary>
+	public const int MinSectorCount = 4;
+
+	/// <summary>轮盘扇区方位数量的合法上界（12 键钟表方位，渲染调参密度上限）</summary>
+	public const int MaxSectorCount = 12;
+
+	/// <summary>扇区方位数量是否为合法值：预设档 4/8/12 与自定义档 5/6/7/9/10/11 均落在 4–12 连续区间内</summary>
+	public static bool IsValidSectorCount(int sectorCount) => sectorCount is >= MinSectorCount and <= MaxSectorCount;
+
 	public List<ActionItem> Actions { get; set; } = new List<ActionItem>();
 
 	/// <summary>中心核心圆死区动作（在外甩脱离取消开启时，松开光标于中心死区触发）</summary>
@@ -167,9 +176,10 @@ public class WheelProfile : INotifyPropertyChanged
 			{
 				layer.Name = $"第 {l + 1} 层";
 			}
-			if (layer.SectorCount != 4 && layer.SectorCount != 8 && layer.SectorCount != 12)
+			if (!IsValidSectorCount(layer.SectorCount))
 			{
-				layer.SectorCount = (this.SectorCount is 4 or 8 or 12) ? this.SectorCount : 8;
+				// 自愈：非法档位（如旧版本写坏的 0/3/13）继承本方案的合法档位，方案本身也非法时回落 8 键预设档
+				layer.SectorCount = IsValidSectorCount(this.SectorCount) ? this.SectorCount : 8;
 			}
 			if (layer.Actions == null)
 			{

@@ -6,26 +6,42 @@
 
 ## [v1.7.3-beta.4] - 2026-09-09
 
-### 内存按需轻量驻留与线程句柄深度优化 (Memory & Thread Optimization)
+### 4–12 任意自定义轮盘方位数量支持 (Arbitrary 4–12 Sector Count Support)
+1. **打破固定 4/8/12 扇区硬编码限制**：
+   - 彻底解除以往仅限 4、8、12 扇区的局限，支持 4~12 任意自定义扇区数量（如 5 键、6 键、7 键、9 键、10 键、11 键等），完美适配 3D CAD/三维建模等专业用户对 6 键手势轮盘的刚性习惯与肌肉记忆；
+   - 扇区数量调整时智能保留原有方位动作，未使用的多余槽位安全隐藏，防止配置篡改与意外覆盖；
+   - 交互画布与微缩方位指示器（`WheelPositionIndicator`）全面支持任意 N 扇区实时极角划分与动态渲染。
+2. **扇区角度连续插值公式修复 (Continuous Angle Interpolation Fix)**：
+   - 修复 `RadialWindow.xaml.cs` 中 `InterpolateBySectorAngle` 在 45°~90° 区间的数学插值方向颠倒 bug，确保 4~12 键在所有角度下的内外径、倒角、图标与字体大小平滑单调过渡，彻底消灭 5/6/7 键在 45.1° 临界点时的形变跳变与尺寸突变。
+
+### 任务栏与系统托盘物理点击原生透传守护 (Taskbar & System Tray Native Passthrough, 根治 Issue #92)
+1. **物理坐标智能识别与原生绝对透传**：
+   - **析因**：此前全局低级鼠标钩子未对光标所在的 Windows 任务栏（`Shell_TrayWnd` / `Shell_SecondaryTrayWnd`）及托盘溢出区（`NotifyIconOverflowWindow` / `TopLevelWindowForOverflowXamlIsland`）做物理坐标旁路。在后台运行时，用户右键任务栏或托盘时触发键被钩子拦截并经 `mouse_event` 模拟重放，触发 Windows UIPI 防护机制，导致任务栏固定图标右键跳转列表（JumpList）与右键菜单无响应；
+   - **解决方案**：在 `GestureController` 中引入物理坐标检测 `IsPointOnTaskbar(physicalPt)`。当鼠标光标落在主屏任务栏、副屏任务栏、系统托盘通知区或托盘溢出浮窗之上时，100% 绝对透传物理按键事件，零拦截、零模拟、零时延，使任务栏右键菜单、JumpList 跳转列表与托盘图标点击彻底恢复系统原生响应。
+2. **设置窗口后台隐藏时显式退出任务栏**：
+   - 在 `SettingsWindow` 隐藏后台与完全释放时显式将 `ShowInTaskbar` 设为 `false`，呼出时置为 `true`，彻底消除 Windows Explorer 任务栏代理窗口句柄脱节与固定图标右键失灵。
+
+### 内存按需轻量驻留与透明轮盘单 HWND 复用 (Memory & Reusable Radial HWND)
 1. **任务栏状态预取按需调度 (Taskbar Prefetch On-Demand)**：
-   - **析因**：此前在呼出手势（`ShowRadialUI`）时无条件调用 `WindowTaskbarHelper.Prefetch()`，在后台拉起了 Windows UIAutomation COM 线程与句柄，即使方案中未配置任何窗口或任务栏动作，也会产生额外的系统资源占用与潜在线程积压；
-   - **解决方案**：在 `GestureController` 中新增方案动作预检判定 `ProfileRequiresTaskbarPrefetch()`。仅当当前轮盘方案的主动作或二级子动作中明确包含 `SwitchWindow`、`Taskbar`、`Tile` 等窗口调度动作时才触发预取；纯快捷键、命令、网址与文件夹等手势方案彻底绕过 UIAutomation，保持底层极致轻量与零泄漏。
+   - 在 `GestureController` 中新增方案动作预检判定 `ProfileRequiresTaskbarPrefetch()`。仅当当前轮盘方案的主动作或二级子动作中明确包含 `SwitchWindow`、`Taskbar`、`Tile` 等窗口调度动作时才触发预取；纯快捷键、命令、网址与文件夹等手势方案彻底绕过 UIAutomation COM 扫描与线程积压，保持底层极致轻量与零泄漏。
 2. **自动更新与管理员提权静默启动自愈 (Silent Launch on Update & Elevation)**：
-   - **析因**：在线自动更新脚本与设置页面的「以管理员身份重启」在拉起新进程时，遗漏了 `--silent` 命令行参数。导致程序启动时直接实例化了包含 4 大标签页与交互画布的完整设置窗口，使得初始工作集直接冲上 160MB+；
-   - **解决方案**：
-     - 在 `UpdateManager` 的自解压安装守护脚本中，为更新后启动的进程参数显式追加 `-ArgumentList "--silent"`；
-     - 在 `App.xaml.cs` 的 `RestartElevated()` 中追加 `Arguments = "--silent"`；
-     - 使得更新与提权后程序 100% 保持在纯托盘静默后台守护态（15MB~30MB 物理内存驻留），杜绝意外弹出或膨胀。
+   - 在 `UpdateManager` 的自解压安装守护脚本与 `App.xaml.cs` 的 `RestartElevated()` 中显式追加 `--silent` 启动参数，使得更新与提权后程序 100% 保持在纯托盘静默后台守护态（15MB~30MB 物理内存驻留），杜绝意外弹出或膨胀。
 3. **旧版配置 Base64 嵌入数据自动洗涤 (Legacy Base64 Data Purge & Sanitization)**：
-   - **析因**：早期版本中部分用户配置遗留了内嵌图标数据或超长 Base64 字符串，长期存在于 `config.json` 中并可能引发大对象堆（LOH）内存碎片；
-   - **解决方案**：在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除异常超长 Base64 文本并自动持久化干净配置，杜绝历史配置导致的内存暗病。
+   - 在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除历史残留的大对象堆（LOH）异常字符串并自动持久化干净配置，杜绝历史配置导致的内存暗病。
 4. **设置窗口关闭释放深度修剪 (Deep Working Set Trim on Console Release)**：
-   - 优化控制台生命周期：用户关闭设置窗口 30 秒后进入延迟完全释放流程（`SettingsWindow_Closed`），除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
+   - 用户关闭设置窗口 30 秒后进入延迟完全释放流程，除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
 5. **透明轮盘 HWND 单例复用与按需重建 (Reusable Radial HWND)**：
-   - **析因**：压力测试确认每次重新创建 `AllowsTransparency=True` 的 `RadialWindow` 都会残留 2 个 `Mutant` 与 2 个 `Section` 原生句柄，Private Memory 基线随呼出次数阶梯抬升；托管窗口对象本身可正常回收，问题集中在重复创建透明 HWND 与 WPF 合成通道。
-   - **解决方案**：`GestureController` 全程复用单个 `RadialWindow/HWND`，手势结束仅执行 generation-safe `Dismiss/Hide`，仅在进程退出或窗口异常失效时真正 `Close`；引入 `ConfigManager.ConfigurationRevision`，配置、方案或活动层变化时才重建扇区视觉树，普通呼出仅重置高亮、更新物理中心与 DPI。
-   - **竞态守护**：为每次呈现绑定 `PresentationVersion`，旧手势排队中的关闭与音量预览回调不得隐藏或污染新手势；应用退出时由 `GestureController.Dispose()` 统一注销 Hook 事件并销毁复用窗口。
-   - **压力验证**：同一透明 HWND 连续 1200 次呼出/隐藏后句柄仅有 3~5 个系统噪声波动，不再按每次 +4 线性增长；连续 100 次配置修订重建时视觉子项数量恒定，句柄无累积。
+   - `GestureController` 全程复用单个 `RadialWindow/HWND`，手势结束仅执行 generation-safe `Dismiss/Hide`，仅在进程退出或窗口异常失效时真正 `Close`；引入 `ConfigManager.ConfigurationRevision`，配置、方案或活动层变化时才重建扇区视觉树，普通呼出仅重置高亮、更新物理中心与 DPI；
+   - **竞态守护**：为每次呈现绑定 `PresentationVersion`，旧手势排队中的关闭与音量预览回调不得隐藏或污染新手势；应用退出时由 `GestureController.Dispose()` 统一注销 Hook 事件并销毁复用窗口；
+   - **压力验证**：同一透明 HWND 连续 1200 次呼出/隐藏后句柄保持稳定无泄漏；连续 100 次配置修订重建时视觉子项数量恒定，句柄无累积。
+
+### 社区协同与体验提升 (Community PRs Integrated)
+1. **控制台支持 80%~200% 全局界面缩放 (Settings UI Scaling, PR #87)**：
+   - 设置界面新增全局缩放滑块（80% ~ 200%），支持 4K/高分屏或小尺寸屏幕自由缩放控制台 UI。
+2. **中心文字自适应配色修复 (Center Text Auto Contrast, PR #88)**：
+   - 修复浅色主题下中心文字在浅色背景上白字白底对比度不足缺陷，动态检测背景亮度自适应深浅文本色。
+3. **补回「自定义配色」主题入口 (Custom Color Theme Entry, PR #89)**：
+   - 补齐一二级主题下拉选单中的自定义配色方案入口，使高级自定义色彩能够无损实时生效与切换。
 
 ---
 

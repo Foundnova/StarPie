@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -156,6 +157,72 @@ public class GestureController : IDisposable
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool SetCursorPos(int X, int Y);
+
+	[DllImport("user32.dll")]
+	private static extern nint WindowFromPoint(POINT Point);
+
+	[DllImport("user32.dll")]
+	private static extern nint GetAncestor(nint hwnd, uint gaFlags);
+	private const uint GA_ROOT = 2;
+
+	[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+	private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
+
+	/// <summary>
+	/// 检测物理坐标是否位于 Windows 任务栏、辅助屏任务栏、托盘通知区或溢出窗口之上。
+	/// 避免星盘低级鼠标钩子截断任务栏右键菜单、跳转列表 (JumpList) 或托盘图标原生点击。
+	/// </summary>
+	private static bool IsPointOnTaskbar(Point physicalPt)
+	{
+		try
+		{
+			POINT pt = new POINT { x = (int)Math.Round(physicalPt.X), y = (int)Math.Round(physicalPt.Y) };
+			nint hWnd = WindowFromPoint(pt);
+			if (hWnd == IntPtr.Zero)
+			{
+				return false;
+			}
+			nint rootHwnd = GetAncestor(hWnd, GA_ROOT);
+			if (rootHwnd == IntPtr.Zero)
+			{
+				rootHwnd = hWnd;
+			}
+
+			StringBuilder sb = new StringBuilder(128);
+			if (GetClassName(rootHwnd, sb, 128) > 0)
+			{
+				string rootClass = sb.ToString();
+				if (string.Equals(rootClass, "Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
+				    string.Equals(rootClass, "Shell_SecondaryTrayWnd", StringComparison.OrdinalIgnoreCase) ||
+				    string.Equals(rootClass, "NotifyIconOverflowWindow", StringComparison.OrdinalIgnoreCase) ||
+				    string.Equals(rootClass, "TopLevelWindowForOverflowXamlIsland", StringComparison.OrdinalIgnoreCase))
+				{
+					return true;
+				}
+			}
+
+			if (rootHwnd != hWnd)
+			{
+				sb.Clear();
+				if (GetClassName(hWnd, sb, 128) > 0)
+				{
+					string childClass = sb.ToString();
+					if (string.Equals(childClass, "Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
+					    string.Equals(childClass, "Shell_SecondaryTrayWnd", StringComparison.OrdinalIgnoreCase) ||
+					    string.Equals(childClass, "NotifyIconOverflowWindow", StringComparison.OrdinalIgnoreCase) ||
+					    string.Equals(childClass, "TrayNotifyWnd", StringComparison.OrdinalIgnoreCase))
+					{
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+		catch
+		{
+			return false;
+		}
+	}
 
 	public GestureController(MouseHook mouseHook, KeyboardHook? keyboardHook = null)
 	{
@@ -700,9 +767,9 @@ public class GestureController : IDisposable
 		ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
 		if ((!triggerConfig.RequireCtrl || ((((int)currentModifiers & 2))) != 0) && (!triggerConfig.RequireShift || ((((int)currentModifiers & 4))) != 0) && (!triggerConfig.RequireAlt || ((((int)currentModifiers & 1))) != 0) && (!triggerConfig.RequireWin || ((((int)currentModifiers & 8))) != 0))
 		{
-			if (CheckIsIsolated(out string _))
+			if (CheckIsIsolated(out string _) || IsPointOnTaskbar(e.Position))
 			{
-				// 隔离模式与黑名单（如 Maya）：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()，杜绝注入虚假 KeyUp 破坏物理按键
+				// 隔离模式、黑名单或位于任务栏/托盘区域：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()，杜绝注入虚假 KeyUp 破坏物理按键
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				_mouseTriggerDown = false;
@@ -762,7 +829,7 @@ public class GestureController : IDisposable
 				_gestureReplayPending = false;
 				return;
 			}
-			if (CheckIsIsolated(out _))
+			if (CheckIsIsolated(out _) || IsPointOnTaskbar(e.Position))
 			{
 				_gestureMode = false;
 				e.Handled = false;
