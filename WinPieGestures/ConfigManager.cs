@@ -82,6 +82,8 @@ public static class ConfigManager
 			if (File.Exists(ConfigPath))
 			{
 				string json = File.ReadAllText(ConfigPath);
+				bool hasLegacyBase64 = json.Contains("\"EmbeddedCustomIcons\"", StringComparison.OrdinalIgnoreCase) ||
+				                       json.Contains("data:image/", StringComparison.OrdinalIgnoreCase);
 				JsonSerializerOptions options = new JsonSerializerOptions
 				{
 					PropertyNameCaseInsensitive = true,
@@ -91,6 +93,11 @@ public static class ConfigManager
 				CurrentConfig = JsonSerializer.Deserialize<AppConfig>(json, options) ?? CreateDefaultConfig();
 				EnsureConfigHealth(CurrentConfig);
 				AppLogger.LogInfo($"Loaded configuration from '{ConfigPath}'");
+				if (hasLegacyBase64)
+				{
+					SaveConfig();
+					AppLogger.LogInfo("Automatically purged legacy Base64 embedded data from config file.");
+				}
 			}
 			else
 			{
@@ -231,7 +238,46 @@ public static class ConfigManager
 			profile.SyncActiveLayerFromRootProperties();
 		}
 
+		CleanLegacyActionBase64(currentConfig);
 		EnsureTriggerHealth(currentConfig);
+	}
+
+	private static void CleanLegacyActionBase64(AppConfig? config)
+	{
+		if (config?.Profiles == null) return;
+		foreach (var profile in config.Profiles)
+		{
+			if (profile == null) continue;
+			CleanActionsBase64(profile.Actions);
+			if (profile.Layers != null)
+			{
+				foreach (var layer in profile.Layers)
+				{
+					if (layer != null) CleanActionsBase64(layer.Actions);
+				}
+			}
+		}
+	}
+
+	private static void CleanActionsBase64(List<ActionItem>? actions)
+	{
+		if (actions == null) return;
+		foreach (var a in actions)
+		{
+			if (a == null) continue;
+			if (!string.IsNullOrEmpty(a.CustomIconSvg) && (a.CustomIconSvg.StartsWith("data:image", StringComparison.OrdinalIgnoreCase) || a.CustomIconSvg.Length > 80000))
+			{
+				a.CustomIconSvg = string.Empty;
+			}
+			if (!string.IsNullOrEmpty(a.InheritAppIconPath) && a.InheritAppIconPath.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+			{
+				a.InheritAppIconPath = string.Empty;
+			}
+			if (a.SubActions != null)
+			{
+				CleanActionsBase64(a.SubActions);
+			}
+		}
 	}
 
 	// 返回是否保存成功，调用方据此决定提示文案，避免无条件宣称“已保存”。

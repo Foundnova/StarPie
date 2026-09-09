@@ -1769,13 +1769,17 @@ public class GestureController
 		profile.SyncRootPropertiesFromActiveLayer();
 		_activeProfile = profile;
 
-		// 预加载的线程调度与 single-flight 统一由 WindowTaskbarHelper 管理。
-		try
+		// 动作感知的按需预取：仅当当前轮盘配置中确实包含窗口切换或平铺动作时，才预取任务栏窗口
+		// 普通手势彻底杜绝无谓的 UIAutomation 扫描与线程池开销
+		if (ProfileRequiresTaskbarPrefetch(profile))
 		{
-			WindowTaskbarHelper.Prefetch();
-		}
-		catch
-		{
+			try
+			{
+				WindowTaskbarHelper.Prefetch();
+			}
+			catch
+			{
+			}
 		}
 
 		// 构造过程可能同步读取缓存图标，必须在手势状态锁外执行。
@@ -2009,5 +2013,61 @@ public class GestureController
 		while (angle > 180.0) angle -= 360.0;
 		while (angle < -180.0) angle += 360.0;
 		return angle;
+	}
+
+	private static bool ProfileRequiresTaskbarPrefetch(WheelProfile? profile)
+	{
+		if (profile == null) return false;
+		if (ActionRequiresTaskbar(profile.CenterAction)) return true;
+		if (profile.Actions != null)
+		{
+			for (int i = 0; i < profile.Actions.Count; i++)
+			{
+				if (ActionRequiresTaskbar(profile.Actions[i])) return true;
+			}
+		}
+		if (profile.Layers != null)
+		{
+			for (int l = 0; l < profile.Layers.Count; l++)
+			{
+				var layer = profile.Layers[l];
+				if (layer == null) continue;
+				if (ActionRequiresTaskbar(layer.CenterAction)) return true;
+				if (layer.Actions != null)
+				{
+					for (int i = 0; i < layer.Actions.Count; i++)
+					{
+						if (ActionRequiresTaskbar(layer.Actions[i])) return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private static bool ActionRequiresTaskbar(ActionItem? action)
+	{
+		if (action == null) return false;
+		string type = action.Type ?? "";
+		if (type.Equals("SwitchWindow", StringComparison.OrdinalIgnoreCase) ||
+		    type.Equals("Taskbar", StringComparison.OrdinalIgnoreCase) ||
+		    type.Equals("Tile", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		string param = action.Parameter ?? "";
+		if (param.StartsWith("Taskbar", StringComparison.OrdinalIgnoreCase) ||
+		    param.StartsWith("SwitchWindow", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+		if (action.SubActions != null)
+		{
+			for (int i = 0; i < action.SubActions.Count; i++)
+			{
+				if (ActionRequiresTaskbar(action.SubActions[i])) return true;
+			}
+		}
+		return false;
 	}
 }

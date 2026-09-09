@@ -837,13 +837,13 @@ try {{
     Get-ChildItem -LiteralPath $targetDir -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 }} catch {{}}
 
-# 5. 重新启动新版 StarPie
+# 5. 重新启动新版 StarPie (以 --silent 静默模式启动，避免更新后强制弹出全量控制台 UI)
 Start-Sleep -Milliseconds 400
 try {{
-    Start-Process -FilePath $exePath -WorkingDirectory $targetDir
+    Start-Process -FilePath $exePath -ArgumentList ""--silent"" -WorkingDirectory $targetDir
 }} catch {{
     try {{
-        [System.Diagnostics.Process]::Start($exePath)
+        [System.Diagnostics.Process]::Start($exePath, ""--silent"")
     }} catch {{}}
 }}
 

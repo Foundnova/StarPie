@@ -4,6 +4,26 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.7.3-beta.4] - 2026-09-09
+
+### 内存按需轻量驻留与线程句柄深度优化 (Memory & Thread Optimization)
+1. **任务栏状态预取按需调度 (Taskbar Prefetch On-Demand)**：
+   - **析因**：此前在呼出手势（`ShowRadialUI`）时无条件调用 `WindowTaskbarHelper.Prefetch()`，在后台拉起了 Windows UIAutomation COM 线程与句柄，即使方案中未配置任何窗口或任务栏动作，也会产生额外的系统资源占用与潜在线程积压；
+   - **解决方案**：在 `GestureController` 中新增方案动作预检判定 `ProfileRequiresTaskbarPrefetch()`。仅当当前轮盘方案的主动作或二级子动作中明确包含 `SwitchWindow`、`Taskbar`、`Tile` 等窗口调度动作时才触发预取；纯快捷键、命令、网址与文件夹等手势方案彻底绕过 UIAutomation，保持底层极致轻量与零泄漏。
+2. **自动更新与管理员提权静默启动自愈 (Silent Launch on Update & Elevation)**：
+   - **析因**：在线自动更新脚本与设置页面的「以管理员身份重启」在拉起新进程时，遗漏了 `--silent` 命令行参数。导致程序启动时直接实例化了包含 4 大标签页与交互画布的完整设置窗口，使得初始工作集直接冲上 160MB+；
+   - **解决方案**：
+     - 在 `UpdateManager` 的自解压安装守护脚本中，为更新后启动的进程参数显式追加 `-ArgumentList "--silent"`；
+     - 在 `App.xaml.cs` 的 `RestartElevated()` 中追加 `Arguments = "--silent"`；
+     - 使得更新与提权后程序 100% 保持在纯托盘静默后台守护态（15MB~30MB 物理内存驻留），杜绝意外弹出或膨胀。
+3. **旧版配置 Base64 嵌入数据自动洗涤 (Legacy Base64 Data Purge & Sanitization)**：
+   - **析因**：早期版本中部分用户配置遗留了内嵌图标数据或超长 Base64 字符串，长期存在于 `config.json` 中并可能引发大对象堆（LOH）内存碎片；
+   - **解决方案**：在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除异常超长 Base64 文本并自动持久化干净配置，杜绝历史配置导致的内存暗病。
+4. **设置窗口关闭释放深度修剪 (Deep Working Set Trim on Console Release)**：
+   - 优化控制台生命周期：用户关闭设置窗口 30 秒后进入延迟完全释放流程（`SettingsWindow_Closed`），除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
+
+---
+
 ## [v1.7.3-beta.3] - 2026-09-09
 
 ### 历史版本一键回退机制 (Version Rollback Engine)

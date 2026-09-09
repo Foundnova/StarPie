@@ -136,7 +136,7 @@ public partial class App : Application
 			}
 		}
 		base.OnStartup(e);
-		AppLogger.LogInfo($"=== StarPie v1.7.3-beta.3 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
+		AppLogger.LogInfo($"=== StarPie v1.7.3-beta.4 Starting (OS: {Environment.OSVersion}, .NET: {Environment.Version}, 64bit: {Environment.Is64BitProcess}, Elevated: {ConfigManager.IsElevated()}) ===");
 		base.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(App_DispatcherUnhandledException);
 		AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 		try
@@ -258,7 +258,7 @@ public partial class App : Application
 		if (!_isExiting && Application.Current != null)
 		{
 			Application.Current.Dispatcher.BeginInvoke(
-				(Action)(() => MemoryOptimizer.TrimMemory(force: false)),
+				(Action)(() => MemoryOptimizer.TrimMemory(force: true)),
 				DispatcherPriority.ApplicationIdle);
 		}
 	}
@@ -306,6 +306,7 @@ public partial class App : Application
 			Process.Start(new ProcessStartInfo
 			{
 				FileName = fileName,
+				Arguments = "--silent",
 				UseShellExecute = true,
 				Verb = "runas"
 			});
