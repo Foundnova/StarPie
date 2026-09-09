@@ -89,7 +89,6 @@ public static class ConfigManager
 					ReadCommentHandling = JsonCommentHandling.Skip
 				};
 				CurrentConfig = JsonSerializer.Deserialize<AppConfig>(json, options) ?? CreateDefaultConfig();
-				IconHelper.UnpackEmbeddedAssets(CurrentConfig);
 				EnsureConfigHealth(CurrentConfig);
 				AppLogger.LogInfo($"Loaded configuration from '{ConfigPath}'");
 			}
@@ -253,7 +252,6 @@ public static class ConfigManager
 						p?.SyncRootPropertiesFromActiveLayer();
 					}
 				}
-				IconHelper.PackEmbeddedAssets(CurrentConfig);
 			}
 			JsonSerializerOptions options = new JsonSerializerOptions
 			{
@@ -585,7 +583,6 @@ public static class ConfigManager
 						p?.SyncRootPropertiesFromActiveLayer();
 					}
 				}
-				IconHelper.PackEmbeddedAssets(CurrentConfig);
 			}
 			JsonSerializerOptions options = new JsonSerializerOptions
 			{
@@ -619,7 +616,6 @@ public static class ConfigManager
 			AppConfig? appConfig = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(sourceFilePath), options);
 			if (appConfig != null)
 			{
-				IconHelper.UnpackEmbeddedAssets(appConfig);
 				EnsureConfigHealth(appConfig);
 				CurrentConfig = appConfig;
 				I18n.SetLanguage(CurrentConfig.Language);

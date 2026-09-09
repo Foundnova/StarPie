@@ -747,32 +747,15 @@ public partial class RadialWindow : Window
 			{
 				customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
 			}
-			bool flag = customIconItem != null && !customIconItem.IsSvg && (File.Exists(customIconItem.FilePath) || IconHelper.GetCustomImageSource(customIconItem.Key) != null);
-			bool flag2 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && (File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath) || IconHelper.GetCustomImageSource("core:image") != null || IconHelper.GetCustomImageSource(ConfigManager.CurrentConfig.CoreCustomImagePath) != null);
+			bool flag = customIconItem != null && !customIconItem.IsSvg && File.Exists(customIconItem.FilePath);
+			bool flag2 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
 			bool isImagePattern = ((text2 == "Image") | flag) || (flag2 && text2 != "Custom" && text2 != "Exit");
-			string? text3 = (flag ? (customIconItem?.FilePath ?? customIconItem?.Key) : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
+			string? text3 = (flag ? customIconItem?.FilePath : (flag2 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
 
 			ImageSource? loadedCoreImgSource = null;
 			if (isImagePattern && !string.IsNullOrEmpty(text3))
 			{
-				if (File.Exists(text3))
-				{
-					try
-					{
-						BitmapImage bitmapImage = new BitmapImage();
-						bitmapImage.BeginInit();
-						bitmapImage.UriSource = new Uri(text3, UriKind.Absolute);
-						bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-						bitmapImage.EndInit();
-						((Freezable)bitmapImage).Freeze();
-						loadedCoreImgSource = bitmapImage;
-					}
-					catch { }
-				}
-				if (loadedCoreImgSource == null)
-				{
-					loadedCoreImgSource = IconHelper.GetCustomImageSource(text3) ?? IconHelper.GetCustomImageSource("core:image");
-				}
+				loadedCoreImgSource = IconHelper.GetCustomImageSource(text3);
 			}
 
 			if (loadedCoreImgSource != null)

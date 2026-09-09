@@ -90,11 +90,6 @@ public class AppConfig
 	/// <summary>是否开启应用专属方案继承/叠加 Global 全局方案（当应用方案槽位留空未配置时自动透传全局动作）。</summary>
 	public bool EnableGlobalInheritance { get; set; } = true;
 
-	/// <summary>
-	/// 配置文件内嵌记忆的自定义图片与图标缓存库（键：资源键或相对路径，值：Base64 编码数据或 SVG 文本）。
-	/// 使得配置文件在导出并迁移到其他没有本地原始图片路径的电脑上导入时，依然能 100% 完整无损显示所有自定义图片与图标。
-	/// </summary>
-	public Dictionary<string, string> EmbeddedCustomIcons { get; set; } = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
 
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 

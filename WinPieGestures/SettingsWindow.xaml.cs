@@ -6285,10 +6285,10 @@ public partial class SettingsWindow : Window
 				{
 					customIconItem = IconHelper.GetCustomIcons().FirstOrDefault(c => string.Equals(c.Key, cfg.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
 				}
-				bool isCustomFileImg = customIconItem != null && !customIconItem.IsSvg && (File.Exists(customIconItem.FilePath) || IconHelper.GetCustomImageSource(customIconItem.Key) != null);
-				bool hasCustomImgPath = !string.IsNullOrEmpty(cfg.CoreCustomImagePath) && (File.Exists(cfg.CoreCustomImagePath) || IconHelper.GetCustomImageSource("core:image") != null || IconHelper.GetCustomImageSource(cfg.CoreCustomImagePath) != null);
+				bool isCustomFileImg = customIconItem != null && !customIconItem.IsSvg && File.Exists(customIconItem.FilePath);
+				bool hasCustomImgPath = !string.IsNullOrEmpty(cfg.CoreCustomImagePath) && File.Exists(cfg.CoreCustomImagePath);
 				bool isImageMode = ((text2 == "Image") || isCustomFileImg) || (hasCustomImgPath && text2 != "Custom" && text2 != "Exit");
-				string? targetImgPath = isCustomFileImg ? (customIconItem?.FilePath ?? customIconItem?.Key) : (hasCustomImgPath ? cfg.CoreCustomImagePath : null);
+				string? targetImgPath = isCustomFileImg ? customIconItem?.FilePath : (hasCustomImgPath ? cfg.CoreCustomImagePath : null);
 
 				double coreScale = (cfg.CoreIconScale > 0.0) ? cfg.CoreIconScale : 1.0;
 				double coreImageOffsetX = cfg.CoreImageOffsetX;
@@ -6298,24 +6298,7 @@ public partial class SettingsWindow : Window
 				ImageSource? loadedImgSource = null;
 				if (isImageMode && !string.IsNullOrEmpty(targetImgPath))
 				{
-					if (File.Exists(targetImgPath))
-					{
-						try
-						{
-							BitmapImage bitmapImage = new BitmapImage();
-							bitmapImage.BeginInit();
-							bitmapImage.UriSource = new Uri(targetImgPath, UriKind.Absolute);
-							bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-							bitmapImage.EndInit();
-							((Freezable)bitmapImage).Freeze();
-							loadedImgSource = bitmapImage;
-						}
-						catch { }
-					}
-					if (loadedImgSource == null)
-					{
-						loadedImgSource = IconHelper.GetCustomImageSource(targetImgPath) ?? IconHelper.GetCustomImageSource("core:image");
-					}
+					loadedImgSource = IconHelper.GetCustomImageSource(targetImgPath);
 				}
 
 				if (loadedImgSource != null)
@@ -10789,7 +10772,7 @@ public partial class SettingsWindow : Window
 			}
 			try
 			{
-				ImageSource? fallbackSource = IconHelper.GetCustomImageSource(imagePath) ?? IconHelper.GetCustomImageSource("core:image");
+				ImageSource? fallbackSource = IconHelper.GetCustomImageSource(imagePath);
 				if (fallbackSource != null)
 				{
 					CoreImageThumbnail.Source = fallbackSource;
@@ -12762,10 +12745,10 @@ public partial class SettingsWindow : Window
 			{
 				customIconItem = IconHelper.GetCustomIcons().FirstOrDefault((IconHelper.CustomIconItem c) => string.Equals(c.Key, ConfigManager.CurrentConfig.CoreCustomIconKey, StringComparison.OrdinalIgnoreCase));
 			}
-			bool flag2 = customIconItem != null && !customIconItem.IsSvg && (File.Exists(customIconItem.FilePath) || IconHelper.GetCustomImageSource(customIconItem.Key) != null);
-			bool flag3 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && (File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath) || IconHelper.GetCustomImageSource("core:image") != null || IconHelper.GetCustomImageSource(ConfigManager.CurrentConfig.CoreCustomImagePath) != null);
+			bool flag2 = customIconItem != null && !customIconItem.IsSvg && File.Exists(customIconItem.FilePath);
+			bool flag3 = !string.IsNullOrEmpty(ConfigManager.CurrentConfig.CoreCustomImagePath) && File.Exists(ConfigManager.CurrentConfig.CoreCustomImagePath);
 			bool num16 = ((text6 == "Image") | flag2) || (flag3 && text6 != "Custom" && text6 != "Exit");
-			string text7 = (flag2 ? (customIconItem?.FilePath ?? customIconItem?.Key) : (flag3 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
+			string text7 = (flag2 ? customIconItem?.FilePath : (flag3 ? ConfigManager.CurrentConfig.CoreCustomImagePath : null));
 			double num17 = ((ConfigManager.CurrentConfig.CoreIconScale > 0.0) ? ConfigManager.CurrentConfig.CoreIconScale : 1.0);
 			double coreImageOffsetX = ConfigManager.CurrentConfig.CoreImageOffsetX;
 			double coreImageOffsetY = ConfigManager.CurrentConfig.CoreImageOffsetY;
@@ -12777,24 +12760,7 @@ public partial class SettingsWindow : Window
 				ImageSource? loadedImgSource = null;
 				if (num16 && !string.IsNullOrEmpty(text7))
 				{
-					if (File.Exists(text7))
-					{
-						try
-						{
-							BitmapImage bitmapImage = new BitmapImage();
-							bitmapImage.BeginInit();
-							bitmapImage.UriSource = new Uri(text7, UriKind.Absolute);
-							bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-							bitmapImage.EndInit();
-							((Freezable)bitmapImage).Freeze();
-							loadedImgSource = bitmapImage;
-						}
-						catch { }
-					}
-					if (loadedImgSource == null)
-					{
-						loadedImgSource = IconHelper.GetCustomImageSource(text7) ?? IconHelper.GetCustomImageSource("core:image");
-					}
+					loadedImgSource = IconHelper.GetCustomImageSource(text7);
 				}
 
 				if (loadedImgSource != null)
