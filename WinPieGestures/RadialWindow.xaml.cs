@@ -228,6 +228,8 @@ public partial class RadialWindow : Window
 		{
 			try
 			{
+				_isPresented = false;
+				PresentationVersion = -1;
 				BeginAnimation(UIElement.OpacityProperty, null);
 				Visibility = Visibility.Collapsed;
 				Close();
@@ -390,6 +392,8 @@ public partial class RadialWindow : Window
 
 	private bool _hasRenderedContent;
 
+	private bool _isPresented;
+
 	private bool _isDisposed;
 
 	private static Point ComputeClampedPhysicalCenter(Point centerPoint, double canvasSize)
@@ -545,6 +549,7 @@ public partial class RadialWindow : Window
 		_centerPoint = centerPoint;
 		_profile = profile;
 		_requestedConfigurationRevision = configurationRevision;
+		_isPresented = true;
 		PresentationVersion = presentationVersion;
 		ResetPresentationState();
 		ApplyLayoutFromCurrentConfiguration(centerPoint);
@@ -562,30 +567,18 @@ public partial class RadialWindow : Window
 			Show();
 		}
 		PositionWindowOnTargetMonitor();
-		Dispatcher.BeginInvoke(new Action(() =>
-		{
-			if (!_isDisposed && PresentationVersion == presentationVersion)
-			{
-				CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
-			}
-		}), DispatcherPriority.Render);
 
-		// 内容层在上一帧完成前保持隐藏；下一次 Render 回调再显示并启动动效，
-		// 避免复用透明 HWND 时 DWM 先显示旧的完整视觉树。
+		// 内容层在上一帧隐藏状态下已完成最新配置与视觉树更新，
+		// 紧接在下一 Render 回调即刻校准物理中心、揭示内容并平滑播放入场动效。
 		Dispatcher.BeginInvoke(new Action(() =>
 		{
-			if (_isDisposed || !IsVisible || PresentationVersion != presentationVersion)
+			if (_isDisposed || !_isPresented || PresentationVersion != presentationVersion)
 			{
 				return;
 			}
+			CenterOnPhysically(_centerPoint.X, _centerPoint.Y);
 			MainGrid.Visibility = Visibility.Visible;
-			Dispatcher.BeginInvoke(new Action(() =>
-			{
-				if (!_isDisposed && IsVisible && PresentationVersion == presentationVersion)
-				{
-					StartIntroAnimation(presentationVersion);
-				}
-			}), DispatcherPriority.Render);
+			StartIntroAnimation(presentationVersion);
 		}), DispatcherPriority.Render);
 	}
 
@@ -601,6 +594,8 @@ public partial class RadialWindow : Window
 		{
 			return;
 		}
+		_isPresented = false;
+		PresentationVersion = -1;
 		StopPresentationAnimations();
 		// 保持透明 HWND 常驻，只隐藏内容层；不再 Hide/Show 窗口，避免 DWM 在重新显示时闪出上一帧。
 		Opacity = 1.0;
@@ -1041,7 +1036,7 @@ public partial class RadialWindow : Window
 
 	private void StartIntroAnimation(long presentationVersion)
 	{
-		if (_isDisposed || !IsVisible || PresentationVersion != presentationVersion)
+		if (_isDisposed || !_isPresented || !IsVisible || PresentationVersion != presentationVersion)
 		{
 			return;
 		}
@@ -2055,7 +2050,6 @@ public partial class RadialWindow : Window
 			_isOuterEscaped = isEscaped;
 			DoubleAnimation animation = new DoubleAnimation
 			{
-				From = Opacity,
 				To = (isEscaped ? 0.38 : 1.0),
 				Duration = TimeSpan.FromMilliseconds(120.0),
 				EasingFunction = new QuadraticEase
