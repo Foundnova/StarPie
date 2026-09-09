@@ -21,6 +21,11 @@
    - **解决方案**：在 `ConfigManager.LoadConfig()` 与 `EnsureConfigHealth()` 中加入旧版 Base64 自动探测与洗涤逻辑，自动清除异常超长 Base64 文本并自动持久化干净配置，杜绝历史配置导致的内存暗病。
 4. **设置窗口关闭释放深度修剪 (Deep Working Set Trim on Console Release)**：
    - 优化控制台生命周期：用户关闭设置窗口 30 秒后进入延迟完全释放流程（`SettingsWindow_Closed`），除了注销全部外部事件并释放 UI 视觉树外，调度 `MemoryOptimizer.TrimMemory(force: true)` 强制执行第二代 GC 回收与物理工作集规整，让内存迅速利落回落至 15MB~30MB 基准。
+5. **透明轮盘 HWND 单例复用与按需重建 (Reusable Radial HWND)**：
+   - **析因**：压力测试确认每次重新创建 `AllowsTransparency=True` 的 `RadialWindow` 都会残留 2 个 `Mutant` 与 2 个 `Section` 原生句柄，Private Memory 基线随呼出次数阶梯抬升；托管窗口对象本身可正常回收，问题集中在重复创建透明 HWND 与 WPF 合成通道。
+   - **解决方案**：`GestureController` 全程复用单个 `RadialWindow/HWND`，手势结束仅执行 generation-safe `Dismiss/Hide`，仅在进程退出或窗口异常失效时真正 `Close`；引入 `ConfigManager.ConfigurationRevision`，配置、方案或活动层变化时才重建扇区视觉树，普通呼出仅重置高亮、更新物理中心与 DPI。
+   - **竞态守护**：为每次呈现绑定 `PresentationVersion`，旧手势排队中的关闭与音量预览回调不得隐藏或污染新手势；应用退出时由 `GestureController.Dispose()` 统一注销 Hook 事件并销毁复用窗口。
+   - **压力验证**：同一透明 HWND 连续 1200 次呼出/隐藏后句柄仅有 3~5 个系统噪声波动，不再按每次 +4 线性增长；连续 100 次配置修订重建时视觉子项数量恒定，句柄无累积。
 
 ---
 

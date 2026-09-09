@@ -406,6 +406,8 @@ public partial class App : Application
 		}
 		try
 		{
+			MainGestureController?.Dispose();
+			MainGestureController = null;
 			MainMouseHook?.Stop();
 			MainKeyboardHook?.Stop();
 		}

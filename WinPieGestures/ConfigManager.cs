@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Principal;
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Win32;
 
 namespace WinPieGestures;
@@ -16,6 +17,19 @@ public static class ConfigManager
 	private static readonly string ConfigPath;
 
 	public static AppConfig CurrentConfig { get; private set; }
+
+	private static long _configurationRevision;
+
+	/// <summary>
+	/// 轮盘可见配置的单调修订号。设置页发生内存态修改时立即递增，保存/导入/重新加载时也递增，
+	/// 供长期复用的 RadialWindow 判断是否需要重建视觉树。
+	/// </summary>
+	public static long ConfigurationRevision => Interlocked.Read(ref _configurationRevision);
+
+	public static void MarkConfigurationChanged()
+	{
+		Interlocked.Increment(ref _configurationRevision);
+	}
 
 	// 本次启动是否因配置文件损坏而回落到了默认配置。
 	// 为 true 时必须禁止任何自动写盘，否则会把默认配置覆盖掉用户尚可恢复的损坏文件。
@@ -107,6 +121,7 @@ public static class ConfigManager
 				AppLogger.LogInfo($"Created and saved default configuration at '{ConfigPath}'");
 			}
 			I18n.SetLanguage(CurrentConfig.Language);
+			MarkConfigurationChanged();
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
 			_ = System.Threading.Tasks.Task.Run(async () =>
 			{
@@ -128,6 +143,7 @@ public static class ConfigManager
 			CurrentConfig = CreateDefaultConfig();
 			EnsureConfigHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
+			MarkConfigurationChanged();
 		}
 	}
 
@@ -283,6 +299,9 @@ public static class ConfigManager
 	// 返回是否保存成功，调用方据此决定提示文案，避免无条件宣称“已保存”。
 	public static bool SaveConfig()
 	{
+		// 配置即使因磁盘故障保存失败，当前进程中的内存态也已经改变；
+		// 先失效轮盘渲染缓存，确保下一次呼出展示最新状态。
+		MarkConfigurationChanged();
 		try
 		{
 			if (!Directory.Exists(AppDataFolder))
