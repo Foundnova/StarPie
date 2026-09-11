@@ -493,6 +493,20 @@ public static class I18n
 			[LanguageCode.En] = "When enabled, hovering over a sector with sub-actions will smoothly expand cascading outer sub-sectors. Flick outward to trigger.",
 			[LanguageCode.Ja] = "有効にすると、サブアクションが設定されたセクターにホバーした際に外側にカスケードサブメニューが展開され、外側へスワイプしてトリガーできます。"
 		};
+		dictionary["AutoExpandSubRingsTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "唤出时直接同时展开一二级轮盘 (Auto-Expand Sub-Rings)",
+			[LanguageCode.ZhTw] = "喚出時直接同時展開一二級輪盤 (Auto-Expand Sub-Rings)",
+			[LanguageCode.En] = "Expand Sub-Rings Simultaneously on Popup",
+			[LanguageCode.Ja] = "ポップアップ時にサブリングを同時展開"
+		};
+		dictionary["AutoExpandSubRingsDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "开启后，呼出轮盘时所有已配置二级动作的外圈子环将与一级扇区同时呈现，无需向外划出触发距离即可一览全部操作。",
+			[LanguageCode.ZhTw] = "開啟後，呼出輪盤時所有已配置二級動作的外圈子環將與一級扇區同時呈現，無需向外劃出觸發距離即可一覽全部操作。",
+			[LanguageCode.En] = "When enabled, outer sub-rings for all configured sectors expand simultaneously upon popup without needing to drag past trigger distance.",
+			[LanguageCode.Ja] = "有効にすると、ポップアップ時にトリガー距離をスワイプしなくても、設定済みのすべてのサブリングがメインセクターと同時に展開されます。"
+		};
 		dictionary["IsolationModeTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "进程隔离与生效模式 (Process Isolation Mode)",

@@ -515,7 +515,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
-		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.4");
+		string text = "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.5");
 		if (SidebarVersionText != null)
 		{
 			SidebarVersionText.Text = text;
@@ -1200,6 +1200,15 @@ public partial class SettingsWindow : Window
 		{
 			EnableMultiTierCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableMultiTier;
 		}
+		if (AutoExpandSubRingsCheckBox != null)
+		{
+			AutoExpandSubRingsCheckBox.IsChecked = ConfigManager.CurrentConfig.AutoExpandSubRingsOnPopup;
+		}
+		if (AutoExpandSubRingsPanel != null)
+		{
+			bool isFanSub = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+			AutoExpandSubRingsPanel.Visibility = (ConfigManager.CurrentConfig.EnableMultiTier && !isFanSub) ? Visibility.Visible : Visibility.Collapsed;
+		}
 		ApplySettingsUiScale(ConfigManager.CurrentConfig.SettingsUiScale);
 		if (UiScaleSlider != null)
 		{
@@ -1454,7 +1463,7 @@ public partial class SettingsWindow : Window
 		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
 		if (UpdateStatusDescText != null)
 		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.4"} (64位)。上次检查: {lastCheck}";
+			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.5"} (64位)。上次检查: {lastCheck}";
 		}
 		UpdateOcrBadgeUi();
 		UpdateRollbackBadgeAndCandidates();
@@ -2136,6 +2145,8 @@ public partial class SettingsWindow : Window
 		if (SubmenuStyleWheelItem != null) SubmenuStyleWheelItem.Content = I18n.T("SubmenuStyleWheel");
 		if (SubmenuStyleFanItem != null) SubmenuStyleFanItem.Content = I18n.T("SubmenuStyleFan");
 		if (SubmenuStyleDescTextBlock != null) SubmenuStyleDescTextBlock.Text = I18n.T("SubmenuStyleDesc");
+		if (AutoExpandSubRingsCheckBox != null) AutoExpandSubRingsCheckBox.Content = I18n.T("AutoExpandSubRingsTitle");
+		if (AutoExpandSubRingsDescText != null) AutoExpandSubRingsDescText.Text = I18n.T("AutoExpandSubRingsDesc");
 
 		// Layer Indicator
 		if (LayerIndicatorSectionTitle != null) LayerIndicatorSectionTitle.Text = I18n.T("LayerIndicatorSectionTitle");
@@ -11351,6 +11362,25 @@ public partial class SettingsWindow : Window
 		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && EnableMultiTierCheckBox != null)
 		{
 			ConfigManager.CurrentConfig.EnableMultiTier = EnableMultiTierCheckBox.IsChecked == true;
+			bool isFan = string.Equals(ConfigManager.CurrentConfig.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+			if (AutoExpandSubRingsPanel != null)
+			{
+				AutoExpandSubRingsPanel.Visibility = (ConfigManager.CurrentConfig.EnableMultiTier && !isFan) ? Visibility.Visible : Visibility.Collapsed;
+			}
+			ConfigManager.SaveConfig();
+			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
+			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
+			{
+				RenderLiveWheelPreview();
+			}
+		}
+	}
+
+	private void AutoExpandSubRingsCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (!_isUpdatingUi && ConfigManager.CurrentConfig != null && AutoExpandSubRingsCheckBox != null)
+		{
+			ConfigManager.CurrentConfig.AutoExpandSubRingsOnPopup = AutoExpandSubRingsCheckBox.IsChecked == true;
 			ConfigManager.SaveConfig();
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;
 			if (appearanceSettingsGrid != null && appearanceSettingsGrid.Visibility == Visibility.Visible)
@@ -11915,7 +11945,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.4"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.3-beta.5"} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -12361,7 +12391,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.3-beta.4"));
+			client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Desktop", "1.7.3-beta.5"));
 			client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
 			string json = await client.GetStringAsync("https://api.github.com/repos/SoftBlack42/StarPie/contributors");
@@ -14732,6 +14762,10 @@ public partial class SettingsWindow : Window
 			if (LivePreviewTierSegmentBorder != null)
 			{
 				LivePreviewTierSegmentBorder.Visibility = isFan ? Visibility.Visible : Visibility.Collapsed;
+			}
+			if (AutoExpandSubRingsPanel != null)
+			{
+				AutoExpandSubRingsPanel.Visibility = (ConfigManager.CurrentConfig.EnableMultiTier && !isFan) ? Visibility.Visible : Visibility.Collapsed;
 			}
 			TierDimensionRadio_Checked(Tier1ConfigSegmentRadio, new RoutedEventArgs());
 			Grid appearanceSettingsGrid = AppearanceSettingsGrid;

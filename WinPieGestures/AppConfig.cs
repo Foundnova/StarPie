@@ -82,12 +82,15 @@ public class AppConfig
 	/// <summary>设置控制台界面整体缩放比例（1.0 = 100%，有效范围 0.8 ~ 2.0，按 5% 步进对齐）。</summary>
 	public double SettingsUiScale { get; set; } = 1.0;
 
-	public string Theme { get; set; } = "System";
+	public string Theme { get; set; } = "Light";
 
-	public string UiStyle { get; set; } = "ClassicRing";
+	public string UiStyle { get; set; } = "Glassmorphism";
 	public string SubmenuStyle { get; set; } = "Wheel";
 
 	public bool EnableMultiTier { get; set; } = true;
+
+	/// <summary>当启用外圈子环二级菜单时，呼出轮盘是否直接同时展开所有一二级轮盘（无需划出触发距离）。</summary>
+	public bool AutoExpandSubRingsOnPopup { get; set; } = true;
 
 	/// <summary>在设置控制台拖拽对调一级扇区时，是否连同其绑定的二级级联子动作一块换位（默认 true）。</summary>
 	public bool LinkSubActionsWhenDragging { get; set; } = true;
@@ -191,7 +194,7 @@ public class AppConfig
 
 	public double SectorCornerRadius { get; set; } = 4.0;
 
-	public string IconLayoutMode { get; set; } = "IconAndText";
+	public string IconLayoutMode { get; set; } = "IconOnly";
 
 	public string SectorTextPlacement { get; set; } = "Below";
 
@@ -244,15 +247,15 @@ public class AppConfig
 
 	public double HighlightGlowOpacity { get; set; } = 0.85;
 
-	public string CustomSectorBg { get; set; } = "#9016161A";
+	public string CustomSectorBg { get; set; } = "#F0F8FAFC";
 
-	public string CustomSectorBorder { get; set; } = "#35FFFFFF";
+	public string CustomSectorBorder { get; set; } = "#3064748B";
 
-	public string CustomHighlightBg { get; set; } = "#E06C4DFF";
+	public string CustomHighlightBg { get; set; } = "#FF2563EB";
 
-	public string CustomHighlightBorder { get; set; } = "#A0FFFFFF";
+	public string CustomHighlightBorder { get; set; } = "#FF60A5FA";
 
-	public string CustomText { get; set; } = "#E0FFFFFF";
+	public string CustomText { get; set; } = "#FF0F172A";
 
 	public List<CustomColorPreset> CustomColorPresets { get; set; } = new List<CustomColorPreset>();
 

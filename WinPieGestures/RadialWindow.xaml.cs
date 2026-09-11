@@ -261,6 +261,8 @@ public partial class RadialWindow : Window
 			_subSectorTransforms?.Clear();
 			_subContainerTransforms?.Clear();
 			_subSectorAngles?.Clear();
+			_subSectorParentIndices?.Clear();
+			_subSectorChildIndices?.Clear();
 			_subTierCache?.Clear();
 		}
 		catch
@@ -325,6 +327,12 @@ public partial class RadialWindow : Window
 	private readonly List<TranslateTransform> _subContainerTransforms;
 
 	private readonly List<double> _subSectorAngles;
+
+	private readonly List<int> _subSectorParentIndices = new List<int>();
+
+	private readonly List<int> _subSectorChildIndices = new List<int>();
+
+	private bool _allSubTiersActive;
 
 	private readonly Dictionary<int, SubTierVisuals> _subTierCache = new Dictionary<int, SubTierVisuals>();
 
@@ -559,6 +567,13 @@ public partial class RadialWindow : Window
 		if (wasLoaded && needsRebuild)
 		{
 			RebuildVisualsFromCurrentConfiguration(configurationRevision);
+		}
+
+		if (ConfigManager.CurrentConfig.EnableMultiTier &&
+			ConfigManager.CurrentConfig.SubmenuStyle == "Wheel" &&
+			ConfigManager.CurrentConfig.AutoExpandSubRingsOnPopup)
+		{
+			ShowAllSubTiers();
 		}
 
 		if (!IsVisible)
@@ -2075,6 +2090,10 @@ public partial class RadialWindow : Window
 				transform.X = 0.0;
 				transform.Y = 0.0;
 			}
+			if (_allSubTiersActive)
+			{
+				WheelCanvas.Children.Remove(subSectorPath);
+			}
 		}
 		for (int i = 0; i < _subContentContainers.Count; i++)
 		{
@@ -2090,12 +2109,19 @@ public partial class RadialWindow : Window
 				transform.X = 0.0;
 				transform.Y = 0.0;
 			}
+			if (_allSubTiersActive)
+			{
+				WheelCanvas.Children.Remove(subContentContainer);
+			}
 		}
 		_subSectorPaths.Clear();
 		_subContentContainers.Clear();
 		_subSectorTransforms.Clear();
 		_subContainerTransforms.Clear();
 		_subSectorAngles.Clear();
+		_subSectorParentIndices.Clear();
+		_subSectorChildIndices.Clear();
+		_allSubTiersActive = false;
 		_activeSubTierParentSector = -1;
 		_currentHighlightedSubSector = -1;
 	}
@@ -2108,6 +2134,11 @@ public partial class RadialWindow : Window
 		_subSectorTransforms.AddRange(visuals.PathTransforms);
 		_subContainerTransforms.AddRange(visuals.ContainerTransforms);
 		_subSectorAngles.AddRange(visuals.Angles);
+		for (int i = 0; i < visuals.Paths.Count; i++)
+		{
+			_subSectorParentIndices.Add(parentIndex);
+			_subSectorChildIndices.Add(i);
+		}
 
 		Duration duration = new Duration(TimeSpan.FromMilliseconds(110.0));
 		DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, duration)
@@ -2144,10 +2175,8 @@ public partial class RadialWindow : Window
 		}
 	}
 
-	private void ShowSubTier(int parentIndex)
+	private void RenderWheelSubTierForSector(int parentIndex, bool animateEntrance)
 	{
-		if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan") { RenderFanSubtier(parentIndex); return; }
-		ClearSubTier();
 		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.SectorCount)
 		{
 			return;
@@ -2155,11 +2184,6 @@ public partial class RadialWindow : Window
 		ActionItem? actionItem = _profile.GetEffectiveAction(parentIndex);
 		if (actionItem == null || actionItem.SubActions == null || actionItem.SubActions.Count == 0)
 		{
-			return;
-		}
-		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
-		{
-			ActivateCachedSubTier(parentIndex, cachedVisuals);
 			return;
 		}
 		int sectorCount = _profile.SectorCount;
@@ -2179,7 +2203,6 @@ public partial class RadialWindow : Window
 		List<ActionItem> subActions = actionItem.SubActions;
 		int count = subActions.Count;
 		double num9 = num / (double)count;
-		_activeSubTierParentSector = parentIndex;
 		for (int i = 0; i < count; i++)
 		{
 			double num10 = num8 + (double)i * num9;
@@ -2189,7 +2212,7 @@ public partial class RadialWindow : Window
 			double num14 = num2 + Math.Cos(num12) * num13;
 			double num15 = num3 + Math.Sin(num12) * num13;
 			Geometry data = IconHelper.CreateAdvancedSectorGeometry(num2, num3, num10, num11, num6, num4, shape, num5, cornerRadius);
-			ScaleTransform scaleTransform = new ScaleTransform(0.75, 0.75, num2, num3);
+			ScaleTransform scaleTransform = new ScaleTransform(animateEntrance ? 0.75 : 1.0, animateEntrance ? 0.75 : 1.0, num2, num3);
 			TranslateTransform translateTransform = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup = new TransformGroup();
 			transformGroup.Children.Add(scaleTransform);
@@ -2201,7 +2224,7 @@ public partial class RadialWindow : Window
 				Stroke = _subSectorBorderBrush,
 				StrokeThickness = _borderThickness,
 				Tag = $"sub_{parentIndex}_{i}",
-				Opacity = 0.0,
+				Opacity = animateEntrance ? 0.0 : 1.0,
 				RenderTransform = transformGroup
 			};
 			Panel.SetZIndex(path, 15);
@@ -2209,9 +2232,11 @@ public partial class RadialWindow : Window
 			_subSectorPaths.Add(path);
 			_subSectorTransforms.Add(translateTransform);
 			_subSectorAngles.Add(num12);
+			_subSectorParentIndices.Add(parentIndex);
+			_subSectorChildIndices.Add(i);
 			double num16 = ((count >= 4) ? 76.0 : 92.0);
 			double num17 = ((count >= 4) ? 54.0 : 64.0);
-			ScaleTransform scaleTransform2 = new ScaleTransform(0.75, 0.75, num16 / 2.0, num17 / 2.0);
+			ScaleTransform scaleTransform2 = new ScaleTransform(animateEntrance ? 0.75 : 1.0, animateEntrance ? 0.75 : 1.0, num16 / 2.0, num17 / 2.0);
 			TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup2 = new TransformGroup();
 			transformGroup2.Children.Add(scaleTransform2);
@@ -2220,7 +2245,7 @@ public partial class RadialWindow : Window
 			{
 				Width = num16,
 				Height = num17,
-				Opacity = 0.0,
+				Opacity = animateEntrance ? 0.0 : 1.0,
 				RenderTransform = transformGroup2
 			};
 			StackPanel stackPanel = new StackPanel
@@ -2462,36 +2487,81 @@ public partial class RadialWindow : Window
 			WheelCanvas.Children.Add(grid);
 			_subContentContainers.Add(grid);
 			_subContainerTransforms.Add(translateTransform2);
-			BackEase easingFunction = new BackEase
+			if (animateEntrance)
 			{
-				Amplitude = 0.35,
-				EasingMode = EasingMode.EaseOut
-			};
-			Duration duration = new Duration(TimeSpan.FromMilliseconds(130.0));
-			DoubleAnimation animation = new DoubleAnimation(0.75, 1.0, duration)
-			{
-				EasingFunction = easingFunction
-			};
-			DoubleAnimation animation2 = new DoubleAnimation(0.0, 1.0, duration)
-			{
-				EasingFunction = new CircleEase
+				BackEase easingFunction = new BackEase
 				{
+					Amplitude = 0.35,
 					EasingMode = EasingMode.EaseOut
-				}
-			};
-			scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
-			scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-			path.BeginAnimation(UIElement.OpacityProperty, animation2);
-			scaleTransform2.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
-			scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-			grid.BeginAnimation(UIElement.OpacityProperty, animation2);
+				};
+				Duration duration = new Duration(TimeSpan.FromMilliseconds(130.0));
+				DoubleAnimation animation = new DoubleAnimation(0.75, 1.0, duration)
+				{
+					EasingFunction = easingFunction
+				};
+				DoubleAnimation animation2 = new DoubleAnimation(0.0, 1.0, duration)
+				{
+					EasingFunction = new CircleEase
+					{
+						EasingMode = EasingMode.EaseOut
+					}
+				};
+				scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
+				scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+				path.BeginAnimation(UIElement.OpacityProperty, animation2);
+				scaleTransform2.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
+				scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+				grid.BeginAnimation(UIElement.OpacityProperty, animation2);
+			}
 		}
+	}
+
+	private void ShowSubTier(int parentIndex)
+	{
+		if (ConfigManager.CurrentConfig.SubmenuStyle == "Fan") { RenderFanSubtier(parentIndex); return; }
+		ClearSubTier();
+		if (!ConfigManager.CurrentConfig.EnableMultiTier || parentIndex < 0 || parentIndex >= _profile.SectorCount)
+		{
+			return;
+		}
+		ActionItem? actionItem = _profile.GetEffectiveAction(parentIndex);
+		if (actionItem == null || actionItem.SubActions == null || actionItem.SubActions.Count == 0)
+		{
+			return;
+		}
+		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
+		{
+			ActivateCachedSubTier(parentIndex, cachedVisuals);
+			return;
+		}
+		_activeSubTierParentSector = parentIndex;
+		RenderWheelSubTierForSector(parentIndex, animateEntrance: true);
 		_subTierCache[parentIndex] = new SubTierVisuals(
 			new List<System.Windows.Shapes.Path>(_subSectorPaths),
 			new List<Grid>(_subContentContainers),
 			new List<TranslateTransform>(_subSectorTransforms),
 			new List<TranslateTransform>(_subContainerTransforms),
 			new List<double>(_subSectorAngles));
+	}
+
+	private void ShowAllSubTiers()
+	{
+		ClearSubTier();
+		if (!ConfigManager.CurrentConfig.EnableMultiTier || ConfigManager.CurrentConfig.SubmenuStyle != "Wheel" || _profile == null)
+		{
+			return;
+		}
+		_allSubTiersActive = true;
+		_activeSubTierParentSector = -1;
+		int sectorCount = _profile.SectorCount;
+		for (int p = 0; p < sectorCount; p++)
+		{
+			ActionItem? actionItem = _profile.GetEffectiveAction(p);
+			if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
+			{
+				RenderWheelSubTierForSector(p, animateEntrance: false);
+			}
+		}
 	}
 
 	public void HighlightSector(int index)
@@ -2668,7 +2738,11 @@ public partial class RadialWindow : Window
 				_styleRenderer.ApplySectorHighlight(path3, isHighlighted: true);
 			}
 		}
-		if (showSubTier && mainIndex >= 0 && mainIndex < _profile.Actions.Count)
+		if (_allSubTiersActive)
+		{
+			// All sub-rings are active simultaneously; no dynamic show/clear on parent hover
+		}
+		else if (showSubTier && mainIndex >= 0 && mainIndex < _profile.Actions.Count)
 		{
 			if (_activeSubTierParentSector != mainIndex)
 			{
@@ -2692,7 +2766,11 @@ public partial class RadialWindow : Window
 			double num5 = ((i < _subSectorAngles.Count) ? _subSectorAngles[i] : 0.0);
 			TextBlock textBlock3 = obj3?.Children.OfType<StackPanel>().FirstOrDefault()?.Children.OfType<TextBlock>().FirstOrDefault();
 			System.Windows.Shapes.Path path6 = obj3?.Children.OfType<StackPanel>().FirstOrDefault()?.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault();
-			if (i == subIndex)
+			bool isHighlighted = _allSubTiersActive
+				? (i < _subSectorParentIndices.Count && i < _subSectorChildIndices.Count &&
+				   _subSectorParentIndices[i] == mainIndex && _subSectorChildIndices[i] == subIndex && subIndex >= 0)
+				: (i == subIndex);
+			if (isHighlighted)
 			{
 				path5.Fill = _subHighlightSectorBrush;
 				path5.Stroke = _subHighlightBorderBrush;

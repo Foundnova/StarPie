@@ -679,12 +679,12 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.4&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.5&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -849,6 +849,10 @@
                         </ComboBox>
                       </Grid>
                     </Border>
+                  </StackPanel>
+                  <StackPanel Name="AutoExpandSubRingsPanel" Margin="0,10,0,0">
+                    <CheckBox Name="AutoExpandSubRingsCheckBox" Content="唤出时直接同时展开一二级轮盘 (Auto-Expand Sub-Rings)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,4" Checked="AutoExpandSubRingsCheckBox_Changed" Unchecked="AutoExpandSubRingsCheckBox_Changed" />
+                    <TextBlock Name="AutoExpandSubRingsDescText" Text="开启后，呼出轮盘时所有已配置二级动作的外圈子环将与一级扇区同时呈现，无需向外划出触发距离即可一览全部操作。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                   </StackPanel>
                   <StackPanel Name="SubWheelTriggerDistancePanel" Margin="0,10,0,0">
                     <Grid Margin="0,0,0,4">
@@ -3381,7 +3385,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.4 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.5 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3399,7 +3403,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.4" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.5" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -3798,7 +3802,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.5" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3808,6 +3812,17 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.3-beta.5 唤出一二级轮盘全展开 &amp; 开箱高颜值默认配置友好优化" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🌟 【一二级轮盘唤出直展】：在多级轮盘与外圈子环形态下新增「唤出时直接同时展开一二级轮盘」开关，轮盘唤出时全方位子环直接同步呈现，无需拖拽即刻清晰感知并直选子动作；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎨 【开箱新手默认友好性】：全面重塑新用户首次进入的默认轮盘参数与配色：默认启用液态毛玻璃 + 浅色模式 + 纯图标居中高质感布局，四象限丰富常用子动作一览无余；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【子环极速命中与响应】：深度优化多子环常开状态下的极坐标扇区命中与动态高亮，与父级扇区无缝联动，保持 60/120 FPS 丝滑微动效。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>

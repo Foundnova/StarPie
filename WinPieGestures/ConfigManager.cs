@@ -448,21 +448,13 @@ public static class ConfigManager
 					Type = "Hotkey",
 					Name = "复制 (Copy)",
 					Parameter = "Ctrl+C",
-					IconKey = "Copy"
-				},
-				new ActionItem
-				{
-					Type = "System",
-					Name = "锁定电脑 (Lock)",
-					Parameter = "Lock",
-					IconKey = "Lock"
-				},
-				new ActionItem
-				{
-					Type = "System",
-					Name = "显示桌面 (Desktop)",
-					Parameter = "ShowDesktop",
-					IconKey = "ShowDesktop"
+					IconKey = "Copy",
+					SubActions = new List<ActionItem>
+					{
+						new ActionItem { Type = "Hotkey", Name = "粘贴 (Paste)", Parameter = "Ctrl+V", IconKey = "Paste" },
+						new ActionItem { Type = "Hotkey", Name = "剪切 (Cut)", Parameter = "Ctrl+X", IconKey = "Cut" },
+						new ActionItem { Type = "Hotkey", Name = "全选 (Select All)", Parameter = "Ctrl+A", IconKey = "Folder" }
+					}
 				},
 				new ActionItem
 				{
@@ -473,10 +465,35 @@ public static class ConfigManager
 				},
 				new ActionItem
 				{
+					Type = "System",
+					Name = "显示桌面 (Desktop)",
+					Parameter = "ShowDesktop",
+					IconKey = "ShowDesktop",
+					SubActions = new List<ActionItem>
+					{
+						new ActionItem { Type = "System", Name = "锁定电脑 (Lock)", Parameter = "Lock", IconKey = "Lock" }
+					}
+				},
+				new ActionItem
+				{
+					Type = "System",
+					Name = "多任务视图 (Task View)",
+					Parameter = "TaskView",
+					IconKey = "Camera"
+				},
+				new ActionItem
+				{
 					Type = "Hotkey",
-					Name = "粘贴 (Paste)",
+					Name = "常用工具 (Utilities)",
 					Parameter = "Ctrl+V",
-					IconKey = "Paste"
+					IconKey = "Paste",
+					SubActions = new List<ActionItem>
+					{
+						new ActionItem { Type = "System", Name = "任务管理器", Parameter = "TaskManager", IconKey = "Terminal" },
+						new ActionItem { Type = "System", Name = "计算器", Parameter = "Calculator", IconKey = "Code" },
+						new ActionItem { Type = "Launch", Name = "记事本", Parameter = "notepad.exe", IconKey = "Code" },
+						new ActionItem { Type = "System", Name = "控制面板", Parameter = "ControlPanel", IconKey = "Settings" }
+					}
 				},
 				new ActionItem
 				{
@@ -488,32 +505,14 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "Launch",
-					Name = "系统工具 (Tools)",
-					Parameter = "notepad.exe",
-					IconKey = "Code",
+					Name = "浏览器 (Web Browser)",
+					Parameter = "https://www.google.com",
+					IconKey = "Browser",
 					SubActions = new List<ActionItem>
 					{
-						new ActionItem
-						{
-							Type = "Launch",
-							Name = "记事本",
-							Parameter = "notepad.exe",
-							IconKey = "Code"
-						},
-						new ActionItem
-						{
-							Type = "System",
-							Name = "计算器",
-							Parameter = "Calculator",
-							IconKey = "Code"
-						},
-						new ActionItem
-						{
-							Type = "System",
-							Name = "任务管理器",
-							Parameter = "TaskManager",
-							IconKey = "Terminal"
-						}
+						new ActionItem { Type = "Launch", Name = "Google Chrome", Parameter = "chrome.exe", IconKey = "Chrome" },
+						new ActionItem { Type = "Launch", Name = "Microsoft Edge", Parameter = "msedge.exe", IconKey = "Edge" },
+						new ActionItem { Type = "Hotkey", Name = "新建标签页", Parameter = "Ctrl+T", IconKey = "NewTab" }
 					}
 				},
 				new ActionItem

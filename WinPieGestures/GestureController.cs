@@ -1801,7 +1801,7 @@ public class GestureController : IDisposable
 						}
 						else
 						{
-							if (num3 >= num7)
+							if (num3 >= num7 || (ConfigManager.CurrentConfig.AutoExpandSubRingsOnPopup && ConfigManager.CurrentConfig.SubmenuStyle == "Wheel"))
 							{
 								flag2 = true;
 							}
