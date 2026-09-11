@@ -2483,8 +2483,9 @@
                 <!-- 卡片 2：动作聚焦精调卡片 (Focus Editor Card) -->
                 <Border Name="FocusActionEditorBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,12">
                   <StackPanel>
-                    <!-- 顶部槽位导航与微标 -->
-                    <Grid Margin="0,0,0,12">
+                    <StackPanel Name="FocusSingleSlotPanel">
+                      <!-- 顶部槽位导航与微标 -->
+                      <Grid Margin="0,0,0,12">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -2951,7 +2952,128 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
-                </Border>
+
+                  <!-- 批量修改模式卡片 (Batch Mode) -->
+                  <StackPanel Name="FocusBatchModePanel" Visibility="Collapsed">
+                    <!-- 批量模式头部 -->
+                    <Grid Margin="0,0,0,12">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <Border Width="36" Height="36" CornerRadius="8" Background="{DynamicResource AccentPrimaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <TextBlock Name="FocusBatchBadgeText" Text="多选" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                          <TextBlock Name="FocusBatchTitleText" Text="批量修改模式 (Batch Mode)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                          <Border CornerRadius="4" Background="#183B82F6" BorderBrush="#803B82F6" BorderThickness="1" Padding="6,2" VerticalAlignment="Center">
+                            <TextBlock Name="FocusBatchTagText" Text="已多选 0 个扇区" FontSize="10.5" FontWeight="SemiBold" Foreground="#3B82F6" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Name="FocusBatchSubtitleText" Text="在右侧画布中按住 Ctrl 点击可增减多选扇区；在此统一调整排版属性" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                      </StackPanel>
+                      <Button Name="FocusBatchExitBtn" Grid.Column="2" Content="✕ 退出多选" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" VerticalAlignment="Center" Click="FocusBatchExitBtn_Click" />
+                    </Grid>
+
+                    <!-- 批量操作控制区 -->
+                    <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                      <StackPanel>
+                        <!-- 1. 批量排版模式 -->
+                        <TextBlock Text="批量切换排版模式 (Layout Mode):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                        <Grid Margin="0,0,0,10">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Button Name="BatchLayoutBothBtn" Content="🖼️+🔤 图文" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="0,0,4,0" FontSize="10.5" ToolTip="将所有选中扇区批量设为图文并茂居中" Click="BatchLayoutBothBtn_Click" />
+                          <Button Name="BatchLayoutIconOnlyBtn" Grid.Column="1" Content="🖼️ 仅图标" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="0,0,4,0" FontSize="10.5" ToolTip="将所有选中扇区批量设为仅显示图标" Click="BatchLayoutIconOnlyBtn_Click" />
+                          <Button Name="BatchLayoutTextOnlyBtn" Grid.Column="2" Content="🔤 仅文字" Style="{StaticResource ModernButtonStyle}" Height="28" Margin="0,0,4,0" FontSize="10.5" ToolTip="将所有选中扇区批量设为仅显示文字" Click="BatchLayoutTextOnlyBtn_Click" />
+                          <Button Name="BatchLayoutInheritBtn" Grid.Column="3" Content="🌐 继承全局" Style="{StaticResource ModernButtonStyle}" Height="28" FontSize="10.5" ToolTip="将所有选中扇区排版模式批量恢复继承全局" Click="BatchLayoutInheritBtn_Click" />
+                        </Grid>
+
+                        <!-- 2. 批量字号与图标大小 -->
+                        <Grid Margin="0,0,0,8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <!-- 批量文字字号 -->
+                          <StackPanel Grid.Column="0">
+                            <Grid>
+                              <TextBlock Text="文字字号大小:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Name="BatchFontSizeLabel" Text="11.0 px" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Name="BatchFontSizeSlider" Minimum="8" Maximum="20" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchFontSizeSlider_ValueChanged" />
+                          </StackPanel>
+                          <!-- 批量图标大小 -->
+                          <StackPanel Grid.Column="2">
+                            <Grid>
+                              <TextBlock Text="图标尺寸大小:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Name="BatchIconSizeLabel" Text="20 px" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Name="BatchIconSizeSlider" Minimum="12" Maximum="36" Value="20" SmallChange="1" LargeChange="2" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchIconSizeSlider_ValueChanged" />
+                          </StackPanel>
+                        </Grid>
+
+                        <!-- 3. 批量文字颜色 -->
+                        <TextBlock Text="批量文字颜色 (Sector Text Color):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,4" />
+                        <Grid Margin="0,0,0,8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="32" />
+                            <ColumnDefinition Width="32" />
+                          </Grid.ColumnDefinitions>
+                          <Border Name="BatchTextColorPreview" Width="20" Height="20" CornerRadius="4" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center" />
+                          <TextBox Name="BatchTextColorTextBox" Grid.Column="1" Height="28" VerticalContentAlignment="Center" Margin="0,0,6,0" TextChanged="BatchTextColorTextBox_TextChanged" />
+                          <Button Grid.Column="2" Content="🎨" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="BatchCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click" />
+                          <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="BatchCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
+                        </Grid>
+
+                        <!-- 4. 批量边距微调 (X/Y 偏移) -->
+                        <Grid Margin="0,2,0,8">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <StackPanel Grid.Column="0">
+                            <Grid>
+                              <TextBlock Text="水平边距 (X 偏移):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Name="BatchTextOffsetXLabel" Text="0 px" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Name="BatchTextOffsetXSlider" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchTextOffsetSlider_ValueChanged" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="2">
+                            <Grid>
+                              <TextBlock Text="垂直边距 (Y 偏移):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Name="BatchTextOffsetYLabel" Text="0 px" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Name="BatchTextOffsetYSlider" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchTextOffsetSlider_ValueChanged" />
+                          </StackPanel>
+                        </Grid>
+
+                        <!-- 5. 一键复位 -->
+                        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
+                          <Grid>
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="💡 清除所有选中槽位的独立定制，恢复跟随全局统一外观" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button Name="BatchResetCustomBtn" Grid.Column="1" Content="🔄 清除自定义，恢复跟随全局统一" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" Margin="8,0,0,0" Click="BatchResetCustomBtn_Click" />
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
               </StackPanel>
             </ScrollViewer>
 
@@ -3019,6 +3141,8 @@
                         <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.12" />
                       </Border.Effect>
                       <StackPanel Orientation="Horizontal">
+                        <Button Name="MappingsShowTextToggleBtn" Content="🔤 图文" ToolTip="开启/关闭动作名称复合展示（开启后在扇区中直观渲染动作名称与图标，让拖拽对调一目了然）" Style="{StaticResource CanvasToolBtnStyle}" Width="52" Height="24" Padding="4,0" FontSize="10.5" FontWeight="SemiBold" Margin="0,0,3,0" Click="MappingsShowTextToggleBtn_Click" />
+                        <Border Width="1" Height="12" Background="{DynamicResource CardBorderBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
                         <Button Name="MappingsZoomOutBtn" Content="➖" ToolTip="缩小视图" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="MappingsZoomOutBtn_Click" />
                         <TextBlock Name="MappingsZoomLabel" Text="100%" Width="36" TextAlignment="Center" VerticalAlignment="Center" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand" ToolTip="点击复位为 100%" MouseLeftButtonDown="MappingsZoomLabel_MouseLeftButtonDown" />
                         <Button Name="MappingsZoomInBtn" Content="➕" ToolTip="放大视图" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="MappingsZoomInBtn_Click" />

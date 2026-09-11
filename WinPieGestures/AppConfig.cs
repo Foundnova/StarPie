@@ -95,6 +95,9 @@ public class AppConfig
 	/// <summary>在设置控制台拖拽对调一级扇区时，是否连同其绑定的二级级联子动作一块换位（默认 true）。</summary>
 	public bool LinkSubActionsWhenDragging { get; set; } = true;
 
+	/// <summary>动作配置交互画布是否开启“图文并茂”复合展示（即使未配置自定义图标，也直观呈现动作名称文本，默认 true）。</summary>
+	public bool MappingsCanvasShowText { get; set; } = true;
+
 	/// <summary>是否开启应用专属方案继承/叠加 Global 全局方案（当应用方案槽位留空未配置时自动透传全局动作）。</summary>
 	public bool EnableGlobalInheritance { get; set; } = true;
 
