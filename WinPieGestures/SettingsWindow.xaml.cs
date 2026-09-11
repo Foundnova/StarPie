@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -1469,6 +1470,23 @@ public partial class SettingsWindow : Window
 		}
 		UpdateOcrBadgeUi();
 		UpdateRollbackBadgeAndCandidates();
+		UpdateLayerSwitchTriggerUi();
+		if (ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig.MappingsCanvasColumnWidth >= 300.0)
+		{
+			if (Tab2LeftColumn != null && Tab2RightColumn != null)
+			{
+				Tab2LeftColumn.Width = new GridLength(1.0, GridUnitType.Star);
+				Tab2RightColumn.Width = new GridLength(ConfigManager.CurrentConfig.MappingsCanvasColumnWidth, GridUnitType.Pixel);
+			}
+		}
+		else
+		{
+			if (Tab2LeftColumn != null && Tab2RightColumn != null)
+			{
+				Tab2LeftColumn.Width = new GridLength(1.15, GridUnitType.Star);
+				Tab2RightColumn.Width = new GridLength(1.0, GridUnitType.Star);
+			}
+		}
 	}
 
 	private void UpdateOcrBadgeUi()
@@ -4047,6 +4065,7 @@ public partial class SettingsWindow : Window
 			{
 				DeleteLayerBtn.IsEnabled = (_selectedProfile.Layers.Count > 1);
 			}
+			UpdateLayerSwitchTriggerUi();
 		}
 		finally
 		{
@@ -4255,29 +4274,69 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private void LayerSwitchSettingBtn_Click(object sender, RoutedEventArgs e)
+	private void UpdateLayerSwitchTriggerUi()
 	{
-		if (LayerSwitchSettingBtn?.ContextMenu != null)
+		string currentTrigger = ConfigManager.CurrentConfig?.LayerSwitchTrigger ?? "Wheel";
+		if (LayerSwitchTriggerComboBox != null)
 		{
-			string currentTrigger = ConfigManager.CurrentConfig?.LayerSwitchTrigger ?? "Wheel";
-			if (LayerSwitchMenuWheel != null) LayerSwitchMenuWheel.IsChecked = (currentTrigger == "Wheel");
-			if (LayerSwitchMenuTab != null) LayerSwitchMenuTab.IsChecked = (currentTrigger == "Tab");
-			LayerSwitchSettingBtn.ContextMenu.PlacementTarget = LayerSwitchSettingBtn;
-			LayerSwitchSettingBtn.ContextMenu.IsOpen = true;
+			foreach (ComboBoxItem item in LayerSwitchTriggerComboBox.Items)
+			{
+				if (item?.Tag is string tag && string.Equals(tag, currentTrigger, StringComparison.OrdinalIgnoreCase))
+				{
+					LayerSwitchTriggerComboBox.SelectedItem = item;
+					break;
+				}
+			}
 		}
 	}
 
-	private void LayerSwitchTriggerMenu_Click(object sender, RoutedEventArgs e)
+	private void LayerSwitchTriggerComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (sender is MenuItem item && item.Tag is string tag)
+		if (_isUpdatingUi || ConfigManager.CurrentConfig == null) return;
+		if (LayerSwitchTriggerComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag)
 		{
+			ConfigManager.CurrentConfig.LayerSwitchTrigger = tag;
+			ConfigManager.SaveConfig();
+		}
+	}
+
+	private void Tab2GridSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+	{
+		try
+		{
+			if (Tab2RightColumn != null && Tab2RightColumn.ActualWidth >= 300)
+			{
+				if (ConfigManager.CurrentConfig != null)
+				{
+					ConfigManager.CurrentConfig.MappingsCanvasColumnWidth = Math.Round(Tab2RightColumn.ActualWidth, 1);
+					ConfigManager.SaveConfig();
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Tab2GridSplitter_DragCompleted error", ex);
+		}
+	}
+
+	private void Tab2GridSplitter_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+	{
+		try
+		{
+			if (Tab2LeftColumn != null && Tab2RightColumn != null)
+			{
+				Tab2LeftColumn.Width = new GridLength(1.15, GridUnitType.Star);
+				Tab2RightColumn.Width = new GridLength(1.0, GridUnitType.Star);
+			}
 			if (ConfigManager.CurrentConfig != null)
 			{
-				ConfigManager.CurrentConfig.LayerSwitchTrigger = tag;
+				ConfigManager.CurrentConfig.MappingsCanvasColumnWidth = 0.0;
 				ConfigManager.SaveConfig();
 			}
-			if (LayerSwitchMenuWheel != null) LayerSwitchMenuWheel.IsChecked = (tag == "Wheel");
-			if (LayerSwitchMenuTab != null) LayerSwitchMenuTab.IsChecked = (tag == "Tab");
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Tab2GridSplitter_MouseDoubleClick error", ex);
 		}
 	}
 

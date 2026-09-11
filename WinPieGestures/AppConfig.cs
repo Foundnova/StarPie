@@ -98,6 +98,9 @@ public class AppConfig
 	/// <summary>动作配置交互画布是否开启“图文并茂”复合展示（即使未配置自定义图标，也直观呈现动作名称文本，默认 true）。</summary>
 	public bool MappingsCanvasShowText { get; set; } = true;
 
+	/// <summary>手势动作页（Tab 2）右侧交互画布列宽度（0 表示自适应比例 1*，大于 0 表示用户自定义拖拽宽度）。</summary>
+	public double MappingsCanvasColumnWidth { get; set; } = 0.0;
+
 	/// <summary>是否开启应用专属方案继承/叠加 Global 全局方案（当应用方案槽位留空未配置时自动透传全局动作）。</summary>
 	public bool EnableGlobalInheritance { get; set; } = true;
 

@@ -4,6 +4,22 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [v1.7.3-beta.6] - 2026-09-11
+
+### 📐 交互画布自由拉伸比例 & 轮盘层切换方式状态回显修复 (Canvas Resizable Splitter & Multi-Layer Switch Echo Fix)
+
+1. **动作配置页（Tab 2）交互画布自适应与自由拉伸比例 (Issue #100 建议 1)**：
+   - **自适应空间重构**：动作配置页（Tab 2）告别原先硬编码 `Width="380"` 的局促窄栏，默认改为与 Tab 1 一致的 `1.15*` : `1*` 黄金弹性自适应比例（最小宽度约束 340px），彻底消除外圈子环展开时横向视口拥挤的问题；
+   - **自由拖拽调整手柄 (GridSplitter)**：在左侧方案聚焦编辑卡片栏与右侧实时交互画布之间引入现代半透明居中拖拽分割线（`Tab2GridSplitter`，光标自动切换为 `SizeWE`，配备 0.6 不透明度极细卡片边框）；
+   - **用户个性化比例记忆**：拖拽松手（`DragCompleted`）时自动将右栏画布像素宽度记录至 `AppConfig.MappingsCanvasColumnWidth` 并持久化落盘，重新打开控制台或切换方案时平滑还原用户设定的专属视口宽度；
+   - **双击极速复位默认**：在分割线上双击鼠标左键（`MouseDoubleClick`），立即将左右分栏宽度复位为 `1.15*` : `1*` 默认比例并清除自定义记忆（置为 0.0）。
+
+2. **多层轮盘层切换方式 UI 状态回显双向修复 (Issue #100 问题 2)**：
+   - **现代化交互下拉控件**：将多层轮盘工具栏原先静态写死为 `"💡 滚轮切换"` 的静态文本重构为现代化交互下拉框 `LayerSwitchTriggerComboBox`（选项包含 `🖱️ 滚轮切换` 与 `⌨️ Tab 键切换`）；
+   - **状态双向回显修复**：彻底修复将多层轮盘切换方式保存为 `Tab` 键后界面依然错误回显为“滚轮切换”的属性映射缺陷；在 `LoadConfigToUi()` 与 `RefreshLayersUi()` 中统一增加 `UpdateLayerSwitchTriggerUi()` 双向状态刷新，确保读取配置与用户切换下拉选项时即时双向同步并安全落盘。
+
+---
+
 ## [v1.7.3-beta.5] - 2026-09-11
 
 ### 🌟 唤出一二级轮盘全展开 & 开箱高颜值默认配置友好优化 (Auto-Expand Sub-Rings & Out-of-Box Aesthetic Defaults)

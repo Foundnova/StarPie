@@ -679,12 +679,12 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.5&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.6&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.5" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -2359,15 +2359,11 @@
                     <Button Name="RenameLayerBtn" Content="✏️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,2,0" ToolTip="重命名当前轮盘层" Click="RenameLayerBtn_Click" />
                     <Button Name="DeleteLayerBtn" Content="🗑️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,2,0" ToolTip="删除当前轮盘层（至少保留一层）" Click="DeleteLayerBtn_Click" />
                     <Border Width="1" Height="12" Background="{DynamicResource CardBorderBrush}" Margin="4,0" VerticalAlignment="Center" />
-                    <TextBlock Text="💡 滚轮切换" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="1,0,3,0" />
-                    <Button Name="LayerSwitchSettingBtn" Content="⚙️" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="5,0" Margin="0,0,1,0" ToolTip="配置轮盘层切换触发方式 (鼠标滚轮 / 快捷键)" Click="LayerSwitchSettingBtn_Click">
-                      <Button.ContextMenu>
-                        <ContextMenu Style="{StaticResource ModernContextMenuStyle}">
-                          <MenuItem Name="LayerSwitchMenuWheel" Header="🖱️ 鼠标滚轮滑动切换 (推荐)" Style="{StaticResource ModernMenuItemStyle}" Click="LayerSwitchTriggerMenu_Click" Tag="Wheel" />
-                          <MenuItem Name="LayerSwitchMenuTab" Header="⌨️ Tab 键循环切换" Style="{StaticResource ModernMenuItemStyle}" Click="LayerSwitchTriggerMenu_Click" Tag="Tab" />
-                        </ContextMenu>
-                      </Button.ContextMenu>
-                    </Button>
+                    <TextBlock Name="LayerSwitchTriggerLabel" Text="🔄 切换:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="2,0,4,0" />
+                    <ComboBox Name="LayerSwitchTriggerComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="25" Width="108" VerticalAlignment="Center" ToolTip="多层轮盘切换方式：支持鼠标滚轮上下滑动切换或 Tab 键循环切换" SelectionChanged="LayerSwitchTriggerComboBox_SelectionChanged">
+                      <ComboBoxItem Content="🖱️ 滚轮切换" Tag="Wheel" />
+                      <ComboBoxItem Content="⌨️ Tab 键切换" Tag="Tab" />
+                    </ComboBox>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -2387,8 +2383,9 @@
           <!-- 模式 1：画布联动精调工作区 (MappingsCanvasModeGrid) -->
           <Grid Name="MappingsCanvasModeGrid" Grid.Row="1" Visibility="Visible">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="380" />
+              <ColumnDefinition Name="Tab2LeftColumn" Width="1.15*" MinWidth="340" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Name="Tab2RightColumn" Width="1*" MinWidth="340" />
             </Grid.ColumnDefinitions>
 
             <!-- 左栏：方案工具卡片 + 聚焦精调卡片 (Focus Editor Card) -->
@@ -3077,8 +3074,22 @@
               </StackPanel>
             </ScrollViewer>
 
+            <!-- 分割线与拖拽调整手柄 (GridSplitter) -->
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="Transparent" ShowsPreview="False" Cursor="SizeWE"
+                          DragCompleted="Tab2GridSplitter_DragCompleted" MouseDoubleClick="Tab2GridSplitter_MouseDoubleClick"
+                          ToolTip="拖拽调整画布与配置区比例，双击恢复默认比例">
+              <GridSplitter.Template>
+                <ControlTemplate TargetType="{x:Type GridSplitter}">
+                  <Border Background="Transparent" Width="8" HorizontalAlignment="Center">
+                    <Border Width="1" Background="{DynamicResource CardBorderBrush}" HorizontalAlignment="Center" VerticalAlignment="Stretch" Opacity="0.6" />
+                  </Border>
+                </ControlTemplate>
+              </GridSplitter.Template>
+            </GridSplitter>
+
             <!-- 右栏：实时交互画布 (Interactive Wheel Canvas) -->
-            <Border Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+            <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
               <Grid>
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto" />
@@ -3509,7 +3520,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.5 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.6 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3527,7 +3538,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.5" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.6" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -3926,7 +3937,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.5" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.6" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3936,6 +3947,16 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.3-beta.6 交互画布自由拉伸比例 &amp; 轮盘层切换方式状态回显修复" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 📐 【Tab 2 画布自适应与自由拉伸】：动作配置页（Tab 2）告别 380px 固定宽度限制，默认采用 1.15*:1* 黄金自适应比例；新增分割线拖拽调整手柄 (GridSplitter)，支持自由拖拽调节画布与配置卡片宽度比例，双击即可一键复位为默认比例，自定义宽度自动持久化保存；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🔄 【轮盘层切换方式双向回显修复】：多层轮盘工具栏切换模式升级为现代化交互下拉框，彻底修复保存为 Tab 键切换后 UI 依然错误回显为“滚轮切换”的属性映射与通知缺陷，实现配置加载与切换的双向状态完全同步。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>
