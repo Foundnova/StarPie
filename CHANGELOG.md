@@ -22,6 +22,16 @@
      - **黄金几何比例**：轮盘外径 138px、内径 52px、核心圆 50px、扇区间隙 2px、扇区圆角 4px；二级子轮盘外径 210px、环间距 4px、子扇区圆角 4px；
    - **默认丰富功能方案**：新用户默认方案在上下左右四大象限均预装丰富的高频实用子动作（右侧复制扩展粘贴/剪切/全选；顶部浏览器扩展 Chrome/Edge/新标签页；左侧系统工具扩展任务管理器/计算器/记事本/控制面板；底部显示桌面扩展一键锁屏），开箱即展现令人惊艳的公转轨道级联星盘效果。
 
+3. **二级级联动作添加按钮偶发禁用彻底根治 (Fix Intermittent Disabling of Add SubAction Button)**：
+   - **析因**：`RefreshFocusSubActionsChips()` 原逻辑中当 `subActions == null || subActions.Count == 0` 时会立即提前 `return`，跳过了下方更新 `FocusAddSubActionBtn.IsEnabled` 的逻辑。若用户先前访问过满额扇区（4项子动作）导致按钮置灰，随后切换至未配置子动作的扇区时，按钮将无法恢复启用；
+   - **根治方案**：将 `FocusAddSubActionBtn.IsEnabled` 与 `FocusClearSubActionsBtn.IsEnabled` 的更新逻辑提前至方法顶层无条件执行，并在未配置子动作时稳定保持启用状态，彻底根除偶发与永久禁用缺陷。
+
+4. **非全局配置方案继承二级子盘功能修复与就地物化 (Profile Sub-Ring Inheritance Usability & Local In-Place Customization)**：
+   - **手势引擎修复**：`GestureController` 修复子轮盘命中测试旁路继承缺陷，由原先直接读取未初始化的本地空动作 `_activeProfile.Actions[num4]` 重构为通过 `_activeProfile.GetEffectiveAction(num4)` 动态获取全局继承的二级子动作，彻底解决专属程序方案下二级子环“在屏幕覆盖显示却无法划入悬停、高亮与触发”的严重缺陷；
+   - **聚焦编辑卡片继承态可视化**：在非全局方案中，若主扇区继承自全局且含有子动作，聚焦卡片自动展示全局继承的二级芯片并标有 `(继承)` 微标；
+   - **就地无缝物化**：引入 `EnsureLocalSubActionForEdit` 与 `EnsureLocalPrimaryActionForEdit`，用户在非全局方案中点击继承子动作、点击画布子扇区、或点击【➕ 添加二级动作】时，系统自动锁定并物化继承的主动作信息（名称、图标、类型、参数等）与已继承的子动作列表，确保在添加与定制二级子动作时主动作不会退化为未命名空动作；
+   - **一键复位继承**：支持一键清空并重置为跟随全局方案。
+
 ---
 
 ## [v1.7.3-beta.4] - 2026-09-09

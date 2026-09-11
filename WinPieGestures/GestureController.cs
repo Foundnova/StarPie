@@ -1784,7 +1784,7 @@ public class GestureController : IDisposable
 
 				if (enableMultiTier && _activeProfile != null && num4 >= 0 && num4 < _activeProfile.Actions.Count)
 				{
-					ActionItem actionItem = _activeProfile.Actions[num4];
+					ActionItem? actionItem = _activeProfile.GetEffectiveAction(num4);
 					if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
 					{
 						if (isFan)
@@ -2097,6 +2097,11 @@ public class GestureController : IDisposable
 					}
 				}
 			}
+		}
+		if (ConfigManager.CurrentConfig?.EnableGlobalInheritance == true && !string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
+		{
+			var globalProf = ConfigManager.GetGlobalProfile();
+			if (globalProf != null && ProfileRequiresTaskbarPrefetch(globalProf)) return true;
 		}
 		return false;
 	}

@@ -4355,6 +4355,11 @@ public partial class SettingsWindow : Window
 	{
 		_selectedSlotIndex = parentSlotIndex;
 		_selectedSubActionIndex = subIndex;
+		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+		if (profile != null && !string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase) && ConfigManager.CurrentConfig?.EnableGlobalInheritance == true)
+		{
+			EnsureLocalSubActionForEdit(profile, parentSlotIndex, subIndex);
+		}
 		if (MappingsTier2SegmentRadio != null && MappingsTier2SegmentRadio.IsChecked != true)
 		{
 			_isUpdatingUi = true;
@@ -4362,6 +4367,8 @@ public partial class SettingsWindow : Window
 			finally { _isUpdatingUi = false; }
 		}
 		UpdateFocusEditorUi();
+		RefreshFocusSubActionsChips();
+		RefreshSlots();
 		RenderMappingsWheelPreview();
 	}
 
@@ -4439,7 +4446,100 @@ public partial class SettingsWindow : Window
 		SelectCenterCore();
 	}
 
-	private ActionItem? GetCurrentFocusActionItem()
+	private ActionItem? EnsureLocalSubActionForEdit(WheelProfile profile, int slotIndex, int subIndex)
+	{
+		if (profile.Actions == null || slotIndex < 0 || slotIndex >= profile.Actions.Count) return null;
+		ActionItem primaryAction = profile.Actions[slotIndex];
+		primaryAction.SubActions ??= new List<ActionItem>();
+
+		if (subIndex >= 0 && subIndex < primaryAction.SubActions.Count)
+		{
+			return primaryAction.SubActions[subIndex];
+		}
+
+		if (!string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase) &&
+		    ConfigManager.CurrentConfig?.EnableGlobalInheritance == true)
+		{
+			ActionItem? eff = profile.GetEffectiveAction(slotIndex);
+			if (eff != null && eff.IsInherited)
+			{
+				if (!WheelProfile.IsActionConfigured(primaryAction))
+				{
+					primaryAction.Name = eff.Name;
+					primaryAction.Type = eff.Type;
+					primaryAction.Parameter = eff.Parameter;
+					primaryAction.Arguments = eff.Arguments;
+					primaryAction.IconKey = eff.IconKey;
+					primaryAction.CustomIconSvg = eff.CustomIconSvg;
+					primaryAction.InheritAppIconPath = eff.InheritAppIconPath;
+					primaryAction.CommandTerminal = eff.CommandTerminal;
+					primaryAction.CustomIconSize = eff.CustomIconSize;
+					primaryAction.CustomTextColor = eff.CustomTextColor;
+					primaryAction.IsInherited = false;
+				}
+
+				if (eff.SubActions != null && eff.SubActions.Count > 0)
+				{
+					primaryAction.SubActions = eff.SubActions.Select(s =>
+					{
+						var cloned = s.Clone();
+						cloned.IsInherited = false;
+						return cloned;
+					}).ToList();
+
+					if (subIndex >= 0 && subIndex < primaryAction.SubActions.Count)
+					{
+						return primaryAction.SubActions[subIndex];
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private ActionItem? EnsureLocalPrimaryActionForEdit(WheelProfile profile, int slotIndex)
+	{
+		if (profile.Actions == null || slotIndex < 0 || slotIndex >= profile.Actions.Count) return null;
+		ActionItem primaryAction = profile.Actions[slotIndex];
+
+		if (!string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase) &&
+		    ConfigManager.CurrentConfig?.EnableGlobalInheritance == true &&
+		    !WheelProfile.IsActionConfigured(primaryAction))
+		{
+			ActionItem? eff = profile.GetEffectiveAction(slotIndex);
+			if (eff != null && eff.IsInherited)
+			{
+				primaryAction.Name = eff.Name;
+				primaryAction.Type = eff.Type;
+				primaryAction.Parameter = eff.Parameter;
+				primaryAction.Arguments = eff.Arguments;
+				primaryAction.IconKey = eff.IconKey;
+				primaryAction.CustomIconSvg = eff.CustomIconSvg;
+				primaryAction.InheritAppIconPath = eff.InheritAppIconPath;
+				primaryAction.CommandTerminal = eff.CommandTerminal;
+				primaryAction.CustomIconSize = eff.CustomIconSize;
+				primaryAction.CustomTextColor = eff.CustomTextColor;
+				primaryAction.IsInherited = false;
+				if (primaryAction.SubActions == null || primaryAction.SubActions.Count == 0)
+				{
+					if (eff.SubActions != null && eff.SubActions.Count > 0)
+					{
+						primaryAction.SubActions = eff.SubActions.Select(s =>
+						{
+							var cloned = s.Clone();
+							cloned.IsInherited = false;
+							return cloned;
+						}).ToList();
+					}
+				}
+			}
+		}
+
+		return primaryAction;
+	}
+
+	private ActionItem? GetCurrentFocusActionItem(bool ensureLocalForEdit = false)
 	{
 		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
 		if (profile == null) return null;
@@ -4474,16 +4574,35 @@ public partial class SettingsWindow : Window
 		{
 			return null;
 		}
-		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
 		if (_selectedSubActionIndex.HasValue)
 		{
+			if (ensureLocalForEdit)
+			{
+				var localSub = EnsureLocalSubActionForEdit(profile, _selectedSlotIndex, _selectedSubActionIndex.Value);
+				if (localSub != null) return localSub;
+			}
+			ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
 			if (primaryAction.SubActions != null && _selectedSubActionIndex.Value >= 0 && _selectedSubActionIndex.Value < primaryAction.SubActions.Count)
 			{
 				return primaryAction.SubActions[_selectedSubActionIndex.Value];
 			}
+			if (!string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase) &&
+			    ConfigManager.CurrentConfig?.EnableGlobalInheritance == true &&
+			    _selectedSubActionIndex.Value >= 0)
+			{
+				ActionItem? eff = profile.GetEffectiveAction(_selectedSlotIndex);
+				if (eff?.SubActions != null && _selectedSubActionIndex.Value < eff.SubActions.Count)
+				{
+					return eff.SubActions[_selectedSubActionIndex.Value];
+				}
+			}
 			return null;
 		}
-		return primaryAction;
+		if (ensureLocalForEdit)
+		{
+			EnsureLocalPrimaryActionForEdit(profile, _selectedSlotIndex);
+		}
+		return profile.Actions[_selectedSlotIndex];
 	}
 
 	private void UpdateFocusEditorUi()
@@ -4500,7 +4619,6 @@ public partial class SettingsWindow : Window
 			string[] directions = ResolveDirectionNames(sectorCount);
 
 			ActionItem? primaryAction = (_selectedSlotIndex >= 0 && profile.Actions != null && _selectedSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedSlotIndex] : null;
-			bool isTier2NoSubActions = (MappingsTier2SegmentRadio?.IsChecked == true && _selectedSlotIndex >= 0 && (primaryAction?.SubActions == null || primaryAction.SubActions.Count == 0));
 
 			bool isGlobalProfile = string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
 			bool inheritanceEnabled = ConfigManager.CurrentConfig?.EnableGlobalInheritance == true;
@@ -4531,7 +4649,22 @@ public partial class SettingsWindow : Window
 						}
 					}
 				}
+				else if (_selectedSubActionIndex.HasValue)
+				{
+					if (primaryAction?.SubActions == null || _selectedSubActionIndex.Value >= primaryAction.SubActions.Count)
+					{
+						effectiveInheritedAction = profile.GetEffectiveAction(_selectedSlotIndex);
+						if (effectiveInheritedAction != null && effectiveInheritedAction.IsInherited)
+						{
+							isInherited = true;
+						}
+					}
+				}
 			}
+
+			bool hasAnySubActions = (primaryAction?.SubActions != null && primaryAction.SubActions.Count > 0) ||
+			                       (isInherited && effectiveInheritedAction?.SubActions != null && effectiveInheritedAction.SubActions.Count > 0);
+			bool isTier2NoSubActions = (MappingsTier2SegmentRadio?.IsChecked == true && _selectedSlotIndex >= 0 && !hasAnySubActions);
 
 			if (FocusSlotInheritedBadge != null)
 			{
@@ -4856,12 +4989,50 @@ public partial class SettingsWindow : Window
 		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
 		if (profile?.Actions == null || _selectedSlotIndex >= profile.Actions.Count) return;
 		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
-		var subActions = primaryAction.SubActions;
+
+		bool isGlobalProfile = string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
+		bool inheritanceEnabled = ConfigManager.CurrentConfig?.EnableGlobalInheritance == true;
+		bool isInherited = false;
+		ActionItem? effAction = null;
+		if (!isGlobalProfile && inheritanceEnabled && !WheelProfile.IsActionConfigured(primaryAction))
+		{
+			effAction = profile.GetEffectiveAction(_selectedSlotIndex);
+			if (effAction != null && effAction.IsInherited)
+			{
+				isInherited = true;
+			}
+		}
+
+		var subActions = (primaryAction.SubActions != null && primaryAction.SubActions.Count > 0)
+			? primaryAction.SubActions
+			: (isInherited && effAction?.SubActions != null && effAction.SubActions.Count > 0 ? effAction.SubActions : primaryAction.SubActions);
+
 		int count = subActions?.Count ?? 0;
+		bool isUsingInheritedSubs = isInherited && (primaryAction.SubActions == null || primaryAction.SubActions.Count == 0) && count > 0;
+
+		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
+		int maxAllowed = isFan ? 3 : 4;
+		bool canAdd = count < maxAllowed;
+
+		// 关键修复 1：始终在方法顶层统一更新【➕ 添加二级动作】按钮的启用状态与 ToolTip，彻底根除因早期 return 导致的偶发或持续禁用！
+		if (FocusAddSubActionBtn != null)
+		{
+			FocusAddSubActionBtn.IsEnabled = canAdd;
+			FocusAddSubActionBtn.ToolTip = canAdd 
+				? null 
+				: (isFan ? "当前蜂窝扇模式下最多支持配置 3 个二级级联子动作" : "当前外圈子环模式下最多支持配置 4 个二级级联子动作");
+		}
+
+		if (FocusClearSubActionsBtn != null)
+		{
+			FocusClearSubActionsBtn.IsEnabled = count > 0;
+		}
+
 		if (FocusSubActionsCountLabel != null)
 		{
-			FocusSubActionsCountLabel.Text = $"({count} 项)";
+			FocusSubActionsCountLabel.Text = isUsingInheritedSubs ? $"({count} 项 - 全局继承)" : $"({count} 项)";
 		}
+
 		if (subActions == null || subActions.Count == 0)
 		{
 			TextBlock emptyText = new TextBlock
@@ -4872,18 +5043,8 @@ public partial class SettingsWindow : Window
 				Margin = new Thickness(2, 4, 0, 4)
 			};
 			FocusSubActionsChipsPanel.Children.Add(emptyText);
+			UpdateUndoSubActionsButtonState();
 			return;
-		}
-
-		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
-		int maxAllowed = isFan ? 3 : 4;
-		if (FocusAddSubActionBtn != null)
-		{
-			bool canAdd = count < maxAllowed;
-			FocusAddSubActionBtn.IsEnabled = canAdd;
-			FocusAddSubActionBtn.ToolTip = canAdd 
-				? null 
-				: (isFan ? "当前蜂窝扇模式下最多支持配置 3 个二级级联子动作" : "当前外圈子环模式下最多支持配置 4 个二级级联子动作");
 		}
 
 		for (int i = 0; i < subActions.Count; i++)
@@ -4906,10 +5067,10 @@ public partial class SettingsWindow : Window
 				Padding = new Thickness(8, 4, 6, 4),
 				Margin = new Thickness(0, 0, 6, 6),
 				Cursor = System.Windows.Input.Cursors.Hand,
-				Opacity = isExceeded ? 0.55 : 1.0,
+				Opacity = isExceeded ? 0.55 : (isUsingInheritedSubs ? 0.85 : 1.0),
 				ToolTip = isExceeded 
 					? (isFan ? "当前二级菜单样式为蜂窝扇，轮盘呼出与手势最多激活前 3 项子动作" : "当前二级菜单样式为外圈子环，最多激活前 4 项子动作")
-					: null
+					: (isUsingInheritedSubs ? "继承自全局方案：点击可转为本专属方案自定义子动作" : null)
 			};
 
 			Grid chipGrid = new Grid();
@@ -4945,6 +5106,10 @@ public partial class SettingsWindow : Window
 			{
 				chipName += " (未激活)";
 			}
+			else if (isUsingInheritedSubs)
+			{
+				chipName += " (继承)";
+			}
 
 			TextBlock textBlock = new TextBlock
 			{
@@ -4960,41 +5125,65 @@ public partial class SettingsWindow : Window
 			Grid.SetColumn(textBlock, 1);
 			chipGrid.Children.Add(textBlock);
 
-			TextBlock deleteBtn = new TextBlock
+			if (!isUsingInheritedSubs)
 			{
-				Text = "✕",
-				FontSize = 10,
-				Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush"),
-				VerticalAlignment = VerticalAlignment.Center,
-				Cursor = System.Windows.Input.Cursors.Hand,
-				Padding = new Thickness(2)
-			};
-			deleteBtn.MouseEnter += (s, e) => deleteBtn.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
-			deleteBtn.MouseLeave += (s, e) => deleteBtn.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
-			deleteBtn.MouseLeftButtonDown += (s, e) =>
-			{
-				e.Handled = true;
-				BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
-				primaryAction.SubActions.RemoveAt(subIdx);
-				if (_selectedSubActionIndex == subIdx) _selectedSubActionIndex = null;
-				else if (_selectedSubActionIndex > subIdx) _selectedSubActionIndex--;
-				UpdateFocusEditorUi();
-				RefreshSlots();
-				RenderMappingsWheelPreview();
-				ScheduleAutoSave();
-			};
-			Grid.SetColumn(deleteBtn, 2);
-			chipGrid.Children.Add(deleteBtn);
+				TextBlock deleteBtn = new TextBlock
+				{
+					Text = "✕",
+					FontSize = 10,
+					Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush"),
+					VerticalAlignment = VerticalAlignment.Center,
+					Cursor = System.Windows.Input.Cursors.Hand,
+					Padding = new Thickness(2)
+				};
+				deleteBtn.MouseEnter += (s, e) => deleteBtn.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
+				deleteBtn.MouseLeave += (s, e) => deleteBtn.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
+				deleteBtn.MouseLeftButtonDown += (s, e) =>
+				{
+					e.Handled = true;
+					BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
+					primaryAction.SubActions.RemoveAt(subIdx);
+					if (_selectedSubActionIndex == subIdx) _selectedSubActionIndex = null;
+					else if (_selectedSubActionIndex > subIdx) _selectedSubActionIndex--;
+					UpdateFocusEditorUi();
+					RefreshSlots();
+					RenderMappingsWheelPreview();
+					ScheduleAutoSave();
+				};
+				Grid.SetColumn(deleteBtn, 2);
+				chipGrid.Children.Add(deleteBtn);
+			}
 
 			chip.Child = chipGrid;
 			chip.MouseLeftButtonDown += (s, e) =>
 			{
 				e.Handled = true;
+				if (isUsingInheritedSubs)
+				{
+					EnsureLocalSubActionForEdit(profile, _selectedSlotIndex, subIdx);
+					RefreshSlots();
+					RefreshFocusSubActionsChips();
+					ScheduleAutoSave();
+				}
 				SelectSubAction(_selectedSlotIndex, subIdx);
 			};
 
 			FocusSubActionsChipsPanel.Children.Add(chip);
 		}
+
+		if (isUsingInheritedSubs)
+		{
+			TextBlock inheritTip = new TextBlock
+			{
+				Text = "💡 当前二级子动作继承自全局方案。点击子动作或【➕ 添加二级动作】可转为专属方案独立配置。",
+				FontSize = 10.5,
+				Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush"),
+				Margin = new Thickness(2, 6, 0, 2),
+				TextWrapping = TextWrapping.Wrap
+			};
+			FocusSubActionsChipsPanel.Children.Add(inheritTip);
+		}
+
 		UpdateUndoSubActionsButtonState();
 	}
 
@@ -5005,6 +5194,39 @@ public partial class SettingsWindow : Window
 		if (profile?.Actions == null || _selectedSlotIndex >= profile.Actions.Count) return;
 		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
 		primaryAction.SubActions ??= new List<ActionItem>();
+
+		// 如果是非 Global 方案且属于继承扇区，将继承的主动作属性与可能已继承的子动作物化到本地专属方案
+		bool isGlobal = string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
+		bool inheritanceEnabled = ConfigManager.CurrentConfig?.EnableGlobalInheritance == true;
+		if (!isGlobal && inheritanceEnabled)
+		{
+			ActionItem? eff = profile.GetEffectiveAction(_selectedSlotIndex);
+			if (eff != null && eff.IsInherited)
+			{
+				if (!WheelProfile.IsActionConfigured(primaryAction))
+				{
+					primaryAction.Name = eff.Name;
+					primaryAction.Type = eff.Type;
+					primaryAction.Parameter = eff.Parameter;
+					primaryAction.Arguments = eff.Arguments;
+					primaryAction.IconKey = eff.IconKey;
+					primaryAction.CustomIconSvg = eff.CustomIconSvg;
+					primaryAction.InheritAppIconPath = eff.InheritAppIconPath;
+					primaryAction.CommandTerminal = eff.CommandTerminal;
+					primaryAction.CustomIconSize = eff.CustomIconSize;
+					primaryAction.CustomTextColor = eff.CustomTextColor;
+					primaryAction.IsInherited = false;
+				}
+				if (primaryAction.SubActions.Count == 0 && eff.SubActions != null && eff.SubActions.Count > 0)
+				{
+					primaryAction.SubActions = eff.SubActions.Select(s => {
+						var cloned = s.Clone();
+						cloned.IsInherited = false;
+						return cloned;
+					}).ToList();
+				}
+			}
+		}
 
 		bool isFan = string.Equals(ConfigManager.CurrentConfig?.SubmenuStyle, "Fan", StringComparison.OrdinalIgnoreCase);
 		int maxAllowed = isFan ? 3 : 4;
@@ -5043,14 +5265,47 @@ public partial class SettingsWindow : Window
 		WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
 		if (profile?.Actions == null || _selectedSlotIndex >= profile.Actions.Count) return;
 		ActionItem primaryAction = profile.Actions[_selectedSlotIndex];
-		if (primaryAction.SubActions != null && primaryAction.SubActions.Count > 0)
+
+		bool isGlobal = string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
+		bool inheritanceEnabled = ConfigManager.CurrentConfig?.EnableGlobalInheritance == true;
+		bool hasInheritedSubs = false;
+		ActionItem? eff = null;
+		if (!isGlobal && inheritanceEnabled && (primaryAction.SubActions == null || primaryAction.SubActions.Count == 0))
+		{
+			eff = profile.GetEffectiveAction(_selectedSlotIndex);
+			if (eff != null && eff.IsInherited && eff.SubActions != null && eff.SubActions.Count > 0)
+			{
+				hasInheritedSubs = true;
+			}
+		}
+
+		if ((primaryAction.SubActions != null && primaryAction.SubActions.Count > 0) || hasInheritedSubs)
 		{
 			if (System.Windows.MessageBox.Show(this, "确定要清空该扇区的所有二级动作吗？", "确认清空", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
 			{
 				BackupSubActionsForUndo(_selectedSlotIndex, primaryAction.SubActions);
+				if (hasInheritedSubs && eff != null)
+				{
+					if (!WheelProfile.IsActionConfigured(primaryAction))
+					{
+						primaryAction.Name = eff.Name;
+						primaryAction.Type = eff.Type;
+						primaryAction.Parameter = eff.Parameter;
+						primaryAction.Arguments = eff.Arguments;
+						primaryAction.IconKey = eff.IconKey;
+						primaryAction.CustomIconSvg = eff.CustomIconSvg;
+						primaryAction.InheritAppIconPath = eff.InheritAppIconPath;
+						primaryAction.CommandTerminal = eff.CommandTerminal;
+						primaryAction.CustomIconSize = eff.CustomIconSize;
+						primaryAction.CustomTextColor = eff.CustomTextColor;
+						primaryAction.IsInherited = false;
+					}
+				}
+				primaryAction.SubActions ??= new List<ActionItem>();
 				primaryAction.SubActions.Clear();
 				_selectedSubActionIndex = null;
 				UpdateFocusEditorUi();
+				RefreshFocusSubActionsChips();
 				RefreshSlots();
 				RenderMappingsWheelPreview();
 				ScheduleAutoSave();
@@ -5155,7 +5410,19 @@ public partial class SettingsWindow : Window
 			}
 			profile.EnableCenterAction = false;
 		}
-		else if (!_selectedSubActionIndex.HasValue)
+		else if (_selectedSubActionIndex.HasValue)
+		{
+			if (profile.Actions != null && _selectedSlotIndex >= 0 && _selectedSlotIndex < profile.Actions.Count)
+			{
+				var action = profile.Actions[_selectedSlotIndex];
+				if (action != null)
+				{
+					action.SubActions?.Clear();
+					_selectedSubActionIndex = null;
+				}
+			}
+		}
+		else
 		{
 			if (profile.Actions != null && _selectedSlotIndex >= 0 && _selectedSlotIndex < profile.Actions.Count)
 			{
@@ -5167,6 +5434,7 @@ public partial class SettingsWindow : Window
 					action.Parameter = "";
 					action.IconKey = "";
 					action.InheritAppIconPath = null;
+					action.SubActions?.Clear();
 				}
 			}
 		}
@@ -7193,9 +7461,14 @@ public partial class SettingsWindow : Window
 				bool isSubVisible = !isFanMode || isTier2Mode || (_selectedSlotIndex == slot);
 				if (isSubVisible && dist <= outerR + 50.0)
 				{
-					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
+					ActionItem? effAction = profile.GetEffectiveAction(slot);
+					var targetSubs = (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && profile.Actions[slot].SubActions.Count > 0)
+						? profile.Actions[slot].SubActions
+						: effAction?.SubActions;
+
+					if (targetSubs != null && targetSubs.Count > 0)
 					{
-						int subCount = profile.Actions[slot].SubActions.Count;
+						int subCount = targetSubs.Count;
 						double slotStartAngle = (double)slot * sweep - sweep / 2.0;
 						double relAngle = angleDeg - slotStartAngle;
 						while (relAngle < 0) relAngle += 360.0;
@@ -7259,9 +7532,16 @@ public partial class SettingsWindow : Window
 					int raw = -_dragSourceSlotIndex - 100;
 					int slot = raw / 100;
 					int subIdx = raw % 100;
-					if (slot >= 0 && slot < profile.Actions.Count && profile.Actions[slot].SubActions != null && subIdx < profile.Actions[slot].SubActions.Count)
+					if (slot >= 0 && slot < profile.Actions.Count)
 					{
-						srcName = profile.Actions[slot].SubActions[subIdx].Name ?? $"子动作 {subIdx + 1}";
+						ActionItem? eff = profile.GetEffectiveAction(slot);
+						var subs = (profile.Actions[slot].SubActions != null && subIdx < profile.Actions[slot].SubActions.Count)
+							? profile.Actions[slot].SubActions
+							: eff?.SubActions;
+						if (subs != null && subIdx < subs.Count)
+						{
+							srcName = subs[subIdx].Name ?? $"子动作 {subIdx + 1}";
+						}
 					}
 				}
 
@@ -11341,12 +11621,52 @@ public partial class SettingsWindow : Window
 		}
 		try
 		{
-			SubActionEditorWindow subActionEditorWindow = new SubActionEditorWindow(dataContext.DirectionLabel, dataContext.Name, dataContext.Action.SubActions);
+			WheelProfile? profile = _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault();
+			bool isGlobal = string.Equals(profile?.ProcessName, "Global", StringComparison.OrdinalIgnoreCase);
+			bool inheritanceEnabled = ConfigManager.CurrentConfig?.EnableGlobalInheritance == true;
+
+			// 若当前方案为非全局方案，且子动作未配置，若有继承自全局的子动作，预加载供编辑
+			List<ActionItem> initialSubs = dataContext.Action.SubActions ?? new List<ActionItem>();
+			if (initialSubs.Count == 0 && !isGlobal && inheritanceEnabled && profile != null)
+			{
+				ActionItem? eff = profile.GetEffectiveAction(dataContext.PositionIndex);
+				if (eff != null && eff.IsInherited && eff.SubActions != null && eff.SubActions.Count > 0)
+				{
+					initialSubs = eff.SubActions.Select(s => {
+						var c = s.Clone();
+						c.IsInherited = false;
+						return c;
+					}).ToList();
+				}
+			}
+
+			SubActionEditorWindow subActionEditorWindow = new SubActionEditorWindow(dataContext.DirectionLabel, dataContext.Name, initialSubs);
 			subActionEditorWindow.Owner = this;
 			if (subActionEditorWindow.ShowDialog() == true)
 			{
+				if (!isGlobal && inheritanceEnabled && profile != null && !WheelProfile.IsActionConfigured(dataContext.Action))
+				{
+					ActionItem? eff = profile.GetEffectiveAction(dataContext.PositionIndex);
+					if (eff != null && eff.IsInherited)
+					{
+						dataContext.Action.Name = eff.Name;
+						dataContext.Action.Type = eff.Type;
+						dataContext.Action.Parameter = eff.Parameter;
+						dataContext.Action.Arguments = eff.Arguments;
+						dataContext.Action.IconKey = eff.IconKey;
+						dataContext.Action.CustomIconSvg = eff.CustomIconSvg;
+						dataContext.Action.InheritAppIconPath = eff.InheritAppIconPath;
+						dataContext.Action.CommandTerminal = eff.CommandTerminal;
+						dataContext.Action.CustomIconSize = eff.CustomIconSize;
+						dataContext.Action.CustomTextColor = eff.CustomTextColor;
+						dataContext.Action.IsInherited = false;
+					}
+				}
 				dataContext.Action.SubActions = subActionEditorWindow.ResultSubActions;
 				dataContext.NotifySubActionsChanged();
+				RefreshFocusSubActionsChips();
+				RefreshSlots();
+				RenderMappingsWheelPreview();
 				ConfigManager.SaveConfig();
 				RenderLiveWheelPreview();
 			}

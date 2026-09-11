@@ -334,15 +334,19 @@ public class WheelProfile : INotifyPropertyChanged
 		// 2. 如果本地专属槽位配置了有效动作
 		if (IsActionConfigured(localAction))
 		{
-			if (subSectorIndex >= 0 && localAction!.SubActions != null && subSectorIndex < localAction.SubActions.Count)
+			if (subSectorIndex >= 0)
 			{
-				var sub = localAction.SubActions[subSectorIndex];
-				if (IsActionConfigured(sub))
+				if (localAction!.SubActions != null && subSectorIndex < localAction.SubActions.Count)
 				{
-					return sub;
+					var sub = localAction.SubActions[subSectorIndex];
+					if (IsActionConfigured(sub))
+					{
+						return sub;
+					}
 				}
+				return null; // 本地专属已明确配置有效主动作，未配置的子槽位不串挂全局无关动作
 			}
-			else if (subSectorIndex < 0)
+			else
 			{
 				return localAction;
 			}
