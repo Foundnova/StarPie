@@ -439,12 +439,17 @@ public class GestureController : IDisposable
 	// 判断指定扇区是否为系统音量加/减动作（用于外甩豁免：音量扇区在任意拖距都可调音）
 	private bool IsVolumeSector(int sectorIndex)
 	{
-		if (_activeProfile == null || sectorIndex < 0 || sectorIndex >= _activeProfile.Actions.Count)
+		if (_activeProfile == null || sectorIndex < 0)
 		{
 			return false;
 		}
-		ActionItem? action = _activeProfile.Actions[sectorIndex];
+		ActionItem? action = _activeProfile.GetEffectiveAction(sectorIndex);
 		if (action == null)
+		{
+			return false;
+		}
+		// 若该动作配置了二级级联子动作，首要用途为展开二级轮盘，绝不被误判为音量调音扇区
+		if (action.SubActions != null && action.SubActions.Count > 0)
 		{
 			return false;
 		}
@@ -473,9 +478,21 @@ public class GestureController : IDisposable
 			}
 		return false;
 		}
-		ActionItem? action = (_activeProfile != null && refSector < _activeProfile.Actions.Count)
-			? _activeProfile.Actions[refSector]
+		ActionItem? action = (_activeProfile != null && refSector >= 0)
+			? _activeProfile.GetEffectiveAction(refSector)
 			: null;
+		// 若该动作配置了二级级联子动作，首要用途为展开二级轮盘，绝不接管为音量拖拽调音
+		if (action != null && action.SubActions != null && action.SubActions.Count > 0)
+		{
+			if (_volumeAdjustActive)
+			{
+				_volumeAdjustActive = false;
+				_volumeLockedSector = -1;
+				_volumeFlickPrevDist = -1.0;
+				QueueVolumePreview(-1, GetCurrentGestureVersion());
+			}
+			return false;
+		}
 		bool isSystem = action != null && string.Equals(action.Type, "System", StringComparison.OrdinalIgnoreCase);
 		bool isUp = isSystem && string.Equals(action.Parameter, "volumeup", StringComparison.OrdinalIgnoreCase);
 		bool isDown = isSystem && string.Equals(action.Parameter, "volumedown", StringComparison.OrdinalIgnoreCase);

@@ -1007,6 +1007,7 @@ public partial class SettingsWindow : Window
 		if (SoundOnExpandCheckBox != null) SoundOnExpandCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnExpand;
 		if (SoundOnExecuteCheckBox != null) SoundOnExecuteCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnExecute;
 		if (SoundOnCancelCheckBox != null) SoundOnCancelCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnCancel;
+		CheckAndDisplaySystemAudioState();
 
 		// Animation Speed
 		string animSpeed = ConfigManager.CurrentConfig.AnimationSpeed ?? "Balanced";
@@ -9676,6 +9677,7 @@ public partial class SettingsWindow : Window
 
 	private async void SoundPreviewButton_Click(object sender, RoutedEventArgs e)
 	{
+		CheckAndDisplaySystemAudioState();
 		try
 		{
 			SoundEffectManager.PlayPreview(SoundType.WheelPopup);
@@ -9703,6 +9705,43 @@ public partial class SettingsWindow : Window
 			if (SoundOnExecuteCheckBox != null) ConfigManager.CurrentConfig.SoundOnExecute = SoundOnExecuteCheckBox.IsChecked == true;
 			if (SoundOnCancelCheckBox != null) ConfigManager.CurrentConfig.SoundOnCancel = SoundOnCancelCheckBox.IsChecked == true;
 			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void CheckAndDisplaySystemAudioState()
+	{
+		try
+		{
+			bool isMuted = false;
+			SystemVolume.GetMute(out isMuted);
+			bool gotVol = SystemVolume.TryGetVolume(out float sysVol);
+			bool isSilent = isMuted || (gotVol && sysVol <= 0.005f);
+
+			if (SystemAudioWarningBorder != null)
+			{
+				SystemAudioWarningBorder.Visibility = isSilent ? Visibility.Visible : Visibility.Collapsed;
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private void RestoreSystemAudioButton_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			SystemVolume.SetMute(false);
+			SystemVolume.SetVolume(0.5f);
+			if (SystemAudioWarningBorder != null)
+			{
+				SystemAudioWarningBorder.Visibility = Visibility.Collapsed;
+			}
+			SoundEffectManager.PlayPreview(SoundType.SectorHover);
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to restore system audio", ex);
 		}
 	}
 
@@ -12836,13 +12875,33 @@ public partial class SettingsWindow : Window
 	private void AddBlacklistButton_Click(object sender, RoutedEventArgs e)
 	{
 		string text = NewBlacklistProcessTextBox.Text.Trim().ToLower();
-		if (string.IsNullOrEmpty(text))
-		{
-			NewBlacklistProcessTextBox.Focus();
-		}
-		else
+		if (!string.IsNullOrEmpty(text))
 		{
 			AddBlacklistProcess(text);
+			return;
+		}
+
+		// 输入框为空时，弹出智能运行窗口与进程捕捉器（与照片 2 效果一致），直观高效
+		try
+		{
+			WindowPickerWindow picker = new WindowPickerWindow
+			{
+				Owner = this
+			};
+			if (picker.ShowDialog() == true)
+			{
+				string proc = !string.IsNullOrEmpty(picker.SelectedProcessName)
+					? picker.SelectedProcessName
+					: System.IO.Path.GetFileName(picker.SelectedPath);
+				if (!string.IsNullOrEmpty(proc))
+				{
+					AddBlacklistProcess(proc);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to open WindowPickerWindow for blacklist", ex);
 		}
 	}
 

@@ -1087,6 +1087,17 @@
                         </Grid>
                         <Slider Name="SoundVolumeSlider" AutomationProperties.AutomationId="SoundVolumeSlider" Minimum="0" Maximum="100" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SoundVolumeSlider_ValueChanged" />
                         <TextBlock Name="SoundVolumeDescText" Text="硬件级数学振幅无损缩放，完全独立于系统主音量，绝不修改 Windows 系统全局音量。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        <!-- 系统静音/音量为0异常诊断与一键恢复条 -->
+                        <Border Name="SystemAudioWarningBorder" Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,8,0,0" Visibility="Collapsed">
+                          <Grid>
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Name="SystemAudioWarningText" Text="⚠️ 检测到 Windows 系统主音量当前为 0% 或已静音，会导致所有交互音效无声。" FontSize="11.5" Foreground="#DC2626" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button Name="RestoreSystemAudioButton" Grid.Column="1" Content="🔊 一键解除静音并恢复音量 (50%)" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="10,0" FontSize="11" Margin="8,0,0,0" Click="RestoreSystemAudioButton_Click" Cursor="Hand" />
+                          </Grid>
+                        </Border>
                       </StackPanel>
                     </Border>
 

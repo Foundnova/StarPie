@@ -36,17 +36,28 @@ public enum SoundType
 /// </summary>
 public static class SoundEffectManager
 {
-	[DllImport("winmm.dll", EntryPoint = "PlaySound", SetLastError = true)]
+	[DllImport("winmm.dll", EntryPoint = "PlaySoundW", CharSet = CharSet.Unicode, SetLastError = true)]
 	[return: MarshalAs(UnmanagedType.Bool)]
-	private static extern bool PlaySound(IntPtr pszSound, IntPtr hmod, uint fdwSound);
+	private static extern bool PlaySoundW(IntPtr pszSound, IntPtr hmod, uint fdwSound);
 
-	private const uint SND_ASYNC = 0x0001;
+	private const uint SND_SYNC = 0x0000;
 	private const uint SND_NODEFAULT = 0x0002;
 	private const uint SND_MEMORY = 0x0004;
 
 	private static readonly object _syncLock = new object();
 	private static readonly Dictionary<SoundType, IntPtr> _soundPointers = new();
 	private static readonly Dictionary<SoundType, int> _soundLengths = new();
+
+	private static readonly System.Threading.Channels.Channel<SoundType> _soundChannel =
+		System.Threading.Channels.Channel.CreateBounded<SoundType>(new System.Threading.Channels.BoundedChannelOptions(2)
+		{
+			SingleWriter = false,
+			SingleReader = true,
+			FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest
+		});
+
+	private static Thread? _workerThread;
+	private static volatile bool _isRunning = false;
 
 	private static string _currentTheme = string.Empty;
 	private static double _currentVolume = -1.0;
@@ -55,6 +66,72 @@ public static class SoundEffectManager
 
 	/// <summary>扇区切换音效最小触发时间间隔 (毫秒)，防止光标在扇区分界线来回微颤时产生刺耳噪音。</summary>
 	private const long HoverDebounceMs = 35L;
+
+	/// <summary>
+	/// 确保专属音频后台回放工作线程已启动（单读者无锁队列，彻底规避 WinMM 异步中断死锁）。
+	/// </summary>
+	private static void EnsureWorkerStarted()
+	{
+		if (_isRunning && _workerThread != null && _workerThread.IsAlive)
+		{
+			return;
+		}
+		lock (_syncLock)
+		{
+			if (_isRunning && _workerThread != null && _workerThread.IsAlive)
+			{
+				return;
+			}
+			_isRunning = true;
+			_workerThread = new Thread(ProcessSoundQueue)
+			{
+				Name = "StarPie.SoundWorker",
+				IsBackground = true,
+				Priority = ThreadPriority.AboveNormal
+			};
+			_workerThread.Start();
+		}
+	}
+
+	/// <summary>
+	/// 专属音频播放循环：在独立工作线程内使用 SND_SYNC 同步回放。
+	/// 根本消除快速滑过多个子轮盘时 WinMM 频繁中止 waveOutReset 导致的内部死锁与无声故障。
+	/// </summary>
+	private static void ProcessSoundQueue()
+	{
+		var reader = _soundChannel.Reader;
+		while (_isRunning)
+		{
+			try
+			{
+				if (reader.WaitToReadAsync().AsTask().Result)
+				{
+					while (reader.TryRead(out SoundType type))
+					{
+						IntPtr ptr = IntPtr.Zero;
+						lock (_syncLock)
+						{
+							if (_soundPointers.TryGetValue(type, out IntPtr p))
+							{
+								ptr = p;
+							}
+						}
+
+						if (ptr != IntPtr.Zero && _isRunning)
+						{
+							// 使用 SND_SYNC 在专属工作线程内完整播放微型 PCM 波形（~30ms），
+							// 不产生 WinMM 内部辅助线程竞争，保证 100% 稳定可靠
+							PlaySoundW(ptr, IntPtr.Zero, SND_SYNC | SND_MEMORY | SND_NODEFAULT);
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogWarn($"SoundWorker iteration exception: {ex.Message}");
+			}
+		}
+	}
 
 	/// <summary>
 	/// 初始化或按需刷新音效数据缓存（在应用启动、配置载入或用户修改音量/主题时调用）。
@@ -87,6 +164,8 @@ public static class SoundEffectManager
 
 			_initialized = true;
 		}
+
+		EnsureWorkerStarted();
 	}
 
 	/// <summary>
@@ -126,8 +205,15 @@ public static class SoundEffectManager
 			}
 			_lastHoverTick = now;
 		}
+		else if (type == SoundType.SubmenuExpand)
+		{
+			// 二级展开保护期：防止展开瞬间紧接着触发子扇区 Hover 堆叠
+			_lastHoverTick = Environment.TickCount64 + 20L;
+		}
 
-		PlayDirect(type);
+		EnsureInitialized();
+		EnsureWorkerStarted();
+		_soundChannel.Writer.TryWrite(type);
 	}
 
 	/// <summary>
@@ -136,35 +222,8 @@ public static class SoundEffectManager
 	public static void PlayPreview(SoundType type)
 	{
 		EnsureInitialized();
-		PlayDirect(type);
-	}
-
-	private static void PlayDirect(SoundType type)
-	{
-		IntPtr ptr = IntPtr.Zero;
-		lock (_syncLock)
-		{
-			if (!_initialized)
-			{
-				Initialize();
-			}
-			if (_soundPointers.TryGetValue(type, out IntPtr p))
-			{
-				ptr = p;
-			}
-		}
-
-		if (ptr != IntPtr.Zero)
-		{
-			try
-			{
-				PlaySound(ptr, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
-			}
-			catch
-			{
-				// Win32 音频异常安全吸收，绝不拖累核心手势
-			}
-		}
+		EnsureWorkerStarted();
+		_soundChannel.Writer.TryWrite(type);
 	}
 
 	private static void EnsureInitialized()
@@ -187,37 +246,48 @@ public static class SoundEffectManager
 
 	private static void FreePointers()
 	{
+		lock (_syncLock)
+		{
+			try
+			{
+				// 立即中止可能正在回放的声音
+				PlaySoundW(IntPtr.Zero, IntPtr.Zero, 0);
+			}
+			catch
+			{
+			}
+
+			foreach (var kvp in _soundPointers)
+			{
+				if (kvp.Value != IntPtr.Zero)
+				{
+					try
+					{
+						Marshal.FreeHGlobal(kvp.Value);
+					}
+					catch
+					{
+					}
+				}
+			}
+			_soundPointers.Clear();
+			_soundLengths.Clear();
+		}
+	}
+
+	/// <summary>
+	/// 释放所有非托管音频内存与工作线程（在应用退出时调用）。
+	/// </summary>
+	public static void Shutdown()
+	{
+		_isRunning = false;
 		try
 		{
-			// 立即中止 winmm 任何正在异步回放的音频，防止底层非托管工作线程读取野指针导致访问违规
-			PlaySound(IntPtr.Zero, IntPtr.Zero, 0);
+			_soundChannel.Writer.TryComplete();
 		}
 		catch
 		{
 		}
-
-		foreach (var kvp in _soundPointers)
-		{
-			if (kvp.Value != IntPtr.Zero)
-			{
-				try
-				{
-					Marshal.FreeHGlobal(kvp.Value);
-				}
-				catch
-				{
-				}
-			}
-		}
-		_soundPointers.Clear();
-		_soundLengths.Clear();
-	}
-
-	/// <summary>
-	/// 释放所有非托管音频内存（在应用退出时调用）。
-	/// </summary>
-	public static void Shutdown()
-	{
 		lock (_syncLock)
 		{
 			FreePointers();

@@ -187,6 +187,56 @@ public static class SystemVolume
 		}
 	}
 
+	/// <summary>获取系统是否处于静音状态。失败返回 false。</summary>
+	public static bool GetMute(out bool isMuted)
+	{
+		isMuted = false;
+		IAudioEndpointVolume? volume = GetEndpointVolume();
+		if (volume == null)
+		{
+			return false;
+		}
+		try
+		{
+			if (volume.GetMute(out int muteVal) == 0)
+			{
+				isMuted = (muteVal != 0);
+				return true;
+			}
+			ResetEndpoint();
+			return false;
+		}
+		catch
+		{
+			ResetEndpoint();
+			return false;
+		}
+	}
+
+	/// <summary>设置系统静音状态。失败返回 false。</summary>
+	public static bool SetMute(bool mute)
+	{
+		IAudioEndpointVolume? volume = GetEndpointVolume();
+		if (volume == null)
+		{
+			return false;
+		}
+		try
+		{
+			if (volume.SetMute(mute ? 1 : 0, IntPtr.Zero) == 0)
+			{
+				return true;
+			}
+			ResetEndpoint();
+			return false;
+		}
+		catch
+		{
+			ResetEndpoint();
+			return false;
+		}
+	}
+
 	/// <summary>Wake the native volume flyout and correct system volume to the exact target.</summary>
 	/// <remarks>Injecting a system volume key makes the OS pop the volume OSD; the trailing
 	/// SetVolume immediately re-aligns the real volume so the flyout reflects the target.</remarks>
