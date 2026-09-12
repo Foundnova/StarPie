@@ -143,6 +143,8 @@ public partial class App : Application
 		{
 			ConfigManager.LoadConfig();
 			AppLogger.LogInfo("ConfigManager.LoadConfig completed");
+			SoundEffectManager.Initialize();
+			AppLogger.LogInfo("SoundEffectManager.Initialize completed");
 			MainMouseHook = new MouseHook();
 			MainMouseHook.Start();
 			AppLogger.LogInfo("MainMouseHook started");
@@ -410,6 +412,7 @@ public partial class App : Application
 			MainGestureController = null;
 			MainMouseHook?.Stop();
 			MainKeyboardHook?.Stop();
+			SoundEffectManager.Shutdown();
 		}
 		catch
 		{

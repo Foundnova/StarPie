@@ -104,6 +104,34 @@ public class AppConfig
 	/// <summary>是否开启应用专属方案继承/叠加 Global 全局方案（当应用方案槽位留空未配置时自动透传全局动作）。</summary>
 	public bool EnableGlobalInheritance { get; set; } = true;
 
+	/// <summary>当前正在使用的配置方案名称（如 "默认配置"、"CAD建模方案" 等），对应 AppData/Configs/<Name>.json。</summary>
+	public string ActiveConfigProfileName { get; set; } = "默认配置";
+
+	// ---- 轮盘交互音效系统 (Audio Haptic Feedback) ----
+	/// <summary>是否开启轮盘交互音效（提供机械触觉/清脆盲操反馈，默认 true）。</summary>
+	public bool EnableSoundEffects { get; set; } = true;
+
+	/// <summary>交互音效全局音量（0.0 ~ 1.0，默认 0.6 即 60%）。</summary>
+	public double SoundVolume { get; set; } = 0.6;
+
+	/// <summary>音效主题风格："Mechanical"（机械手感）、"Crisp"（现代清脆）、"Bubble"（轻盈气泡）、"Minimalist"（极简短音）。默认 "Mechanical"。</summary>
+	public string SoundTheme { get; set; } = "Mechanical";
+
+	/// <summary>细项开关：轮盘呼出音效。</summary>
+	public bool SoundOnPopup { get; set; } = true;
+
+	/// <summary>细项开关：扇区切换高亮音效。</summary>
+	public bool SoundOnHover { get; set; } = true;
+
+	/// <summary>细项开关：二级子菜单展开音效。</summary>
+	public bool SoundOnExpand { get; set; } = true;
+
+	/// <summary>细项开关：动作执行确认音效。</summary>
+	public bool SoundOnExecute { get; set; } = true;
+
+	/// <summary>细项开关：外甩/脱离取消音效。</summary>
+	public bool SoundOnCancel { get; set; } = true;
+
 
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 

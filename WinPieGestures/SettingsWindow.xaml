@@ -679,12 +679,12 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.6&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.7&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.6" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.7" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -1032,6 +1032,78 @@
                     <Slider Name="AnimSpeedSlider" Minimum="10" Maximum="500" Value="80" SmallChange="5" LargeChange="10" TickFrequency="10" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="AnimSpeedSlider_ValueChanged" />
                     <TextBlock Name="AnimSpeedSliderLabel" Grid.Column="1" Text="80 ms" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
+                </StackPanel>
+              </Border>
+              <!-- 轮盘触发与交互音效系统 (Audio Haptic Feedback) -->
+              <Border Name="Tab0_SoundEffectsCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Name="SoundEffectsTitleText" Text="轮盘触发交互音效 (Sound &amp; Haptic Feedback)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="SoundEffectsDescText" Text="基于原生 Win32 非托管内存音频管线与极微波形合成，为轮盘唤醒、划过扇区、二级展开与触发确认提供毫秒级零延迟微动音效，建立盲操听觉闭环。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
+                  
+                  <CheckBox Name="EnableSoundEffectsCheckBox" AutomationProperties.AutomationId="EnableSoundEffectsCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="EnableSoundEffectsCheckBox_Changed" Unchecked="EnableSoundEffectsCheckBox_Changed">
+                    <StackPanel Margin="6,0,0,0">
+                      <TextBlock Name="EnableSoundEffectsTitleText" Text="开启轮盘交互音效 (推荐开启，建立盲操手感)" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="EnableSoundEffectsSubText" Text="零延迟 &lt; 2ms，常驻内存 &lt; 20KB，不阻塞鼠标任何手势操作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+                  </CheckBox>
+
+                  <StackPanel Name="SoundEffectsDetailsPanel" Margin="0,10,0,0" Visibility="Visible">
+                    <!-- 主题风格与音量设置行 -->
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                          <TextBlock Name="SoundThemeLabelText" Text="音效风格主题 (Sound Theme)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Name="SoundThemeDescText" Text="可选机械轴体敲击、现代手机触感微点、轻盈水滴气泡或极简脉冲短音。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox Name="SoundThemeComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SoundThemeComboBox_SelectionChanged">
+                          <ComboBoxItem Tag="Mechanical" Content="⚙️ 机械手感 (轴体微动/刻度)" IsSelected="True" />
+                          <ComboBoxItem Tag="Crisp" Content="✨ 现代清脆 (数码触感)" />
+                          <ComboBoxItem Tag="Bubble" Content="🫧 柔和气泡 (水滴轻音)" />
+                          <ComboBoxItem Tag="Minimalist" Content="⚡ 极简短音 (超微脉冲)" />
+                        </ComboBox>
+                      </Grid>
+                    </Border>
+
+                    <!-- 音量调节与试听 -->
+                    <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
+                      <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Name="SoundVolumeTitleText" Text="交互音量 (Volume):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Name="SoundVolumeLabel" Grid.Column="2" Text="60%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0" />
+                          <Button Name="SoundPreviewButton" Grid.Column="3" Content="🔊 试听全套音效" Height="28" Padding="12,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="SoundPreviewButton_Click" ToolTip="依次播放当前主题的唤出、划过、展开、确认与取消音效" />
+                        </Grid>
+                        <Slider Name="SoundVolumeSlider" AutomationProperties.AutomationId="SoundVolumeSlider" Minimum="0" Maximum="100" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SoundVolumeSlider_ValueChanged" />
+                        <TextBlock Name="SoundVolumeDescText" Text="硬件级数学振幅无损缩放，完全独立于系统主音量，绝不修改 Windows 系统全局音量。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      </StackPanel>
+                    </Border>
+
+                    <!-- 细项事件独立开关 -->
+                    <Border Name="SoundSubEventsBorder" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
+                      <StackPanel>
+                        <TextBlock Name="SoundSubEventsTitleText" Text="细项事件声音独立开关 (Event Toggles)" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <WrapPanel Orientation="Horizontal">
+                          <CheckBox Name="SoundOnPopupCheckBox" Content="呼出轮盘" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
+                          <CheckBox Name="SoundOnHoverCheckBox" Content="扇区切换/划过" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
+                          <CheckBox Name="SoundOnExpandCheckBox" Content="二级菜单展开" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
+                          <CheckBox Name="SoundOnExecuteCheckBox" Content="动作执行确认" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
+                          <CheckBox Name="SoundOnCancelCheckBox" Content="顺势外甩/取消" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
+                        </WrapPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
                 </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
@@ -3520,7 +3592,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.6 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.7 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3538,7 +3610,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.6" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.7" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -3617,128 +3689,144 @@
                     </Grid>
                   </Border>
 
-                  <!-- 下方偏好与加速策略 -->
-                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,14,0,0">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                      </Grid.ColumnDefinitions>
-                      <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                      </Grid.RowDefinitions>
-
-                      <!-- 自动检查更新开关 -->
-                      <Grid Grid.Column="0" Margin="0,0,10,10">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                          <TextBlock Name="UpdateSilentCheckTitleText" Text="开机静默检查更新" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                          <TextBlock Name="UpdateSilentCheckDescText" Text="程序启动后在后台静默查询 GitHub Releases" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <CheckBox Name="AutoCheckUpdateCheckBox" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center" Checked="AutoCheckUpdateCheckBox_Changed" Unchecked="AutoCheckUpdateCheckBox_Changed" />
-                      </Grid>
-
-                      <!-- 推送通道选择 -->
-                      <Grid Grid.Column="1" Margin="10,0,0,10">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="150" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                          <TextBlock Name="UpdateChannelTitleText" Text="更新推送通道" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                          <TextBlock Name="UpdateChannelDescText" Text="选择稳定版或尝鲜版" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox Name="UpdateChannelComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" VerticalAlignment="Center" SelectionChanged="UpdateChannelComboBox_SelectionChanged">
-                          <ComboBoxItem Tag="Stable" Content="🌟 正式稳定版" />
-                          <ComboBoxItem Tag="Beta" Content="🚀 尝鲜测试版" />
-                        </ComboBox>
-                      </Grid>
-
-                      <!-- 国内加速下载镜像源 -->
-                      <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,0">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                          <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚡" FontSize="13" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                            <TextBlock Name="UpdateProxyTitleText" Text="GitHub 下载加速镜像源" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                            <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="3" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                              <TextBlock Text="国内极速下载" FontSize="10" Foreground="{DynamicResource AccentPrimaryBrush}" />
-                            </Border>
-                          </StackPanel>
-                          <TextBlock Name="UpdateProxyDescText" Text="解决国内访问 GitHub Releases 丢包或限速问题，自动加速代理下载" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox Name="UpdateProxyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" VerticalAlignment="Center" SelectionChanged="UpdateProxyComboBox_SelectionChanged">
-                          <ComboBoxItem Tag="ghfast" Content="⚡ 镜像源 1 (ghfast.top 推荐)" />
-                          <ComboBoxItem Tag="gh-proxy" Content="⚡ 镜像源 2 (gh-proxy.com 备用)" />
-                          <ComboBoxItem Tag="mirror" Content="⚡ 镜像源 3 (mirror.ghproxy.com)" />
-                          <ComboBoxItem Tag="direct" Content="🌐 官方直连 (GitHub Official)" />
-                        </ComboBox>
-                      </Grid>
-                    </Grid>
-                  </Border>
-
-                  <!-- 版本回退专区 (Version Rollback) -->
-                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,14,0,0">
-                    <StackPanel>
-                      <Grid>
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*" />
-                          <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="⏮️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
-                            <TextBlock Name="RollbackSectionTitleText" Text="历史版本回退 (Version Rollback)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                            <Border Name="RollbackCountBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                              <TextBlock Name="RollbackCountBadgeText" Text="🚀 测试版最多回退5个版本" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
-                            </Border>
-                          </StackPanel>
-                          <TextBlock Name="RollbackSectionDescText" Text="若当前版本发生兼容性或配置异常，可选择历史版本一键覆盖回退安装。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <!-- 选择历史版本下拉框与回退按钮 -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                          <ComboBox Name="RollbackVersionComboBox" Style="{StaticResource FlatComboBoxStyle}" Width="210" Height="32" Margin="0,0,8,0" VerticalAlignment="Center" SelectionChanged="RollbackVersionComboBox_SelectionChanged" />
-                          <Button Name="StartRollbackBtn" Content="⬇️ 回退至此版本" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" VerticalAlignment="Center" IsEnabled="False" Click="StartRollbackBtn_Click" />
-                        </StackPanel>
-                      </Grid>
-
-                      <!-- 选中回退版本的详情卡片 (折叠展开) -->
-                      <Border Name="RollbackDetailCard" Visibility="Collapsed" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,10,0,0">
-                        <StackPanel>
-                          <Grid Margin="0,0,0,6">
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="*" />
-                              <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                              <TextBlock Name="RollbackDetailTagText" Text="V1.7.3-beta.1" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                              <Border Name="RollbackDetailChannelBorder" Background="#25F59E0B" CornerRadius="3" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Name="RollbackDetailChannelText" Text="尝鲜测试版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
-                              </Border>
-                              <TextBlock Name="RollbackDetailDateText" Text="· 发布于 2026-09-08" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                              <TextBlock Text="安装包架构:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                              <TextBlock Name="RollbackInstallTypeText" Text="独立免安装版" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                            </StackPanel>
-                          </Grid>
-                          <TextBlock Text="📋 历史更新日志摘要:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2,0,4" />
-                          <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8">
-                            <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                              <TextBlock Name="RollbackChangelogText" Text="" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="16" />
-                            </ScrollViewer>
+                  <!-- 下方偏好、加速与历史版本回退高级选项 (默认折叠收纳) -->
+                  <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,12,0,0">
+                    <Expander Name="UpdateAdvancedSettingsExpander" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0" Foreground="{DynamicResource TextPrimaryBrush}">
+                      <HeaderedContentControl.Header>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,0,3">
+                          <TextBlock Text="⚙️" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                          <TextBlock Name="UpdateAdvancedSettingsExpanderTitle" Text="更新偏好、下载加速与历史版本回退 (展开/折叠)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="3" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="高级选项" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" />
                           </Border>
                         </StackPanel>
-                      </Border>
-                    </StackPanel>
+                      </HeaderedContentControl.Header>
+                      <StackPanel Margin="0,8,0,0">
+                        <!-- 下方偏好与加速策略 -->
+                        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,6,0,0">
+                          <Grid>
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                              <RowDefinition Height="Auto" />
+                              <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- 自动检查更新开关 -->
+                            <Grid Grid.Column="0" Margin="0,0,10,10">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Name="UpdateSilentCheckTitleText" Text="开机静默检查更新" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Name="UpdateSilentCheckDescText" Text="程序启动后在后台静默查询 GitHub Releases" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <CheckBox Name="AutoCheckUpdateCheckBox" Grid.Column="1" Style="{StaticResource ToggleSwitchStyle}" VerticalAlignment="Center" Checked="AutoCheckUpdateCheckBox_Changed" Unchecked="AutoCheckUpdateCheckBox_Changed" />
+                            </Grid>
+
+                            <!-- 推送通道选择 -->
+                            <Grid Grid.Column="1" Margin="10,0,0,10">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="150" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock Name="UpdateChannelTitleText" Text="更新推送通道" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Name="UpdateChannelDescText" Text="选择稳定版或尝鲜版" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <ComboBox Name="UpdateChannelComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" VerticalAlignment="Center" SelectionChanged="UpdateChannelComboBox_SelectionChanged">
+                                <ComboBoxItem Tag="Stable" Content="🌟 正式稳定版" />
+                                <ComboBoxItem Tag="Beta" Content="🚀 尝鲜测试版" />
+                              </ComboBox>
+                            </Grid>
+
+                            <!-- 国内加速下载镜像源 -->
+                            <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,0">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                <StackPanel Orientation="Horizontal">
+                                  <TextBlock Text="⚡" FontSize="13" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                  <TextBlock Name="UpdateProxyTitleText" Text="GitHub 下载加速镜像源" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                  <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="3" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="国内极速下载" FontSize="10" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                                  </Border>
+                                </StackPanel>
+                                <TextBlock Name="UpdateProxyDescText" Text="解决国内访问 GitHub Releases 丢包或限速问题，自动加速代理下载" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <ComboBox Name="UpdateProxyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" VerticalAlignment="Center" SelectionChanged="UpdateProxyComboBox_SelectionChanged">
+                                <ComboBoxItem Tag="ghfast" Content="⚡ 镜像源 1 (ghfast.top 推荐)" />
+                                <ComboBoxItem Tag="gh-proxy" Content="⚡ 镜像源 2 (gh-proxy.com 备用)" />
+                                <ComboBoxItem Tag="mirror" Content="⚡ 镜像源 3 (mirror.ghproxy.com)" />
+                                <ComboBoxItem Tag="direct" Content="🌐 官方直连 (GitHub Official)" />
+                              </ComboBox>
+                            </Grid>
+                          </Grid>
+                        </Border>
+
+                        <!-- 版本回退专区 (Version Rollback) -->
+                        <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,12,0,0">
+                          <StackPanel>
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                  <TextBlock Text="⏮️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                  <TextBlock Name="RollbackSectionTitleText" Text="历史版本回退 (Version Rollback)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                  <Border Name="RollbackCountBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Name="RollbackCountBadgeText" Text="🚀 测试版最多回退5个版本" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                                  </Border>
+                                </StackPanel>
+                                <TextBlock Name="RollbackSectionDescText" Text="若当前版本发生兼容性或配置异常，可选择历史版本一键覆盖回退安装。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                              </StackPanel>
+
+                              <!-- 选择历史版本下拉框与回退按钮 -->
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox Name="RollbackVersionComboBox" Style="{StaticResource FlatComboBoxStyle}" Width="210" Height="32" Margin="0,0,8,0" VerticalAlignment="Center" SelectionChanged="RollbackVersionComboBox_SelectionChanged" />
+                                <Button Name="StartRollbackBtn" Content="⬇️ 回退至此版本" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" VerticalAlignment="Center" IsEnabled="False" Click="StartRollbackBtn_Click" />
+                              </StackPanel>
+                            </Grid>
+
+                            <!-- 选中回退版本的详情卡片 (折叠展开) -->
+                            <Border Name="RollbackDetailCard" Visibility="Collapsed" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,10,0,0">
+                              <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                  </Grid.ColumnDefinitions>
+                                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Name="RollbackDetailTagText" Text="V1.7.3-beta.1" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                                    <Border Name="RollbackDetailChannelBorder" Background="#25F59E0B" CornerRadius="3" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                      <TextBlock Name="RollbackDetailChannelText" Text="尝鲜测试版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
+                                    </Border>
+                                    <TextBlock Name="RollbackDetailDateText" Text="· 发布于 2026-09-08" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="安装包架构:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Name="RollbackInstallTypeText" Text="独立免安装版" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </Grid>
+                                <TextBlock Text="📋 历史更新日志摘要:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2,0,4" />
+                                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8">
+                                  <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <TextBlock Name="RollbackChangelogText" Text="" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="16" />
+                                  </ScrollViewer>
+                                </Border>
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </Border>
+                      </StackPanel>
+                    </Expander>
                   </Border>
                 </StackPanel>
               </Border>
@@ -3867,16 +3955,58 @@
                   <Button Name="TrimMemoryButton" Grid.Column="1" Content="立即压缩内存" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="14,0" VerticalAlignment="Center" ToolTip="立即清理未引用的工作集物理内存" Click="TrimMemoryButton_Click" />
                 </Grid>
               </Border>
+              <!-- Card: 多配置文件方案与备份管理 -->
               <Border Name="Tab3_BackupCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14">
                 <UIElement.Effect>
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="BackupTitleText" Text="配置导出与导入 (Backup &amp; Migration)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12" />
-                  <WrapPanel>
-                    <Button Name="ExportConfigButton" Content="导出当前配置为 JSON..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,10,0" Click="ExportConfigButton_Click" />
-                    <Button Name="ImportConfigButton" Content="从外部 JSON 文件导入..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Click="ImportConfigButton_Click" />
-                  </WrapPanel>
+                  <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📁" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Name="BackupTitleText" Text="多配置文件方案与备份管理 (Profiles &amp; Backup)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <Border Name="ActiveProfileBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                          <TextBlock Name="ActiveProfileBadgeText" Text="当前方案: 默认配置" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Name="BackupDescText" Text="管理多套独立配置方案（如建模CAD、日常办公、游戏娱乐等），随时一键热切换，并支持导入与导出外部配置。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Grid>
+
+                  <!-- 方案管理主卡片 -->
+                  <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,12">
+                    <StackPanel>
+                      <!-- 上行：方案切换与增删改 -->
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="220" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Name="ActiveProfileLabelText" Text="当前激活方案:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox Name="ConfigProfilesComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="32" VerticalAlignment="Center" SelectionChanged="ConfigProfilesComboBox_SelectionChanged" />
+                        <WrapPanel Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0">
+                          <Button Name="SaveNewProfileBtn" Content="➕ 保存为新方案" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Margin="0,0,8,0" Click="SaveNewProfileBtn_Click" ToolTip="将当前全部轮盘动作与设置另存为一套全新的配置方案" />
+                          <Button Name="RenameProfileBtn" Content="✏️ 重命名" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Margin="0,0,8,0" Click="RenameProfileBtn_Click" ToolTip="重命名当前选中的配置方案" />
+                          <Button Name="DeleteProfileBtn" Content="🗑️ 删除" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="10,0" Click="DeleteProfileBtn_Click" ToolTip="删除当前选中的配置方案（需保留至少一套）" />
+                        </WrapPanel>
+                      </Grid>
+
+                      <!-- 下行：外部导入与导出 -->
+                      <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,10,0,0">
+                        <WrapPanel VerticalAlignment="Center">
+                          <Button Name="ImportConfigButton" Content="📂 导入外部配置..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Margin="0,0,10,0" Click="ImportConfigButton_Click" ToolTip="导入外部 StarPie JSON 配置文件并自动收纳入配置方案列表" />
+                          <Button Name="ExportConfigButton" Content="💾 导出选中配置..." Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Margin="0,0,10,0" Click="ExportConfigButton_Click" ToolTip="将选中的配置方案导出为单独的 JSON 备份文件" />
+                          <Button Name="ResetDefaultConfigBtn" Content="🔄 恢复默认配置" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Click="ResetDefaultConfigBtn_Click" ToolTip="恢复初始默认轮盘手势与设置（不会影响其它已保存方案）" />
+                        </WrapPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Name="Tab3_LogsCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
@@ -3937,7 +4067,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.6" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.7" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -3947,6 +4077,18 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.3-beta.7 轮盘触发交互音效系统 (方案C 极低延迟)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🔊 【原生 Win32 非托管音频管线 (方案C)】：采用 winmm.dll 内存驻留非托管 PCM 回放与程序化波形合成引擎，延迟 &lt; 2ms，常驻内存 &lt; 20KB，零 GC 抖动，零外部依赖；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎵 【5 大交互节点全闭环反馈】：覆盖轮盘呼出、扇区划过切换、二级菜单展开、动作确认触发与顺势外甩取消，建立视听协同的极速盲操确定性；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎛️ 【4 款主题预设与独立音量控制】：内置机械手感、现代清脆、柔和气泡、极简短音 4 款专属音效，支持硬件级数学无损音量缩放、一键全套试听与细项事件独立开关；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🛡️ 【35ms 扇区防抖闸门】：鼠标在扇区分界线微颤时自动限频防抖，彻底消除刺耳杂音。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>

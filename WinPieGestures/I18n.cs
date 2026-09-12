@@ -2350,31 +2350,73 @@ public static class I18n
 		};
 		dictionary["BackupTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "配置备份与恢复 (Backup & Reset)",
-			[LanguageCode.ZhTw] = "配置備份與恢復 (Backup & Reset)",
-			[LanguageCode.En] = "Backup & Reset",
-			[LanguageCode.Ja] = "バックアップとリセット"
+			[LanguageCode.ZhCn] = "多配置文件方案与备份管理 (Profiles & Backup)",
+			[LanguageCode.ZhTw] = "多設定檔方案與備份管理 (Profiles & Backup)",
+			[LanguageCode.En] = "Configuration Profiles & Backup Management",
+			[LanguageCode.Ja] = "設定プロファイルとバックアップ管理"
+		};
+		dictionary["BackupDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "管理多套独立配置方案（如建模CAD、日常办公、游戏娱乐等），随时一键热切换，并支持导入与导出外部配置。",
+			[LanguageCode.ZhTw] = "管理多套獨立配置方案（如建模CAD、日常辦公、遊戲娛樂等），隨時一鍵熱切換，並支援匯入與匯出外部設定。",
+			[LanguageCode.En] = "Manage multiple independent profiles (CAD, Office, Gaming, etc.) with instant hot-switching, import, and export.",
+			[LanguageCode.Ja] = "複数の独立した設定プロファイル（CAD、オフィス、ゲームなど）を管理し、即時切り替え、インポート、エクスポートに対応します。"
+		};
+		dictionary["ActiveProfileLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "当前激活方案:",
+			[LanguageCode.ZhTw] = "當前啟用方案:",
+			[LanguageCode.En] = "Active Profile:",
+			[LanguageCode.Ja] = "アクティブプロファイル:"
+		};
+		dictionary["BtnSaveNewProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 保存为新方案",
+			[LanguageCode.ZhTw] = "➕ 儲存為新方案",
+			[LanguageCode.En] = "➕ Save as New Profile",
+			[LanguageCode.Ja] = "➕ 新規保存"
+		};
+		dictionary["BtnRenameProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✏️ 重命名",
+			[LanguageCode.ZhTw] = "✏️ 重新命名",
+			[LanguageCode.En] = "✏️ Rename",
+			[LanguageCode.Ja] = "✏️ 名前の変更"
+		};
+		dictionary["BtnDeleteProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🗑️ 删除",
+			[LanguageCode.ZhTw] = "🗑️ 刪除",
+			[LanguageCode.En] = "🗑️ Delete",
+			[LanguageCode.Ja] = "🗑️ 削除"
 		};
 		dictionary["BtnExportConfig"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "导出配置备份",
-			[LanguageCode.ZhTw] = "匯出配置備份",
-			[LanguageCode.En] = "Export Backup",
-			[LanguageCode.Ja] = "設定をエクスポート"
+			[LanguageCode.ZhCn] = "💾 导出选中配置...",
+			[LanguageCode.ZhTw] = "💾 匯出所選配置...",
+			[LanguageCode.En] = "💾 Export Selected...",
+			[LanguageCode.Ja] = "💾 選択した設定をエクスポート..."
 		};
 		dictionary["BtnImportConfig"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "导入配置文件",
-			[LanguageCode.ZhTw] = "匯入設定檔",
-			[LanguageCode.En] = "Import Config",
-			[LanguageCode.Ja] = "設定をインポート"
+			[LanguageCode.ZhCn] = "📂 导入外部配置...",
+			[LanguageCode.ZhTw] = "📂 匯入外部設定檔...",
+			[LanguageCode.En] = "📂 Import External...",
+			[LanguageCode.Ja] = "📂 外部設定をインポート..."
 		};
 		dictionary["BtnResetConfig"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "恢复出厂设置",
-			[LanguageCode.ZhTw] = "恢復原廠設定",
-			[LanguageCode.En] = "Restore Factory Defaults",
-			[LanguageCode.Ja] = "初期設定にリセット"
+			[LanguageCode.ZhCn] = "🔄 恢复默认配置",
+			[LanguageCode.ZhTw] = "🔄 恢復預設配置",
+			[LanguageCode.En] = "🔄 Reset to Default",
+			[LanguageCode.Ja] = "🔄 デフォルトにリセット"
+		};
+		dictionary["UpdateAdvancedToggleTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "更新偏好、下载加速与历史版本回退 (展开/折叠)",
+			[LanguageCode.ZhTw] = "更新偏好、下載加速與歷史版本回退 (展開/折疊)",
+			[LanguageCode.En] = "Update Preferences, Mirrors & Version Rollback (Expand/Collapse)",
+			[LanguageCode.Ja] = "更新設定・ミラー・バージョンロールバック (展開/折りたたみ)"
 		};
 		dictionary["LogsTitle"] = new Dictionary<LanguageCode, string>
 		{
@@ -2942,6 +2984,111 @@ public static class I18n
 			[LanguageCode.ZhTw] = "🔄 恢復預設提示微標樣式",
 			[LanguageCode.En] = "🔄 Reset Indicator Style",
 			[LanguageCode.Ja] = "🔄 インジケータースタイルを初期化"
+		};
+		dictionary["SoundEffectsTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘触发交互音效 (Sound & Haptic Feedback)",
+			[LanguageCode.ZhTw] = "輪盤觸發互動音效 (Sound & Haptic Feedback)",
+			[LanguageCode.En] = "Radial Interaction Sound Effects",
+			[LanguageCode.Ja] = "ホイール起動・操作サウンド効果"
+		};
+		dictionary["SoundEffectsDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "基于原生 Win32 非托管内存音频管线与极微波形合成，为轮盘唤醒、划过扇区、二级展开与触发确认提供毫秒级零延迟微动音效，建立盲操听觉闭环。",
+			[LanguageCode.ZhTw] = "基於原生 Win32 非託管記憶體音訊管線與極微波形合成，為輪盤喚醒、劃過扇區、二級展開與觸發確認提供毫秒級零延遲微動音效，建立盲操聽覺閉環。",
+			[LanguageCode.En] = "Powered by native Win32 memory audio pipeline & procedural synthesis, delivering sub-millisecond tactile audio feedback for popup, hover, expansion and execution.",
+			[LanguageCode.Ja] = "Win32ネイティブ低遅延メモリオーディオにより、起動、ホバー、サブメニュー展開、実行、キャンセルの各操作に極微フィードバック音を提供します。"
+		};
+		dictionary["EnableSoundEffectsTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "开启轮盘交互音效 (推荐开启，建立盲操手感)",
+			[LanguageCode.ZhTw] = "開啟輪盤互動音效 (推薦開啟，建立盲操手感)",
+			[LanguageCode.En] = "Enable Sound Effects (Recommended for muscle memory)",
+			[LanguageCode.Ja] = "ホイール操作サウンドを有効化（ブラインド操作に推奨）"
+		};
+		dictionary["EnableSoundEffectsSub"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "零延迟 < 2ms，常驻内存 < 20KB，不阻塞鼠标任何手势操作。",
+			[LanguageCode.ZhTw] = "零延遲 < 2ms，常駐記憶體 < 20KB，不阻塞滑鼠任何手勢操作。",
+			[LanguageCode.En] = "Zero latency (<2ms), ultra-low memory (<20KB), non-blocking.",
+			[LanguageCode.Ja] = "超低遅延（2ms未満）、メモリ占有極小（20KB未満）、マウス操作を一切妨げません。"
+		};
+		dictionary["SoundThemeLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "音效风格主题 (Sound Theme)",
+			[LanguageCode.ZhTw] = "音效風格主題 (Sound Theme)",
+			[LanguageCode.En] = "Sound Theme",
+			[LanguageCode.Ja] = "サウンドテーマ"
+		};
+		dictionary["SoundThemeDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "可选机械轴体敲击、现代手机触感微点、轻盈水滴气泡或极简脉冲短音。",
+			[LanguageCode.ZhTw] = "可選機械軸體敲擊、現代手機觸感微點、輕盈水滴氣泡或極簡脈衝短音。",
+			[LanguageCode.En] = "Choose between mechanical switch, modern tactile haptic, soft bubble, or minimalist blip.",
+			[LanguageCode.Ja] = "メカニカル軸、現代風触覚クリック、ソフトバブル、ミニマルパルスから選択できます。"
+		};
+		dictionary["SoundVolumeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "交互音量 (Volume):",
+			[LanguageCode.ZhTw] = "互動音量 (Volume):",
+			[LanguageCode.En] = "Feedback Volume:",
+			[LanguageCode.Ja] = "効果音音量:"
+		};
+		dictionary["SoundVolumeDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "硬件级数学振幅无损缩放，完全独立于系统主音量，绝不修改 Windows 系统全局音量。",
+			[LanguageCode.ZhTw] = "硬體級數學振幅無損縮放，完全獨立於系統主音量，絕不修改 Windows 系統全域音量。",
+			[LanguageCode.En] = "Mathematical sample scaling completely independent of Windows master volume.",
+			[LanguageCode.Ja] = "Windowsのマスター音量とは完全に独立した数学的振幅スケーリングを行います。"
+		};
+		dictionary["BtnSoundPreview"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔊 试听全套音效",
+			[LanguageCode.ZhTw] = "🔊 試聽全套音效",
+			[LanguageCode.En] = "🔊 Preview Sound Pack",
+			[LanguageCode.Ja] = "🔊 サウンドを試聴"
+		};
+		dictionary["SoundSubEventsTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "细项事件声音独立开关 (Event Toggles)",
+			[LanguageCode.ZhTw] = "細項事件聲音獨立開關 (Event Toggles)",
+			[LanguageCode.En] = "Independent Event Toggles",
+			[LanguageCode.Ja] = "個別イベントのサウンド設定"
+		};
+		dictionary["SoundOnPopup"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "呼出轮盘",
+			[LanguageCode.ZhTw] = "呼出輪盤",
+			[LanguageCode.En] = "Menu Popup",
+			[LanguageCode.Ja] = "ホイール起動"
+		};
+		dictionary["SoundOnHover"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扇区切换/划过",
+			[LanguageCode.ZhTw] = "扇區切換/劃過",
+			[LanguageCode.En] = "Sector Hover",
+			[LanguageCode.Ja] = "セクターホバー"
+		};
+		dictionary["SoundOnExpand"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二级菜单展开",
+			[LanguageCode.ZhTw] = "二級選單展開",
+			[LanguageCode.En] = "Submenu Expand",
+			[LanguageCode.Ja] = "サブメニュー展開"
+		};
+		dictionary["SoundOnExecute"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "动作执行确认",
+			[LanguageCode.ZhTw] = "動作執行確認",
+			[LanguageCode.En] = "Action Execute",
+			[LanguageCode.Ja] = "アクション実行"
+		};
+		dictionary["SoundOnCancel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "顺势外甩/取消",
+			[LanguageCode.ZhTw] = "順勢外甩/取消",
+			[LanguageCode.En] = "Flick Cancel",
+			[LanguageCode.Ja] = "キャンセル"
 		};
 		Translations = dictionary;
 	}

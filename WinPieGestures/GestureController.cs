@@ -336,6 +336,11 @@ public class GestureController : IDisposable
 				return;
 			}
 
+			int prevSector = _selectedSectorIndex;
+			int prevSubSector = _selectedSubSectorIndex;
+			bool prevEscaped = _lastEscapedState;
+			bool prevShowSubTier = _lastShowSubTier;
+
 			_selectedSectorIndex = sectorIndex;
 			_selectedSubSectorIndex = subSectorIndex;
 			_lastEscapedState = isEscaped;
@@ -347,6 +352,24 @@ public class GestureController : IDisposable
 			_pendingGestureVersion = gestureVersion;
 			shouldSchedule = !_highlightUpdateScheduled;
 			_highlightUpdateScheduled = true;
+
+			// 音效反馈触发：扇区切换、二级展开与外甩取消
+			if (!prevEscaped && isEscaped)
+			{
+				SoundEffectManager.Play(SoundType.GestureCancel);
+			}
+			else if (!prevShowSubTier && showSubTier)
+			{
+				SoundEffectManager.Play(SoundType.SubmenuExpand);
+			}
+			else if (showSubTier && prevSubSector != subSectorIndex && subSectorIndex >= 0)
+			{
+				SoundEffectManager.Play(SoundType.SectorHover);
+			}
+			else if (prevSector != sectorIndex && sectorIndex >= 0)
+			{
+				SoundEffectManager.Play(SoundType.SectorHover);
+			}
 		}
 
 		if (!shouldSchedule)
@@ -1339,7 +1362,12 @@ public class GestureController : IDisposable
 				}
 				if (targetAction != null)
 				{
+					SoundEffectManager.Play(SoundType.ActionExecute);
 					ActionExecutor.EnqueueAction(targetAction);
+				}
+				else
+				{
+					SoundEffectManager.Play(SoundType.GestureCancel);
 				}
 			}, DispatcherPriority.Normal, Array.Empty<object>());
 			e.Handled = true;
@@ -1389,6 +1417,7 @@ public class GestureController : IDisposable
 			// ESC 按键即刻取消手势轮盘并吞键，防止干扰前台应用
 			if (e.VkCode == 27)
 			{
+				SoundEffectManager.Play(SoundType.GestureCancel);
 				CancelGestureTracking();
 				e.Handled = true;
 				return;
@@ -1608,7 +1637,12 @@ public class GestureController : IDisposable
 				}
 				if (targetAction != null)
 				{
+					SoundEffectManager.Play(SoundType.ActionExecute);
 					ActionExecutor.EnqueueAction(targetAction);
+				}
+				else
+				{
+					SoundEffectManager.Play(SoundType.GestureCancel);
 				}
 			}, DispatcherPriority.Normal, Array.Empty<object>());
 			// 穿透模式：激活前的 Down 已原生放行，KeyUp 放行与其配对，
@@ -1891,6 +1925,7 @@ public class GestureController : IDisposable
 				SetCursorPos((int)Math.Round(actualCenter.X), (int)Math.Round(actualCenter.Y));
 				ProcessMove(actualCenter);
 			}
+			SoundEffectManager.Play(SoundType.WheelPopup);
 			return true;
 		}
 		catch

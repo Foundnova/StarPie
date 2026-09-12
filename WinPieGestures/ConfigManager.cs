@@ -16,7 +16,7 @@ public static class ConfigManager
 
 	private static readonly string ConfigPath;
 
-	public static AppConfig CurrentConfig { get; private set; }
+	public static AppConfig CurrentConfig { get; internal set; }
 
 	private static long _configurationRevision;
 
@@ -122,6 +122,7 @@ public static class ConfigManager
 			}
 			I18n.SetLanguage(CurrentConfig.Language);
 			MarkConfigurationChanged();
+			EnsureConfigsFolder();
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
 			_ = System.Threading.Tasks.Task.Run(async () =>
 			{
@@ -144,12 +145,17 @@ public static class ConfigManager
 			EnsureConfigHealth(CurrentConfig);
 			I18n.SetLanguage(CurrentConfig.Language);
 			MarkConfigurationChanged();
+			EnsureConfigsFolder();
 		}
 	}
 
 	public static void EnsureConfigHealth(AppConfig currentConfig)
 	{
 		if (currentConfig == null) return;
+		if (string.IsNullOrWhiteSpace(currentConfig.ActiveConfigProfileName))
+		{
+			currentConfig.ActiveConfigProfileName = "默认配置";
+		}
 		if (currentConfig.BlacklistedProcesses == null)
 		{
 			currentConfig.BlacklistedProcesses = new List<string> { "mstsc.exe", "paint.exe" };
@@ -336,6 +342,30 @@ public static class ConfigManager
 			{
 				File.Move(tempPath, ConfigPath, overwrite: true);
 			}
+
+			// 同步保存至方案子目录对应的配置文件
+			try
+			{
+				string? activeProfile = CurrentConfig?.ActiveConfigProfileName;
+				if (!string.IsNullOrWhiteSpace(activeProfile))
+				{
+					if (!Directory.Exists(ConfigsFolder))
+					{
+						Directory.CreateDirectory(ConfigsFolder);
+					}
+					string clean = CleanFileName(activeProfile);
+					if (!string.IsNullOrWhiteSpace(clean))
+					{
+						string profilePath = Path.Combine(ConfigsFolder, $"{clean}.json");
+						File.WriteAllText(profilePath, contents);
+					}
+				}
+			}
+			catch (Exception exSync)
+			{
+				AppLogger.LogError("Failed to mirror save profile config", exSync);
+			}
+
 			return true;
 		}
 		catch (Exception ex)
@@ -431,7 +461,7 @@ public static class ConfigManager
 		return wheelProfile;
 	}
 
-	private static AppConfig CreateDefaultConfig()
+	public static AppConfig CreateDefaultConfig()
 	{
 		AppConfig obj = new AppConfig
 		{
@@ -692,6 +722,302 @@ public static class ConfigManager
 			AppLogger.LogError("Failed to import config from '" + sourceFilePath + "'", ex);
 		}
 		return false;
+	}
+
+	public static string ConfigsFolder => Path.Combine(AppDataFolder, "Configs");
+
+	public static void EnsureConfigsFolder()
+	{
+		try
+		{
+			if (!Directory.Exists(ConfigsFolder))
+			{
+				Directory.CreateDirectory(ConfigsFolder);
+			}
+
+			string activeName = CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+			if (string.IsNullOrWhiteSpace(activeName))
+			{
+				activeName = "默认配置";
+				if (CurrentConfig != null)
+				{
+					CurrentConfig.ActiveConfigProfileName = activeName;
+				}
+			}
+
+			string clean = CleanFileName(activeName);
+			if (string.IsNullOrWhiteSpace(clean)) clean = "默认配置";
+
+			string activeFile = Path.Combine(ConfigsFolder, $"{clean}.json");
+			if (!File.Exists(activeFile))
+			{
+				if (CurrentConfig != null)
+				{
+					JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = true };
+					File.WriteAllText(activeFile, JsonSerializer.Serialize(CurrentConfig, options));
+				}
+				else if (File.Exists(ConfigPath))
+				{
+					File.Copy(ConfigPath, activeFile, overwrite: true);
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to ensure configs folder", ex);
+		}
+	}
+
+	public static List<string> GetSavedConfigNames()
+	{
+		EnsureConfigsFolder();
+		List<string> list = new List<string>();
+		try
+		{
+			if (Directory.Exists(ConfigsFolder))
+			{
+				string[] files = Directory.GetFiles(ConfigsFolder, "*.json");
+				foreach (string file in files)
+				{
+					string name = Path.GetFileNameWithoutExtension(file);
+					if (!string.IsNullOrWhiteSpace(name))
+					{
+						list.Add(name);
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to list saved configs", ex);
+		}
+
+		if (list.Count == 0)
+		{
+			list.Add("默认配置");
+		}
+		list.Sort(StringComparer.OrdinalIgnoreCase);
+		return list;
+	}
+
+	public static bool SaveConfigAs(string newProfileName)
+	{
+		if (string.IsNullOrWhiteSpace(newProfileName)) return false;
+		string cleanName = CleanFileName(newProfileName);
+		if (string.IsNullOrWhiteSpace(cleanName)) return false;
+
+		EnsureConfigsFolder();
+		if (CurrentConfig != null)
+		{
+			CurrentConfig.ActiveConfigProfileName = cleanName;
+		}
+
+		string targetFile = Path.Combine(ConfigsFolder, $"{cleanName}.json");
+		try
+		{
+			JsonSerializerOptions options = new JsonSerializerOptions { WriteIndented = true };
+			string json = JsonSerializer.Serialize(CurrentConfig, options);
+			File.WriteAllText(targetFile, json);
+			SaveConfig();
+			MarkConfigurationChanged();
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to save config as '{cleanName}'", ex);
+			return false;
+		}
+	}
+
+	public static bool SwitchToConfig(string profileName)
+	{
+		if (string.IsNullOrWhiteSpace(profileName)) return false;
+		EnsureConfigsFolder();
+		string cleanName = CleanFileName(profileName);
+		string targetFile = Path.Combine(ConfigsFolder, $"{cleanName}.json");
+		if (!File.Exists(targetFile)) return false;
+
+		try
+		{
+			JsonSerializerOptions options = new JsonSerializerOptions
+			{
+				PropertyNameCaseInsensitive = true,
+				AllowTrailingCommas = true,
+				ReadCommentHandling = JsonCommentHandling.Skip
+			};
+			AppConfig? loaded = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(targetFile), options);
+			if (loaded != null)
+			{
+				loaded.ActiveConfigProfileName = cleanName;
+				EnsureConfigHealth(loaded);
+				CurrentConfig = loaded;
+				I18n.SetLanguage(CurrentConfig.Language);
+				SaveConfig();
+				MarkConfigurationChanged();
+				return true;
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to switch to config '{cleanName}'", ex);
+		}
+		return false;
+	}
+
+	public static bool RenameSavedConfig(string oldName, string newName)
+	{
+		if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName)) return false;
+		string cleanOld = CleanFileName(oldName);
+		string cleanNew = CleanFileName(newName);
+		if (string.IsNullOrWhiteSpace(cleanOld) || string.IsNullOrWhiteSpace(cleanNew)) return false;
+		if (string.Equals(cleanOld, cleanNew, StringComparison.OrdinalIgnoreCase)) return true;
+
+		EnsureConfigsFolder();
+		string oldFile = Path.Combine(ConfigsFolder, $"{cleanOld}.json");
+		string newFile = Path.Combine(ConfigsFolder, $"{cleanNew}.json");
+		if (!File.Exists(oldFile) || File.Exists(newFile)) return false;
+
+		try
+		{
+			File.Move(oldFile, newFile);
+			if (string.Equals(CurrentConfig?.ActiveConfigProfileName, cleanOld, StringComparison.OrdinalIgnoreCase))
+			{
+				CurrentConfig.ActiveConfigProfileName = cleanNew;
+				SaveConfig();
+			}
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to rename config '{cleanOld}' to '{cleanNew}'", ex);
+			return false;
+		}
+	}
+
+	public static bool DeleteSavedConfig(string profileName, out string fallbackName)
+	{
+		fallbackName = "";
+		if (string.IsNullOrWhiteSpace(profileName)) return false;
+		string clean = CleanFileName(profileName);
+
+		EnsureConfigsFolder();
+		List<string> all = GetSavedConfigNames();
+		if (all.Count <= 1) return false;
+
+		string file = Path.Combine(ConfigsFolder, $"{clean}.json");
+		try
+		{
+			if (File.Exists(file))
+			{
+				File.Delete(file);
+			}
+
+			if (string.Equals(CurrentConfig?.ActiveConfigProfileName, clean, StringComparison.OrdinalIgnoreCase))
+			{
+				fallbackName = all.FirstOrDefault(x => !string.Equals(x, clean, StringComparison.OrdinalIgnoreCase)) ?? "默认配置";
+				SwitchToConfig(fallbackName);
+			}
+			else
+			{
+				fallbackName = CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+			}
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to delete config '{clean}'", ex);
+			return false;
+		}
+	}
+
+	public static bool ImportExternalConfig(string externalFilePath, string? preferredName, out string importedName)
+	{
+		importedName = "";
+		if (!File.Exists(externalFilePath)) return false;
+
+		try
+		{
+			JsonSerializerOptions options = new JsonSerializerOptions
+			{
+				PropertyNameCaseInsensitive = true,
+				AllowTrailingCommas = true,
+				ReadCommentHandling = JsonCommentHandling.Skip
+			};
+			AppConfig? loaded = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(externalFilePath), options);
+			if (loaded == null) return false;
+
+			EnsureConfigsFolder();
+			string baseName = !string.IsNullOrWhiteSpace(preferredName) ? preferredName : Path.GetFileNameWithoutExtension(externalFilePath);
+			baseName = CleanFileName(baseName);
+			if (string.IsNullOrWhiteSpace(baseName)) baseName = "导入方案";
+
+			string targetName = baseName;
+			int counter = 1;
+			while (File.Exists(Path.Combine(ConfigsFolder, $"{targetName}.json")))
+			{
+				targetName = $"{baseName} ({counter++})";
+			}
+
+			loaded.ActiveConfigProfileName = targetName;
+			EnsureConfigHealth(loaded);
+
+			string targetFile = Path.Combine(ConfigsFolder, $"{targetName}.json");
+			JsonSerializerOptions saveOpts = new JsonSerializerOptions { WriteIndented = true };
+			File.WriteAllText(targetFile, JsonSerializer.Serialize(loaded, saveOpts));
+
+			SwitchToConfig(targetName);
+			importedName = targetName;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to import external config '{externalFilePath}'", ex);
+			return false;
+		}
+	}
+
+	public static bool ExportConfigToFile(string profileName, string targetFilePath)
+	{
+		try
+		{
+			EnsureConfigsFolder();
+			string clean = CleanFileName(profileName);
+			string profileFile = Path.Combine(ConfigsFolder, $"{clean}.json");
+			if (string.Equals(CurrentConfig?.ActiveConfigProfileName, clean, StringComparison.OrdinalIgnoreCase) || !File.Exists(profileFile))
+			{
+				return ExportConfig(targetFilePath);
+			}
+
+			File.Copy(profileFile, targetFilePath, overwrite: true);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"Failed to export config '{profileName}' to '{targetFilePath}'", ex);
+			return false;
+		}
+	}
+
+	public static string CleanFileName(string fileName)
+	{
+		if (string.IsNullOrWhiteSpace(fileName)) return "";
+		char[] invalid = Path.GetInvalidFileNameChars();
+		return new string(fileName.Where(c => !invalid.Contains(c)).ToArray()).Trim();
+	}
+
+	public static void ResetToDefault(string? profileName = null)
+	{
+		string name = !string.IsNullOrWhiteSpace(profileName) ? profileName : (CurrentConfig?.ActiveConfigProfileName ?? "默认配置");
+		string clean = CleanFileName(name);
+		if (string.IsNullOrWhiteSpace(clean)) clean = "默认配置";
+
+		AppConfig defaultConf = CreateDefaultConfig();
+		defaultConf.ActiveConfigProfileName = clean;
+		EnsureConfigHealth(defaultConf);
+		CurrentConfig = defaultConf;
+		I18n.SetLanguage(CurrentConfig.Language);
+		SaveConfig();
+		MarkConfigurationChanged();
 	}
 
 	private static void EnsureTriggerHealth(AppConfig? config)

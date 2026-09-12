@@ -854,6 +854,7 @@ public partial class SettingsWindow : Window
 			MappingsProfileComboBox.ItemsSource = ConfigManager.CurrentConfig.Profiles;
 			MappingsProfileComboBox.SelectedItem = _selectedProfile ?? ConfigManager.CurrentConfig.Profiles.FirstOrDefault();
 		}
+		RefreshConfigProfilesUi();
 		UpdateProfileToolbarButtonStates();
 		UpdateProfileBindingUi();
 		UpdateFocusActionTypeItemsSource();
@@ -971,6 +972,41 @@ public partial class SettingsWindow : Window
 		{
 			OuterEscapeDistanceLabel.Text = $"{OuterEscapeDistanceSlider?.Value ?? 190.0:0} px";
 		}
+
+		// Sound Effects
+		if (EnableSoundEffectsCheckBox != null)
+		{
+			EnableSoundEffectsCheckBox.IsChecked = ConfigManager.CurrentConfig.EnableSoundEffects;
+		}
+		if (SoundEffectsDetailsPanel != null)
+		{
+			SoundEffectsDetailsPanel.Visibility = ConfigManager.CurrentConfig.EnableSoundEffects ? Visibility.Visible : Visibility.Collapsed;
+		}
+		if (SoundThemeComboBox != null)
+		{
+			string theme = ConfigManager.CurrentConfig.SoundTheme ?? "Mechanical";
+			foreach (var item in SoundThemeComboBox.Items)
+			{
+				if (item is ComboBoxItem cbi && string.Equals(cbi.Tag?.ToString(), theme, StringComparison.OrdinalIgnoreCase))
+				{
+					SoundThemeComboBox.SelectedItem = cbi;
+					break;
+				}
+			}
+		}
+		if (SoundVolumeSlider != null)
+		{
+			SoundVolumeSlider.Value = Math.Round(ConfigManager.CurrentConfig.SoundVolume * 100.0);
+		}
+		if (SoundVolumeLabel != null)
+		{
+			SoundVolumeLabel.Text = $"{(int)Math.Round(ConfigManager.CurrentConfig.SoundVolume * 100.0)}%";
+		}
+		if (SoundOnPopupCheckBox != null) SoundOnPopupCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnPopup;
+		if (SoundOnHoverCheckBox != null) SoundOnHoverCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnHover;
+		if (SoundOnExpandCheckBox != null) SoundOnExpandCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnExpand;
+		if (SoundOnExecuteCheckBox != null) SoundOnExecuteCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnExecute;
+		if (SoundOnCancelCheckBox != null) SoundOnCancelCheckBox.IsChecked = ConfigManager.CurrentConfig.SoundOnCancel;
 
 		// Animation Speed
 		string animSpeed = ConfigManager.CurrentConfig.AnimationSpeed ?? "Balanced";
@@ -1601,6 +1637,10 @@ public partial class SettingsWindow : Window
 		{
 			Tab0_VolumeDragCardBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
 		}
+		if (SoundSubEventsBorder != null)
+		{
+			SoundSubEventsBorder.Visibility = isSimple ? Visibility.Collapsed : Visibility.Visible;
+		}
 
 		// 2. Tab 1 外观与形态: 隐藏独立字体选择与文字位置偏移
 		if (Tab1_FontFamilyPanel != null)
@@ -1779,6 +1819,21 @@ public partial class SettingsWindow : Window
 		{
 			TriggerPageHeader.Text = I18n.T("TriggerHeader");
 		}
+		if (SoundEffectsTitleText != null) SoundEffectsTitleText.Text = I18n.T("SoundEffectsTitle");
+		if (SoundEffectsDescText != null) SoundEffectsDescText.Text = I18n.T("SoundEffectsDesc");
+		if (EnableSoundEffectsTitleText != null) EnableSoundEffectsTitleText.Text = I18n.T("EnableSoundEffectsTitle");
+		if (EnableSoundEffectsSubText != null) EnableSoundEffectsSubText.Text = I18n.T("EnableSoundEffectsSub");
+		if (SoundThemeLabelText != null) SoundThemeLabelText.Text = I18n.T("SoundThemeLabel");
+		if (SoundThemeDescText != null) SoundThemeDescText.Text = I18n.T("SoundThemeDesc");
+		if (SoundVolumeTitleText != null) SoundVolumeTitleText.Text = I18n.T("SoundVolumeTitle");
+		if (SoundVolumeDescText != null) SoundVolumeDescText.Text = I18n.T("SoundVolumeDesc");
+		if (SoundPreviewButton != null) SoundPreviewButton.Content = I18n.T("BtnSoundPreview");
+		if (SoundSubEventsTitleText != null) SoundSubEventsTitleText.Text = I18n.T("SoundSubEventsTitle");
+		if (SoundOnPopupCheckBox != null) SoundOnPopupCheckBox.Content = I18n.T("SoundOnPopup");
+		if (SoundOnHoverCheckBox != null) SoundOnHoverCheckBox.Content = I18n.T("SoundOnHover");
+		if (SoundOnExpandCheckBox != null) SoundOnExpandCheckBox.Content = I18n.T("SoundOnExpand");
+		if (SoundOnExecuteCheckBox != null) SoundOnExecuteCheckBox.Content = I18n.T("SoundOnExecute");
+		if (SoundOnCancelCheckBox != null) SoundOnCancelCheckBox.Content = I18n.T("SoundOnCancel");
 		if (LongPressTriggerTitleText != null)
 		{
 			LongPressTriggerTitleText.Text = I18n.T("LongPressTriggerTitle");
@@ -2260,9 +2315,33 @@ public partial class SettingsWindow : Window
 		{
 			TrimMemoryButton.Content = I18n.T("BtnTrimMemory");
 		}
+		if (UpdateAdvancedSettingsExpanderTitle != null)
+		{
+			UpdateAdvancedSettingsExpanderTitle.Text = I18n.T("UpdateAdvancedToggleTitle");
+		}
 		if (BackupTitleText != null)
 		{
 			BackupTitleText.Text = I18n.T("BackupTitle");
+		}
+		if (BackupDescText != null)
+		{
+			BackupDescText.Text = I18n.T("BackupDesc");
+		}
+		if (ActiveProfileLabelText != null)
+		{
+			ActiveProfileLabelText.Text = I18n.T("ActiveProfileLabel");
+		}
+		if (SaveNewProfileBtn != null)
+		{
+			SaveNewProfileBtn.Content = I18n.T("BtnSaveNewProfile");
+		}
+		if (RenameProfileBtn != null)
+		{
+			RenameProfileBtn.Content = I18n.T("BtnRenameProfile");
+		}
+		if (DeleteProfileBtn != null)
+		{
+			DeleteProfileBtn.Content = I18n.T("BtnDeleteProfile");
 		}
 		if (ExportConfigButton != null)
 		{
@@ -2271,6 +2350,10 @@ public partial class SettingsWindow : Window
 		if (ImportConfigButton != null)
 		{
 			ImportConfigButton.Content = I18n.T("BtnImportConfig");
+		}
+		if (ResetDefaultConfigBtn != null)
+		{
+			ResetDefaultConfigBtn.Content = I18n.T("BtnResetConfig");
 		}
 		if (LogsTitleText != null)
 		{
@@ -2766,6 +2849,23 @@ public partial class SettingsWindow : Window
 			{
 				ConfigManager.CurrentConfig.EdgeSafeMarginY = EdgeSafeMarginYSlider.Value;
 			}
+			if (EnableSoundEffectsCheckBox != null)
+			{
+				ConfigManager.CurrentConfig.EnableSoundEffects = EnableSoundEffectsCheckBox.IsChecked == true;
+			}
+			if (SoundThemeComboBox?.SelectedItem is ComboBoxItem soundThemeItem)
+			{
+				ConfigManager.CurrentConfig.SoundTheme = soundThemeItem.Tag?.ToString() ?? "Mechanical";
+			}
+			if (SoundVolumeSlider != null)
+			{
+				ConfigManager.CurrentConfig.SoundVolume = Math.Clamp(SoundVolumeSlider.Value / 100.0, 0.0, 1.0);
+			}
+			if (SoundOnPopupCheckBox != null) ConfigManager.CurrentConfig.SoundOnPopup = SoundOnPopupCheckBox.IsChecked == true;
+			if (SoundOnHoverCheckBox != null) ConfigManager.CurrentConfig.SoundOnHover = SoundOnHoverCheckBox.IsChecked == true;
+			if (SoundOnExpandCheckBox != null) ConfigManager.CurrentConfig.SoundOnExpand = SoundOnExpandCheckBox.IsChecked == true;
+			if (SoundOnExecuteCheckBox != null) ConfigManager.CurrentConfig.SoundOnExecute = SoundOnExecuteCheckBox.IsChecked == true;
+			if (SoundOnCancelCheckBox != null) ConfigManager.CurrentConfig.SoundOnCancel = SoundOnCancelCheckBox.IsChecked == true;
 			if (ConfigManager.CurrentConfig?.Profiles != null)
 			{
 				foreach (var p in ConfigManager.CurrentConfig.Profiles)
@@ -9517,6 +9617,95 @@ public partial class SettingsWindow : Window
 		SyncUiToConfigAndSave();
 	}
 
+	private void EnableSoundEffectsCheckBox_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		{
+			bool enabled = EnableSoundEffectsCheckBox.IsChecked == true;
+			ConfigManager.CurrentConfig.EnableSoundEffects = enabled;
+			if (SoundEffectsDetailsPanel != null)
+			{
+				SoundEffectsDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+			}
+			if (enabled)
+			{
+				SoundEffectManager.Initialize(ConfigManager.CurrentConfig.SoundTheme, ConfigManager.CurrentConfig.SoundVolume);
+				SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			}
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private void SoundThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null && SoundThemeComboBox?.SelectedItem is ComboBoxItem item)
+		{
+			string theme = item.Tag?.ToString() ?? "Mechanical";
+			ConfigManager.CurrentConfig.SoundTheme = theme;
+			SoundEffectManager.Initialize(theme, ConfigManager.CurrentConfig.SoundVolume);
+			SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			SyncUiToConfigAndSave();
+		}
+	}
+
+	private long _lastVolumePreviewTick;
+
+	private void SoundVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (SoundVolumeLabel != null)
+		{
+			SoundVolumeLabel.Text = $"{(int)Math.Round(e.NewValue)}%";
+		}
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		{
+			double vol = Math.Clamp(e.NewValue / 100.0, 0.0, 1.0);
+			ConfigManager.CurrentConfig.SoundVolume = vol;
+			SoundEffectManager.Initialize(ConfigManager.CurrentConfig.SoundTheme, vol);
+
+			// 滑动音量时节流试听反馈（每 120ms 最多一次），给用户即时响度感知
+			long now = Environment.TickCount64;
+			if (now - _lastVolumePreviewTick >= 120L)
+			{
+				_lastVolumePreviewTick = now;
+				SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			}
+
+			ScheduleAutoSave();
+		}
+	}
+
+	private async void SoundPreviewButton_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			SoundEffectManager.PlayPreview(SoundType.WheelPopup);
+			await System.Threading.Tasks.Task.Delay(200);
+			SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			await System.Threading.Tasks.Task.Delay(160);
+			SoundEffectManager.PlayPreview(SoundType.SubmenuExpand);
+			await System.Threading.Tasks.Task.Delay(200);
+			SoundEffectManager.PlayPreview(SoundType.ActionExecute);
+			await System.Threading.Tasks.Task.Delay(220);
+			SoundEffectManager.PlayPreview(SoundType.GestureCancel);
+		}
+		catch
+		{
+		}
+	}
+
+	private void SoundSubEvent_Changed(object sender, RoutedEventArgs e)
+	{
+		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
+		{
+			if (SoundOnPopupCheckBox != null) ConfigManager.CurrentConfig.SoundOnPopup = SoundOnPopupCheckBox.IsChecked == true;
+			if (SoundOnHoverCheckBox != null) ConfigManager.CurrentConfig.SoundOnHover = SoundOnHoverCheckBox.IsChecked == true;
+			if (SoundOnExpandCheckBox != null) ConfigManager.CurrentConfig.SoundOnExpand = SoundOnExpandCheckBox.IsChecked == true;
+			if (SoundOnExecuteCheckBox != null) ConfigManager.CurrentConfig.SoundOnExecute = SoundOnExecuteCheckBox.IsChecked == true;
+			if (SoundOnCancelCheckBox != null) ConfigManager.CurrentConfig.SoundOnCancel = SoundOnCancelCheckBox.IsChecked == true;
+			SyncUiToConfigAndSave();
+		}
+	}
+
 	private void OuterEscapeCheckBox_Checked(object sender, RoutedEventArgs e)
 	{
 		if (_isUiInitialized && !_isUpdatingUi && ConfigManager.CurrentConfig != null)
@@ -11837,12 +12026,7 @@ public partial class SettingsWindow : Window
 		if (!string.IsNullOrEmpty(text))
 		{
 			ConfigManager.CurrentConfig.CoreIconType = "Image";
-			ConfigManager.CurrentConfig.ShowCoreIcon = true;
 			SetComboBoxSelectedValue(CoreIconTypeComboBox, "Image");
-			if (ShowCoreIconCheckBox != null)
-			{
-				ShowCoreIconCheckBox.IsChecked = true;
-			}
 		}
 		UpdateCoreIconPreviewUI();
 		UpdateCoreImageThumbnail(ConfigManager.CurrentConfig.CoreCustomImagePath);
@@ -12654,7 +12838,7 @@ public partial class SettingsWindow : Window
 		string text = NewBlacklistProcessTextBox.Text.Trim().ToLower();
 		if (string.IsNullOrEmpty(text))
 		{
-			BrowseBlacklistButton_Click(sender, e);
+			NewBlacklistProcessTextBox.Focus();
 		}
 		else
 		{
@@ -13537,23 +13721,219 @@ public partial class SettingsWindow : Window
 		App.RestartElevated();
 	}
 
-	private void ExportConfigButton_Click(object sender, RoutedEventArgs e)
+	private void RefreshConfigProfilesUi()
 	{
-		Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
+		if (ConfigProfilesComboBox == null) return;
+		var profiles = ConfigManager.GetSavedConfigNames();
+		string active = ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+
+		bool wasUpdating = _isUpdatingUi;
+		_isUpdatingUi = true;
+		try
 		{
-			Filter = "JSON 配置文件 (*.json)|*.json",
-			FileName = $"WinPieGestures_Config_Backup_{DateTime.Now:yyyyMMdd}.json",
-			Title = "导出配置文件"
-		};
-		if (saveFileDialog.ShowDialog() == true)
-		{
-			if (ConfigManager.ExportConfig(saveFileDialog.FileName))
+			ConfigProfilesComboBox.ItemsSource = null;
+			ConfigProfilesComboBox.ItemsSource = profiles;
+			int idx = profiles.FindIndex(p => string.Equals(p, active, StringComparison.OrdinalIgnoreCase));
+			ConfigProfilesComboBox.SelectedIndex = idx >= 0 ? idx : 0;
+
+			if (ActiveProfileBadgeText != null)
 			{
-				System.Windows.MessageBox.Show("配置导出成功！", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				ActiveProfileBadgeText.Text = $"当前方案: {active}";
+			}
+
+			if (DeleteProfileBtn != null)
+			{
+				DeleteProfileBtn.IsEnabled = profiles.Count > 1;
+			}
+		}
+		finally
+		{
+			_isUpdatingUi = wasUpdating;
+		}
+	}
+
+	private void ConfigProfilesComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || ConfigProfilesComboBox == null) return;
+		if (ConfigProfilesComboBox.SelectedItem is string selectedName)
+		{
+			if (string.Equals(selectedName, ConfigManager.CurrentConfig?.ActiveConfigProfileName, StringComparison.OrdinalIgnoreCase))
+			{
+				return;
+			}
+
+			// 保存当前方案的修改
+			SyncUiToConfigAndSave();
+
+			if (ConfigManager.SwitchToConfig(selectedName))
+			{
+				_selectedProfile = null;
+				_isUpdatingUi = true;
+				try
+				{
+					LoadConfigToUi();
+					AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
+				}
+				finally
+				{
+					_isUpdatingUi = false;
+				}
+				_selectedProfile = ConfigManager.CurrentConfig.Profiles?.FirstOrDefault();
+				if (ProfilesListBox != null) ProfilesListBox.SelectedItem = _selectedProfile;
+				if (MappingsProfileComboBox != null) MappingsProfileComboBox.SelectedItem = _selectedProfile;
+				ReloadThemePresets();
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+				RenderLiveWheelPreview();
+				RefreshConfigProfilesUi();
+				App.ApplyTrayTheme(IsCurrentThemeDark());
+				App.ShowTrayBalloon(1500, "StarPie", $"已热切换至配置方案「{selectedName}」", ToolTipIcon.Info);
+			}
+		}
+	}
+
+	private void SaveNewProfileBtn_Click(object sender, RoutedEventArgs e)
+	{
+		var list = ConfigManager.GetSavedConfigNames();
+		string defaultName = $"方案_{list.Count + 1}";
+		InputDialog inputDialog = new InputDialog(
+			"保存为新配置方案",
+			"请输入新配置方案名称（如“CAD建模方案”、“日常办公”等）：",
+			defaultName,
+			(string input) =>
+			{
+				if (string.IsNullOrWhiteSpace(input))
+					return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+				string clean = ConfigManager.CleanFileName(input);
+				if (string.IsNullOrWhiteSpace(clean))
+					return (IsValid: false, ErrorMessage: "方案名称包含非法字符，请重新输入！");
+				if (list.Any(x => string.Equals(x, clean, StringComparison.OrdinalIgnoreCase)))
+					return (IsValid: false, ErrorMessage: $"方案名称「{clean}」已存在，请使用其他名称！");
+				return (IsValid: true, ErrorMessage: "");
+			});
+		inputDialog.Owner = this;
+		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+		{
+			string newName = ConfigManager.CleanFileName(inputDialog.InputText.Trim());
+			SyncUiToConfigAndSave(saveToDisk: false);
+			if (ConfigManager.SaveConfigAs(newName))
+			{
+				RefreshConfigProfilesUi();
+				System.Windows.MessageBox.Show(this, $"已成功将当前全部设置另存为方案「{newName}」并已激活！", "保存成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			}
 			else
 			{
-				System.Windows.MessageBox.Show("配置导出失败，请检查写入权限。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+				System.Windows.MessageBox.Show(this, "保存新配置方案失败，请检查写入权限。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+			}
+		}
+	}
+
+	private void RenameProfileBtn_Click(object sender, RoutedEventArgs e)
+	{
+		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		var list = ConfigManager.GetSavedConfigNames();
+		InputDialog inputDialog = new InputDialog(
+			"重命名配置方案",
+			$"请输入配置方案「{currentName}」的新名称：",
+			currentName,
+			(string input) =>
+			{
+				if (string.IsNullOrWhiteSpace(input))
+					return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+				string clean = ConfigManager.CleanFileName(input);
+				if (string.IsNullOrWhiteSpace(clean))
+					return (IsValid: false, ErrorMessage: "方案名称包含非法字符，请重新输入！");
+				if (!string.Equals(clean, currentName, StringComparison.OrdinalIgnoreCase) &&
+				    list.Any(x => string.Equals(x, clean, StringComparison.OrdinalIgnoreCase)))
+					return (IsValid: false, ErrorMessage: $"方案名称「{clean}」已存在，请使用其他名称！");
+				return (IsValid: true, ErrorMessage: "");
+			});
+		inputDialog.Owner = this;
+		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+		{
+			string newName = ConfigManager.CleanFileName(inputDialog.InputText.Trim());
+			if (string.Equals(newName, currentName, StringComparison.OrdinalIgnoreCase)) return;
+
+			if (ConfigManager.RenameSavedConfig(currentName, newName))
+			{
+				RefreshConfigProfilesUi();
+				System.Windows.MessageBox.Show(this, $"配置方案已成功重命名为「{newName}」！", "重命名成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			}
+			else
+			{
+				System.Windows.MessageBox.Show(this, "重命名配置方案失败。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+			}
+		}
+	}
+
+	private void DeleteProfileBtn_Click(object sender, RoutedEventArgs e)
+	{
+		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		var list = ConfigManager.GetSavedConfigNames();
+		if (list.Count <= 1)
+		{
+			System.Windows.MessageBox.Show(this, "至少需要保留一个配置方案，无法删除最后一份配置。", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		var res = System.Windows.MessageBox.Show(
+			this,
+			$"确定要删除配置方案「{currentName}」吗？\n删除后该方案配置文件将被永久移除。",
+			"确认删除配置方案",
+			MessageBoxButton.YesNo,
+			MessageBoxImage.Question);
+		if (res == MessageBoxResult.Yes)
+		{
+			if (ConfigManager.DeleteSavedConfig(currentName, out string fallbackName))
+			{
+				_selectedProfile = null;
+				_isUpdatingUi = true;
+				try
+				{
+					LoadConfigToUi();
+					AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
+				}
+				finally
+				{
+					_isUpdatingUi = false;
+				}
+				_selectedProfile = ConfigManager.CurrentConfig.Profiles?.FirstOrDefault();
+				if (ProfilesListBox != null) ProfilesListBox.SelectedItem = _selectedProfile;
+				if (MappingsProfileComboBox != null) MappingsProfileComboBox.SelectedItem = _selectedProfile;
+				ReloadThemePresets();
+				RefreshSlots();
+				UpdateFocusEditorUi();
+				RenderMappingsWheelPreview();
+				RenderLiveWheelPreview();
+				RefreshConfigProfilesUi();
+				System.Windows.MessageBox.Show(this, $"已成功删除配置方案「{currentName}」，当前已切换至方案「{fallbackName}」。", "删除成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			}
+			else
+			{
+				System.Windows.MessageBox.Show(this, "删除配置方案失败。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+			}
+		}
+	}
+
+	private void ExportConfigButton_Click(object sender, RoutedEventArgs e)
+	{
+		string targetProfile = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
+		{
+			Filter = "JSON 配置文件 (*.json)|*.json",
+			FileName = $"StarPie_Config_{targetProfile}_{DateTime.Now:yyyyMMdd}.json",
+			Title = $"导出配置方案「{targetProfile}」"
+		};
+		if (saveFileDialog.ShowDialog() == true)
+		{
+			if (ConfigManager.ExportConfigToFile(targetProfile, saveFileDialog.FileName))
+			{
+				System.Windows.MessageBox.Show(this, $"配置方案「{targetProfile}」已成功导出至文件！", "导出成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			}
+			else
+			{
+				System.Windows.MessageBox.Show(this, "配置导出失败，请检查写入权限。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
 			}
 		}
 	}
@@ -13563,13 +13943,35 @@ public partial class SettingsWindow : Window
 		Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
 		{
 			Filter = "JSON 配置文件 (*.json)|*.json",
-			Title = "选择要导入的配置文件"
+			Title = "选择要导入的 StarPie 配置文件"
 		};
 		if (openFileDialog.ShowDialog() != true)
 		{
 			return;
 		}
-		if (ConfigManager.ImportConfig(openFileDialog.FileName))
+
+		string defaultName = System.IO.Path.GetFileNameWithoutExtension(openFileDialog.FileName);
+		InputDialog inputDialog = new InputDialog(
+			"导入配置方案",
+			"请输入导入方案在列表中的显示名称：",
+			defaultName,
+			(string input) =>
+			{
+				if (string.IsNullOrWhiteSpace(input))
+					return (IsValid: false, ErrorMessage: "方案名称不能为空！");
+				string clean = ConfigManager.CleanFileName(input);
+				if (string.IsNullOrWhiteSpace(clean))
+					return (IsValid: false, ErrorMessage: "方案名称包含非法字符，请重新输入！");
+				return (IsValid: true, ErrorMessage: "");
+			});
+		inputDialog.Owner = this;
+		string? chosenName = null;
+		if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+		{
+			chosenName = inputDialog.InputText.Trim();
+		}
+
+		if (ConfigManager.ImportExternalConfig(openFileDialog.FileName, chosenName, out string importedName))
 		{
 			_selectedProfile = null;
 			_isUpdatingUi = true;
@@ -13596,11 +13998,49 @@ public partial class SettingsWindow : Window
 			UpdateFocusEditorUi();
 			RenderMappingsWheelPreview();
 			RenderLiveWheelPreview();
-			System.Windows.MessageBox.Show("配置导入成功！已即时应用所有轮盘尺寸、主题与动作方案。", "提示", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			RefreshConfigProfilesUi();
+			System.Windows.MessageBox.Show(this, $"外部配置文件已成功导入并收纳入方案「{importedName}」！\n已即时生效并切换至该方案。", "导入成功", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 		}
 		else
 		{
-			System.Windows.MessageBox.Show("导入失败：文件格式不匹配或已损坏。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+			System.Windows.MessageBox.Show(this, "导入失败：文件格式不匹配或已损坏。", "错误", MessageBoxButton.OK, MessageBoxImage.Hand);
+		}
+	}
+
+	private void ResetDefaultConfigBtn_Click(object sender, RoutedEventArgs e)
+	{
+		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		var res = System.Windows.MessageBox.Show(
+			this,
+			$"确定要将当前激活的方案「{currentName}」恢复为初始默认配置吗？\n该操作将重置手势动作与轮盘外观为初始推荐状态，其他已保存方案不受影响。",
+			"确认重置配置",
+			MessageBoxButton.YesNo,
+			MessageBoxImage.Warning);
+		if (res == MessageBoxResult.Yes)
+		{
+			ConfigManager.ResetToDefault(currentName);
+
+			_selectedProfile = null;
+			_isUpdatingUi = true;
+			try
+			{
+				LoadConfigToUi();
+				AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig.AppTheme ?? "System");
+			}
+			finally
+			{
+				_isUpdatingUi = false;
+			}
+			_selectedProfile = ConfigManager.CurrentConfig.Profiles?.FirstOrDefault();
+			if (ProfilesListBox != null) ProfilesListBox.SelectedItem = _selectedProfile;
+			if (MappingsProfileComboBox != null) MappingsProfileComboBox.SelectedItem = _selectedProfile;
+			ReloadThemePresets();
+			RefreshSlots();
+			UpdateFocusEditorUi();
+			RenderMappingsWheelPreview();
+			RenderLiveWheelPreview();
+			RefreshConfigProfilesUi();
+			System.Windows.MessageBox.Show(this, $"方案「{currentName}」已成功重置为默认配置！", "重置完成", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 		}
 	}
 
@@ -15389,8 +15829,14 @@ public partial class SettingsWindow : Window
 			{
 				return;
 			}
+			int prevSec = _lastHoveredSector;
+			int prevSub = _lastHoveredSubIndex;
 			_lastHoveredSector = num15;
 			_lastHoveredSubIndex = num16;
+			if ((num15 != prevSec && num15 >= 0) || (num16 != prevSub && num16 >= 0))
+			{
+				SoundEffectManager.Play(SoundType.SectorHover);
+			}
 			UpdatePreviewCoreSelection(num15, num16, wheelProfile);
 
 			for (int num23 = 0; num23 < _previewSectorPaths.Count; num23++)
