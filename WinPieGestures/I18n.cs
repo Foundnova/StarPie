@@ -3111,6 +3111,20 @@ public static class I18n
 			[LanguageCode.En] = "Flick Cancel",
 			[LanguageCode.Ja] = "キャンセル"
 		};
+		dictionary["CustomSoundConfigBtn"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 方案配置 (Demo)",
+			[LanguageCode.ZhTw] = "🎛️ 方案配置 (Demo)",
+			[LanguageCode.En] = "🎛️ Custom Studio (Demo)",
+			[LanguageCode.Ja] = "🎛️ カスタム設定 (Demo)"
+		};
+		dictionary["CustomSoundStudioTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 自定义交互音效调音台",
+			[LanguageCode.ZhTw] = "🎛️ 自定義互動音效調音台",
+			[LanguageCode.En] = "🎛️ Custom Sound Studio",
+			[LanguageCode.Ja] = "🎛️ カスタムサウンドスタジオ"
+		};
 		Translations = dictionary;
 	}
 }

@@ -309,7 +309,7 @@ public static class IconHelper
 				Key = "PlayPause",
 				Category = "多媒体与系统",
 				DisplayName = "播放/暂停 (Play/Pause)",
-				SvgData = "M19,19H13V5H19M11,5V19L2,12"
+				SvgData = "M3,5V19L11.5,12Z M13.5,5H16.5V19H13.5Z M18.5,5H21.5V19H18.5Z"
 			},
 			new VectorIconItem
 			{

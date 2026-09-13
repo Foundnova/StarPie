@@ -138,6 +138,12 @@ public class AppConfig
 	/// <summary>细项开关：外甩/脱离取消音效。</summary>
 	public bool SoundOnCancel { get; set; } = true;
 
+	/// <summary>当前选中的自定义音效方案 ID。</summary>
+	public string ActiveCustomSoundProfileId { get; set; } = "cyber";
+
+	/// <summary>用户配置或预置的自定义音效方案列表。</summary>
+	public List<CustomSoundProfile> CustomSoundProfiles { get; set; } = new();
+
 
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 

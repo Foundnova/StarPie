@@ -1408,14 +1408,23 @@ public partial class RadialWindow : Window
 		_profile.ActiveLayerIndex = layerIndex;
 		_profile.SyncRootPropertiesFromActiveLayer();
 
+		ClearSubTier();
+		_subTierCache.Clear();
+
 		_currentHighlightedSector = -999;
 		_currentHighlightedSubSector = -1;
 		_activeSubTierParentSector = -1;
-		_subTierCache.Clear();
 
 		RenderSectors();
 		UpdateCenterIconVisuals();
 		_renderedLayerIndex = layerIndex;
+
+		if (ConfigManager.CurrentConfig.EnableMultiTier &&
+			ConfigManager.CurrentConfig.SubmenuStyle == "Wheel" &&
+			ConfigManager.CurrentConfig.AutoExpandSubRingsOnPopup)
+		{
+			ShowAllSubTiers();
+		}
 
 		if (_profile.Layers.Count > 1 && LayerIndicatorBadge != null && LayerIndicatorText != null)
 		{

@@ -136,7 +136,7 @@ public static class SoundEffectManager
 	/// <summary>
 	/// 初始化或按需刷新音效数据缓存（在应用启动、配置载入或用户修改音量/主题时调用）。
 	/// </summary>
-	public static void Initialize(string? theme = null, double? volume = null)
+	public static void Initialize(string? theme = null, double? volume = null, bool force = false)
 	{
 		lock (_syncLock)
 		{
@@ -144,7 +144,7 @@ public static class SoundEffectManager
 			double targetVolume = volume ?? ConfigManager.CurrentConfig?.SoundVolume ?? 0.6;
 			targetVolume = Math.Clamp(targetVolume, 0.0, 1.0);
 
-			if (_initialized && string.Equals(_currentTheme, targetTheme, StringComparison.OrdinalIgnoreCase)
+			if (!force && _initialized && string.Equals(_currentTheme, targetTheme, StringComparison.OrdinalIgnoreCase)
 				&& Math.Abs(_currentVolume - targetVolume) < 0.01)
 			{
 				return;
@@ -224,6 +224,33 @@ public static class SoundEffectManager
 		EnsureInitialized();
 		EnsureWorkerStarted();
 		_soundChannel.Writer.TryWrite(type);
+	}
+
+	/// <summary>
+	/// 直接试听指定的自定义音效事件配置（非阻塞独立线程播放，零延迟且不破坏主手势队列）。
+	/// </summary>
+	public static void PlayCustomEventPreview(SoundEventConfig config, double? volume = null)
+	{
+		if (config == null) return;
+		EnsureWorkerStarted();
+		double vol = volume ?? ConfigManager.CurrentConfig?.SoundVolume ?? 0.6;
+		byte[] wavData = SynthesizeCustomEventSound(config, vol);
+		if (wavData == null || wavData.Length == 0) return;
+
+		System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+		{
+			IntPtr ptr = Marshal.AllocHGlobal(wavData.Length);
+			try
+			{
+				Marshal.Copy(wavData, 0, ptr, wavData.Length);
+				PlaySoundW(ptr, IntPtr.Zero, SND_SYNC | SND_MEMORY | SND_NODEFAULT);
+			}
+			catch { }
+			finally
+			{
+				try { Marshal.FreeHGlobal(ptr); } catch { }
+			}
+		});
 	}
 
 	private static void EnsureInitialized()
@@ -350,6 +377,13 @@ public static class SoundEffectManager
 					_ => SynthesizeClick(sampleRate, 1800, 900, 32, volume * 0.85)
 				};
 
+			case "custom": // 自定义音效方案 (真实程序化参数合成与采样加载)
+				var activeProfileId = ConfigManager.CurrentConfig?.ActiveCustomSoundProfileId;
+				var profile = ConfigManager.CurrentConfig?.CustomSoundProfiles?.FirstOrDefault(p => p.Id == activeProfileId)
+					?? ConfigManager.CurrentConfig?.CustomSoundProfiles?.FirstOrDefault();
+				var evConfig = profile?.Events?.FirstOrDefault(e => e.EventType == type);
+				return SynthesizeCustomEventSound(evConfig, volume);
+
 			case "mechanical": // 机械手感 (默认 - 轴体微动与刻度感)
 			default:
 				return type switch
@@ -362,6 +396,82 @@ public static class SoundEffectManager
 					_ => SynthesizeMechanicalClick(sampleRate, 1750, 780, 38, volume)
 				};
 		}
+	}
+
+	/// <summary>
+	/// 为自定义手势事件配置生成专属 PCM 波形（支持程序化极微波形、经典预设与外部音频采样）。
+	/// </summary>
+	public static byte[] SynthesizeCustomEventSound(SoundEventConfig? config, double masterVolume)
+	{
+		int sampleRate = 44100;
+		if (config == null || config.SourceType == SoundSourceType.Mute)
+		{
+			// 静音模式返回极微静默帧
+			return WrapPcmToWav(new short[1], sampleRate);
+		}
+
+		double effectiveVol = Math.Clamp(config.RelativeVolume, 0.0, 1.0) * masterVolume;
+
+		if (config.SourceType == SoundSourceType.BuiltInPreset)
+		{
+			string theme = config.BuiltInTheme ?? "Mechanical";
+			return SynthesizeSound(config.EventType, theme, effectiveVol);
+		}
+
+		if (config.SourceType == SoundSourceType.CustomFile)
+		{
+			if (!string.IsNullOrWhiteSpace(config.CustomFilePath) && File.Exists(config.CustomFilePath))
+			{
+				return TryLoadCustomWavFile(config.CustomFilePath, effectiveVol);
+			}
+			// 文件不存在或为空时回退至清脆微动
+			return SynthesizeClick(sampleRate, 1800, 900, 32, effectiveVol);
+		}
+
+		// 程序化极微波形 (ProceduralWave)
+		double pitchMult = Math.Pow(2.0, config.PitchSemitones / 12.0);
+		double durationMs = Math.Clamp(config.DurationMs, 5.0, 300.0);
+
+		return (config.WavePreset?.ToLowerInvariant()) switch
+		{
+			"sine1200" => SynthesizeTone(sampleRate, 1200.0 * pitchMult, durationMs, effectiveVol),
+			"square850" => SynthesizeClick(sampleRate, 1800.0 * pitchMult, 850.0 * pitchMult, durationMs, effectiveVol),
+			"pulse2ms" => SynthesizeClick(sampleRate, 3200.0 * pitchMult, 1600.0 * pitchMult, Math.Min(durationMs, 22.0), effectiveVol),
+			"sinedeep" => SynthesizeSweep(sampleRate, 480.0 * pitchMult, 220.0 * pitchMult, durationMs, effectiveVol),
+			"metallicclick" => SynthesizeMechanicalClick(sampleRate, 2400.0 * pitchMult, 720.0 * pitchMult, durationMs, effectiveVol),
+			"laserzap" => SynthesizeSweep(sampleRate, 2200.0 * pitchMult, 440.0 * pitchMult, durationMs, effectiveVol),
+			"waterdrop" => SynthesizeBubble(sampleRate, 650.0 * pitchMult, 1550.0 * pitchMult, durationMs, effectiveVol),
+			"cybersweep" => SynthesizeSweep(sampleRate, 320.0 * pitchMult, 1680.0 * pitchMult, durationMs, effectiveVol),
+			_ => SynthesizeClick(sampleRate, 1800.0 * pitchMult, 900.0 * pitchMult, durationMs, effectiveVol)
+		};
+	}
+
+	private static byte[] TryLoadCustomWavFile(string filePath, double sliderVol)
+	{
+		try
+		{
+			if (File.Exists(filePath) && filePath.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+			{
+				byte[] data = File.ReadAllBytes(filePath);
+				if (data.Length >= 44 && Encoding.ASCII.GetString(data, 0, 4) == "RIFF")
+				{
+					double gain = GetAcousticGain(sliderVol);
+					if (Math.Abs(gain - 1.0) < 0.04) return data;
+
+					byte[] scaled = (byte[])data.Clone();
+					for (int i = 44; i + 1 < scaled.Length; i += 2)
+					{
+						short sample = (short)(scaled[i] | (scaled[i + 1] << 8));
+						sample = (short)Math.Clamp(sample * gain, -32768.0, 32767.0);
+						scaled[i] = (byte)(sample & 0xFF);
+						scaled[i + 1] = (byte)((sample >> 8) & 0xFF);
+					}
+					return scaled;
+				}
+			}
+		}
+		catch { }
+		return SynthesizeClick(44100, 1800, 900, 35, sliderVol);
 	}
 
 	/// <summary>

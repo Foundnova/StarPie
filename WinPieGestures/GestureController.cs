@@ -105,6 +105,8 @@ public class GestureController : IDisposable
 
 	private int _selectedSubSectorIndex = -1;
 
+	private Point _lastMovePoint;
+
 	private bool _lastEscapedState;
 
 	private bool _lastShowSubTier;
@@ -879,6 +881,7 @@ public class GestureController : IDisposable
 			_activeTrigger = triggerConfig;
 			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
 			_startPoint = e.Position;
+			_lastMovePoint = _startPoint;
 			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 			_currentDpiScaleX = scaleX;
 			_currentDpiScaleY = scaleY;
@@ -1290,6 +1293,7 @@ public class GestureController : IDisposable
 				_kbTriggerWaiting = false;
 				GetCursorPos(out var lpPoint);
 				_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
+				_lastMovePoint = _startPoint;
 				var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 				_currentDpiScaleX = scaleX;
 				_currentDpiScaleY = scaleY;
@@ -1555,7 +1559,15 @@ public class GestureController : IDisposable
 					RadialWindow? rw = _radialWindow;
 					if (rw != null)
 					{
-						DispatchUi(() => rw.SwitchToLayer(nextIdx));
+						DispatchUi(() =>
+						{
+							rw.SwitchToLayer(nextIdx);
+							Point pt = (_lastMovePoint != default) ? _lastMovePoint : _startPoint;
+							if (_isGestureActive && pt != default)
+							{
+								ProcessMove(pt);
+							}
+						});
 					}
 					e.Handled = true;
 					return;
@@ -1605,7 +1617,15 @@ public class GestureController : IDisposable
 					RadialWindow? rw = _radialWindow;
 					if (rw != null)
 					{
-						DispatchUi(() => rw.SwitchToLayer(nextIdx));
+						DispatchUi(() =>
+						{
+							rw.SwitchToLayer(nextIdx);
+							Point pt = (_lastMovePoint != default) ? _lastMovePoint : _startPoint;
+							if (_isGestureActive && pt != default)
+							{
+								ProcessMove(pt);
+							}
+						});
 					}
 					e.Handled = true;
 					return;
@@ -1664,6 +1684,7 @@ public class GestureController : IDisposable
 			_activeTrigger = triggerConfig;
 			GetCursorPos(out var lpPoint);
 			_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
+			_lastMovePoint = _startPoint;
 			var (dpiX, dpiY) = RadialWindow.GetMonitorDpiScale(_startPoint);
 			_currentDpiScaleX = dpiX;
 			_currentDpiScaleY = dpiY;
@@ -1907,6 +1928,7 @@ public class GestureController : IDisposable
 
 	private void ProcessMove(Point currentPoint)
 	{
+		_lastMovePoint = currentPoint;
 		double moveScaleX = (_currentDpiScaleX > 0.0) ? _currentDpiScaleX : 1.0;
 		double moveScaleY = (_currentDpiScaleY > 0.0) ? _currentDpiScaleY : 1.0;
 		double num = (currentPoint.X - _startPoint.X) / moveScaleX;

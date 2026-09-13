@@ -1,4 +1,4 @@
-﻿global using Point = System.Windows.Point;
+global using Point = System.Windows.Point;
 global using Size = System.Windows.Size;
 global using Rect = System.Windows.Rect;
 global using Color = System.Windows.Media.Color;
@@ -21,3 +21,6 @@ global using MessageBox = System.Windows.MessageBox;
 global using HorizontalAlignment = System.Windows.HorizontalAlignment;
 global using VerticalAlignment = System.Windows.VerticalAlignment;
 global using Cursors = System.Windows.Input.Cursors;
+global using ComboBox = System.Windows.Controls.ComboBox;
+global using ComboBoxItem = System.Windows.Controls.ComboBoxItem;
+global using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
