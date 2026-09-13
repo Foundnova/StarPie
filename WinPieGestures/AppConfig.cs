@@ -321,6 +321,18 @@ public class AppConfig
 
 	public List<string> BlacklistedProcesses { get; set; } = new List<string> { "mstsc.exe", "paint.exe" };
 
+	/// <summary>黑名单程序专属触发唤醒按键覆盖配置（Key: 小写进程名如 "sldworks.exe"，Value: 专属触发按键配置）</summary>
+	public Dictionary<string, TriggerConfig> BlacklistTriggerOverrides { get; set; } = new Dictionary<string, TriggerConfig>(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>秒搜窗口宽度（像素，默认 740）</summary>
+	public double QuickSearchWidth { get; set; } = 740.0;
+
+	/// <summary>秒搜窗口高度（像素，默认 530）</summary>
+	public double QuickSearchHeight { get; set; } = 530.0;
+
+	/// <summary>秒搜窗口是否置顶常驻（失焦不隐藏）</summary>
+	public bool QuickSearchPinned { get; set; } = false;
+
 	public List<string> WhitelistedProcesses { get; set; } = new List<string>();
 
 	public bool DisableOnCtrl { get; set; }

@@ -160,6 +160,18 @@ public static class ConfigManager
 		{
 			currentConfig.BlacklistedProcesses = new List<string> { "mstsc.exe", "paint.exe" };
 		}
+		if (currentConfig.BlacklistTriggerOverrides == null)
+		{
+			currentConfig.BlacklistTriggerOverrides = new Dictionary<string, TriggerConfig>(StringComparer.OrdinalIgnoreCase);
+		}
+		if (currentConfig.QuickSearchWidth < 480)
+		{
+			currentConfig.QuickSearchWidth = 740.0;
+		}
+		if (currentConfig.QuickSearchHeight < 320)
+		{
+			currentConfig.QuickSearchHeight = 530.0;
+		}
 		if (currentConfig.WhitelistedProcesses == null)
 		{
 			currentConfig.WhitelistedProcesses = new List<string>();

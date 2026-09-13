@@ -164,6 +164,8 @@ public class GestureController : IDisposable
 
 	private long _pendingVolumePreviewVersion;
 
+	private TriggerConfig? _activeTrigger;
+
 	[DllImport("user32.dll")]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool GetCursorPos(out POINT lpPoint);
@@ -730,7 +732,28 @@ public class GestureController : IDisposable
 		radialWindow.SetVolumePreview(percent, percent >= 0);
 	}
 
-	private bool CheckIsIsolated(out string processName)
+	public static TriggerConfig? GetOverrideTriggerForProcess(string cleanProcess)
+	{
+		if (string.IsNullOrEmpty(cleanProcess)) return null;
+		if (ConfigManager.CurrentConfig?.BlacklistTriggerOverrides != null &&
+		    ConfigManager.CurrentConfig.BlacklistTriggerOverrides.TryGetValue(cleanProcess, out var overrideTrigger))
+		{
+			return overrideTrigger;
+		}
+		return null;
+	}
+
+	public static TriggerConfig GetEffectiveTriggerForProcess(string cleanProcess)
+	{
+		var overrideTrigger = GetOverrideTriggerForProcess(cleanProcess);
+		if (overrideTrigger != null)
+		{
+			return overrideTrigger;
+		}
+		return ConfigManager.CurrentConfig?.Trigger ?? new TriggerConfig();
+	}
+
+	private bool CheckIsIsolated(out string processName, TriggerConfig? activeTrigger = null)
 	{
 		processName = ActiveWindowHelper.GetActiveWindowInfo(out nint fgHwnd);
 		string cleanProcess = (processName ?? "").Trim().ToLowerInvariant();
@@ -749,13 +772,23 @@ public class GestureController : IDisposable
 		}
 
 		bool isBlacklisted = false;
+		var overrideTrigger = GetOverrideTriggerForProcess(cleanProcess);
 		if (ConfigManager.CurrentConfig.BlacklistedProcesses != null)
 		{
 			foreach (string blacklistedProcess in ConfigManager.CurrentConfig.BlacklistedProcesses)
 			{
 				if (string.Equals(blacklistedProcess.Trim(), cleanProcess, StringComparison.OrdinalIgnoreCase))
 				{
-					isBlacklisted = true;
+					// 核心双轨路由：若该黑名单进程配置了专属触发键，且当前正是以该专属触发键呼出，则放行唤醒轮盘；
+					// 若未配置专属按键，或按下的是全局默认按键，则完全隔离并零延迟放行给宿主软件（如 SolidWorks CAD 笔势）
+					if (overrideTrigger != null && activeTrigger == overrideTrigger)
+					{
+						isBlacklisted = false;
+					}
+					else
+					{
+						isBlacklisted = true;
+					}
 					break;
 				}
 			}
@@ -771,7 +804,7 @@ public class GestureController : IDisposable
 			isProcessIsolated = isBlacklisted;
 		}
 
-		TriggerConfig? triggerConfig = ConfigManager.CurrentConfig.Trigger;
+		TriggerConfig triggerConfig = activeTrigger ?? GetEffectiveTriggerForProcess(cleanProcess);
 		ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
 		bool disableCtrl = ConfigManager.CurrentConfig.DisableOnCtrl && currentModifiers.HasFlag(ModifierKeys.Control) && !(triggerConfig?.RequireCtrl == true);
 		bool disableShift = ConfigManager.CurrentConfig.DisableOnShift && currentModifiers.HasFlag(ModifierKeys.Shift) && !(triggerConfig?.RequireShift == true);
@@ -813,7 +846,8 @@ public class GestureController : IDisposable
 		//IL_0061: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0087: Unknown result type (might be due to invalid IL or missing references)
 		//IL_008c: Unknown result type (might be due to invalid IL or missing references)
-		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		TriggerConfig triggerConfig = GetEffectiveTriggerForProcess(activeProc);
 		if (triggerConfig.TriggerType != "Mouse")
 		{
 			return;
@@ -831,16 +865,18 @@ public class GestureController : IDisposable
 		ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
 		if ((!triggerConfig.RequireCtrl || ((((int)currentModifiers & 2))) != 0) && (!triggerConfig.RequireShift || ((((int)currentModifiers & 4))) != 0) && (!triggerConfig.RequireAlt || ((((int)currentModifiers & 1))) != 0) && (!triggerConfig.RequireWin || ((((int)currentModifiers & 8))) != 0))
 		{
-			if (CheckIsIsolated(out string _) || IsPointOnTaskbar(e.Position))
+			if (CheckIsIsolated(out string _, triggerConfig) || IsPointOnTaskbar(e.Position))
 			{
 				// 隔离模式、黑名单或位于任务栏/托盘区域：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()，杜绝注入虚假 KeyUp 破坏物理按键
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				_mouseTriggerDown = false;
+				_activeTrigger = null;
 				CancelLongPressTimer();
 				e.Handled = false;
 				return;
 			}
+			_activeTrigger = triggerConfig;
 			string triggerBtn = triggerConfig.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
 			_startPoint = e.Position;
 			var (scaleX, scaleY) = RadialWindow.GetMonitorDpiScale(_startPoint);
@@ -874,7 +910,8 @@ public class GestureController : IDisposable
 			return;
 		}
 		string gestureButton = ConfigManager.CurrentConfig.GestureTriggerButton ?? "MiddleButton";
-		var triggerConfig = ConfigManager.CurrentConfig.Trigger;
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		var triggerConfig = GetEffectiveTriggerForProcess(activeProc);
 		string wheelBtn = triggerConfig?.MouseButton ?? ConfigManager.CurrentConfig.TriggerButton ?? "RightButton";
 		// 冲突守卫：若手势按键与主轮盘触发键重叠，优先保证轮盘手势，手势让位，杜绝双重拦截
 		if (string.Equals(gestureButton, wheelBtn, StringComparison.OrdinalIgnoreCase))
@@ -1295,7 +1332,8 @@ public class GestureController : IDisposable
 
 	private void Hook_OnTriggerButtonUp(object? sender, MouseEventArgs e)
 	{
-		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		TriggerConfig triggerConfig = _activeTrigger ?? GetEffectiveTriggerForProcess(activeProc);
 		if (triggerConfig.TriggerType != "Mouse")
 		{
 			return;
@@ -1586,7 +1624,8 @@ public class GestureController : IDisposable
 		//IL_0062: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00da: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00df: Unknown result type (might be due to invalid IL or missing references)
-		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		TriggerConfig triggerConfig = GetEffectiveTriggerForProcess(activeProc);
 		if (triggerConfig.TriggerType != "Keyboard")
 		{
 			return;
@@ -1611,16 +1650,18 @@ public class GestureController : IDisposable
 				// 键盘触发等待期（含自动重复）：穿透放行，原生输入零干扰。
 				return;
 			}
-			if (CheckIsIsolated(out string _))
+			if (CheckIsIsolated(out string _, triggerConfig))
 			{
 				// 隔离模式与黑名单：绝对穿透放行，严禁调用 CancelGestureTracking() 及其包含的 ReleaseStuckModifiers()
 				_isWaitingForThreshold = false;
 				_isGestureActive = false;
 				_kbTriggerWaiting = false;
+				_activeTrigger = null;
 				CancelLongPressTimer();
 				e.Handled = false;
 				return;
 			}
+			_activeTrigger = triggerConfig;
 			GetCursorPos(out var lpPoint);
 			_startPoint = new Point((double)lpPoint.x, (double)lpPoint.y);
 			var (dpiX, dpiY) = RadialWindow.GetMonitorDpiScale(_startPoint);
@@ -1641,7 +1682,8 @@ public class GestureController : IDisposable
 
 	private void KeyboardHook_OnKeyUp(object? sender, GlobalKeyEventArgs e)
 	{
-		TriggerConfig triggerConfig = ConfigManager.CurrentConfig.Trigger ?? new TriggerConfig();
+		string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+		TriggerConfig triggerConfig = _activeTrigger ?? GetEffectiveTriggerForProcess(activeProc);
 		if (triggerConfig.TriggerType != "Keyboard")
 		{
 			return;

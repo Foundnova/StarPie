@@ -19,11 +19,21 @@ public partial class QuickSearchWindow : Window
 	private DispatcherTimer? _debounceTimer;
 	private DispatcherTimer? _feedbackTimer;
 	private CancellationTokenSource? _searchCts;
-	private bool _isEverythingActive;
+	private bool _isContextMenuOpen;
+	private bool _isPinned;
 
 	public QuickSearchWindow()
 	{
 		InitializeComponent();
+
+		if (ConfigManager.CurrentConfig != null)
+		{
+			if (ConfigManager.CurrentConfig.QuickSearchWidth >= 560)
+				Width = ConfigManager.CurrentConfig.QuickSearchWidth;
+			if (ConfigManager.CurrentConfig.QuickSearchHeight >= 380)
+				Height = ConfigManager.CurrentConfig.QuickSearchHeight;
+			_isPinned = ConfigManager.CurrentConfig.QuickSearchPinned;
+		}
 
 		_debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(75) };
 		_debounceTimer.Tick += DebounceTimer_Tick;
@@ -36,29 +46,47 @@ public partial class QuickSearchWindow : Window
 		};
 	}
 
-	public static void ShowOrActivate()
+	public static void ShowOrActivate(Point? triggerPoint = null)
 	{
 		if (_instance == null || !_instance.IsLoaded)
 		{
 			_instance = new QuickSearchWindow();
 		}
-		_instance.ShowAndPosition();
+		_instance.ShowAndPosition(triggerPoint);
 	}
 
-	private void ShowAndPosition()
+	private void ShowAndPosition(Point? triggerPoint = null)
 	{
 		AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 
-		// 居中偏上（经典 Spotlight / 极速搜索最佳视觉热区）
-		var primaryScreen = System.Windows.Forms.Screen.PrimaryScreen;
-		if (primaryScreen != null)
+		if (ConfigManager.CurrentConfig != null)
 		{
-			var bounds = primaryScreen.WorkingArea;
-			Left = bounds.Left + (bounds.Width - Width) / 2;
-			Top = bounds.Top + bounds.Height * 0.16;
+			if (ConfigManager.CurrentConfig.QuickSearchWidth >= 560)
+				Width = ConfigManager.CurrentConfig.QuickSearchWidth;
+			if (ConfigManager.CurrentConfig.QuickSearchHeight >= 380)
+				Height = ConfigManager.CurrentConfig.QuickSearchHeight;
+			_isPinned = ConfigManager.CurrentConfig.QuickSearchPinned;
 		}
+		UpdatePinVisual();
 
-		UpdateEverythingStatus();
+		// 1. 获取当前触发时的物理光标坐标并解析所在屏幕上下文
+		var physPos = triggerPoint ?? ScreenHelper.GetCursorPhysicalPosition();
+		var screenCtx = ScreenHelper.GetScreenContextAtPoint(physPos);
+		Point mouseDip = ScreenHelper.PhysicalToDip(physPos, screenCtx.DpiScale);
+
+		// 2. 将搜索框水平居中于鼠标，垂直方向偏上（让顶部搜索条刚好落在光标位置附近，实现指哪搜哪的盲操手感）
+		double targetLeft = mouseDip.X - Width / 2.0;
+		double targetTop = mouseDip.Y - 45.0;
+
+		// 3. 严格遵循屏幕工作区贴边防溢出规范（支持多显示器与任务栏规避）
+		Rect work = screenCtx.DipWorkArea;
+		const double margin = 12.0;
+		targetLeft = Math.Clamp(targetLeft, work.Left + margin, Math.Max(work.Left + margin, work.Right - Width - margin));
+		targetTop = Math.Clamp(targetTop, work.Top + margin, Math.Max(work.Top + margin, work.Bottom - Height - margin));
+
+		Left = targetLeft;
+		Top = targetTop;
+
 		SearchInputBox.Text = "";
 		_currentCategory = "All";
 		UpdateFilterChipsStyle();
@@ -71,14 +99,131 @@ public partial class QuickSearchWindow : Window
 
 	private void Window_Loaded(object sender, RoutedEventArgs e)
 	{
-		UpdateEverythingStatus();
+		UpdatePinVisual();
 		TriggerSearch(immediate: true);
 	}
 
 	private void Window_Deactivated(object? sender, EventArgs e)
 	{
+		if (_isContextMenuOpen || _isPinned) return;
 		// 鼠标点击搜索框外部区域时自动平滑隐藏，避免干扰用户正常工作
 		Hide();
+	}
+
+	private void PinBtn_Click(object sender, RoutedEventArgs e)
+	{
+		_isPinned = !_isPinned;
+		if (ConfigManager.CurrentConfig != null)
+		{
+			ConfigManager.CurrentConfig.QuickSearchPinned = _isPinned;
+			ConfigManager.SaveConfig();
+		}
+		UpdatePinVisual();
+	}
+
+	private void UpdatePinVisual()
+	{
+		if (PinBtn == null) return;
+		Topmost = true;
+		if (_isPinned)
+		{
+			PinBtn.Background = (Brush)FindResource("AccentPrimaryBrush");
+			PinBtn.Foreground = (Brush)FindResource("AccentTextBrush");
+			PinBtn.BorderBrush = (Brush)FindResource("AccentHoverBrush");
+			PinBtn.ToolTip = "取消置顶 (当前已固定在最前端，失焦不隐藏)";
+		}
+		else
+		{
+			PinBtn.ClearValue(BackgroundProperty);
+			PinBtn.ClearValue(ForegroundProperty);
+			PinBtn.ClearValue(BorderBrushProperty);
+			PinBtn.ToolTip = "窗口置顶 (点击固定在最前端，失焦不隐藏)";
+		}
+	}
+
+	private void WindowResizeGrip_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+	{
+		ResizeWindow(e.HorizontalChange, e.VerticalChange);
+	}
+
+	private void RightEdge_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+	{
+		ResizeWindow(e.HorizontalChange, 0);
+	}
+
+	private void BottomEdge_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+	{
+		ResizeWindow(0, e.VerticalChange);
+	}
+
+	private void ResizeWindow(double deltaW, double deltaH)
+	{
+		double newW = Math.Max(MinWidth, Width + deltaW);
+		double newH = Math.Max(MinHeight, Height + deltaH);
+
+		var screenCtx = ScreenHelper.GetScreenContextAtPoint(new Point(Left, Top));
+		Rect work = screenCtx.DipWorkArea;
+		newW = Math.Min(newW, work.Width - 24);
+		newH = Math.Min(newH, work.Height - 24);
+
+		Width = newW;
+		Height = newH;
+
+		if (ConfigManager.CurrentConfig != null)
+		{
+			ConfigManager.CurrentConfig.QuickSearchWidth = newW;
+			ConfigManager.CurrentConfig.QuickSearchHeight = newH;
+			ConfigManager.SaveConfig();
+		}
+	}
+
+	private void ContextMenu_Opened(object sender, RoutedEventArgs e)
+	{
+		_isContextMenuOpen = true;
+	}
+
+	private void ContextMenu_Closed(object sender, RoutedEventArgs e)
+	{
+		_isContextMenuOpen = false;
+	}
+
+	private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+	{
+		if (e.ChangedButton != MouseButton.Left) return;
+
+		// 检查点击的元素：如果点击的是可交互控件（输入框、按钮、列表项、滚动条等），不触发窗口拖拽
+		DependencyObject? current = e.OriginalSource as DependencyObject;
+		while (current != null && current != this)
+		{
+			if (current is TextBox ||
+			    current is Button ||
+			    current is ListBoxItem ||
+			    current is System.Windows.Controls.Primitives.ScrollBar ||
+			    current is System.Windows.Controls.Primitives.Thumb)
+			{
+				return;
+			}
+			current = VisualTreeHelper.GetParent(current);
+		}
+
+		if (e.ButtonState == MouseButtonState.Pressed)
+		{
+			try
+			{
+				DragMove();
+			}
+			catch { }
+		}
+	}
+
+	private static bool IsDescendantOf(DependencyObject? node, DependencyObject target)
+	{
+		while (node != null)
+		{
+			if (node == target) return true;
+			node = VisualTreeHelper.GetParent(node);
+		}
+		return false;
 	}
 
 	private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -87,56 +232,6 @@ public partial class QuickSearchWindow : Window
 		{
 			Hide();
 			e.Handled = true;
-		}
-	}
-
-	private void UpdateEverythingStatus()
-	{
-		bool dllOk = EverythingService.IsDllAvailable();
-		bool running = EverythingService.IsEverythingRunning();
-		_isEverythingActive = dllOk && running;
-
-		if (_isEverythingActive)
-		{
-			StatusDot.Fill = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81)); // 翠绿
-			StatusChipText.Text = "⚡ Everything 已连接";
-			StatusChipText.Foreground = (Brush)FindResource("AccentPrimaryBrush");
-			EverythingStatusChip.ToolTip = "Everything IPC 极速引擎正常运行中 (响应时间 < 2ms)";
-		}
-		else
-		{
-			StatusDot.Fill = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)); // 暖黄警告
-			StatusChipText.Text = "⚠️ Everything 未运行 (点击启动)";
-			StatusChipText.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
-			EverythingStatusChip.ToolTip = "未检测到后台运行的 Everything。点击可尝试一键唤起，或使用本地优雅降级检索。";
-		}
-	}
-
-	private void EverythingStatusChip_Click(object sender, MouseButtonEventArgs e)
-	{
-		if (!_isEverythingActive)
-		{
-			bool launched = EverythingService.TryLaunchEverything();
-			if (launched)
-			{
-				ShowFeedbackBanner("🚀 正在尝试唤起 Everything，请稍候...", isWarning: false);
-				var checkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.2) };
-				checkTimer.Tick += (s, ev) =>
-				{
-					checkTimer.Stop();
-					UpdateEverythingStatus();
-					TriggerSearch(immediate: true);
-				};
-				checkTimer.Start();
-			}
-			else
-			{
-				ShowFeedbackBanner("💡 未检测到本地 Everything.exe 安装，当前启用本地降级扫描模式。", isWarning: true);
-			}
-		}
-		else
-		{
-			ShowFeedbackBanner("⚡ Everything IPC 极速检索核心已就绪", isWarning: false);
 		}
 	}
 
@@ -197,13 +292,13 @@ public partial class QuickSearchWindow : Window
 			else
 			{
 				EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"未找到关于 \"{query}\" 的结果";
-				EmptyNoticeSub.Text = _isEverythingActive ? "尝试换个关键词，或切换上方分类" : "Everything 未运行，降级模式仅扫描桌面与常用目录";
+				EmptyNoticeSub.Text = "尝试换个关键词，或切换上方分类";
 				EmptyResultsNotice.Visibility = Visibility.Visible;
 				ResultsListBox.Visibility = Visibility.Collapsed;
 			}
 
-			string engineTag = _isEverythingActive ? "Everything 极速索引" : "本地降级搜索";
-			StatusCountText.Text = $"找到 {results.Count} 项结果 · {elapsedMs:F1} ms ({engineTag})";
+			string countPrefix = string.IsNullOrEmpty(query) ? "常用推荐" : $"找到 {results.Count} 项结果";
+			StatusCountText.Text = $"{countPrefix} · {elapsedMs:F0} ms";
 		}
 		catch (OperationCanceledException)
 		{
@@ -277,7 +372,7 @@ public partial class QuickSearchWindow : Window
 
 	private void UpdateFilterChipsStyle()
 	{
-		var chips = new[] { FilterAllBtn, FilterAppsBtn, FilterCadBtn, FilterDocsBtn, FilterFoldersBtn, FilterSystemBtn };
+		var chips = new[] { FilterAllBtn, FilterAppsBtn, FilterCadBtn, FilterDocsBtn, FilterVideoBtn, FilterFoldersBtn, FilterSystemBtn };
 		foreach (var chip in chips)
 		{
 			if (chip == null) continue;

@@ -679,12 +679,12 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3-beta.8&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.3&#x0a;© 2026 StarPie">
             <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
               <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.3-beta.8" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -1465,8 +1465,100 @@
                     <Button Name="BrowseBlacklistButton" Grid.Column="1" Content="🔍 选择应用..." Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" ToolTip="从已安装软件列表中快速选择要添加的程序" Click="BrowseBlacklistButton_Click" />
                     <Button Name="AddBlacklistButton" Grid.Column="2" Content="➕ 添加进程" Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="16,0" ToolTip="将输入框中的进程名称加入名单" Click="AddBlacklistButton_Click" />
                   </Grid>
-                  <ListBox Name="BlacklistListBox" Height="110" Margin="0,0,0,8" KeyDown="BlacklistListBox_KeyDown" />
-                  <Button Name="DeleteBlacklistButton" Content="🗑️ 移除选中的进程" Style="{StaticResource ModernButtonStyle}" HorizontalAlignment="Right" Height="30" Padding="12,0" Click="DeleteBlacklistButton_Click" />
+                  <ListBox Name="BlacklistListBox" Height="160" Margin="0,0,0,10"
+                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                           SelectionChanged="BlacklistListBox_SelectionChanged"
+                           KeyDown="BlacklistListBox_KeyDown">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <Grid Margin="2,4">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+
+                          <!-- 进程图标 -->
+                          <TextBlock Grid.Column="0" Text="💻" FontSize="14" VerticalAlignment="Center" Margin="2,0,8,0" />
+
+                          <!-- 进程名称 -->
+                          <TextBlock Grid.Column="1" Text="{Binding ProcessName}" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                          <!-- 专属触发按键状态徽章 (对应第二张照片框选区域) -->
+                          <Border Grid.Column="2" Background="{Binding BadgeBgBrush}" BorderBrush="{Binding BadgeBorderBrush}" BorderThickness="1.2" CornerRadius="6" Padding="8,3" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding BadgeIcon}" FontSize="11.5" Margin="0,0,5,0" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding TriggerDisplayText}" FontSize="11" FontWeight="Medium" Foreground="{Binding BadgeFgBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Border>
+
+                          <!-- 行内操作按钮 -->
+                          <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,2,0">
+                            <Button Content="⚙️ 配置触发键" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" FontSize="10.5" Click="ConfigProcessTriggerBtn_Click" Tag="{Binding}" ToolTip="为此进程录制专属的呼出按键或组合键" Margin="0,0,6,0" />
+                            <Button Content="🔄 恢复放行" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="6,0" FontSize="10.5" Click="ResetProcessTriggerBtn_Click" Tag="{Binding}" ToolTip="清除专属按键，恢复完全放行" Visibility="{Binding ResetVisibility}" Margin="0,0,6,0" />
+                            <Button Content="🗑️" Style="{StaticResource ModernButtonStyle}" Height="26" Width="26" Padding="0" FontSize="11" Click="DeleteSingleProcessBtn_Click" Tag="{Binding}" ToolTip="从名单中移除此进程" />
+                          </StackPanel>
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+
+                  <!-- 选定进程专属触发按键 & 组合键录制卡片 (完全复刻 Tab 2 录制交互 - 照片 3) -->
+                  <Border Name="BlacklistProcessTriggerCard" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.2" CornerRadius="10" Padding="14,12" Margin="0,0,0,10" Visibility="Collapsed">
+                    <StackPanel>
+                      <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                          <TextBlock Text="🎯 进程专属唤醒按键配置：" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="6,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Name="SelectedProcessNameLabel" Text="sldworks.exe" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                          </Border>
+                        </StackPanel>
+                        <Button Name="CloseProcessTriggerCardBtn" Grid.Column="1" Content="✕" Style="{StaticResource ModernButtonStyle}" Width="24" Height="24" Padding="0" FontSize="10" Click="CloseProcessTriggerCardBtn_Click" ToolTip="收起此配置卡片" />
+                      </Grid>
+
+                      <TextBlock Text="为选中的程序配置单独的轮盘呼出按键（如在 SolidWorks 中配置中键/侧键，避免与右键笔势冲突；普通右键将 100% 放行给该软件）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
+
+                      <!-- 触发键状态与录制按钮 (复刻 Tab 2) -->
+                      <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                          <TextBlock Text="当前专属触发键：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                          <Border Name="ProcessCurrentTriggerBadgeBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="12,5" VerticalAlignment="Center">
+                            <TextBlock Name="ProcessCurrentTriggerBadgeText" Text="🚫 未配置 (完全放行右键)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                          <Button Name="RecordProcessTriggerButton" Content="🔴 点击录制专属按键 / 组合键" Height="34" Padding="14,0" Style="{StaticResource PrimaryButtonStyle}" Cursor="Hand" Click="RecordProcessTriggerButton_Click" />
+                          <Button Name="ResetProcessTriggerButton" Content="🔄 恢复默认 (完全放行)" Height="34" Padding="12,0" Margin="8,0,0,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="ResetProcessTriggerButton_Click" />
+                        </StackPanel>
+                      </Grid>
+
+                      <!-- 硬件感知器实时反馈 (复刻 Tab 2) -->
+                      <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Ellipse Name="ProcessLiveSensorDot" Width="9" Height="9" Fill="#10B981" VerticalAlignment="Center" Margin="0,0,8,0" />
+                          <TextBlock Name="ProcessLiveSensorStatusText" Grid.Column="1" Text="硬件感知器已就绪：点击上方录制按钮后，按下你想作为该程序呼出键的鼠标按键（如中键/侧键）或键盘按键..." FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Name="DeleteBlacklistButton" Content="🗑️ 移除选中的进程" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="12,0" Click="DeleteBlacklistButton_Click" />
+                  </StackPanel>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -3258,7 +3350,7 @@
                         <DropShadowEffect BlurRadius="8" ShadowDepth="1" Color="#000000" Opacity="0.12" />
                       </Border.Effect>
                       <StackPanel Orientation="Horizontal">
-                        <Button Name="MappingsShowTextToggleBtn" Content="🔤 图文" ToolTip="开启/关闭动作名称复合展示（开启后在扇区中直观渲染动作名称与图标，让拖拽对调一目了然）" Style="{StaticResource CanvasToolBtnStyle}" Width="52" Height="24" Padding="4,0" FontSize="10.5" FontWeight="SemiBold" Margin="0,0,3,0" Click="MappingsShowTextToggleBtn_Click" />
+                        <Button Name="MappingsShowTextToggleBtn" Content="🔤 图文" ToolTip="开启/关闭动作名称复合展示（开启后在扇区中直观渲染动作名称与图标，让拖拽对调一目了然）" Style="{StaticResource CanvasToolBtnStyle}" Width="Auto" MinWidth="68" Height="24" Padding="8,0" FontSize="10.5" FontWeight="SemiBold" Margin="0,0,4,0" Click="MappingsShowTextToggleBtn_Click" />
                         <Border Width="1" Height="12" Background="{DynamicResource CardBorderBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
                         <Button Name="MappingsZoomOutBtn" Content="➖" ToolTip="缩小视图" Style="{StaticResource CanvasToolBtnStyle}" FontSize="10" Click="MappingsZoomOutBtn_Click" />
                         <TextBlock Name="MappingsZoomLabel" Text="100%" Width="36" TextAlignment="Center" VerticalAlignment="Center" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand" ToolTip="点击复位为 100%" MouseLeftButtonDown="MappingsZoomLabel_MouseLeftButtonDown" />
@@ -3626,7 +3718,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3-beta.8 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.3 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3644,7 +3736,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                           <StackPanel Orientation="Horizontal">
-                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3-beta.8" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Name="UpdateNewVersionTagText" Text="🎉 发现新版本 v1.7.3" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
                             <Border Background="#25F59E0B" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                               <TextBlock Name="UpdateReleaseChannelTag" Text="正式稳定版" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
                             </Border>
@@ -4101,7 +4193,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3-beta.8" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -4117,8 +4209,23 @@
                   <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="v1.7.3-beta.8 OCR 截屏识字专项修复 &amp; 智能版面重建" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                  <TextBlock Text="• 🎯 【选区与坐标 1:1 精确映射】：采用底层物理全景屏幕快照冻结与直接裁切机制，彻底解决高 DPI 与多显示器缩放下的选区坐标漂移问题；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="v1.7.3 正式版 CAD 专属按键唤醒 &amp; 全盘深度秒搜与自由拉伸" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🎯 【黑名单程序专属呼出按键】：针对 SolidWorks 等 3D CAD 软件原生笔势痛点，支持在黑名单中为特定程序配置单独专属唤醒按键（如中键/侧键/组合键）；原生鼠标右键 100% 绝对零时延放行给宿主软件，完美兼顾 CAD 笔势与 StarPie 全局手势；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🔴 【复刻物理录制卡片与实时反馈】：专属按键配置完全复刻 Tab 2 录制交互，支持鼠标所有按键与键盘单键/修饰组合键物理录制，配备硬件感知器与 ESC 快速取消；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎬 【全盘秒搜增加视频分类过滤】：新增「🎬 视频」独立分类过滤按钮，内置主流视频格式（.mp4, .mkv, .avi, .mov, .flv, .wmv, .webm 等）精准匹配，并支持无输入时自动推荐近期视频；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📌 【秒搜窗口置顶图钉锁定】：右上角增加窗口置顶图钉按钮，开启后窗口始终置顶且点击外部失焦不关闭，方便对照文件与多任务协作；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 📐 【秒搜窗口自由拖拽缩放与记忆】：支持右下角点阵手柄与边缘自由拖拽调整窗口宽度与高度，并自动持久化记忆用户自定义窗口尺寸。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <DropShadowEffect BlurRadius="12" ShadowDepth="1" Color="#000000" Opacity="0.03" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.3-beta.8 全盘秒搜 (Quick Finder) &amp; OCR 截屏识字专项优化" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🔍 【光标跟随与自由拖拽秒搜 (Quick Finder)】：秒搜窗口唤出时自动定位在鼠标触发光标处，且支持按住窗口顶部及空白区域自由拖拽移动；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【内置原生引擎与 Everything 智能协同】：完全内置自主研发的毫秒级文件与程序极速搜索引擎，开箱即用无需依赖第三方；当本地运行 Everything 时自动开启 IPC 极速全盘索引加速，未运行或检索异常时无缝回退原生引擎；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎯 【OCR 选区与坐标 1:1 精确映射】：采用底层物理全景屏幕快照冻结与直接裁切机制，彻底解决高 DPI 与多显示器缩放下的选区坐标漂移问题；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                   <TextBlock Text="• 🖼️ 【多分辨率自适应与防黑化修复】：大图自动下采样防止 2600px 引擎超限崩溃，小图高保真双三次插值放大提升识别率，修复 GDI+ 32bpp 格式导致的黑屏问题；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                   <TextBlock Text="• 📄 【智能版面结构重建引擎】：基于词块空间几何信息，自动还原自然段落空行、同一长句智能平滑合并断行、保留表格分栏间隙，并消除汉字间误插空格。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>

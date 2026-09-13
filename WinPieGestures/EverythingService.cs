@@ -99,6 +99,7 @@ public static class EverythingService
 		public string BadgeBg { get; set; } = "#183B82F6";
 		public string BadgeFg { get; set; } = "#3B82F6";
 		public string IconEmoji { get; set; } = "📄";
+		public string EngineSource { get; set; } = "Native";
 		public string Details => IsFolder ? "文件夹" : $"{SizeFormatted} · {DateFormatted}";
 	}
 
@@ -127,8 +128,14 @@ public static class EverythingService
 	{
 		try
 		{
-			return Native.FindWindow("EVERYTHING_TASKBAR_NOTIFICATION", null) != IntPtr.Zero
-				|| Native.FindWindow("EVERYTHING", null) != IntPtr.Zero;
+			if (Native.FindWindow("EVERYTHING_TASKBAR_NOTIFICATION", null) != IntPtr.Zero
+				|| Native.FindWindow("EVERYTHING", null) != IntPtr.Zero)
+			{
+				return true;
+			}
+
+			var procs = Process.GetProcessesByName("Everything");
+			return procs.Length > 0;
 		}
 		catch
 		{
@@ -143,9 +150,14 @@ public static class EverythingService
 	{
 		try
 		{
-			// 1. 常见安装路径检查
+			// 1. 常见安装路径及桌面便携版检查
 			string[] candidates = new[]
 			{
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Everything.exe"),
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Everything.exe"),
+				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Everything.exe"),
+				@"G:\Users\2 Better\Desktop\Everything.exe",
+				Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Everything.exe"),
 				@"C:\Program Files\Everything\Everything.exe",
 				@"C:\Program Files (x86)\Everything\Everything.exe",
 				@"C:\Program Files\Everything 1.5a\Everything.exe",
@@ -205,13 +217,22 @@ public static class EverythingService
 					{
 						Native.Everything_Reset();
 						// 排除安装包、卸载程序、回收站以及 Windows 系统敏感补丁目录
-						string everythingQuery = $"ext:exe {query} !unins !setup !install !update !patcher !vcredist !dotnet !$Recycle.Bin !\\Windows\\WinSxS\\";
+						string everythingQuery = $"ext:exe {query} !unins !setup !install !update !patcher !vcredist !dotnet !$Recycle.Bin";
 						Native.Everything_SetSearchW(everythingQuery);
 						Native.Everything_SetMax((uint)maxResults);
 						Native.Everything_SetRequestFlags(EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME | EVERYTHING_REQUEST_SIZE | EVERYTHING_REQUEST_DATE_MODIFIED);
 						Native.Everything_SetSort(EVERYTHING_SORT_NAME_ASCENDING);
 
-						if (Native.Everything_QueryW(true))
+						bool queryOk = Native.Everything_QueryW(true);
+						if (!queryOk && Native.Everything_GetLastError() == 2)
+						{
+							Native.Everything_Reset();
+							Native.Everything_SetSearchW(everythingQuery);
+							Native.Everything_SetMax((uint)maxResults);
+							queryOk = Native.Everything_QueryW(true);
+						}
+
+						if (queryOk)
 						{
 							uint count = Native.Everything_GetNumResults();
 							StringBuilder sb = new StringBuilder(1024);
@@ -244,7 +265,8 @@ public static class EverythingService
 									CategoryDisplay = "绿色便携",
 									BadgeBg = "#18F97316",
 									BadgeFg = "#F97316",
-									IconEmoji = "🚀"
+									IconEmoji = "🚀",
+									EngineSource = "Everything"
 								});
 							}
 						}
@@ -254,10 +276,26 @@ public static class EverythingService
 					}
 				}
 			}
-			else
+
+			if (results.Count == 0)
 			{
-				// 降级：快速遍历常用免安装程序目录
-				ScanPortableDirectoriesFallback(query, results, maxResults);
+				// 降级：使用内置引擎快速检索免安装与可执行程序
+				var nativeApps = NativeSearchEngine.SearchAsync(query, "App", maxResults).GetAwaiter().GetResult();
+				foreach (var a in nativeApps)
+				{
+					if (a.Extension.Equals(".exe", StringComparison.OrdinalIgnoreCase))
+					{
+						a.CategoryDisplay = "绿色便携";
+						a.BadgeBg = "#18F97316";
+						a.BadgeFg = "#F97316";
+						a.IconEmoji = "🚀";
+						results.Add(a);
+					}
+				}
+				if (results.Count == 0)
+				{
+					ScanPortableDirectoriesFallback(query, results, maxResults);
+				}
 			}
 
 			return results;
@@ -265,27 +303,44 @@ public static class EverythingService
 	}
 
 	/// <summary>
-	/// 全盘文件与程序秒搜核心查询：支持分类穿透与毫秒级过滤
+	/// 全盘文件与程序秒搜核心查询：支持内置原生引擎与 Everything 智能协同
 	/// </summary>
-	public static Task<List<SearchResultItem>> SearchFilesAndFoldersAsync(string query, string category = "All", int maxResults = 120)
+	public static async Task<List<SearchResultItem>> SearchFilesAndFoldersAsync(string query, string category = "All", int maxResults = 120)
 	{
-		return Task.Run(() =>
-		{
-			var results = new List<SearchResultItem>();
+		string trimmed = query?.Trim() ?? "";
 
-			if (IsDllAvailable() && IsEverythingRunning())
+		// 空白初始态：直接返回内置原生引擎的高频推荐与常用项目
+		if (string.IsNullOrEmpty(trimmed))
+		{
+			return NativeSearchEngine.GetInitialRecommendations(category);
+		}
+
+		// 若 Everything 正在运行且 DLL 正常，优先尝试通过 IPC 极速检索
+		if (IsDllAvailable() && IsEverythingRunning())
+		{
+			var everythingResults = await Task.Run(() =>
 			{
+				var results = new List<SearchResultItem>();
 				lock (_syncLock)
 				{
 					try
 					{
 						Native.Everything_Reset();
-						string builtQuery = BuildCategoryQuery(query, category);
+						string builtQuery = BuildCategoryQuery(trimmed, category);
 						Native.Everything_SetSearchW(builtQuery);
 						Native.Everything_SetMax((uint)maxResults);
 						Native.Everything_SetRequestFlags(EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME | EVERYTHING_REQUEST_SIZE | EVERYTHING_REQUEST_DATE_MODIFIED);
 
-						if (Native.Everything_QueryW(true))
+						bool queryOk = Native.Everything_QueryW(true);
+						if (!queryOk && Native.Everything_GetLastError() == 2)
+						{
+							Native.Everything_Reset();
+							Native.Everything_SetSearchW(builtQuery);
+							Native.Everything_SetMax((uint)maxResults);
+							queryOk = Native.Everything_QueryW(true);
+						}
+
+						if (queryOk)
 						{
 							uint count = Native.Everything_GetNumResults();
 							StringBuilder sb = new StringBuilder(1024);
@@ -321,7 +376,8 @@ public static class EverythingService
 									CategoryDisplay = catDisplay,
 									BadgeBg = badgeBg,
 									BadgeFg = badgeFg,
-									IconEmoji = emoji
+									IconEmoji = emoji,
+									EngineSource = "Everything"
 								});
 							}
 						}
@@ -330,32 +386,33 @@ public static class EverythingService
 					{
 					}
 				}
-			}
-			else
-			{
-				// Everything 未运行时的优雅本地降级搜索
-				FallbackLocalSearch(query, category, results, maxResults);
-			}
+				return results;
+			});
 
-			return results;
-		});
+			if (everythingResults.Count > 0)
+			{
+				return everythingResults;
+			}
+		}
+
+		// 若 Everything 未运行或返回 0 结果（如 32 位 IPC 不通或过滤空），无缝回退至内置原生极速引擎
+		return await NativeSearchEngine.SearchAsync(trimmed, category, maxResults);
 	}
 
 	private static string BuildCategoryQuery(string rawQuery, string category)
 	{
 		string q = string.IsNullOrWhiteSpace(rawQuery) ? "" : rawQuery.Trim();
-
-		// 基础垃圾过滤
-		string excludeJunk = "!$Recycle.Bin !\\Windows\\WinSxS\\";
+		string excludeJunk = "!$Recycle.Bin";
 
 		return category switch
 		{
-			"App" => string.IsNullOrEmpty(q) ? $"ext:exe;bat;cmd;ps1 {excludeJunk}" : $"ext:exe;bat;cmd;ps1 {q} {excludeJunk}",
-			"CAD" => string.IsNullOrEmpty(q) ? $"ext:sldprt;sldasm;slddrw;step;stp;iges;igs;dwg;dxf;prt;asm;catpart;x_t;x_b {excludeJunk}" : $"ext:sldprt;sldasm;slddrw;step;stp;iges;igs;dwg;dxf;prt;asm;catpart;x_t;x_b {q} {excludeJunk}",
-			"Doc" => string.IsNullOrEmpty(q) ? $"ext:md;txt;doc;docx;xls;xlsx;ppt;pptx;pdf;py;cs;cpp;h;json;xml;csv {excludeJunk}" : $"ext:md;txt;doc;docx;xls;xlsx;ppt;pptx;pdf;py;cs;cpp;h;json;xml;csv {q} {excludeJunk}",
-			"Folder" => string.IsNullOrEmpty(q) ? $"folder: {excludeJunk}" : $"folder: {q} {excludeJunk}",
-			"System" => string.IsNullOrEmpty(q) ? $"ext:cpl;msc {excludeJunk}" : $"ext:cpl;msc {q} {excludeJunk}",
-			_ => string.IsNullOrEmpty(q) ? excludeJunk : $"{q} {excludeJunk}"
+			"App" => string.IsNullOrEmpty(q) ? "ext:exe;bat;cmd;ps1" : $"ext:exe;bat;cmd;ps1 {q} {excludeJunk}",
+			"CAD" => string.IsNullOrEmpty(q) ? "ext:sldprt;sldasm;slddrw;step;stp;iges;igs;dwg;dxf;prt;asm;catpart;x_t;x_b" : $"ext:sldprt;sldasm;slddrw;step;stp;iges;igs;dwg;dxf;prt;asm;catpart;x_t;x_b {q} {excludeJunk}",
+			"Doc" => string.IsNullOrEmpty(q) ? "ext:md;txt;doc;docx;xls;xlsx;ppt;pptx;pdf;py;cs;cpp;h;json;xml;csv" : $"ext:md;txt;doc;docx;xls;xlsx;ppt;pptx;pdf;py;cs;cpp;h;json;xml;csv {q} {excludeJunk}",
+			"Folder" => string.IsNullOrEmpty(q) ? "folder:" : $"folder: {q} {excludeJunk}",
+			"Video" => string.IsNullOrEmpty(q) ? "ext:mp4;mkv;avi;mov;flv;wmv;rmvb;webm;ts;m4v;3gp" : $"ext:mp4;mkv;avi;mov;flv;wmv;rmvb;webm;ts;m4v;3gp {q} {excludeJunk}",
+			"System" => string.IsNullOrEmpty(q) ? "ext:cpl;msc" : $"ext:cpl;msc {q} {excludeJunk}",
+			_ => string.IsNullOrEmpty(q) ? "" : $"{q} {excludeJunk}"
 		};
 	}
 
@@ -422,6 +479,20 @@ public static class EverythingService
 			case ".json":
 			case ".xml":
 				return ("Doc", "配置文件", "#1864748B", "#64748B", "📋");
+
+			// 视频媒体格式
+			case ".mp4":
+			case ".mkv":
+			case ".avi":
+			case ".mov":
+			case ".flv":
+			case ".wmv":
+			case ".rmvb":
+			case ".webm":
+			case ".ts":
+			case ".m4v":
+			case ".3gp":
+				return ("Video", "视频媒体", "#18EC4899", "#EC4899", "🎬");
 
 			// 系统工具
 			case ".cpl":

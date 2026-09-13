@@ -89,6 +89,10 @@ public partial class SettingsWindow : Window
 
 	private bool _isRecordingTrigger;
 
+	private bool _isRecordingProcessTrigger;
+
+	private string? _recordingProcessName;
+
 	private System.Windows.Media.Brush? _originalBadgeBorderBrush;
 
 	private WheelProfile? _selectedProfile;
@@ -688,7 +692,7 @@ public partial class SettingsWindow : Window
 
 	private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
-		if (_isRecordingTrigger || ConfigManager.CurrentConfig == null || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+		if (_isRecordingTrigger || _isRecordingProcessTrigger || ConfigManager.CurrentConfig == null || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
 		{
 			return;
 		}
@@ -8751,7 +8755,7 @@ public partial class SettingsWindow : Window
 		//IL_015e: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0160: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0162: Invalid comparison between Unknown and I4
-		if ((base.IsVisible || _isRecordingTrigger) && ConfigManager.CurrentConfig != null)
+		if ((base.IsVisible || _isRecordingTrigger || _isRecordingProcessTrigger) && ConfigManager.CurrentConfig != null)
 		{
 			string text = mouseButton switch
 			{
@@ -8779,13 +8783,39 @@ public partial class SettingsWindow : Window
 			{
 				text2 += "Win + ";
 			}
-			if (LiveSensorStatusText != null)
+			if (LiveSensorStatusText != null && !_isRecordingProcessTrigger)
 			{
 				LiveSensorStatusText.Text = "\ud83d\udfe2 实时捕获输入: " + text2 + text + " | 状态: 硬件信号正常响应";
 			}
-			if (LiveSensorDot != null)
+			if (LiveSensorDot != null && !_isRecordingProcessTrigger)
 			{
 				LiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+			}
+			if (ProcessLiveSensorStatusText != null && _isRecordingProcessTrigger)
+			{
+				ProcessLiveSensorStatusText.Text = "实时捕获输入: " + text2 + text + " | 状态: 硬件信号正常响应";
+			}
+			if (ProcessLiveSensorDot != null && _isRecordingProcessTrigger)
+			{
+				ProcessLiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+			}
+			if (_isRecordingProcessTrigger && !string.IsNullOrWhiteSpace(_recordingProcessName))
+			{
+				var procTrigger = new TriggerConfig
+				{
+					TriggerType = "Mouse",
+					MouseButton = mouseButton,
+					RequireCtrl = (((((int)currentModifiers & 2))) > 0),
+					RequireShift = (((((int)currentModifiers & 4))) > 0),
+					RequireAlt = (((((int)currentModifiers & 1))) > 0),
+					RequireWin = (((((int)currentModifiers & 8))) > 0)
+				};
+				procTrigger.DisplayText = FormatTriggerDisplay(procTrigger);
+				ConfigManager.CurrentConfig.BlacklistTriggerOverrides ??= new Dictionary<string, TriggerConfig>(StringComparer.OrdinalIgnoreCase);
+				ConfigManager.CurrentConfig.BlacklistTriggerOverrides[_recordingProcessName] = procTrigger;
+				ScheduleAutoSave();
+				StopProcessTriggerRecording(saved: true);
+				return;
 			}
 			if (_isRecordingTrigger)
 			{
@@ -8886,6 +8916,11 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
+		if ((int)e.Key == 13 && _isRecordingProcessTrigger)
+		{
+			StopProcessTriggerRecording(saved: false);
+			return;
+		}
 		if ((int)e.Key == 13 && _isRecordingTrigger)
 		{
 			StopTriggerRecording(saved: false);
@@ -8926,13 +8961,40 @@ public partial class SettingsWindow : Window
 		{
 			text += "Win + ";
 		}
-		if (LiveSensorStatusText != null)
+		if (LiveSensorStatusText != null && !_isRecordingProcessTrigger)
 		{
 			LiveSensorStatusText.Text = $"\ud83d\udfe2 实时捕获键盘输入: {text}⌨\ufe0f {value} | 虚拟键码 VkCode: 0x{e.VkCode:X2}";
 		}
-		if (LiveSensorDot != null)
+		if (LiveSensorDot != null && !_isRecordingProcessTrigger)
 		{
 			LiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+		}
+		if (ProcessLiveSensorStatusText != null && _isRecordingProcessTrigger)
+		{
+			ProcessLiveSensorStatusText.Text = $"实时捕获键盘输入: {text}⌨\ufe0f {value} | 虚拟键码 VkCode: 0x{e.VkCode:X2}";
+		}
+		if (ProcessLiveSensorDot != null && _isRecordingProcessTrigger)
+		{
+			ProcessLiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+		}
+		if (_isRecordingProcessTrigger && !string.IsNullOrWhiteSpace(_recordingProcessName) && (int)e.Key != 118 && (int)e.Key != 119 && (int)e.Key != 116 && (int)e.Key != 117 && (int)e.Key != 120 && (int)e.Key != 121 && (int)e.Key != 70 && (int)e.Key != 71)
+		{
+			var procTrigger = new TriggerConfig
+			{
+				TriggerType = "Keyboard",
+				Key = ((object)e.Key/*cast due to constrained. prefix*/).ToString(),
+				VkCode = e.VkCode,
+				RequireCtrl = (((((int)modifiers & 2))) > 0),
+				RequireShift = (((((int)modifiers & 4))) > 0),
+				RequireAlt = (((((int)modifiers & 1))) > 0),
+				RequireWin = (((((int)modifiers & 8))) > 0)
+			};
+			procTrigger.DisplayText = FormatTriggerDisplay(procTrigger);
+			ConfigManager.CurrentConfig.BlacklistTriggerOverrides ??= new Dictionary<string, TriggerConfig>(StringComparer.OrdinalIgnoreCase);
+			ConfigManager.CurrentConfig.BlacklistTriggerOverrides[_recordingProcessName] = procTrigger;
+			ScheduleAutoSave();
+			StopProcessTriggerRecording(saved: true);
+			return;
 		}
 		if (_isRecordingTrigger && (int)e.Key != 118 && (int)e.Key != 119 && (int)e.Key != 116 && (int)e.Key != 117 && (int)e.Key != 120 && (int)e.Key != 121 && (int)e.Key != 70 && (int)e.Key != 71)
 		{
@@ -13014,28 +13076,261 @@ public partial class SettingsWindow : Window
 		{
 			ProcessListDescText.Text = (flag ? I18n.T("WhitelistDesc") : I18n.T("BlacklistDesc"));
 		}
-		BlacklistListBox.Items.Clear();
-		List<string> list = (flag ? ConfigManager.CurrentConfig.WhitelistedProcesses : ConfigManager.CurrentConfig.BlacklistedProcesses);
-		if (list == null)
+
+		string? previouslySelectedProcess = (BlacklistListBox.SelectedItem as BlacklistProcessItemViewModel)?.ProcessName ?? _recordingProcessName;
+
+		List<string>? list = flag ? ConfigManager.CurrentConfig.WhitelistedProcesses : ConfigManager.CurrentConfig.BlacklistedProcesses;
+		var viewModels = new List<BlacklistProcessItemViewModel>();
+		if (list != null)
 		{
-			return;
+			foreach (string item in list)
+			{
+				TriggerConfig? overrideTrigger = null;
+				if (!flag && ConfigManager.CurrentConfig.BlacklistTriggerOverrides != null)
+				{
+					ConfigManager.CurrentConfig.BlacklistTriggerOverrides.TryGetValue(item, out overrideTrigger);
+				}
+				viewModels.Add(BlacklistProcessItemViewModel.Create(item, overrideTrigger));
+			}
 		}
-		foreach (string item in list)
+
+		BlacklistListBox.ItemsSource = viewModels;
+
+		if (!string.IsNullOrEmpty(previouslySelectedProcess))
 		{
-			BlacklistListBox.Items.Add(item);
+			var matched = viewModels.FirstOrDefault(vm => string.Equals(vm.ProcessName, previouslySelectedProcess, StringComparison.OrdinalIgnoreCase));
+			if (matched != null)
+			{
+				BlacklistListBox.SelectedItem = matched;
+				BlacklistListBox.ScrollIntoView(matched);
+				UpdateProcessTriggerCardVisual();
+			}
+			else if (_recordingProcessName != null)
+			{
+				HideProcessTriggerCard();
+			}
+		}
+	}
+
+	private void BlacklistListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (BlacklistListBox.SelectedItem is BlacklistProcessItemViewModel vm)
+		{
+			ShowProcessTriggerCard(vm.ProcessName);
 		}
 	}
 
 	private void BlacklistListBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0008: Invalid comparison between Unknown and I4
-		//IL_000b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0011: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 32 || (int)e.Key == 2)
 		{
 			DeleteBlacklistButton_Click(sender, e);
 			e.Handled = true;
+		}
+	}
+
+	private void ShowProcessTriggerCard(string proc)
+	{
+		if (string.IsNullOrWhiteSpace(proc))
+		{
+			return;
+		}
+		_recordingProcessName = proc.Trim().ToLower();
+		if (SelectedProcessNameLabel != null)
+		{
+			SelectedProcessNameLabel.Text = _recordingProcessName;
+		}
+		if (BlacklistProcessTriggerCard != null)
+		{
+			BlacklistProcessTriggerCard.Visibility = Visibility.Visible;
+		}
+		UpdateProcessTriggerCardVisual();
+	}
+
+	private void HideProcessTriggerCard()
+	{
+		if (_isRecordingProcessTrigger)
+		{
+			StopProcessTriggerRecording(saved: false);
+		}
+		_recordingProcessName = null;
+		if (BlacklistProcessTriggerCard != null)
+		{
+			BlacklistProcessTriggerCard.Visibility = Visibility.Collapsed;
+		}
+	}
+
+	private void UpdateProcessTriggerCardVisual()
+	{
+		if (string.IsNullOrWhiteSpace(_recordingProcessName) || ConfigManager.CurrentConfig == null)
+		{
+			return;
+		}
+
+		TriggerConfig? trigger = null;
+		ConfigManager.CurrentConfig.BlacklistTriggerOverrides?.TryGetValue(_recordingProcessName, out trigger);
+
+		if (trigger != null)
+		{
+			if (ProcessCurrentTriggerBadgeText != null)
+			{
+				ProcessCurrentTriggerBadgeText.Text = "🎯 " + (string.IsNullOrWhiteSpace(trigger.DisplayText) ? FormatTriggerDisplay(trigger) : trigger.DisplayText);
+				ProcessCurrentTriggerBadgeText.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+			}
+			if (ProcessCurrentTriggerBadgeBorder != null)
+			{
+				ProcessCurrentTriggerBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+				ProcessCurrentTriggerBadgeBorder.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(120, 16, 185, 129));
+			}
+			if (ResetProcessTriggerButton != null)
+			{
+				ResetProcessTriggerButton.IsEnabled = true;
+			}
+		}
+		else
+		{
+			if (ProcessCurrentTriggerBadgeText != null)
+			{
+				ProcessCurrentTriggerBadgeText.Text = "🚫 未配置 (完全放行右键)";
+				ProcessCurrentTriggerBadgeText.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#94A3B8"));
+			}
+			if (ProcessCurrentTriggerBadgeBorder != null)
+			{
+				ProcessCurrentTriggerBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(20, 148, 163, 184));
+				ProcessCurrentTriggerBadgeBorder.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(60, 148, 163, 184));
+			}
+			if (ResetProcessTriggerButton != null)
+			{
+				ResetProcessTriggerButton.IsEnabled = false;
+			}
+		}
+	}
+
+	private void RecordProcessTriggerButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (!_isRecordingProcessTrigger)
+		{
+			StartProcessTriggerRecording();
+		}
+		else
+		{
+			StopProcessTriggerRecording(saved: false);
+		}
+	}
+
+	private void StartProcessTriggerRecording()
+	{
+		if (string.IsNullOrWhiteSpace(_recordingProcessName))
+		{
+			return;
+		}
+		_isRecordingProcessTrigger = true;
+		if (RecordProcessTriggerButton != null)
+		{
+			RecordProcessTriggerButton.Content = "⚡ 正在监听... 请按专属键 (ESC取消)";
+			RecordProcessTriggerButton.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF4444"));
+		}
+		if (ProcessLiveSensorStatusText != null)
+		{
+			ProcessLiveSensorStatusText.Text = $"正在监听 [{_recordingProcessName}] 专属呼出键：请直接按下你想作为该程序呼出键的鼠标按键（如中键/侧键）或键盘按键（按 ESC 取消）...";
+		}
+		if (ProcessLiveSensorDot != null)
+		{
+			ProcessLiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF4444"));
+		}
+	}
+
+	private void StopProcessTriggerRecording(bool saved)
+	{
+		_isRecordingProcessTrigger = false;
+		if (RecordProcessTriggerButton != null)
+		{
+			RecordProcessTriggerButton.Content = "🔴 点击录制专属按键 / 组合键";
+			((DependencyObject)RecordProcessTriggerButton).ClearValue(System.Windows.Controls.Control.BackgroundProperty);
+		}
+		if (ProcessLiveSensorStatusText != null)
+		{
+			if (saved)
+			{
+				ProcessLiveSensorStatusText.Text = $"[{_recordingProcessName}] 专属触发键录制成功并已保存！";
+			}
+			else
+			{
+				ProcessLiveSensorStatusText.Text = "硬件感知器已就绪：点击上方录制按钮后，按下你想作为该程序呼出键的鼠标按键（如中键/侧键）或键盘按键...";
+			}
+		}
+		if (ProcessLiveSensorDot != null)
+		{
+			ProcessLiveSensorDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
+		}
+		UpdateProcessTriggerCardVisual();
+		RefreshProcessListUI();
+	}
+
+	private void ResetProcessTriggerButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (!string.IsNullOrWhiteSpace(_recordingProcessName) && ConfigManager.CurrentConfig?.BlacklistTriggerOverrides != null)
+		{
+			ConfigManager.CurrentConfig.BlacklistTriggerOverrides.Remove(_recordingProcessName);
+			ScheduleAutoSave();
+			StopProcessTriggerRecording(saved: false);
+			if (ProcessLiveSensorStatusText != null)
+			{
+				ProcessLiveSensorStatusText.Text = $"已恢复 [{_recordingProcessName}] 默认设置：完全放行鼠标右键";
+			}
+			UpdateProcessTriggerCardVisual();
+			RefreshProcessListUI();
+		}
+	}
+
+	private void CloseProcessTriggerCardBtn_Click(object sender, RoutedEventArgs e)
+	{
+		HideProcessTriggerCard();
+	}
+
+	private void ConfigProcessTriggerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if ((sender as FrameworkElement)?.Tag is BlacklistProcessItemViewModel vm)
+		{
+			ShowProcessTriggerCard(vm.ProcessName);
+			StartProcessTriggerRecording();
+		}
+	}
+
+	private void ResetProcessTriggerBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if ((sender as FrameworkElement)?.Tag is BlacklistProcessItemViewModel vm)
+		{
+			ConfigManager.CurrentConfig?.BlacklistTriggerOverrides?.Remove(vm.ProcessName);
+			ScheduleAutoSave();
+			if (string.Equals(_recordingProcessName, vm.ProcessName, StringComparison.OrdinalIgnoreCase))
+			{
+				UpdateProcessTriggerCardVisual();
+			}
+			RefreshProcessListUI();
+		}
+	}
+
+	private void DeleteSingleProcessBtn_Click(object sender, RoutedEventArgs e)
+	{
+		if ((sender as FrameworkElement)?.Tag is BlacklistProcessItemViewModel vm)
+		{
+			string proc = vm.ProcessName;
+			if (string.Equals(ConfigManager.CurrentConfig?.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
+			{
+				ConfigManager.CurrentConfig?.WhitelistedProcesses?.Remove(proc);
+			}
+			else
+			{
+				ConfigManager.CurrentConfig?.BlacklistedProcesses?.Remove(proc);
+				ConfigManager.CurrentConfig?.BlacklistTriggerOverrides?.Remove(proc);
+			}
+			if (string.Equals(_recordingProcessName, proc, StringComparison.OrdinalIgnoreCase))
+			{
+				HideProcessTriggerCard();
+			}
+			ScheduleAutoSave();
+			RefreshProcessListUI();
 		}
 	}
 
@@ -13050,56 +13345,51 @@ public partial class SettingsWindow : Window
 		{
 			proc += ".exe";
 		}
-		object obj;
-		if (!string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
+		bool isWhitelist = string.Equals(ConfigManager.CurrentConfig?.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase);
+		List<string> list = isWhitelist
+			? (ConfigManager.CurrentConfig.WhitelistedProcesses ??= new List<string>())
+			: (ConfigManager.CurrentConfig.BlacklistedProcesses ??= new List<string>());
+
+		if (!list.Contains(proc))
 		{
-			AppConfig currentConfig = ConfigManager.CurrentConfig;
-			obj = currentConfig.BlacklistedProcesses ?? (currentConfig.BlacklistedProcesses = new List<string>());
-		}
-		else
-		{
-			AppConfig currentConfig = ConfigManager.CurrentConfig;
-			obj = currentConfig.WhitelistedProcesses ?? (currentConfig.WhitelistedProcesses = new List<string>());
-		}
-		List<string> list3 = (List<string>)obj;
-		if (!BlacklistListBox.Items.Contains(proc))
-		{
-			BlacklistListBox.Items.Add(proc);
-			BlacklistListBox.SelectedItem = proc;
-			BlacklistListBox.ScrollIntoView(proc);
-			if (!list3.Contains(proc))
-			{
-				list3.Add(proc);
-			}
-			NewBlacklistProcessTextBox.Clear();
+			list.Add(proc);
+			NewBlacklistProcessTextBox?.Clear();
 			SyncUiToConfigAndSave();
+			RefreshProcessListUI();
+			ShowProcessTriggerCard(proc);
 		}
 		else
 		{
-			BlacklistListBox.SelectedItem = proc;
-			BlacklistListBox.ScrollIntoView(proc);
+			ShowProcessTriggerCard(proc);
 		}
 	}
 
 	private void DeleteBlacklistButton_Click(object sender, RoutedEventArgs e)
 	{
-		string text = BlacklistListBox.SelectedItem?.ToString();
-		if (string.IsNullOrEmpty(text) && BlacklistListBox.Items.Count > 0)
+		var selectedVm = BlacklistListBox?.SelectedItem as BlacklistProcessItemViewModel;
+		string? text = selectedVm?.ProcessName;
+		if (string.IsNullOrEmpty(text) && BlacklistListBox?.Items.Count > 0)
 		{
-			text = BlacklistListBox.Items[BlacklistListBox.Items.Count - 1]?.ToString();
+			var lastVm = BlacklistListBox.Items[BlacklistListBox.Items.Count - 1] as BlacklistProcessItemViewModel;
+			text = lastVm?.ProcessName;
 		}
 		if (!string.IsNullOrEmpty(text))
 		{
-			BlacklistListBox.Items.Remove(text);
-			if (string.Equals(ConfigManager.CurrentConfig.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(ConfigManager.CurrentConfig?.IsolationMode, "Whitelist", StringComparison.OrdinalIgnoreCase))
 			{
-				ConfigManager.CurrentConfig.WhitelistedProcesses?.Remove(text);
+				ConfigManager.CurrentConfig?.WhitelistedProcesses?.Remove(text);
 			}
 			else
 			{
-				ConfigManager.CurrentConfig.BlacklistedProcesses?.Remove(text);
+				ConfigManager.CurrentConfig?.BlacklistedProcesses?.Remove(text);
+				ConfigManager.CurrentConfig?.BlacklistTriggerOverrides?.Remove(text);
+			}
+			if (string.Equals(_recordingProcessName, text, StringComparison.OrdinalIgnoreCase))
+			{
+				HideProcessTriggerCard();
 			}
 			SyncUiToConfigAndSave();
+			RefreshProcessListUI();
 		}
 	}
 

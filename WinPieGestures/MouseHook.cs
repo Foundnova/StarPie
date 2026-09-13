@@ -103,6 +103,8 @@ public class MouseHook
 
 	private int _isPaused;
 
+	private string? _activeMouseTriggerButton;
+
 	public bool IsPaused
 	{
 		get
@@ -430,11 +432,12 @@ public class MouseHook
 					return 1; // 手势等已接管该按键：拦截原生事件
 				}
 			}
-			var triggerConfig = ConfigManager.CurrentConfig?.Trigger;
+			string activeProc = ActiveWindowHelper.GetActiveWindowProcessName();
+			var triggerConfig = GestureController.GetEffectiveTriggerForProcess(activeProc);
 			bool isMouseTrigger = triggerConfig == null || string.Equals(triggerConfig.TriggerType, "Mouse", StringComparison.OrdinalIgnoreCase);
-			if (isMouseTrigger)
+			if (isMouseTrigger || !string.IsNullOrEmpty(_activeMouseTriggerButton))
 			{
-				string text2 = triggerConfig?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
+				string text2 = _activeMouseTriggerButton ?? triggerConfig?.MouseButton ?? ConfigManager.CurrentConfig?.TriggerButton ?? "RightButton";
 				bool num2 = flag && string.Equals(text, text2, StringComparison.OrdinalIgnoreCase);
 				bool flag3 = flag2 && string.Equals(text, text2, StringComparison.OrdinalIgnoreCase);
 				if (num2)
@@ -443,11 +446,13 @@ public class MouseHook
 					OnTriggerButtonDown?.Invoke(this, e4);
 					if (e4.Handled)
 					{
+						_activeMouseTriggerButton = text;
 						return 1;
 					}
 				}
 				else if (flag3)
 				{
+					_activeMouseTriggerButton = null;
 					MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 					OnTriggerButtonUp?.Invoke(this, e5);
 					if (e5.Handled)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -145,45 +145,7 @@ public partial class ProgramPickerWindow : Window
 
 	private async void Window_Loaded(object sender, RoutedEventArgs e)
 	{
-		UpdateEverythingStatus();
 		await LoadProgramsAsync(forceRescan: false);
-	}
-
-	private void UpdateEverythingStatus()
-	{
-		if (EverythingStatusChip == null || EverythingStatusText == null) return;
-		bool isRunning = EverythingService.IsEverythingRunning();
-		if (isRunning)
-		{
-			EverythingStatusText.Text = "⚡ Everything 穿透 (已连接)";
-			EverythingStatusText.Foreground = (Brush)new BrushConverter().ConvertFrom("#10B981")!;
-			EverythingStatusChip.Background = (Brush)new BrushConverter().ConvertFrom("#1810B981")!;
-			EverythingStatusChip.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#6010B981")!;
-			EverythingStatusChip.ToolTip = "Everything 极速索引引擎已正常连接，输入关键词将自动穿透全盘搜索免安装绿色程序";
-		}
-		else
-		{
-			EverythingStatusText.Text = "⚡ Everything (未运行)";
-			EverythingStatusText.Foreground = (Brush)new BrushConverter().ConvertFrom("#F59E0B")!;
-			EverythingStatusChip.Background = (Brush)new BrushConverter().ConvertFrom("#18F59E0B")!;
-			EverythingStatusChip.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#60F59E0B")!;
-			EverythingStatusChip.ToolTip = "未检测到 Everything 服务正在运行。点击可尝试自动启动以解锁全盘免安装软件极速检索";
-		}
-	}
-
-	private void EverythingStatusChip_Click(object sender, MouseButtonEventArgs e)
-	{
-		if (!EverythingService.IsEverythingRunning())
-		{
-			if (EverythingService.TryLaunchEverything())
-		{
-				Task.Delay(1000).ContinueWith(_ => Dispatcher.Invoke(UpdateEverythingStatus));
-			}
-			else
-			{
-				MessageBox.Show(this, "未在常见安装路径检测到 Everything.exe。\n\n如需全盘毫秒级秒搜绿色免安装软件，建议安装并启动 Everything 软件 (https://www.voidtools.com)。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-			}
-		}
 	}
 
 	private async Task LoadProgramsAsync(bool forceRescan)
@@ -231,6 +193,7 @@ public partial class ProgramPickerWindow : Window
 		ScanRegistryAppPaths(dictionary);
 		ScanRegistryUninstall(dictionary);
 		ScanProgramFilesTopLevel(dictionary);
+		ScanAllDrivesProgramDirectories(dictionary);
 		List<ProgramItem> list = dictionary.Values.ToList();
 		list.Sort((ProgramItem a, ProgramItem b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
 		return list;
@@ -707,6 +670,79 @@ public partial class ProgramPickerWindow : Window
 			{
 			}
 		}
+	}
+
+	private void ScanAllDrivesProgramDirectories(Dictionary<string, ProgramItem> dict)
+	{
+		try
+		{
+			var drives = DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed);
+			foreach (var drive in drives)
+			{
+				try
+				{
+					var rootDirs = Directory.GetDirectories(drive.RootDirectory.FullName);
+					foreach (var dir in rootDirs)
+					{
+						string dirName = Path.GetFileName(dir);
+						if (string.IsNullOrEmpty(dirName)) continue;
+
+						// 过滤系统核心卷与垃圾箱
+						if (dirName.StartsWith("$") ||
+						    dirName.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase) ||
+						    dirName.Equals("Windows", StringComparison.OrdinalIgnoreCase) ||
+						    dirName.Equals("Recovery", StringComparison.OrdinalIgnoreCase) ||
+						    dirName.Equals("MSOCache", StringComparison.OrdinalIgnoreCase))
+						{
+							continue;
+						}
+
+						// 1. 扫描根级目录下的直接可执行程序
+						try
+						{
+							string[] exes = Directory.GetFiles(dir, "*.exe", SearchOption.TopDirectoryOnly);
+							foreach (string exe in exes)
+							{
+								string exeName = Path.GetFileNameWithoutExtension(exe);
+								AddProgramEntry(dict, $"{dirName} ({exeName})", exe, "Portable");
+							}
+						}
+						catch { }
+
+						// 2. 深入 1 级子目录（常见如 H:\PS2024\Adobe Photoshop 2024\Photoshop.exe 或 K:\QQ\Bin\QQ.exe）
+						try
+						{
+							string[] subDirs = Directory.GetDirectories(dir);
+							foreach (string subDir in subDirs)
+							{
+								string subName = Path.GetFileName(subDir);
+								if (string.IsNullOrEmpty(subName) || subName.StartsWith(".") ||
+								    subName.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+								    subName.Equals("temp", StringComparison.OrdinalIgnoreCase) ||
+								    subName.Equals("cache", StringComparison.OrdinalIgnoreCase))
+								{
+									continue;
+								}
+
+								try
+								{
+									string[] subExes = Directory.GetFiles(subDir, "*.exe", SearchOption.TopDirectoryOnly);
+									foreach (string subExe in subExes)
+									{
+										string subExeName = Path.GetFileNameWithoutExtension(subExe);
+										AddProgramEntry(dict, $"{subExeName} ({dirName})", subExe, "Portable");
+									}
+								}
+								catch { }
+							}
+						}
+						catch { }
+					}
+				}
+				catch { }
+			}
+		}
+		catch { }
 	}
 
 	private void UpdateDisplayedList(string filter)
