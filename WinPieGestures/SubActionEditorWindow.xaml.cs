@@ -209,12 +209,9 @@ public partial class SubActionEditorWindow : Window
 				vm.InheritAppIconPath = programPicker.SelectedPath;
 				vm.IconKey = "";
 				vm.CustomIconSvg = "";
-				if (string.IsNullOrWhiteSpace(vm.Name) || vm.Name.StartsWith("子动作"))
-				{
-					vm.Name = !string.IsNullOrEmpty(programPicker.SelectedName)
-						? programPicker.SelectedName
-						: Path.GetFileNameWithoutExtension(programPicker.SelectedPath);
-				}
+				vm.Name = !string.IsNullOrEmpty(programPicker.SelectedName)
+					? programPicker.SelectedName
+					: Path.GetFileNameWithoutExtension(programPicker.SelectedPath);
 			}
 		}
 	}
@@ -233,12 +230,9 @@ public partial class SubActionEditorWindow : Window
 				vm.InheritAppIconPath = picker.SelectedPath;
 				vm.IconKey = "";
 				vm.CustomIconSvg = "";
-				if (string.IsNullOrWhiteSpace(vm.Name) || vm.Name.StartsWith("子动作"))
-				{
-					vm.Name = !string.IsNullOrEmpty(picker.SelectedTitle)
-						? picker.SelectedTitle
-						: (!string.IsNullOrEmpty(picker.SelectedProcessName) ? picker.SelectedProcessName : Path.GetFileNameWithoutExtension(picker.SelectedPath));
-				}
+				vm.Name = !string.IsNullOrEmpty(picker.SelectedTitle)
+					? picker.SelectedTitle
+					: (!string.IsNullOrEmpty(picker.SelectedProcessName) ? picker.SelectedProcessName : Path.GetFileNameWithoutExtension(picker.SelectedPath));
 			}
 		}
 	}
@@ -258,10 +252,7 @@ public partial class SubActionEditorWindow : Window
 				vm.InheritAppIconPath = dlg.FileName;
 				vm.IconKey = "";
 				vm.CustomIconSvg = "";
-				if (string.IsNullOrWhiteSpace(vm.Name) || vm.Name.StartsWith("子动作"))
-				{
-					vm.Name = Path.GetFileNameWithoutExtension(dlg.FileName);
-				}
+				vm.Name = Path.GetFileNameWithoutExtension(dlg.FileName);
 			}
 		}
 	}

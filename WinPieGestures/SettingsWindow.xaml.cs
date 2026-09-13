@@ -6397,14 +6397,11 @@ public partial class SettingsWindow : Window
 			item.InheritAppIconPath = programPicker.SelectedPath;
 			item.IconKey = "";
 			item.CustomIconSvg = "";
-			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
-			{
-				string autoName = !string.IsNullOrEmpty(programPicker.SelectedName) 
-					? programPicker.SelectedName 
-					: System.IO.Path.GetFileNameWithoutExtension(programPicker.SelectedPath);
-				item.Name = autoName;
-				FocusActionNameTextBox.Text = autoName;
-			}
+			string autoName = !string.IsNullOrEmpty(programPicker.SelectedName) 
+				? programPicker.SelectedName 
+				: System.IO.Path.GetFileNameWithoutExtension(programPicker.SelectedPath);
+			item.Name = autoName;
+			FocusActionNameTextBox.Text = autoName;
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -6427,14 +6424,11 @@ public partial class SettingsWindow : Window
 			item.InheritAppIconPath = picker.SelectedPath;
 			item.IconKey = "";
 			item.CustomIconSvg = "";
-			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
-			{
-				string autoName = !string.IsNullOrEmpty(picker.SelectedTitle)
-					? picker.SelectedTitle
-					: (!string.IsNullOrEmpty(picker.SelectedProcessName) ? picker.SelectedProcessName : System.IO.Path.GetFileNameWithoutExtension(picker.SelectedPath));
-				item.Name = autoName;
-				FocusActionNameTextBox.Text = autoName;
-			}
+			string autoName = !string.IsNullOrEmpty(picker.SelectedTitle)
+				? picker.SelectedTitle
+				: (!string.IsNullOrEmpty(picker.SelectedProcessName) ? picker.SelectedProcessName : System.IO.Path.GetFileNameWithoutExtension(picker.SelectedPath));
+			item.Name = autoName;
+			FocusActionNameTextBox.Text = autoName;
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
@@ -6460,12 +6454,9 @@ public partial class SettingsWindow : Window
 			item.InheritAppIconPath = dlg.FileName;
 			item.IconKey = "";
 			item.CustomIconSvg = "";
-			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("启动"))
-			{
-				string autoName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
-				item.Name = autoName;
-				FocusActionNameTextBox.Text = autoName;
-			}
+			string autoName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName);
+			item.Name = autoName;
+			FocusActionNameTextBox.Text = autoName;
 			UpdateFocusEditorUi();
 			RefreshSlots();
 			RenderMappingsWheelPreview();
