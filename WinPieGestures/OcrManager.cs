@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -71,6 +73,9 @@ public static class OcrManager
 		string recognizedText = "";
 		string engineName = "本地离线引擎";
 
+		// 尺寸与超分辨率自适应准备（防止 2600px 溢出崩溃，提升微小字号清晰度）
+		Bitmap workingBmp = PrepareBitmapForOcr(bmp);
+
 		try
 		{
 			string provider = config.Provider?.Trim() ?? "Local";
@@ -78,23 +83,23 @@ public static class OcrManager
 			{
 			case "Ai":
 				engineName = $"AI 视觉大模型 ({config.AiModel})";
-				recognizedText = await RecognizeWithAiVisionAsync(bmp, config);
+				recognizedText = await RecognizeWithAiVisionAsync(workingBmp, config);
 				break;
 
 			case "Custom":
 				engineName = "自定义 HTTP OCR";
-				recognizedText = await RecognizeWithCustomHttpAsync(bmp, config);
+				recognizedText = await RecognizeWithCustomHttpAsync(workingBmp, config);
 				break;
 
 			case "Cloud":
 				engineName = $"{config.CloudProvider} 云端 OCR";
-				recognizedText = await RecognizeWithCloudAsync(bmp, config);
+				recognizedText = await RecognizeWithCloudAsync(workingBmp, config);
 				break;
 
 			case "Local":
 			default:
 				engineName = "Windows 本地离线引擎";
-				recognizedText = await RecognizeWithLocalWinRtAsync(bmp, config);
+				recognizedText = await RecognizeWithLocalWinRtAsync(workingBmp, config);
 				break;
 			}
 		}
@@ -106,13 +111,17 @@ public static class OcrManager
 		finally
 		{
 			sw.Stop();
-			bmp.Dispose();
+			if (!ReferenceEquals(workingBmp, bmp))
+			{
+				try { workingBmp.Dispose(); } catch { }
+			}
+			try { bmp.Dispose(); } catch { }
 		}
 
 		string latency = $"{sw.ElapsedMilliseconds}ms";
 
-		// 格式后处理：去除中文字间多余空格、合并断行
-		if (config.MergeLines && !recognizedText.StartsWith("["))
+		// 格式后处理：去除中文字符与全角标点间硬塞的空格
+		if (!recognizedText.StartsWith("["))
 		{
 			recognizedText = PostProcessText(recognizedText, config.RemoveSpacesBetweenCjk);
 		}
@@ -203,12 +212,7 @@ public static class OcrManager
 			return "[未识别到有效文字内容]";
 		}
 
-		StringBuilder sb = new StringBuilder();
-		foreach (var line in result.Lines)
-		{
-			sb.AppendLine(line.Text);
-		}
-		return sb.ToString().TrimEnd();
+		return ReconstructLayout(result, config);
 	}
 
 	/// <summary>2. OpenAI 兼容 / 本地 Ollama 多模态视觉模型 API</summary>
@@ -337,10 +341,64 @@ public static class OcrManager
 		return $"[{config.CloudProvider} 云端 OCR]: 凭证已就绪 (可直接在设置中绑定 API Key 与 Secret)";
 	}
 
+	/// <summary>
+	/// 智能图像尺寸与超分辨率优化：
+	/// 1. 约束最大尺寸在 2500px 以内，消除 Windows.Media.Ocr 的 2600px 溢出抛异常崩溃；
+	/// 2. 对微小字号/小图（如行高小于 60px）进行高保真双三次插值放大（2x 或 3x），显著提升笔画识别特征。
+	/// </summary>
+	private static Bitmap PrepareBitmapForOcr(Bitmap input)
+	{
+		int w = input.Width;
+		int h = input.Height;
+		const int MaxAllowedDim = 2500;
+
+		// 1. 超大尺寸下采样保护
+		if (w > MaxAllowedDim || h > MaxAllowedDim)
+		{
+			double scale = Math.Min((double)MaxAllowedDim / w, (double)MaxAllowedDim / h);
+			int newW = Math.Max(10, (int)Math.Round(w * scale));
+			int newH = Math.Max(10, (int)Math.Round(h * scale));
+
+			Bitmap scaled = new Bitmap(newW, newH, PixelFormat.Format24bppRgb);
+			using (Graphics g = Graphics.FromImage(scaled))
+			{
+				g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+				g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+				g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+				g.DrawImage(input, 0, 0, newW, newH);
+			}
+			return scaled;
+		}
+
+		// 2. 极小字号/细微图像超分辨率放大增强
+		if (h < 60 || w < 60)
+		{
+			int scaleFactor = (h < 30 || w < 30) ? 3 : 2;
+			int newW = w * scaleFactor;
+			int newH = h * scaleFactor;
+
+			if (newW <= MaxAllowedDim && newH <= MaxAllowedDim)
+			{
+				Bitmap scaled = new Bitmap(newW, newH, PixelFormat.Format24bppRgb);
+				using (Graphics g = Graphics.FromImage(scaled))
+				{
+					g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+					g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+					g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+					g.DrawImage(input, 0, 0, newW, newH);
+				}
+				return scaled;
+			}
+		}
+
+		return input;
+	}
+
 	private static async Task<SoftwareBitmap> ConvertToSoftwareBitmapAsync(Bitmap bmp)
 	{
 		using MemoryStream ms = new MemoryStream();
-		bmp.Save(ms, ImageFormat.Png);
+		// 使用标准 BMP 编码保存，彻底规避 GDI+ 32bpp 未初始化 Alpha 黑化问题
+		bmp.Save(ms, ImageFormat.Bmp);
 		byte[] bytes = ms.ToArray();
 
 		InMemoryRandomAccessStream ras = new InMemoryRandomAccessStream();
@@ -354,9 +412,261 @@ public static class OcrManager
 		ras.Seek(0);
 
 		BitmapDecoder decoder = await BitmapDecoder.CreateAsync(ras);
-		SoftwareBitmap softwareBitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+		// 强制忽略 Alpha 通道，保证图像为 100% 不透明实色 RGB，OCR 引擎绝无黑屏风险
+		SoftwareBitmap softwareBitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
 		ras.Dispose();
 		return softwareBitmap;
+	}
+
+	private class LineLayoutInfo
+	{
+		public double Left { get; set; }
+		public double Top { get; set; }
+		public double Right { get; set; }
+		public double Bottom { get; set; }
+		public double Height => Bottom - Top;
+		public string FormattedText { get; set; } = "";
+	}
+
+	/// <summary>
+	/// 基于 OCR 词边界几何空间的版面结构智能重建引擎：
+	/// 1. 词间距分析：智能识别表格列对齐并保留制表间距，去除中文汉字与标点间硬塞的空格，保留英文字词与标点规范；
+	/// 2. 空间聚类排序：按行高阈值进行水平基线聚类，防止多栏排版混读；
+	/// 3. 自然段落还原：行间距大于 0.75 倍行高时自动插入空行；
+	/// 4. 智能合并断行：开启 MergeLines 时对同一长句的自动折行平滑拼接，遇到句末标点、缩进或序号列表时保留换行。
+	/// </summary>
+	private static string ReconstructLayout(OcrResult result, OcrSettings config)
+	{
+		if (result.Lines == null || result.Lines.Count == 0)
+		{
+			return "";
+		}
+
+		List<LineLayoutInfo> lineInfos = new();
+		foreach (var line in result.Lines)
+		{
+			if (line.Words == null || line.Words.Count == 0)
+			{
+				if (!string.IsNullOrWhiteSpace(line.Text))
+				{
+					lineInfos.Add(new LineLayoutInfo
+					{
+						FormattedText = line.Text.Trim()
+					});
+				}
+				continue;
+			}
+
+			double minX = double.MaxValue;
+			double minY = double.MaxValue;
+			double maxX = double.MinValue;
+			double maxY = double.MinValue;
+
+			foreach (var w in line.Words)
+			{
+				var r = w.BoundingRect;
+				if (r.X < minX) minX = r.X;
+				if (r.Y < minY) minY = r.Y;
+				if (r.X + r.Width > maxX) maxX = r.X + r.Width;
+				if (r.Y + r.Height > maxY) maxY = r.Y + r.Height;
+			}
+
+			string formatted = FormatLineWords(line.Words, config);
+			if (string.IsNullOrWhiteSpace(formatted))
+			{
+				continue;
+			}
+
+			lineInfos.Add(new LineLayoutInfo
+			{
+				Left = minX,
+				Top = minY,
+				Right = maxX,
+				Bottom = maxY,
+				FormattedText = formatted
+			});
+		}
+
+		if (lineInfos.Count == 0)
+		{
+			return "";
+		}
+
+		// 计算平均行高
+		double avgH = lineInfos.Average(l => Math.Max(8.0, l.Height));
+
+		// 行聚类排序：垂直方向在 0.45 * avgH 容差内视为同一视觉行，按 X 从左到右，其余按 Y 严格从上到下
+		lineInfos.Sort((a, b) =>
+		{
+			double diffY = a.Top - b.Top;
+			if (Math.Abs(diffY) > avgH * 0.45)
+			{
+				return a.Top.CompareTo(b.Top);
+			}
+			return a.Left.CompareTo(b.Left);
+		});
+
+		StringBuilder resultSb = new StringBuilder();
+		for (int i = 0; i < lineInfos.Count; i++)
+		{
+			var currLine = lineInfos[i];
+			if (i == 0)
+			{
+				resultSb.Append(currLine.FormattedText);
+				continue;
+			}
+
+			var prevLine = lineInfos[i - 1];
+			double vGap = currLine.Top - prevLine.Bottom;
+			double lineH = Math.Max(avgH, Math.Max(currLine.Height, prevLine.Height));
+
+			// 1. 自然段落大间距或空行判断
+			if (vGap > lineH * 0.75)
+			{
+				resultSb.AppendLine();
+				resultSb.AppendLine();
+				resultSb.Append(currLine.FormattedText);
+				continue;
+			}
+
+			// 2. 智能合并断行
+			if (config.MergeLines)
+			{
+				string prevText = prevLine.FormattedText;
+				char prevLastChar = prevText.Length > 0 ? prevText[^1] : ' ';
+				string currText = currLine.FormattedText;
+				char currFirstChar = currText.Length > 0 ? currText[0] : ' ';
+
+				bool isPrevSentenceEnd = "。！？…；.!?;\":".IndexOf(prevLastChar) >= 0;
+				bool isCurrListOrBullet = IsListOrBulletItem(currText);
+				bool isIndented = (currLine.Left - prevLine.Left) > lineH * 1.2;
+
+				if (isPrevSentenceEnd || isCurrListOrBullet || isIndented)
+				{
+					// 句末完结、列表项目或缩进，保持自然换行
+					resultSb.AppendLine();
+					resultSb.Append(currLine.FormattedText);
+				}
+				else
+				{
+					// 同一句话段内自动折行，平滑拼接
+					if (prevText.EndsWith("-") && IsAsciiWordChar(currFirstChar))
+					{
+						resultSb.Length--; // 移除行尾连字符
+						resultSb.Append(currLine.FormattedText);
+					}
+					else if (IsCjk(prevLastChar) && IsCjk(currFirstChar))
+					{
+						resultSb.Append(currLine.FormattedText);
+					}
+					else
+					{
+						resultSb.Append(' ');
+						resultSb.Append(currLine.FormattedText);
+					}
+				}
+			}
+			else
+			{
+				resultSb.AppendLine();
+				resultSb.Append(currLine.FormattedText);
+			}
+		}
+
+		return resultSb.ToString().TrimEnd();
+	}
+
+	private static string FormatLineWords(IReadOnlyList<OcrWord> words, OcrSettings config)
+	{
+		if (words.Count == 0) return "";
+		if (words.Count == 1) return words[0].Text?.Trim() ?? "";
+
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < words.Count; i++)
+		{
+			var curr = words[i];
+			string currText = curr.Text ?? "";
+			if (currText.Length == 0) continue;
+
+			if (i > 0)
+			{
+				var prev = words[i - 1];
+				string prevText = prev.Text ?? "";
+				double gap = curr.BoundingRect.X - (prev.BoundingRect.X + prev.BoundingRect.Width);
+				double charW = Math.Max(4.0, prev.BoundingRect.Height * 0.65);
+
+				// 1. 水平大间隙保留（表格列或对齐项目）
+				if (gap > charW * 2.2)
+				{
+					int spaces = Math.Min(8, Math.Max(2, (int)Math.Round(gap / charW)));
+					sb.Append(new string(' ', spaces));
+				}
+				else
+				{
+					char lastChar = prevText.Length > 0 ? prevText[^1] : ' ';
+					char firstChar = currText[0];
+
+					bool prevIsCjk = IsCjk(lastChar);
+					bool currIsCjk = IsCjk(firstChar);
+					bool prevIsPunct = IsFullWidthPunctuation(lastChar);
+					bool currIsPunct = IsFullWidthPunctuation(firstChar);
+
+					if (config.RemoveSpacesBetweenCjk && (prevIsCjk || prevIsPunct) && (currIsCjk || currIsPunct))
+					{
+						// 中文词间及全角标点间消除空格
+					}
+					else if (config.RemoveSpacesBetweenCjk && (prevIsCjk && IsHalfWidthPunctuation(firstChar) || IsHalfWidthPunctuation(lastChar) && currIsCjk))
+					{
+						// 汉字与半角标点贴合
+					}
+					else if ((IsAsciiWordChar(lastChar) && currIsCjk) || (prevIsCjk && IsAsciiWordChar(firstChar)))
+					{
+						// 中英文词界保留一个微空格
+						sb.Append(' ');
+					}
+					else if (!prevIsCjk && !currIsCjk)
+					{
+						// 英文/数字词间保留正常空格
+						sb.Append(' ');
+					}
+				}
+			}
+
+			sb.Append(currText);
+		}
+
+		return sb.ToString().Trim();
+	}
+
+	private static bool IsListOrBulletItem(string text)
+	{
+		if (string.IsNullOrWhiteSpace(text)) return false;
+		string t = text.TrimStart();
+		return Regex.IsMatch(t, @"^(\d+[\.\)、]|[\(（]\d+[\)）]|[•\-\*\+·]|[\u2460-\u2473]|[一二三四五六七八九十]+[、\.\)])");
+	}
+
+	private static bool IsCjk(char c)
+	{
+		return (c >= 0x4E00 && c <= 0x9FFF) ||
+		       (c >= 0x3400 && c <= 0x4DBF) ||
+		       (c >= 0x3040 && c <= 0x309F) ||
+		       (c >= 0x30A0 && c <= 0x30FF) ||
+		       (c >= 0xAC00 && c <= 0xD7AF);
+	}
+
+	private static bool IsFullWidthPunctuation(char c)
+	{
+		return "，。！？：；、（）【】《》“”‘’—…·「」『』〈〉".IndexOf(c) >= 0;
+	}
+
+	private static bool IsHalfWidthPunctuation(char c)
+	{
+		return ",.!:;?()[]{}<>\"'".IndexOf(c) >= 0;
+	}
+
+	private static bool IsAsciiWordChar(char c)
+	{
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 	}
 
 	private static string PostProcessText(string text, bool removeCjkSpaces)
@@ -365,8 +675,8 @@ public static class OcrManager
 		string res = text;
 		if (removeCjkSpaces)
 		{
-			// 移除中文字符之间的多余空格 (CJK unified ideographs)
-			res = Regex.Replace(res, @"(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])", "");
+			// 清除汉字与汉字、汉字与全角标点之间的多余空格
+			res = Regex.Replace(res, @"(?<=[\u4e00-\u9fa5，。！？：；、（）【】《》“”‘’])\s+(?=[\u4e00-\u9fa5，。！？：；、（）【】《》“”‘’])", "");
 		}
 		return res;
 	}

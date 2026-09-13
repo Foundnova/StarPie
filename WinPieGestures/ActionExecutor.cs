@@ -1868,6 +1868,17 @@ public static class ActionExecutor
 		case "windowssearch":
 			ExecuteHotkey("Win+S");
 			break;
+		case "quicksearch":
+		case "quickfinder":
+		case "everythingsearch":
+		case "everything":
+		case "文件秒搜":
+		case "快速秒搜":
+			Application.Current?.Dispatcher?.BeginInvoke((Action)delegate
+			{
+				QuickSearchWindow.ShowOrActivate();
+			});
+			break;
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
 			break;

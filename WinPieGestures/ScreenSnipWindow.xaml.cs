@@ -1,45 +1,105 @@
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using MouseEventArgs = System.Windows.Input.MouseEventArgs;
-using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 
 namespace WinPieGestures;
 
 public partial class ScreenSnipWindow : Window
 {
+	[DllImport("user32.dll")]
+	private static extern int GetSystemMetrics(int nIndex);
+
+	[DllImport("user32.dll", SetLastError = true)]
+	private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+	[DllImport("gdi32.dll")]
+	private static extern bool DeleteObject(IntPtr hObject);
+
+	private const int SM_XVIRTUALSCREEN = 76;
+	private const int SM_YVIRTUALSCREEN = 77;
+	private const int SM_CXVIRTUALSCREEN = 78;
+	private const int SM_CYVIRTUALSCREEN = 79;
+	private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+	private const uint SWP_NOACTIVATE = 0x0010;
+	private const uint SWP_NOZORDER = 0x0004;
+
 	private System.Windows.Point _startPoint;
 	private bool _isSelecting;
 	private readonly Action<Bitmap?> _onCaptured;
+	private Bitmap? _fullScreenBmp;
 
 	public ScreenSnipWindow(Action<Bitmap?> onCaptured)
 	{
 		InitializeComponent();
 		_onCaptured = onCaptured;
 
+		// 1. 获取真实多显示器全景物理边界
+		int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+		int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+		int vw = Math.Max(100, GetSystemMetrics(SM_CXVIRTUALSCREEN));
+		int vh = Math.Max(100, GetSystemMetrics(SM_CYVIRTUALSCREEN));
+
+		// 2. 瞬间冻结屏幕，抓取 24bpp 纯 RGB 全景物理快照（杜绝任何 Alpha 透明通道污染）
+		try
+		{
+			_fullScreenBmp = new Bitmap(vw, vh, PixelFormat.Format24bppRgb);
+			using (Graphics g = Graphics.FromImage(_fullScreenBmp))
+			{
+				g.CopyFromScreen(vx, vy, 0, 0, new System.Drawing.Size(vw, vh), CopyPixelOperation.SourceCopy);
+			}
+			BackgroundImage.Source = BitmapToBitmapSource(_fullScreenBmp);
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Failed to capture freeze full screen", ex);
+		}
+
+		// 3. WPF 逻辑尺寸对齐虚拟桌面
 		Left = SystemParameters.VirtualScreenLeft;
 		Top = SystemParameters.VirtualScreenTop;
 		Width = SystemParameters.VirtualScreenWidth;
 		Height = SystemParameters.VirtualScreenHeight;
+
+		SourceInitialized += (s, e) =>
+		{
+			IntPtr handle = new WindowInteropHelper(this).Handle;
+			if (handle != IntPtr.Zero)
+			{
+				SetWindowPos(handle, HWND_TOPMOST, vx, vy, vw, vh, SWP_NOACTIVATE | SWP_NOZORDER);
+			}
+		};
 	}
 
 	private void Window_Loaded(object sender, RoutedEventArgs e)
 	{
 		Focus();
 		CaptureMouse();
+		double w = Math.Max(1.0, ActualWidth);
+		double h = Math.Max(1.0, ActualHeight);
+		ScreenGeometry.Rect = new Rect(0, 0, w, h);
+		CutoutGeometry.Rect = Rect.Empty;
+		Canvas.SetLeft(GuideBadge, Math.Max(10, (w - 260) / 2));
 	}
 
-	private void Window_KeyDown(object sender, KeyEventArgs e)
+	private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
 		if (e.Key == Key.Escape)
 		{
 			ReleaseMouseCapture();
-			_onCaptured?.Invoke(null);
-			Close();
+			CleanupAndClose(null);
 		}
+	}
+
+	private void Window_MouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+	{
+		ReleaseMouseCapture();
+		CleanupAndClose(null);
 	}
 
 	private void Window_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -47,13 +107,15 @@ public partial class ScreenSnipWindow : Window
 		_startPoint = e.GetPosition(this);
 		_isSelecting = true;
 
-		SelectionRect.Visibility = Visibility.Visible;
+		SelectionBorder.Visibility = Visibility.Visible;
 		InfoBadge.Visibility = Visibility.Visible;
 
-		Canvas.SetLeft(SelectionRect, _startPoint.X);
-		Canvas.SetTop(SelectionRect, _startPoint.Y);
-		SelectionRect.Width = 0;
-		SelectionRect.Height = 0;
+		Canvas.SetLeft(SelectionBorder, _startPoint.X);
+		Canvas.SetTop(SelectionBorder, _startPoint.Y);
+		SelectionBorder.Width = 0;
+		SelectionBorder.Height = 0;
+
+		CutoutGeometry.Rect = new Rect(_startPoint.X, _startPoint.Y, 0, 0);
 	}
 
 	private void Window_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
@@ -69,10 +131,12 @@ public partial class ScreenSnipWindow : Window
 		double w = Math.Abs(currentPoint.X - _startPoint.X);
 		double h = Math.Abs(currentPoint.Y - _startPoint.Y);
 
-		Canvas.SetLeft(SelectionRect, x);
-		Canvas.SetTop(SelectionRect, y);
-		SelectionRect.Width = w;
-		SelectionRect.Height = h;
+		CutoutGeometry.Rect = new Rect(x, y, w, h);
+
+		Canvas.SetLeft(SelectionBorder, x);
+		Canvas.SetTop(SelectionBorder, y);
+		SelectionBorder.Width = w;
+		SelectionBorder.Height = h;
 
 		SizeTextBlock.Text = $"{(int)w} × {(int)h}";
 		Canvas.SetLeft(InfoBadge, Math.Max(10, x));
@@ -94,36 +158,79 @@ public partial class ScreenSnipWindow : Window
 		double w = Math.Abs(endPoint.X - _startPoint.X);
 		double h = Math.Abs(endPoint.Y - _startPoint.Y);
 
-		Close();
+		Bitmap? capturedSnippet = null;
 
-		if (w > 5 && h > 5)
+		if (w > 5 && h > 5 && _fullScreenBmp != null)
 		{
 			try
 			{
-				// 换算绝对屏幕坐标与 DPI
-				PresentationSource source = PresentationSource.FromVisual(this);
-				double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
-				double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+				double actualW = Math.Max(1.0, ActualWidth);
+				double actualH = Math.Max(1.0, ActualHeight);
 
-				int physLeft = (int)Math.Round((Left + x) * dpiX);
-				int physTop = (int)Math.Round((Top + y) * dpiY);
-				int physWidth = (int)Math.Round(w * dpiX);
-				int physHeight = (int)Math.Round(h * dpiY);
+				// 1:1 精确投影缩放比 (无论何种 DPI 缩放、单双屏分辨率均 100% 精确映射到物理大图)
+				double ratioX = (double)_fullScreenBmp.Width / actualW;
+				double ratioY = (double)_fullScreenBmp.Height / actualH;
 
-				Bitmap bmp = new Bitmap(physWidth, physHeight);
-				using (Graphics g = Graphics.FromImage(bmp))
+				int cropX = (int)Math.Round(x * ratioX);
+				int cropY = (int)Math.Round(y * ratioY);
+				int cropW = (int)Math.Round(w * ratioX);
+				int cropH = (int)Math.Round(h * ratioY);
+
+				// 边界安全钳位
+				cropX = Math.Clamp(cropX, 0, _fullScreenBmp.Width - 1);
+				cropY = Math.Clamp(cropY, 0, _fullScreenBmp.Height - 1);
+				cropW = Math.Clamp(cropW, 1, _fullScreenBmp.Width - cropX);
+				cropH = Math.Clamp(cropH, 1, _fullScreenBmp.Height - cropY);
+
+				if (cropW > 3 && cropH > 3)
 				{
-					g.CopyFromScreen(physLeft, physTop, 0, 0, new System.Drawing.Size(physWidth, physHeight), CopyPixelOperation.SourceCopy);
+					// 直接从纯净全景物理快照中裁出选区，零位移、零残影、零透明通道黑化
+					capturedSnippet = _fullScreenBmp.Clone(
+						new System.Drawing.Rectangle(cropX, cropY, cropW, cropH),
+						PixelFormat.Format24bppRgb);
 				}
-				_onCaptured?.Invoke(bmp);
-				return;
 			}
 			catch (Exception ex)
 			{
-				AppLogger.LogError("Failed to capture snippet rectangle", ex);
+				AppLogger.LogError("Failed to crop snippet rectangle", ex);
 			}
 		}
 
-		_onCaptured?.Invoke(null);
+		CleanupAndClose(capturedSnippet);
+	}
+
+	private void CleanupAndClose(Bitmap? result)
+	{
+		try
+		{
+			_fullScreenBmp?.Dispose();
+			_fullScreenBmp = null;
+		}
+		catch
+		{
+		}
+
+		Close();
+		_onCaptured?.Invoke(result);
+	}
+
+	private static BitmapSource BitmapToBitmapSource(Bitmap bitmap)
+	{
+		IntPtr hBitmap = bitmap.GetHbitmap();
+		try
+		{
+			BitmapSource source = Imaging.CreateBitmapSourceFromHBitmap(
+				hBitmap,
+				IntPtr.Zero,
+				Int32Rect.Empty,
+				BitmapSizeOptions.FromEmptyOptions());
+			source.Freeze();
+			return source;
+		}
+		finally
+		{
+			DeleteObject(hBitmap);
+		}
 	}
 }
+

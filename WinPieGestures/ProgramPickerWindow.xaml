@@ -65,7 +65,14 @@
         <TextBlock Text="🔍" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0" IsHitTestVisible="False" />
         <TextBlock Name="SearchPlaceholderText" Text="搜索软件名称、微软商店应用、拼音首字母(如jsb/jsq)..." FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.6" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="30,0,0,0" IsHitTestVisible="False" />
       </Grid>
-      <Button Name="RefreshButton" Grid.Column="1" Content="🔄 刷新" Style="{StaticResource PickerBtn}" Height="34" Padding="12,0" ToolTip="重新扫描系统已安装的软件、微软商店与开始菜单" Click="RefreshButton_Click" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <Border Name="EverythingStatusChip" VerticalAlignment="Center" CornerRadius="6" Background="#183B82F6" BorderBrush="#503B82F6" BorderThickness="1" Padding="8,5" Margin="0,0,8,0" Cursor="Hand" ToolTip="已接入 Everything 极速穿透，支持全盘毫秒级搜索任意绿色免安装程序" MouseLeftButtonDown="EverythingStatusChip_Click">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Name="EverythingStatusText" Text="⚡ Everything 穿透" FontSize="11" FontWeight="SemiBold" Foreground="#3B82F6" />
+          </StackPanel>
+        </Border>
+        <Button Name="RefreshButton" Content="🔄 刷新" Style="{StaticResource PickerBtn}" Height="34" Padding="12,0" ToolTip="重新扫描系统已安装的软件、微软商店与开始菜单" Click="RefreshButton_Click" />
+      </StackPanel>
     </Grid>
     <Border Grid.Row="2" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8">
       <ListView Name="ProgramsListView" BorderThickness="0" Background="#00FFFFFF" SelectionMode="Single" MouseDoubleClick="ProgramsListView_MouseDoubleClick">

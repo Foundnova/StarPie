@@ -48,6 +48,7 @@ public partial class ProgramPickerWindow : Window
 			"WinStore" => "微软商店", 
 			"MSIX" => "MSIX应用", 
 			"System" => "系统内置", 
+			"Portable" => "绿色便携", 
 			_ => "桌面应用", 
 		};
 
@@ -56,6 +57,7 @@ public partial class ProgramPickerWindow : Window
 			"WinStore" => "#186366F1", 
 			"MSIX" => "#188B5CF6", 
 			"System" => "#180EA5E9", 
+			"Portable" => "#18F97316", 
 			_ => "#1464748B", 
 		};
 
@@ -64,6 +66,7 @@ public partial class ProgramPickerWindow : Window
 			"WinStore" => "#6366F1", 
 			"MSIX" => "#8B5CF6", 
 			"System" => "#0284C7", 
+			"Portable" => "#F97316", 
 			_ => "#64748B", 
 		};
 	}
@@ -142,7 +145,45 @@ public partial class ProgramPickerWindow : Window
 
 	private async void Window_Loaded(object sender, RoutedEventArgs e)
 	{
+		UpdateEverythingStatus();
 		await LoadProgramsAsync(forceRescan: false);
+	}
+
+	private void UpdateEverythingStatus()
+	{
+		if (EverythingStatusChip == null || EverythingStatusText == null) return;
+		bool isRunning = EverythingService.IsEverythingRunning();
+		if (isRunning)
+		{
+			EverythingStatusText.Text = "⚡ Everything 穿透 (已连接)";
+			EverythingStatusText.Foreground = (Brush)new BrushConverter().ConvertFrom("#10B981")!;
+			EverythingStatusChip.Background = (Brush)new BrushConverter().ConvertFrom("#1810B981")!;
+			EverythingStatusChip.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#6010B981")!;
+			EverythingStatusChip.ToolTip = "Everything 极速索引引擎已正常连接，输入关键词将自动穿透全盘搜索免安装绿色程序";
+		}
+		else
+		{
+			EverythingStatusText.Text = "⚡ Everything (未运行)";
+			EverythingStatusText.Foreground = (Brush)new BrushConverter().ConvertFrom("#F59E0B")!;
+			EverythingStatusChip.Background = (Brush)new BrushConverter().ConvertFrom("#18F59E0B")!;
+			EverythingStatusChip.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#60F59E0B")!;
+			EverythingStatusChip.ToolTip = "未检测到 Everything 服务正在运行。点击可尝试自动启动以解锁全盘免安装软件极速检索";
+		}
+	}
+
+	private void EverythingStatusChip_Click(object sender, MouseButtonEventArgs e)
+	{
+		if (!EverythingService.IsEverythingRunning())
+		{
+			if (EverythingService.TryLaunchEverything())
+		{
+				Task.Delay(1000).ContinueWith(_ => Dispatcher.Invoke(UpdateEverythingStatus));
+			}
+			else
+			{
+				MessageBox.Show(this, "未在常见安装路径检测到 Everything.exe。\n\n如需全盘毫秒级秒搜绿色免安装软件，建议安装并启动 Everything 软件 (https://www.voidtools.com)。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+			}
+		}
 	}
 
 	private async Task LoadProgramsAsync(bool forceRescan)
@@ -710,13 +751,48 @@ public partial class ProgramPickerWindow : Window
 				} into x
 				where x.Score > 0.0
 				orderby x.Score descending
-				select x.Item).Take(150).ToList(), cts.Token);
+				select x.Item).Take(100).ToList(), cts.Token);
 			if (cts.Token.IsCancellationRequested)
 			{
 				return;
 			}
+
+			// 如果输入了关键词，通过 Everything 全盘穿透搜索免安装绿色程序 (.exe)
+			List<ProgramItem> portableMatches = new List<ProgramItem>();
+			string queryTrimmed = text.Trim();
+			if (!string.IsNullOrEmpty(queryTrimmed) && queryTrimmed.Length >= 2)
+			{
+				var everythingItems = await EverythingService.SearchExecutablesAsync(queryTrimmed, 50);
+				if (cts.Token.IsCancellationRequested) return;
+
+				var existingPaths = new HashSet<string>(list.Select(m => m.Path), StringComparer.OrdinalIgnoreCase);
+				foreach (var ev in everythingItems)
+				{
+					if (existingPaths.Contains(ev.FullPath)) continue;
+					existingPaths.Add(ev.FullPath);
+
+					portableMatches.Add(new ProgramItem
+					{
+						Name = Path.GetFileNameWithoutExtension(ev.FileName),
+						Path = ev.FullPath,
+						FriendlyPath = ev.FullPath,
+						ExeName = Path.GetFileNameWithoutExtension(ev.FileName),
+						AppType = "Portable",
+						Pinyin = PinyinHelper.GetFullPinyin(ev.FileName),
+						PinyinInitials = PinyinHelper.GetInitials(ev.FileName),
+						IconSource = IconHelper.GetIcon(ev.FullPath)
+					});
+				}
+			}
+
+			if (cts.Token.IsCancellationRequested) return;
+
 			_displayedPrograms.Clear();
 			foreach (ProgramItem item in list)
+			{
+				_displayedPrograms.Add(item);
+			}
+			foreach (ProgramItem item in portableMatches)
 			{
 				_displayedPrograms.Add(item);
 			}
