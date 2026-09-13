@@ -77,4 +77,18 @@ public partial class OcrResultWindow : Window
 	{
 		OcrManager.ShowSettingsDialog();
 	}
+
+	protected override void OnClosed(EventArgs e)
+	{
+		base.OnClosed(e);
+		_ = System.Threading.Tasks.Task.Run(async () =>
+		{
+			try
+			{
+				await System.Threading.Tasks.Task.Delay(5000).ConfigureAwait(false);
+				MemoryOptimizer.TrimMemory(force: false);
+			}
+			catch { }
+		});
+	}
 }

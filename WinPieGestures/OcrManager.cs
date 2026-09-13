@@ -159,6 +159,19 @@ public static class OcrManager
 				{
 				}
 			}
+
+			if (!config.ShowResultWindow)
+			{
+				_ = Task.Run(async () =>
+				{
+					try
+					{
+						await Task.Delay(5000).ConfigureAwait(false);
+						MemoryOptimizer.TrimMemory(force: false);
+					}
+					catch { }
+				});
+			}
 		});
 	}
 

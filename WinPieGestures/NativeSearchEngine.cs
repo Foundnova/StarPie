@@ -473,6 +473,20 @@ public static class NativeSearchEngine
 	}
 
 	/// <summary>
+	/// 清空搜索引擎静态缓存（在搜索窗口关闭或长时间闲置后调用，归还内存）
+	/// </summary>
+	public static void ClearCaches()
+	{
+		lock (_initLock)
+		{
+			_cachedApps.Clear();
+			_cachedApps.TrimExcess();
+			_isInitialized = false;
+			_lastCacheTime = DateTime.MinValue;
+		}
+	}
+
+	/// <summary>
 	/// 内置原生多线程广度优先全盘极速检索
 	/// </summary>
 	public static Task<List<EverythingService.SearchResultItem>> SearchAsync(string query, string category = "All", int maxResults = 80, CancellationToken token = default)
@@ -517,7 +531,7 @@ public static class NativeSearchEngine
 				return results;
 			}
 
-			// 第二层：并发深盘广度优先穿透检索（重点是深度）
+			// 第二层：并发深盘广度优先穿透检索（重点是深度与流式轻量化）
 			var searchRoots = new List<string>();
 			AddDirIfValid(searchRoots, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
 			AddDirIfValid(searchRoots, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
@@ -565,36 +579,78 @@ public static class NativeSearchEngine
 
 					try
 					{
-						var dirInfo = new DirectoryInfo(curDir);
-						foreach (var entry in dirInfo.EnumerateFileSystemInfos())
+						// 流式字符串枚举：彻底摒弃 EnumerateFileSystemInfos 产生上百万 FileInfo/DirectoryInfo 导致堆段爆炸的缺陷
+						foreach (string fullPath in Directory.EnumerateFileSystemEntries(curDir))
 						{
 							if (token.IsCancellationRequested) break;
+							lock (syncLock)
+							{
+								if (results.Count >= maxResults) break;
+							}
 
-							bool isFolder = entry is DirectoryInfo;
-							string ext = isFolder ? "" : entry.Extension.ToLowerInvariant();
+							string name = Path.GetFileName(fullPath);
+							if (string.IsNullOrEmpty(name) || name.StartsWith("."))
+							{
+								continue;
+							}
+
+							// 快速判断目录：通过轻量级 FileAttributes，避免实例化庞大对象
+							FileAttributes attr;
+							try
+							{
+								attr = File.GetAttributes(fullPath);
+							}
+							catch
+							{
+								continue;
+							}
+
+							if (attr.HasFlag(FileAttributes.Hidden))
+							{
+								continue;
+							}
+
+							bool isFolder = attr.HasFlag(FileAttributes.Directory);
+							string ext = isFolder ? "" : Path.GetExtension(name).ToLowerInvariant();
 
 							// 匹配关键词
-							if (entry.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+							if (name.Contains(q, StringComparison.OrdinalIgnoreCase))
 							{
-								var (cat, catDisplay, badgeBg, badgeFg, emoji) = ClassifyEntry(entry.FullName, isFolder, ext);
+								var (cat, catDisplay, badgeBg, badgeFg, emoji) = ClassifyEntry(fullPath, isFolder, ext);
 
 								// 分类过滤
 								if (category == "All" || cat.Equals(category, StringComparison.OrdinalIgnoreCase))
 								{
 									lock (syncLock)
 									{
-										if (seenPaths.Add(entry.FullName))
+										if (seenPaths.Add(fullPath))
 										{
-											long size = isFolder ? 0 : ((FileInfo)entry).Length;
+											long size = 0;
+											DateTime dateModified = DateTime.MinValue;
+											try
+											{
+												if (!isFolder)
+												{
+													var fi = new FileInfo(fullPath);
+													size = fi.Length;
+													dateModified = fi.LastWriteTime;
+												}
+												else
+												{
+													dateModified = Directory.GetLastWriteTime(fullPath);
+												}
+											}
+											catch { }
+
 											results.Add(new EverythingService.SearchResultItem
 											{
-												FullPath = entry.FullName,
-												FileName = entry.Name,
+												FullPath = fullPath,
+												FileName = name,
 												Extension = ext,
 												Size = size,
 												SizeFormatted = isFolder ? "" : FormatFileSize(size),
-												DateModified = entry.LastWriteTime,
-												DateFormatted = entry.LastWriteTime.ToString("yyyy-MM-dd"),
+												DateModified = dateModified,
+												DateFormatted = dateModified != DateTime.MinValue ? dateModified.ToString("yyyy-MM-dd") : "",
 												IsFolder = isFolder,
 												Category = cat,
 												CategoryDisplay = catDisplay,
@@ -613,9 +669,9 @@ public static class NativeSearchEngine
 							// 子目录入队：支持深层 15 层递归，过滤无关庞大垃圾缓存
 							if (isFolder && depth < maxDepth)
 							{
-								if (!s_ignoredDirs.Contains(entry.Name) && !entry.Attributes.HasFlag(FileAttributes.Hidden))
+								if (!s_ignoredDirs.Contains(name))
 								{
-									queue.Enqueue((entry.FullName, depth + 1));
+									queue.Enqueue((fullPath, depth + 1));
 								}
 							}
 						}

@@ -203,8 +203,10 @@ public partial class ScreenSnipWindow : Window
 	{
 		try
 		{
+			BackgroundImage.Source = null;
 			_fullScreenBmp?.Dispose();
 			_fullScreenBmp = null;
+			CutoutGeometry.Rect = Rect.Empty;
 		}
 		catch
 		{

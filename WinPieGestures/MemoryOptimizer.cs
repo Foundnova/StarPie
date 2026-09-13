@@ -32,8 +32,9 @@ public static class MemoryOptimizer
 				if (force)
 				{
 					// 用户在设置中手动点击【立即压缩物理内存】时才执行深度工作集剥离
-					GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+					GC.Collect(2, GCCollectionMode.Forced, blocking: true);
 					GC.WaitForPendingFinalizers();
+					GC.Collect(2, GCCollectionMode.Forced, blocking: true);
 					if (Environment.OSVersion.Platform == PlatformID.Win32NT)
 					{
 						nint handle = Process.GetCurrentProcess().Handle;
@@ -43,8 +44,10 @@ public static class MemoryOptimizer
 				}
 				else
 				{
-					// 日常关闭隐藏或后台驻留采用非阻塞温和回收，保留热代码在 RAM 中，杜绝唤出硬缺页顿卡
-					GC.Collect(0, GCCollectionMode.Optimized, blocking: false);
+					// 日常关闭隐藏或后台驻留采用非阻塞温和回收 Gen 0, 1, 2 及大对象堆 LOH，
+					// 释放位图与数据堆内存，同时保留热代码在 RAM 中，杜绝唤出硬缺页顿卡
+					GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
+					GC.WaitForPendingFinalizers();
 				}
 			}
 			catch (Exception)

@@ -108,17 +108,34 @@ public partial class App : Application
 			}
 			if (!createdNew)
 			{
+				bool hasHandle = false;
 				try
 				{
-					using EventWaitHandle eventWaitHandle = EventWaitHandle.OpenExisting(WakeEventName);
-					eventWaitHandle.Set();
+					hasHandle = _singleInstanceMutex.WaitOne(150, false);
+				}
+				catch (AbandonedMutexException)
+				{
+					// 前一进程非正常终止并遗弃了互斥体，当前实例顺利接管所有权
+					hasHandle = true;
 				}
 				catch
 				{
 				}
-				_isDuplicateInstance = true;
-				Shutdown(0);
-				return;
+
+				if (!hasHandle)
+				{
+					try
+					{
+						using EventWaitHandle eventWaitHandle = EventWaitHandle.OpenExisting(WakeEventName);
+						eventWaitHandle.Set();
+					}
+					catch
+					{
+					}
+					_isDuplicateInstance = true;
+					Shutdown(0);
+					return;
+				}
 			}
 			try
 			{

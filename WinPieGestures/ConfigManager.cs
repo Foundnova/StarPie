@@ -121,6 +121,7 @@ public static class ConfigManager
 				AppLogger.LogInfo($"Created and saved default configuration at '{ConfigPath}'");
 			}
 			I18n.SetLanguage(CurrentConfig.Language);
+			IconHelper.PinIconsForConfig(CurrentConfig);
 			MarkConfigurationChanged();
 			EnsureConfigsFolder();
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
@@ -383,6 +384,7 @@ public static class ConfigManager
 				AppLogger.LogError("Failed to mirror save profile config", exSync);
 			}
 
+			IconHelper.PinIconsForConfig(CurrentConfig);
 			return true;
 		}
 		catch (Exception ex)

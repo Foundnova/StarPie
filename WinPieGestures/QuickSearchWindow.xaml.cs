@@ -18,6 +18,8 @@ public partial class QuickSearchWindow : Window
 	private string _currentCategory = "All";
 	private DispatcherTimer? _debounceTimer;
 	private DispatcherTimer? _feedbackTimer;
+	private DispatcherTimer? _idleCleanupTimer;
+	private int _idleStep;
 	private CancellationTokenSource? _searchCts;
 	private bool _isContextMenuOpen;
 	private bool _isPinned;
@@ -44,6 +46,76 @@ public partial class QuickSearchWindow : Window
 			ActionFeedbackBanner.Visibility = Visibility.Collapsed;
 			_feedbackTimer.Stop();
 		};
+
+		IsVisibleChanged += (s, e) =>
+		{
+			if (IsVisible)
+			{
+				_idleCleanupTimer?.Stop();
+				_idleStep = 0;
+			}
+			else
+			{
+				StartIdleCleanup();
+			}
+		};
+	}
+
+	private void StartIdleCleanup()
+	{
+		_searchCts?.Cancel();
+		_idleStep = 0;
+		if (_idleCleanupTimer == null)
+		{
+			_idleCleanupTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+			_idleCleanupTimer.Tick += IdleCleanupTimer_Tick;
+		}
+		_idleCleanupTimer.Stop();
+		_idleCleanupTimer.Start();
+	}
+
+	private void IdleCleanupTimer_Tick(object? sender, EventArgs e)
+	{
+		if (IsVisible)
+		{
+			_idleCleanupTimer?.Stop();
+			return;
+		}
+
+		_idleStep++;
+		if (_idleStep == 1)
+		{
+			// 隐藏 10 秒后：释放 WPF 结果列表视觉树与数据绑定
+			ResultsListBox.ItemsSource = null;
+		}
+		else if (_idleStep >= 3)
+		{
+			// 隐藏 30 秒后：完全销毁窗口实例并释放搜索引擎及动态图标缓存
+			_idleCleanupTimer?.Stop();
+			try
+			{
+				Close();
+			}
+			catch { }
+			_instance = null;
+			NativeSearchEngine.ClearCaches();
+			IconHelper.TrimDynamicCache();
+			MemoryOptimizer.TrimMemory(force: false);
+		}
+	}
+
+	protected override void OnClosed(EventArgs e)
+	{
+		base.OnClosed(e);
+		_idleCleanupTimer?.Stop();
+		_debounceTimer?.Stop();
+		_feedbackTimer?.Stop();
+		_searchCts?.Cancel();
+		ResultsListBox.ItemsSource = null;
+		if (ReferenceEquals(_instance, this))
+		{
+			_instance = null;
+		}
 	}
 
 	public static void ShowOrActivate(Point? triggerPoint = null)
@@ -357,6 +429,7 @@ public partial class QuickSearchWindow : Window
 	private void CloseButton_Click(object sender, RoutedEventArgs e)
 	{
 		Hide();
+		ResultsListBox.ItemsSource = null;
 	}
 
 	private void FilterChip_Click(object sender, RoutedEventArgs e)

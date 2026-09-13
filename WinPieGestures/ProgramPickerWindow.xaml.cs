@@ -972,4 +972,15 @@ public partial class ProgramPickerWindow : Window
 			return null;
 		}
 	}
+
+	protected override void OnClosed(EventArgs e)
+	{
+		base.OnClosed(e);
+		_searchCts?.Cancel();
+		_allPrograms.Clear();
+		_displayedPrograms.Clear();
+		ProgramsListView.ItemsSource = null;
+		IconHelper.TrimDynamicCache();
+		MemoryOptimizer.TrimMemory(force: false);
+	}
 }
