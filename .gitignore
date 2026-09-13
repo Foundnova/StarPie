@@ -13,6 +13,7 @@
 *.dll
 *.pdb
 *.zip
+!WinPieGestures/Everything64.dll
 releases/**/bin/
 releases/**/StarPie-*-Standalone-*/
 releases/**/StarPie-*-Lightweight/
