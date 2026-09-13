@@ -1860,34 +1860,37 @@ public partial class RadialWindow : Window
 					break;
 				}
 
-				// 文字长度与语言弹性自适应 (Auto Font-Fit)
-				int charLen = text2.Length;
-				bool isPureAscii = text2.All(c => c < 128);
+				// 扇区过长文字自适应智能两行排版 (Smart Two-Line Formatting)
+				string formattedSectorText = SectorTextFormatter.FormatSectorText(text2, sectorCount);
+				string[] sectorLines = formattedSectorText.Split('\n');
+				double maxLineWeight = sectorLines.Max(l => SectorTextFormatter.MeasureVisualWeight(l));
+				int maxLineLen = sectorLines.Max(l => l.Length);
+				bool isPureAscii = formattedSectorText.All(c => c < 128);
 				if (sectorCount == 12)
 				{
-					if (charLen > 8 || (isPureAscii && charLen > 7))
+					if (maxLineWeight > 8.0 || (isPureAscii && maxLineLen > 7))
 					{
 						num13 = Math.Max(7.5, num13 * 0.82);
 					}
-					else if (charLen > 5)
+					else if (maxLineWeight > 5.0)
 					{
 						num13 = Math.Max(8.2, num13 * 0.90);
 					}
 				}
 				else if (sectorCount == 8)
 				{
-					if (charLen > 12 || (isPureAscii && charLen > 10))
+					if (maxLineWeight > 12.0 || (isPureAscii && maxLineLen > 10))
 					{
 						num13 = Math.Max(8.5, num13 * 0.85);
 					}
-					else if (charLen > 7)
+					else if (maxLineWeight > 8.0)
 					{
 						num13 = Math.Max(9.2, num13 * 0.92);
 					}
 				}
 				else // 4 键
 				{
-					if (charLen > 14)
+					if (maxLineWeight > 16.0)
 					{
 						num13 = Math.Max(10.0, num13 * 0.88);
 					}
@@ -1896,15 +1899,15 @@ public partial class RadialWindow : Window
 				double maxWidth = sectorCount switch
 				{
 					4 => 128.0, 
-					12 => 68.0, 
-					_ => 102.0, 
+					12 => 66.0, 
+					_ => 96.0, 
 				};
 				string sectorFont = (currentAction != null && !string.IsNullOrWhiteSpace(currentAction.CustomFontFamily))
 					? currentAction.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 				textElement = new TextBlock
 				{
-					Text = text2,
+					Text = formattedSectorText,
 					Foreground = sectorTextColorBrush,
 					FontSize = num13,
 					FontFamily = new FontFamily(sectorFont),
@@ -2430,15 +2433,18 @@ public partial class RadialWindow : Window
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 				double subFinalFontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize;
-				int subCharLen = text2.Length;
-				bool subAsciiOnly = text2.All(c => c < 128);
-				if (subCharLen > 8 || (subAsciiOnly && subCharLen > 7))
+				string subFormattedText = SectorTextFormatter.FormatSectorText(text2, sectorCount, isSubWheel: true);
+				string[] subLines = subFormattedText.Split('\n');
+				double subMaxWeight = subLines.Max(l => SectorTextFormatter.MeasureVisualWeight(l));
+				int subMaxLen = subLines.Max(l => l.Length);
+				bool subAsciiOnly = subFormattedText.All(c => c < 128);
+				if (subMaxWeight > 8.0 || (subAsciiOnly && subMaxLen > 7))
 				{
 					subFinalFontSize = Math.Max(7.5, subFinalFontSize * 0.85);
 				}
 				subTextElement = new TextBlock
 				{
-					Text = text2,
+					Text = subFormattedText,
 					Foreground = subTextColor,
 					FontSize = subFinalFontSize,
 					FontFamily = new FontFamily(subFontFamily),
@@ -3472,15 +3478,18 @@ public partial class RadialWindow : Window
 					? actionItem2.CustomFontFamily
 					: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 				double honeyFinalFontSize = (subLayout == "TextOnly") ? (subFontSize + 1.0) : subFontSize;
-				int honeyCharLen = text2.Length;
-				bool honeyAsciiOnly = text2.All(c => c < 128);
-				if (honeyCharLen > 8 || (honeyAsciiOnly && honeyCharLen > 7))
+				string honeyFormattedText = SectorTextFormatter.FormatSectorText(text2, sectorCount, isSubWheel: true);
+				string[] honeyLines = honeyFormattedText.Split('\n');
+				double honeyMaxWeight = honeyLines.Max(l => SectorTextFormatter.MeasureVisualWeight(l));
+				int honeyMaxLen = honeyLines.Max(l => l.Length);
+				bool honeyAsciiOnly = honeyFormattedText.All(c => c < 128);
+				if (honeyMaxWeight > 8.0 || (honeyAsciiOnly && honeyMaxLen > 7))
 				{
 					honeyFinalFontSize = Math.Max(7.5, honeyFinalFontSize * 0.85);
 				}
 				textBlock = new TextBlock
 				{
-					Text = text2,
+					Text = honeyFormattedText,
 					Foreground = subTextColor,
 					FontSize = honeyFinalFontSize,
 					FontFamily = new FontFamily(subFontFamily),

@@ -15641,33 +15641,36 @@ public partial class SettingsWindow : Window
 						_ => 1.0, 
 					};
 					double val2 = ((sectorLayout == "TextOnly") ? (baseFontSize + 1.2) : baseFontSize) * 0.82 * num32 * (num7 / (135.0 / num5));
-					int previewCharLen = text8.Length;
-					bool previewIsPureAscii = text8.All(c => c < 128);
+					string previewText = SectorTextFormatter.FormatSectorText(text8, num19);
+					string[] previewLines = previewText.Split('\n');
+					double previewMaxWeight = previewLines.Max(l => SectorTextFormatter.MeasureVisualWeight(l));
+					int previewMaxLen = previewLines.Max(l => l.Length);
+					bool previewIsPureAscii = previewText.All(c => c < 128);
 					if (num19 == 12)
 					{
-						if (previewCharLen > 8 || (previewIsPureAscii && previewCharLen > 7))
+						if (previewMaxWeight > 8.0 || (previewIsPureAscii && previewMaxLen > 7))
 						{
 							val2 = Math.Max(5.5, val2 * 0.82);
 						}
-						else if (previewCharLen > 5)
+						else if (previewMaxWeight > 5.0)
 						{
 							val2 = Math.Max(6.0, val2 * 0.90);
 						}
 					}
 					else if (num19 == 8)
 					{
-						if (previewCharLen > 12 || (previewIsPureAscii && previewCharLen > 10))
+						if (previewMaxWeight > 12.0 || (previewIsPureAscii && previewMaxLen > 10))
 						{
 							val2 = Math.Max(6.2, val2 * 0.85);
 						}
-						else if (previewCharLen > 7)
+						else if (previewMaxWeight > 8.0)
 						{
 							val2 = Math.Max(6.8, val2 * 0.92);
 						}
 					}
 					else
 					{
-						if (previewCharLen > 14)
+						if (previewMaxWeight > 16.0)
 						{
 							val2 = Math.Max(7.5, val2 * 0.88);
 						}
@@ -15684,14 +15687,17 @@ public partial class SettingsWindow : Window
 						: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 					textElement = new TextBlock
 					{
-						Text = text8,
+						Text = previewText,
 						FontSize = Math.Max(5.5, val2),
 						FontFamily = new System.Windows.Media.FontFamily(sectorFont),
 						Foreground = sectorPreviewTextBrush,
 						FontWeight = (sectorLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Medium,
 						HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
 						TextAlignment = TextAlignment.Center,
+						TextWrapping = TextWrapping.Wrap,
 						TextTrimming = TextTrimming.CharacterEllipsis,
+						LineHeight = Math.Max(7.0, val2 * 1.15),
+						LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
 						MaxWidth = maxWidth
 					};
 				}
@@ -16026,25 +16032,31 @@ public partial class SettingsWindow : Window
 							: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
 						double subFontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.75 * num7);
 						int subCharLen = actionItem2.Name.Length;
-						if (subCharLen > 8)
+						string subPreviewText = SectorTextFormatter.FormatSectorText(actionItem2.Name, num19, isSubWheel: true);
+						string[] subPreviewLines = subPreviewText.Split('\n');
+						double subPreviewMaxWeight = subPreviewLines.Max(l => SectorTextFormatter.MeasureVisualWeight(l));
+						if (subPreviewMaxWeight > 8.0)
 						{
 							subFontSize = Math.Max(4.2, subFontSize * 0.85);
 						}
-						else if (subCharLen > 5)
+						else if (subPreviewMaxWeight > 5.0)
 						{
 							subFontSize = Math.Max(4.6, subFontSize * 0.92);
 						}
 
 						TextBlock element8 = new TextBlock
 						{
-							Text = actionItem2.Name,
+							Text = subPreviewText,
 							FontSize = subFontSize,
 							FontFamily = new FontFamily(subFontFamily),
 							Foreground = subSectorPreviewTextBrush,
 							FontWeight = (subLayout == "TextOnly") ? FontWeights.SemiBold : FontWeights.Normal,
 							HorizontalAlignment = HorizontalAlignment.Center,
 							TextAlignment = TextAlignment.Center,
+							TextWrapping = TextWrapping.Wrap,
 							TextTrimming = TextTrimming.CharacterEllipsis,
+							LineHeight = Math.Max(5.5, subFontSize * 1.15),
+							LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
 							MaxWidth = 64.0 * num7
 						};
 						stackPanel2.Children.Add(element8);
