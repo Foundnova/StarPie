@@ -415,6 +415,8 @@ This project is led by the developer for architecture design, interaction logic 
 
 ---
 
-## <a id="license"></a>📄 License
+## <a id="license"></a>📄 License & Usage Terms
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License (with Non-Commercial Restriction)](LICENSE):
+- **Personal & Non-Commercial Use**: Completely free for personal, educational, research, and non-commercial daily office workflows. Contributions, feature requests, and personal customizations are welcome.
+- **Commercial Restrictions**: Without explicit prior written permission from the copyright owner (SoftBlack42), any commercial sale, paid repackaging/distribution on marketplaces, or embedding into proprietary closed-source commercial software is strictly prohibited. For commercial licensing, please contact the author.
