@@ -531,7 +531,85 @@ public static class NativeSearchEngine
 				return results;
 			}
 
-			// 第二层：并发深盘广度优先穿透检索（重点是深度与流式轻量化）
+			// 第二层（高频热点极速扫描）：桌面、下载、文档与常用工程极速优先扫描 (通常仅需 3-10ms)
+			var priorityDirs = new List<string>();
+			AddDirIfValid(priorityDirs, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+			AddDirIfValid(priorityDirs, Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));
+			AddDirIfValid(priorityDirs, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
+			AddDirIfValid(priorityDirs, Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+			AddDirIfValid(priorityDirs, @"G:\Users\2 Better\Desktop\design");
+
+			foreach (var pDir in priorityDirs)
+			{
+				if (token.IsCancellationRequested || results.Count >= maxResults) break;
+				if (!Directory.Exists(pDir)) continue;
+
+				try
+				{
+					foreach (var entry in Directory.EnumerateFileSystemEntries(pDir))
+					{
+						if (token.IsCancellationRequested || results.Count >= maxResults) break;
+						string name = Path.GetFileName(entry);
+						if (string.IsNullOrEmpty(name) || name.StartsWith(".")) continue;
+
+						if (name.Contains(q, StringComparison.OrdinalIgnoreCase))
+						{
+							bool isDir = Directory.Exists(entry);
+							string ext = isDir ? "" : Path.GetExtension(entry).ToLowerInvariant();
+							var (cat, catDisplay, badgeBg, badgeFg, emoji) = ClassifyEntry(entry, isDir, ext);
+
+							if (category == "All" || cat.Equals(category, StringComparison.OrdinalIgnoreCase))
+							{
+								if (seenPaths.Add(entry))
+								{
+									long size = 0;
+									DateTime dateModified = DateTime.MinValue;
+									try
+									{
+										if (!isDir)
+										{
+											var fi = new FileInfo(entry);
+											size = fi.Length;
+											dateModified = fi.LastWriteTime;
+										}
+										else
+										{
+											dateModified = Directory.GetLastWriteTime(entry);
+										}
+									}
+									catch { }
+
+									results.Add(new EverythingService.SearchResultItem
+									{
+										FullPath = entry,
+										FileName = name,
+										Extension = ext,
+										Size = size,
+										SizeFormatted = isDir ? "" : FormatFileSize(size),
+										DateModified = dateModified,
+										DateFormatted = dateModified != DateTime.MinValue ? dateModified.ToString("yyyy-MM-dd") : "",
+										IsFolder = isDir,
+										Category = cat,
+										CategoryDisplay = catDisplay,
+										BadgeBg = badgeBg,
+										BadgeFg = badgeFg,
+										IconEmoji = emoji,
+										EngineSource = "Native"
+									});
+								}
+							}
+						}
+					}
+				}
+				catch { }
+			}
+
+			if (token.IsCancellationRequested || results.Count >= maxResults)
+			{
+				return results;
+			}
+
+			// 第三层：并发深盘广度优先穿透检索（重点是深度与流式轻量化）
 			var searchRoots = new List<string>();
 			AddDirIfValid(searchRoots, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
 			AddDirIfValid(searchRoots, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));

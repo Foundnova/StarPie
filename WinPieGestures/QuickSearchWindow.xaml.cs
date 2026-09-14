@@ -162,6 +162,7 @@ public partial class QuickSearchWindow : Window
 		SearchInputBox.Text = "";
 		_currentCategory = "All";
 		UpdateFilterChipsStyle();
+		UpdateEngineBadgeVisual(EverythingService.DetectCurrentEngineState());
 		TriggerSearch(immediate: true);
 
 		Show();
@@ -363,11 +364,37 @@ public partial class QuickSearchWindow : Window
 			}
 			else
 			{
-				EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"未找到关于 \"{query}\" 的结果";
-				EmptyNoticeSub.Text = "尝试换个关键词，或切换上方分类";
-				EmptyResultsNotice.Visibility = Visibility.Visible;
 				ResultsListBox.Visibility = Visibility.Collapsed;
+				EmptyResultsNotice.Visibility = Visibility.Visible;
+
+				if (EverythingService.LastEngineState == EverythingService.SearchEngineState.EverythingPermissionBlocked)
+				{
+					EmptyNoticeEmoji.Text = "🛡️";
+					EmptyNoticeTitle.Text = "Everything 正以管理员权限运行，通信受阻";
+					EmptyNoticeSub.Text = "受 Windows UIPI 安全隔离限制，StarPie 需以管理员身份重启才能建立底层 0ms 极速通信";
+					EmptyActionPanel.Visibility = Visibility.Visible;
+					EmptyElevateBtn.Visibility = Visibility.Visible;
+					EmptyLaunchEverythingBtn.Visibility = Visibility.Collapsed;
+				}
+				else if (EverythingService.LastEngineState == EverythingService.SearchEngineState.EverythingNotRunning)
+				{
+					EmptyNoticeEmoji.Text = "🚀";
+					EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"原生引擎未找到关于 \"{query}\" 的结果";
+					EmptyNoticeSub.Text = "检测到本地 Everything 未在后台运行。启动后可直接开启 0ms 全盘极速秒搜";
+					EmptyActionPanel.Visibility = Visibility.Visible;
+					EmptyElevateBtn.Visibility = Visibility.Collapsed;
+					EmptyLaunchEverythingBtn.Visibility = Visibility.Visible;
+				}
+				else
+				{
+					EmptyNoticeEmoji.Text = "🔍";
+					EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"未找到关于 \"{query}\" 的结果";
+					EmptyNoticeSub.Text = "尝试换个关键词，或切换上方分类";
+					EmptyActionPanel.Visibility = Visibility.Collapsed;
+				}
 			}
+
+			UpdateEngineBadgeVisual(EverythingService.LastEngineState);
 
 			string countPrefix = string.IsNullOrEmpty(query) ? "常用推荐" : $"找到 {results.Count} 项结果";
 			StatusCountText.Text = $"{countPrefix} · {elapsedMs:F0} ms";
@@ -622,5 +649,120 @@ public partial class QuickSearchWindow : Window
 	{
 		ActionFeedbackBanner.Visibility = Visibility.Collapsed;
 		_feedbackTimer?.Stop();
+	}
+
+	private void UpdateEngineBadgeVisual(EverythingService.SearchEngineState state)
+	{
+		if (EngineStatusBadge == null || EngineStatusIcon == null || EngineStatusText == null) return;
+
+		switch (state)
+		{
+			case EverythingService.SearchEngineState.EverythingConnected:
+				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x18, 0x10, 0xB9, 0x81));
+				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x50, 0x10, 0xB9, 0x81));
+				EngineStatusIcon.Text = "⚡";
+				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
+				EngineStatusText.Text = "Everything 极速";
+				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
+				EngineStatusBadge.ToolTip = "Everything 数据库直连就绪 (IPC 0ms 响应)";
+				break;
+
+			case EverythingService.SearchEngineState.EverythingPermissionBlocked:
+				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x22, 0xF5, 0x9E, 0x0B));
+				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x60, 0xF5, 0x9E, 0x0B));
+				EngineStatusIcon.Text = "⚠️";
+				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
+				EngineStatusText.Text = "Everything 权限受阻 (点击提权)";
+				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
+				EngineStatusBadge.ToolTip = "Everything 正以管理员权限运行。受 Windows UIPI 安全隔离限制，StarPie 需以管理员身份运行才能直连 0ms 秒搜。\n点击立即以管理员身份重启 StarPie。";
+				break;
+
+			case EverythingService.SearchEngineState.EverythingNotRunning:
+				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x18, 0xF9, 0x73, 0x16));
+				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x50, 0xF9, 0x73, 0x16));
+				EngineStatusIcon.Text = "🐢";
+				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
+				EngineStatusText.Text = "原生并发 (点击启动 Everything)";
+				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
+				EngineStatusBadge.ToolTip = "未检测到 Everything 正在运行，当前使用内置原生引擎。\n点击立即启动本地 Everything 以享受 0ms 全盘秒搜。";
+				break;
+
+			case EverythingService.SearchEngineState.NativeOnly:
+			default:
+				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x14, 0x64, 0x74, 0x8B));
+				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x64, 0x74, 0x8B));
+				EngineStatusIcon.Text = "📁";
+				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
+				EngineStatusText.Text = "内置原生引擎";
+				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
+				EngineStatusBadge.ToolTip = "当前使用 StarPie 内置自包含原生并发引擎检索文件与常用应用";
+				break;
+		}
+	}
+
+	private void EngineStatusBadge_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+	{
+		e.Handled = true;
+		var state = EverythingService.LastEngineState;
+		if (state == EverythingService.SearchEngineState.EverythingPermissionBlocked)
+		{
+			PromptElevateRestart();
+		}
+		else if (state == EverythingService.SearchEngineState.EverythingNotRunning)
+		{
+			LaunchEverythingAndRefresh();
+		}
+		else if (state == EverythingService.SearchEngineState.EverythingConnected)
+		{
+			ShowFeedbackBanner("⚡ Everything 数据库直连就绪 (IPC 0ms 响应)", isWarning: false);
+		}
+		else
+		{
+			ShowFeedbackBanner("📁 当前使用 StarPie 内置原生轻量并发引擎", isWarning: false);
+		}
+	}
+
+	private void EmptyElevateBtn_Click(object sender, RoutedEventArgs e)
+	{
+		PromptElevateRestart();
+	}
+
+	private void EmptyLaunchEverythingBtn_Click(object sender, RoutedEventArgs e)
+	{
+		LaunchEverythingAndRefresh();
+	}
+
+	private void PromptElevateRestart()
+	{
+		var result = MessageBox.Show(
+			"Everything 当前正在以管理员权限运行。\n\n受 Windows UIPI (用户界面特权隔离) 机制限制，StarPie 需要以管理员身份运行才能建立底层 IPC 通信，实现 0ms 毫秒级秒搜。\n\n是否立即以管理员身份重启 StarPie？",
+			"StarPie - 管理员提权同步 Everything",
+			MessageBoxButton.YesNo,
+			MessageBoxImage.Information);
+
+		if (result == MessageBoxResult.Yes)
+		{
+			App.RestartElevated();
+		}
+	}
+
+	private void LaunchEverythingAndRefresh()
+	{
+		bool launched = EverythingService.TryLaunchEverything();
+		if (launched)
+		{
+			ShowFeedbackBanner("🚀 已启动本地 Everything，正在连接数据库...", isWarning: false);
+			var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+			timer.Tick += (s, ev) =>
+			{
+				timer.Stop();
+				TriggerSearch(immediate: true);
+			};
+			timer.Start();
+		}
+		else
+		{
+			ShowFeedbackBanner("未找到本地 Everything.exe，请确认已安装或放置在桌面", isWarning: true);
+		}
 	}
 }

@@ -103,6 +103,21 @@ public static class EverythingService
 		public string Details => IsFolder ? "文件夹" : $"{SizeFormatted} · {DateFormatted}";
 	}
 
+	public enum SearchEngineState
+	{
+		/// <summary>Everything 数据库已直连，IPC 0ms 毫秒级极速响应</summary>
+		EverythingConnected,
+		/// <summary>Everything 正以管理员权限运行，受 Windows UIPI 安全隔离阻断，需提权同步</summary>
+		EverythingPermissionBlocked,
+		/// <summary>系统已安装或包含 Everything，但当前未在后台运行</summary>
+		EverythingNotRunning,
+		/// <summary>系统未检测到 Everything，仅使用内置原生极速并发引擎</summary>
+		NativeOnly
+	}
+
+	public static SearchEngineState LastEngineState { get; private set; } = SearchEngineState.NativeOnly;
+	public static double LastQueryElapsedMs { get; private set; } = 0;
+
 	/// <summary>
 	/// 检查 Everything64.dll 是否可正常调用
 	/// </summary>
@@ -144,58 +159,125 @@ public static class EverythingService
 	}
 
 	/// <summary>
-	/// 尝试定位并启动本地安装的 Everything.exe
+	/// 综合检测当前检索引擎连通状态（即时响应，零开销探测）
 	/// </summary>
-	public static bool TryLaunchEverything()
+	public static SearchEngineState DetectCurrentEngineState()
+	{
+		if (IsEverythingRunning())
+		{
+			if (IsDllAvailable())
+			{
+				lock (_syncLock)
+				{
+					try
+					{
+						Native.Everything_Reset();
+						Native.Everything_SetSearchW("StarPiePing");
+						Native.Everything_SetMax(1);
+						bool ok = Native.Everything_QueryW(true);
+						if (ok)
+						{
+							LastEngineState = SearchEngineState.EverythingConnected;
+							return LastEngineState;
+						}
+
+						uint err = Native.Everything_GetLastError();
+						if (err == 2 && !ConfigManager.IsElevated())
+						{
+							LastEngineState = SearchEngineState.EverythingPermissionBlocked;
+							return LastEngineState;
+						}
+					}
+					catch { }
+				}
+			}
+			LastEngineState = SearchEngineState.EverythingConnected;
+			return LastEngineState;
+		}
+
+		string? exePath = FindLocalEverythingPath();
+		LastEngineState = string.IsNullOrEmpty(exePath)
+			? SearchEngineState.NativeOnly
+			: SearchEngineState.EverythingNotRunning;
+		return LastEngineState;
+	}
+
+	/// <summary>
+	/// 在系统常见目录、桌面、用户漫游目录与注册表中检索可用的 Everything.exe 完整路径
+	/// </summary>
+	public static string? FindLocalEverythingPath()
 	{
 		try
 		{
-			// 1. 常见安装路径及桌面便携版检查
+			string userDesktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+			string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+			string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+			string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+			string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
 			string[] candidates = new[]
 			{
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Everything.exe"),
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Everything.exe"),
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Desktop", "Everything.exe"),
+				Path.Combine(userDesktop, "Everything.exe"),
+				Path.Combine(commonDesktop, "Everything.exe"),
+				Path.Combine(userProfile, "Desktop", "Everything.exe"),
 				@"G:\Users\2 Better\Desktop\Everything.exe",
+				Path.Combine(appData, @"Everything\Everything.exe"),
+				Path.Combine(localAppData, @"Programs\Everything\Everything.exe"),
 				Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Everything.exe"),
 				@"C:\Program Files\Everything\Everything.exe",
 				@"C:\Program Files (x86)\Everything\Everything.exe",
 				@"C:\Program Files\Everything 1.5a\Everything.exe",
-				@"C:\Program Files\Everything 1.5a\Everything64.exe",
-				Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\Everything\Everything.exe")
+				@"C:\Program Files\Everything 1.5a\Everything64.exe"
 			};
 
 			foreach (var path in candidates)
 			{
 				if (File.Exists(path))
 				{
-					Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-					return true;
+					return path;
 				}
 			}
 
-			// 2. 注册表 App Paths
+			// 注册表 App Paths
 			using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Everything.exe"))
 			{
 				string? regPath = key?.GetValue("")?.ToString();
 				if (!string.IsNullOrEmpty(regPath) && File.Exists(regPath))
 				{
-					Process.Start(new ProcessStartInfo { FileName = regPath, UseShellExecute = true });
-					return true;
+					return regPath;
 				}
 			}
 
-			// 3. 开始菜单快捷方式探测
+			// 开始菜单快捷方式探测
 			string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Everything.lnk");
 			if (File.Exists(startMenu))
 			{
-				Process.Start(new ProcessStartInfo { FileName = startMenu, UseShellExecute = true });
+				if (IconHelper.ResolveShortcutTarget(startMenu, out string target, out string _, out int _) && File.Exists(target))
+				{
+					return target;
+				}
+				return startMenu;
+			}
+		}
+		catch { }
+		return null;
+	}
+
+	/// <summary>
+	/// 尝试定位并启动本地安装的 Everything.exe
+	/// </summary>
+	public static bool TryLaunchEverything()
+	{
+		try
+		{
+			string? path = FindLocalEverythingPath();
+			if (!string.IsNullOrEmpty(path) && (File.Exists(path) || path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)))
+			{
+				Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
 				return true;
 			}
 		}
-		catch
-		{
-		}
+		catch { }
 		return false;
 	}
 
@@ -312,6 +394,7 @@ public static class EverythingService
 		// 空白初始态：直接返回内置原生引擎的高频推荐与常用项目
 		if (string.IsNullOrEmpty(trimmed))
 		{
+			DetectCurrentEngineState();
 			return NativeSearchEngine.GetInitialRecommendations(category);
 		}
 
@@ -332,16 +415,19 @@ public static class EverythingService
 						Native.Everything_SetRequestFlags(EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME | EVERYTHING_REQUEST_SIZE | EVERYTHING_REQUEST_DATE_MODIFIED);
 
 						bool queryOk = Native.Everything_QueryW(true);
-						if (!queryOk && Native.Everything_GetLastError() == 2)
+						uint err = Native.Everything_GetLastError();
+						if (!queryOk && err == 2)
 						{
 							Native.Everything_Reset();
 							Native.Everything_SetSearchW(builtQuery);
 							Native.Everything_SetMax((uint)maxResults);
 							queryOk = Native.Everything_QueryW(true);
+							err = Native.Everything_GetLastError();
 						}
 
 						if (queryOk)
 						{
+							LastEngineState = SearchEngineState.EverythingConnected;
 							uint count = Native.Everything_GetNumResults();
 							StringBuilder sb = new StringBuilder(1024);
 							for (uint i = 0; i < count; i++)
@@ -381,6 +467,19 @@ public static class EverythingService
 								});
 							}
 						}
+						else
+						{
+							if (err == 2)
+							{
+								LastEngineState = !ConfigManager.IsElevated()
+									? SearchEngineState.EverythingPermissionBlocked
+									: SearchEngineState.EverythingNotRunning;
+							}
+							else
+							{
+								LastEngineState = SearchEngineState.EverythingConnected;
+							}
+						}
 					}
 					catch
 					{
@@ -394,8 +493,15 @@ public static class EverythingService
 				return everythingResults;
 			}
 		}
+		else
+		{
+			string? exePath = FindLocalEverythingPath();
+			LastEngineState = string.IsNullOrEmpty(exePath)
+				? SearchEngineState.NativeOnly
+				: SearchEngineState.EverythingNotRunning;
+		}
 
-		// 若 Everything 未运行或返回 0 结果（如 32 位 IPC 不通或过滤空），无缝回退至内置原生极速引擎
+		// 若 Everything 未运行、IPC受阻或检索结果为空，平滑无缝回退至内置原生极速引擎
 		return await NativeSearchEngine.SearchAsync(trimmed, category, maxResults);
 	}
 

@@ -265,9 +265,25 @@
 
         <!-- 无匹配结果空状态提示 -->
         <StackPanel Name="EmptyResultsNotice" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <TextBlock Text="🔍" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,8" />
+          <TextBlock Name="EmptyNoticeEmoji" Text="🔍" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,8" />
           <TextBlock Name="EmptyNoticeTitle" Text="未找到匹配的文件或程序" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" />
           <TextBlock Name="EmptyNoticeSub" Text="尝试换个关键词，或切换上方「全部」分类" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+
+          <!-- 权限受阻或 Everything 未运行时的快捷操作引导按钮 -->
+          <StackPanel Name="EmptyActionPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0" Visibility="Collapsed">
+            <Button Name="EmptyElevateBtn" Style="{StaticResource ModernBtn}" Height="30" Padding="12,0" FontSize="11.5" Click="EmptyElevateBtn_Click" Margin="0,0,8,0" Visibility="Collapsed">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🛡️" Margin="0,0,5,0" />
+                <TextBlock Text="以管理员身份重启 StarPie (直连 Everything 秒搜)" />
+              </StackPanel>
+            </Button>
+            <Button Name="EmptyLaunchEverythingBtn" Style="{StaticResource ModernBtn}" Height="30" Padding="12,0" FontSize="11.5" Click="EmptyLaunchEverythingBtn_Click" Visibility="Collapsed">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🚀" Margin="0,0,5,0" />
+                <TextBlock Text="启动 Everything (开启全盘 0ms 秒搜)" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
         </StackPanel>
       </Grid>
 
@@ -314,8 +330,15 @@
             </Border>
           </StackPanel>
 
-          <!-- 检索响应时间与结果统计及右下角拉伸把手 -->
+          <!-- 检索引擎状态徽章、响应时间与结果统计及右下角拉伸把手 -->
           <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- 引擎状态交互徽章 (绿色极速直连 / 黄色提权受阻 / 橙色未运行 / 灰色原生) -->
+            <Border Name="EngineStatusBadge" CornerRadius="4" BorderThickness="1" Padding="6,2" Margin="0,0,8,0" Cursor="Hand" MouseLeftButtonDown="EngineStatusBadge_MouseLeftButtonDown" ToolTip="检索引擎状态">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Name="EngineStatusIcon" Text="⚡" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
+                <TextBlock Name="EngineStatusText" Text="Everything 极速" FontSize="10" FontWeight="Medium" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
             <TextBlock Name="StatusCountText" Text="就绪" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
             <Thumb Name="WindowResizeGrip" Width="14" Height="14" Cursor="SizeNWSE" VerticalAlignment="Center" DragDelta="WindowResizeGrip_DragDelta" ToolTip="按住拖拽自由拉伸窗口大小">
               <Thumb.Template>
