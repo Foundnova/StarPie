@@ -23,10 +23,12 @@ public partial class QuickSearchWindow : Window
 	private CancellationTokenSource? _searchCts;
 	private bool _isContextMenuOpen;
 	private bool _isPinned;
+	private string _lastSearchedQuery = "";
 
 	public QuickSearchWindow()
 	{
 		InitializeComponent();
+		AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 
 		if (ConfigManager.CurrentConfig != null)
 		{
@@ -37,7 +39,7 @@ public partial class QuickSearchWindow : Window
 			_isPinned = ConfigManager.CurrentConfig.QuickSearchPinned;
 		}
 
-		_debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(75) };
+		_debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
 		_debounceTimer.Tick += DebounceTimer_Tick;
 
 		_feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
@@ -161,8 +163,8 @@ public partial class QuickSearchWindow : Window
 
 		SearchInputBox.Text = "";
 		_currentCategory = "All";
+		_lastSearchedQuery = "";
 		UpdateFilterChipsStyle();
-		UpdateEngineBadgeVisual(EverythingService.DetectCurrentEngineState());
 		TriggerSearch(immediate: true);
 
 		Show();
@@ -313,7 +315,28 @@ public partial class QuickSearchWindow : Window
 		string query = SearchInputBox.Text.Trim();
 		PlaceholderText.Visibility = string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
 		ClearInputBtn.Visibility = string.IsNullOrEmpty(query) ? Visibility.Collapsed : Visibility.Visible;
-		TriggerSearch(immediate: false);
+
+		if (string.IsNullOrEmpty(query))
+		{
+			_debounceTimer?.Stop();
+			_searchCts?.Cancel();
+			if (SearchingIndicator != null)
+			{
+				SearchingIndicator.Visibility = Visibility.Collapsed;
+			}
+			_lastSearchedQuery = "";
+			TriggerSearch(immediate: true);
+		}
+		else
+		{
+			TriggerSearch(immediate: false);
+		}
+	}
+
+	private void SearchBtn_Click(object sender, RoutedEventArgs e)
+	{
+		TriggerSearch(immediate: true);
+		SearchInputBox.Focus();
 	}
 
 	private void TriggerSearch(bool immediate)
@@ -344,16 +367,34 @@ public partial class QuickSearchWindow : Window
 		string query = SearchInputBox.Text.Trim();
 		string category = _currentCategory;
 
+		if (SearchingIndicator != null)
+		{
+			SearchingIndicator.Visibility = Visibility.Visible;
+		}
+		if (StatusCountText != null)
+		{
+			StatusCountText.Text = string.IsNullOrEmpty(query) ? "正在加载常用推荐..." : "⏳ 正在搜索...";
+		}
+
 		Stopwatch sw = Stopwatch.StartNew();
 
 		try
 		{
-			var results = await EverythingService.SearchFilesAndFoldersAsync(query, category, 120);
+			List<SearchResultItem> results;
+			if (string.IsNullOrEmpty(query))
+			{
+				results = NativeSearchEngine.GetInitialRecommendations(category);
+			}
+			else
+			{
+				results = await NativeSearchEngine.SearchAsync(query, category, 120, cts.Token);
+			}
 
 			if (cts.Token.IsCancellationRequested) return;
 
 			sw.Stop();
 			double elapsedMs = sw.Elapsed.TotalMilliseconds;
+			_lastSearchedQuery = query;
 
 			ResultsListBox.ItemsSource = results;
 			if (results.Count > 0)
@@ -366,38 +407,16 @@ public partial class QuickSearchWindow : Window
 			{
 				ResultsListBox.Visibility = Visibility.Collapsed;
 				EmptyResultsNotice.Visibility = Visibility.Visible;
-
-				if (EverythingService.LastEngineState == EverythingService.SearchEngineState.EverythingPermissionBlocked)
-				{
-					EmptyNoticeEmoji.Text = "🛡️";
-					EmptyNoticeTitle.Text = "Everything 正以管理员权限运行，通信受阻";
-					EmptyNoticeSub.Text = "受 Windows UIPI 安全隔离限制，StarPie 需以管理员身份重启才能建立底层 0ms 极速通信";
-					EmptyActionPanel.Visibility = Visibility.Visible;
-					EmptyElevateBtn.Visibility = Visibility.Visible;
-					EmptyLaunchEverythingBtn.Visibility = Visibility.Collapsed;
-				}
-				else if (EverythingService.LastEngineState == EverythingService.SearchEngineState.EverythingNotRunning)
-				{
-					EmptyNoticeEmoji.Text = "🚀";
-					EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"原生引擎未找到关于 \"{query}\" 的结果";
-					EmptyNoticeSub.Text = "检测到本地 Everything 未在后台运行。启动后可直接开启 0ms 全盘极速秒搜";
-					EmptyActionPanel.Visibility = Visibility.Visible;
-					EmptyElevateBtn.Visibility = Visibility.Collapsed;
-					EmptyLaunchEverythingBtn.Visibility = Visibility.Visible;
-				}
-				else
-				{
-					EmptyNoticeEmoji.Text = "🔍";
-					EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"未找到关于 \"{query}\" 的结果";
-					EmptyNoticeSub.Text = "尝试换个关键词，或切换上方分类";
-					EmptyActionPanel.Visibility = Visibility.Collapsed;
-				}
+				EmptyNoticeEmoji.Text = "🔍";
+				EmptyNoticeTitle.Text = string.IsNullOrEmpty(query) ? "未发现匹配文件" : $"未找到关于 \"{query}\" 的结果";
+				EmptyNoticeSub.Text = "尝试换个关键词，或切换上方分类";
 			}
 
-			UpdateEngineBadgeVisual(EverythingService.LastEngineState);
-
 			string countPrefix = string.IsNullOrEmpty(query) ? "常用推荐" : $"找到 {results.Count} 项结果";
-			StatusCountText.Text = $"{countPrefix} · {elapsedMs:F0} ms";
+			if (StatusCountText != null)
+			{
+				StatusCountText.Text = $"{countPrefix} · {elapsedMs:F0} ms";
+			}
 		}
 		catch (OperationCanceledException)
 		{
@@ -405,6 +424,16 @@ public partial class QuickSearchWindow : Window
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"QuickSearchWindow search error: {ex.Message}", ex);
+		}
+		finally
+		{
+			if (ReferenceEquals(_searchCts, cts))
+			{
+				if (SearchingIndicator != null)
+				{
+					SearchingIndicator.Visibility = Visibility.Collapsed;
+				}
+			}
 		}
 	}
 
@@ -432,7 +461,17 @@ public partial class QuickSearchWindow : Window
 		}
 		else if (e.Key == Key.Enter)
 		{
-			if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+			string currentQuery = SearchInputBox.Text.Trim();
+			// 如果输入内容未执行过搜索，或正在搜索中，回车键立即执行搜索
+			if (!string.Equals(currentQuery, _lastSearchedQuery, StringComparison.Ordinal) ||
+			    (SearchingIndicator != null && SearchingIndicator.Visibility == Visibility.Visible))
+			{
+				TriggerSearch(immediate: true);
+				e.Handled = true;
+				return;
+			}
+
+			if (ResultsListBox.SelectedItem is SearchResultItem item)
 			{
 				if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
 				{
@@ -450,6 +489,7 @@ public partial class QuickSearchWindow : Window
 	private void ClearInputBtn_Click(object sender, RoutedEventArgs e)
 	{
 		SearchInputBox.Text = "";
+		_lastSearchedQuery = "";
 		SearchInputBox.Focus();
 	}
 
@@ -494,7 +534,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ResultsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			OpenItem(item);
 		}
@@ -502,7 +542,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ItemOpen_Click(object sender, RoutedEventArgs e)
 	{
-		if (sender is Button btn && btn.Tag is EverythingService.SearchResultItem item)
+		if (sender is Button btn && btn.Tag is SearchResultItem item)
 		{
 			OpenItem(item);
 		}
@@ -510,7 +550,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ContextOpen_Click(object sender, RoutedEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			OpenItem(item);
 		}
@@ -518,7 +558,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ContextReveal_Click(object sender, RoutedEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			RevealItemInExplorer(item);
 		}
@@ -526,7 +566,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ContextRunAsAdmin_Click(object sender, RoutedEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			RunItemAsAdmin(item);
 		}
@@ -534,7 +574,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ContextCopyPath_Click(object sender, RoutedEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			try
 			{
@@ -550,7 +590,7 @@ public partial class QuickSearchWindow : Window
 
 	private void ContextCopyFileName_Click(object sender, RoutedEventArgs e)
 	{
-		if (ResultsListBox.SelectedItem is EverythingService.SearchResultItem item)
+		if (ResultsListBox.SelectedItem is SearchResultItem item)
 		{
 			try
 			{
@@ -564,7 +604,7 @@ public partial class QuickSearchWindow : Window
 		}
 	}
 
-	private void OpenItem(EverythingService.SearchResultItem item)
+	private void OpenItem(SearchResultItem item)
 	{
 		try
 		{
@@ -582,7 +622,7 @@ public partial class QuickSearchWindow : Window
 		}
 	}
 
-	private void RevealItemInExplorer(EverythingService.SearchResultItem item)
+	private void RevealItemInExplorer(SearchResultItem item)
 	{
 		try
 		{
@@ -603,7 +643,7 @@ public partial class QuickSearchWindow : Window
 		}
 	}
 
-	private void RunItemAsAdmin(EverythingService.SearchResultItem item)
+	private void RunItemAsAdmin(SearchResultItem item)
 	{
 		try
 		{
@@ -649,120 +689,5 @@ public partial class QuickSearchWindow : Window
 	{
 		ActionFeedbackBanner.Visibility = Visibility.Collapsed;
 		_feedbackTimer?.Stop();
-	}
-
-	private void UpdateEngineBadgeVisual(EverythingService.SearchEngineState state)
-	{
-		if (EngineStatusBadge == null || EngineStatusIcon == null || EngineStatusText == null) return;
-
-		switch (state)
-		{
-			case EverythingService.SearchEngineState.EverythingConnected:
-				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x18, 0x10, 0xB9, 0x81));
-				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x50, 0x10, 0xB9, 0x81));
-				EngineStatusIcon.Text = "⚡";
-				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
-				EngineStatusText.Text = "Everything 极速";
-				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
-				EngineStatusBadge.ToolTip = "Everything 数据库直连就绪 (IPC 0ms 响应)";
-				break;
-
-			case EverythingService.SearchEngineState.EverythingPermissionBlocked:
-				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x22, 0xF5, 0x9E, 0x0B));
-				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x60, 0xF5, 0x9E, 0x0B));
-				EngineStatusIcon.Text = "⚠️";
-				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
-				EngineStatusText.Text = "Everything 权限受阻 (点击提权)";
-				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B));
-				EngineStatusBadge.ToolTip = "Everything 正以管理员权限运行。受 Windows UIPI 安全隔离限制，StarPie 需以管理员身份运行才能直连 0ms 秒搜。\n点击立即以管理员身份重启 StarPie。";
-				break;
-
-			case EverythingService.SearchEngineState.EverythingNotRunning:
-				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x18, 0xF9, 0x73, 0x16));
-				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x50, 0xF9, 0x73, 0x16));
-				EngineStatusIcon.Text = "🐢";
-				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
-				EngineStatusText.Text = "原生并发 (点击启动 Everything)";
-				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
-				EngineStatusBadge.ToolTip = "未检测到 Everything 正在运行，当前使用内置原生引擎。\n点击立即启动本地 Everything 以享受 0ms 全盘秒搜。";
-				break;
-
-			case EverythingService.SearchEngineState.NativeOnly:
-			default:
-				EngineStatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x14, 0x64, 0x74, 0x8B));
-				EngineStatusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x64, 0x74, 0x8B));
-				EngineStatusIcon.Text = "📁";
-				EngineStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
-				EngineStatusText.Text = "内置原生引擎";
-				EngineStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
-				EngineStatusBadge.ToolTip = "当前使用 StarPie 内置自包含原生并发引擎检索文件与常用应用";
-				break;
-		}
-	}
-
-	private void EngineStatusBadge_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-	{
-		e.Handled = true;
-		var state = EverythingService.LastEngineState;
-		if (state == EverythingService.SearchEngineState.EverythingPermissionBlocked)
-		{
-			PromptElevateRestart();
-		}
-		else if (state == EverythingService.SearchEngineState.EverythingNotRunning)
-		{
-			LaunchEverythingAndRefresh();
-		}
-		else if (state == EverythingService.SearchEngineState.EverythingConnected)
-		{
-			ShowFeedbackBanner("⚡ Everything 数据库直连就绪 (IPC 0ms 响应)", isWarning: false);
-		}
-		else
-		{
-			ShowFeedbackBanner("📁 当前使用 StarPie 内置原生轻量并发引擎", isWarning: false);
-		}
-	}
-
-	private void EmptyElevateBtn_Click(object sender, RoutedEventArgs e)
-	{
-		PromptElevateRestart();
-	}
-
-	private void EmptyLaunchEverythingBtn_Click(object sender, RoutedEventArgs e)
-	{
-		LaunchEverythingAndRefresh();
-	}
-
-	private void PromptElevateRestart()
-	{
-		var result = MessageBox.Show(
-			"Everything 当前正在以管理员权限运行。\n\n受 Windows UIPI (用户界面特权隔离) 机制限制，StarPie 需要以管理员身份运行才能建立底层 IPC 通信，实现 0ms 毫秒级秒搜。\n\n是否立即以管理员身份重启 StarPie？",
-			"StarPie - 管理员提权同步 Everything",
-			MessageBoxButton.YesNo,
-			MessageBoxImage.Information);
-
-		if (result == MessageBoxResult.Yes)
-		{
-			App.RestartElevated();
-		}
-	}
-
-	private void LaunchEverythingAndRefresh()
-	{
-		bool launched = EverythingService.TryLaunchEverything();
-		if (launched)
-		{
-			ShowFeedbackBanner("🚀 已启动本地 Everything，正在连接数据库...", isWarning: false);
-			var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
-			timer.Tick += (s, ev) =>
-			{
-				timer.Stop();
-				TriggerSearch(immediate: true);
-			};
-			timer.Start();
-		}
-		else
-		{
-			ShowFeedbackBanner("未找到本地 Everything.exe，请确认已安装或放置在桌面", isWarning: true);
-		}
 	}
 }

@@ -45,16 +45,12 @@ public static class SoundEffectManager
 	private const uint SND_MEMORY = 0x0004;
 
 	private static readonly object _syncLock = new object();
-	private static readonly Dictionary<SoundType, IntPtr> _soundPointers = new();
-	private static readonly Dictionary<SoundType, int> _soundLengths = new();
+	private static readonly Dictionary<SoundType, byte[]> _soundBuffers = new();
 
-	private static readonly System.Threading.Channels.Channel<SoundType> _soundChannel =
-		System.Threading.Channels.Channel.CreateBounded<SoundType>(new System.Threading.Channels.BoundedChannelOptions(2)
-		{
-			SingleWriter = false,
-			SingleReader = true,
-			FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest
-		});
+	private static readonly object _queueLock = new object();
+	private static readonly AutoResetEvent _soundSignal = new AutoResetEvent(false);
+	private static SoundType? _pendingSound;
+	private static byte[]? _pendingCustomWav;
 
 	private static Thread? _workerThread;
 	private static volatile bool _isRunning = false;
@@ -95,40 +91,85 @@ public static class SoundEffectManager
 
 	/// <summary>
 	/// 专属音频播放循环：在独立工作线程内使用 SND_SYNC 同步回放。
-	/// 根本消除快速滑过多个子轮盘时 WinMM 频繁中止 waveOutReset 导致的内部死锁与无声故障。
+	/// 采用 AutoResetEvent 信号机制与智能合并，杜绝死锁、CPU 跑满与 Use-After-Free 野指针。
 	/// </summary>
 	private static void ProcessSoundQueue()
 	{
-		var reader = _soundChannel.Reader;
 		while (_isRunning)
 		{
 			try
 			{
-				if (reader.WaitToReadAsync().AsTask().Result)
+				_soundSignal.WaitOne();
+				if (!_isRunning)
 				{
-					while (reader.TryRead(out SoundType type))
-					{
-						IntPtr ptr = IntPtr.Zero;
-						lock (_syncLock)
-						{
-							if (_soundPointers.TryGetValue(type, out IntPtr p))
-							{
-								ptr = p;
-							}
-						}
+					break;
+				}
 
-						if (ptr != IntPtr.Zero && _isRunning)
-						{
-							// 使用 SND_SYNC 在专属工作线程内完整播放微型 PCM 波形（~30ms），
-							// 不产生 WinMM 内部辅助线程竞争，保证 100% 稳定可靠
-							PlaySoundW(ptr, IntPtr.Zero, SND_SYNC | SND_MEMORY | SND_NODEFAULT);
-						}
+				SoundType? soundToPlay;
+				byte[]? customWavToPlay;
+				lock (_queueLock)
+				{
+					soundToPlay = _pendingSound;
+					customWavToPlay = _pendingCustomWav;
+					_pendingSound = null;
+					_pendingCustomWav = null;
+				}
+
+				byte[]? wavData = customWavToPlay;
+				if (wavData == null && soundToPlay.HasValue)
+				{
+					lock (_syncLock)
+					{
+						_soundBuffers.TryGetValue(soundToPlay.Value, out wavData);
 					}
 				}
+
+				if (wavData != null && wavData.Length > 0 && _isRunning)
+				{
+					PlaySoundDirect(wavData);
+				}
+			}
+			catch (ThreadAbortException)
+			{
+				break;
 			}
 			catch (Exception ex)
 			{
 				AppLogger.LogWarn($"SoundWorker iteration exception: {ex.Message}");
+			}
+		}
+	}
+
+	/// <summary>
+	/// 仅在专属工作线程内短暂固定托管内存并执行 Win32 PlaySoundW 同步回放。
+	/// 绝不跨线程并发调用，绝不产生野指针释放竞争。
+	/// </summary>
+	private static void PlaySoundDirect(byte[] wavData)
+	{
+		GCHandle pin = default;
+		try
+		{
+			pin = GCHandle.Alloc(wavData, GCHandleType.Pinned);
+			IntPtr ptr = pin.AddrOfPinnedObject();
+			bool success = PlaySoundW(ptr, IntPtr.Zero, SND_SYNC | SND_MEMORY | SND_NODEFAULT);
+			if (!success)
+			{
+				int err = Marshal.GetLastWin32Error();
+				if (err != 0)
+				{
+					AppLogger.LogWarn($"PlaySoundW returned false, Win32 error: {err}");
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"PlaySoundDirect exception: {ex.Message}");
+		}
+		finally
+		{
+			if (pin.IsAllocated)
+			{
+				pin.Free();
 			}
 		}
 	}
@@ -150,17 +191,15 @@ public static class SoundEffectManager
 				return;
 			}
 
-			FreePointers();
-
 			_currentTheme = targetTheme;
 			_currentVolume = targetVolume;
 
-			// 程序化合成 5 大音效事件波形
-			AllocateSound(SoundType.WheelPopup, SynthesizeSound(SoundType.WheelPopup, targetTheme, targetVolume));
-			AllocateSound(SoundType.SectorHover, SynthesizeSound(SoundType.SectorHover, targetTheme, targetVolume));
-			AllocateSound(SoundType.SubmenuExpand, SynthesizeSound(SoundType.SubmenuExpand, targetTheme, targetVolume));
-			AllocateSound(SoundType.ActionExecute, SynthesizeSound(SoundType.ActionExecute, targetTheme, targetVolume));
-			AllocateSound(SoundType.GestureCancel, SynthesizeSound(SoundType.GestureCancel, targetTheme, targetVolume));
+			// 程序化合成 5 大音效事件波形并存入托管字典（原子替换引用，无野指针风险）
+			_soundBuffers[SoundType.WheelPopup] = SynthesizeSound(SoundType.WheelPopup, targetTheme, targetVolume);
+			_soundBuffers[SoundType.SectorHover] = SynthesizeSound(SoundType.SectorHover, targetTheme, targetVolume);
+			_soundBuffers[SoundType.SubmenuExpand] = SynthesizeSound(SoundType.SubmenuExpand, targetTheme, targetVolume);
+			_soundBuffers[SoundType.ActionExecute] = SynthesizeSound(SoundType.ActionExecute, targetTheme, targetVolume);
+			_soundBuffers[SoundType.GestureCancel] = SynthesizeSound(SoundType.GestureCancel, targetTheme, targetVolume);
 
 			_initialized = true;
 		}
@@ -213,7 +252,12 @@ public static class SoundEffectManager
 
 		EnsureInitialized();
 		EnsureWorkerStarted();
-		_soundChannel.Writer.TryWrite(type);
+		lock (_queueLock)
+		{
+			_pendingSound = type;
+			_pendingCustomWav = null;
+		}
+		_soundSignal.Set();
 	}
 
 	/// <summary>
@@ -223,11 +267,16 @@ public static class SoundEffectManager
 	{
 		EnsureInitialized();
 		EnsureWorkerStarted();
-		_soundChannel.Writer.TryWrite(type);
+		lock (_queueLock)
+		{
+			_pendingSound = type;
+			_pendingCustomWav = null;
+		}
+		_soundSignal.Set();
 	}
 
 	/// <summary>
-	/// 直接试听指定的自定义音效事件配置（非阻塞独立线程播放，零延迟且不破坏主手势队列）。
+	/// 直接试听指定的自定义音效事件配置（非阻塞通过专属工作线程播放，零延迟、绝不产生多线程冲突）。
 	/// </summary>
 	public static void PlayCustomEventPreview(SoundEventConfig config, double? volume = null)
 	{
@@ -237,20 +286,12 @@ public static class SoundEffectManager
 		byte[] wavData = SynthesizeCustomEventSound(config, vol);
 		if (wavData == null || wavData.Length == 0) return;
 
-		System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+		lock (_queueLock)
 		{
-			IntPtr ptr = Marshal.AllocHGlobal(wavData.Length);
-			try
-			{
-				Marshal.Copy(wavData, 0, ptr, wavData.Length);
-				PlaySoundW(ptr, IntPtr.Zero, SND_SYNC | SND_MEMORY | SND_NODEFAULT);
-			}
-			catch { }
-			finally
-			{
-				try { Marshal.FreeHGlobal(ptr); } catch { }
-			}
-		});
+			_pendingSound = null;
+			_pendingCustomWav = wavData;
+		}
+		_soundSignal.Set();
 	}
 
 	private static void EnsureInitialized()
@@ -261,63 +302,22 @@ public static class SoundEffectManager
 		}
 	}
 
-	private static void AllocateSound(SoundType type, byte[] wavData)
-	{
-		if (wavData == null || wavData.Length == 0) return;
-
-		IntPtr ptr = Marshal.AllocHGlobal(wavData.Length);
-		Marshal.Copy(wavData, 0, ptr, wavData.Length);
-		_soundPointers[type] = ptr;
-		_soundLengths[type] = wavData.Length;
-	}
-
-	private static void FreePointers()
-	{
-		lock (_syncLock)
-		{
-			try
-			{
-				// 立即中止可能正在回放的声音
-				PlaySoundW(IntPtr.Zero, IntPtr.Zero, 0);
-			}
-			catch
-			{
-			}
-
-			foreach (var kvp in _soundPointers)
-			{
-				if (kvp.Value != IntPtr.Zero)
-				{
-					try
-					{
-						Marshal.FreeHGlobal(kvp.Value);
-					}
-					catch
-					{
-					}
-				}
-			}
-			_soundPointers.Clear();
-			_soundLengths.Clear();
-		}
-	}
-
 	/// <summary>
-	/// 释放所有非托管音频内存与工作线程（在应用退出时调用）。
+	/// 释放所有音频资源与工作线程（在应用退出时调用）。
 	/// </summary>
 	public static void Shutdown()
 	{
 		_isRunning = false;
 		try
 		{
-			_soundChannel.Writer.TryComplete();
+			_soundSignal.Set();
 		}
 		catch
 		{
 		}
 		lock (_syncLock)
 		{
-			FreePointers();
+			_soundBuffers.Clear();
 			_initialized = false;
 		}
 	}
@@ -404,10 +404,13 @@ public static class SoundEffectManager
 	public static byte[] SynthesizeCustomEventSound(SoundEventConfig? config, double masterVolume)
 	{
 		int sampleRate = 44100;
-		if (config == null || config.SourceType == SoundSourceType.Mute)
+		if (config == null)
 		{
-			// 静音模式返回极微静默帧
-			return WrapPcmToWav(new short[1], sampleRate);
+			return SynthesizeSound(SoundType.SectorHover, "Mechanical", masterVolume);
+		}
+		if (config.SourceType == SoundSourceType.Mute)
+		{
+			return Array.Empty<byte>();
 		}
 
 		double effectiveVol = Math.Clamp(config.RelativeVolume, 0.0, 1.0) * masterVolume;

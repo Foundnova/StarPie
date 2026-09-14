@@ -1870,10 +1870,10 @@ public static class ActionExecutor
 			break;
 		case "quicksearch":
 		case "quickfinder":
-		case "everythingsearch":
-		case "everything":
+		case "nativesearch":
 		case "文件秒搜":
 		case "快速秒搜":
+		case "原生秒搜":
 			Application.Current?.Dispatcher?.BeginInvoke((Action)delegate
 			{
 				QuickSearchWindow.ShowOrActivate();

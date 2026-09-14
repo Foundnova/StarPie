@@ -31,7 +31,6 @@
     <Resource Include="logo_light.png" />
     <None Include="app_icon.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="tray_icon.ico" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Everything64.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

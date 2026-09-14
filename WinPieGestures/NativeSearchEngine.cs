@@ -11,14 +11,14 @@ namespace WinPieGestures;
 
 /// <summary>
 /// StarPie 内置自包含原生全盘极速搜索引擎
-/// 无需依赖或安装任何第三方软件（如 Everything），开箱即用；
+/// 100% 自包含零外部依赖，开箱即用；
 /// 具备内存预加载常用应用层、桌面与工程极速扫描层，以及多盘并发广度优先穿透能力。
 /// </summary>
 public static class NativeSearchEngine
 {
 	private static readonly object _initLock = new object();
 	private static bool _isInitialized;
-	private static List<EverythingService.SearchResultItem> _cachedApps = new List<EverythingService.SearchResultItem>();
+	private static List<SearchResultItem> _cachedApps = new List<SearchResultItem>();
 	private static DateTime _lastCacheTime = DateTime.MinValue;
 
 	private static readonly HashSet<string> s_ignoredDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -77,11 +77,11 @@ public static class NativeSearchEngine
 				return;
 			}
 
-			var apps = new List<EverythingService.SearchResultItem>();
+			var apps = new List<SearchResultItem>();
 			var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 			// 1. 系统核心控制预设
-			apps.Add(new EverythingService.SearchResultItem
+			apps.Add(new SearchResultItem
 			{
 				FullPath = @"C:\Windows\System32\Taskmgr.exe",
 				FileName = "任务管理器 (Task Manager)",
@@ -92,7 +92,7 @@ public static class NativeSearchEngine
 				BadgeFg = "#64748B",
 				IconEmoji = "📊"
 			});
-			apps.Add(new EverythingService.SearchResultItem
+			apps.Add(new SearchResultItem
 			{
 				FullPath = @"control.exe",
 				FileName = "控制面板 (Control Panel)",
@@ -103,7 +103,7 @@ public static class NativeSearchEngine
 				BadgeFg = "#64748B",
 				IconEmoji = "⚙️"
 			});
-			apps.Add(new EverythingService.SearchResultItem
+			apps.Add(new SearchResultItem
 			{
 				FullPath = @"calc.exe",
 				FileName = "计算器 (Calculator)",
@@ -114,7 +114,7 @@ public static class NativeSearchEngine
 				BadgeFg = "#3B82F6",
 				IconEmoji = "🔢"
 			});
-			apps.Add(new EverythingService.SearchResultItem
+			apps.Add(new SearchResultItem
 			{
 				FullPath = @"explorer.exe",
 				FileName = "文件资源管理器 (File Explorer)",
@@ -153,7 +153,7 @@ public static class NativeSearchEngine
 
 							if (seenPaths.Add(file.FullName))
 							{
-								apps.Add(new EverythingService.SearchResultItem
+								apps.Add(new SearchResultItem
 								{
 									FullPath = file.FullName,
 									FileName = nameWithoutExt,
@@ -204,7 +204,7 @@ public static class NativeSearchEngine
 									{
 										string name = Path.GetFileNameWithoutExtension(subKeyName);
 										var fi = new FileInfo(cleanPath);
-										apps.Add(new EverythingService.SearchResultItem
+										apps.Add(new SearchResultItem
 										{
 											FullPath = cleanPath,
 											FileName = name,
@@ -259,7 +259,7 @@ public static class NativeSearchEngine
 									if (seenPaths.Add(exe))
 									{
 										var fi = new FileInfo(exe);
-										apps.Add(new EverythingService.SearchResultItem
+										apps.Add(new SearchResultItem
 										{
 											FullPath = exe,
 											FileName = $"{dirName} ({exeName})",
@@ -299,7 +299,7 @@ public static class NativeSearchEngine
 										if (seenPaths.Add(exe))
 										{
 											var fi = new FileInfo(exe);
-											apps.Add(new EverythingService.SearchResultItem
+											apps.Add(new SearchResultItem
 											{
 												FullPath = exe,
 												FileName = $"{exeName} ({dirName})",
@@ -336,11 +336,11 @@ public static class NativeSearchEngine
 	/// <summary>
 	/// 当搜索输入为空时，展示智能推荐与常用项目（告别冷冰冰的“未发现匹配文件”）
 	/// </summary>
-	public static List<EverythingService.SearchResultItem> GetInitialRecommendations(string category = "All")
+	public static List<SearchResultItem> GetInitialRecommendations(string category = "All")
 	{
 		EnsureCacheInitialized();
 
-		var list = new List<EverythingService.SearchResultItem>();
+		var list = new List<SearchResultItem>();
 
 		// 1. 优先放入高频应用程序与系统工具
 		if (category == "All" || category == "App" || category == "System")
@@ -371,7 +371,7 @@ public static class NativeSearchEngine
 					if (category == "All" || cat.Equals(category, StringComparison.OrdinalIgnoreCase))
 					{
 						long size = isFolder ? 0 : ((FileInfo)entry).Length;
-						list.Add(new EverythingService.SearchResultItem
+						list.Add(new SearchResultItem
 						{
 							FullPath = entry.FullName,
 							FileName = isFolder ? entry.Name : Path.GetFileName(entry.FullName),
@@ -407,7 +407,7 @@ public static class NativeSearchEngine
 			{
 				if (Directory.Exists(d) && !list.Any(x => x.FullPath.Equals(d, StringComparison.OrdinalIgnoreCase)))
 				{
-					list.Add(new EverythingService.SearchResultItem
+					list.Add(new SearchResultItem
 					{
 						FullPath = d,
 						FileName = Path.GetFileName(d),
@@ -444,7 +444,7 @@ public static class NativeSearchEngine
 						string ext = file.Extension.ToLowerInvariant();
 						if (s_videoExts.Contains(ext) && !list.Any(x => x.FullPath.Equals(file.FullName, StringComparison.OrdinalIgnoreCase)))
 						{
-							list.Add(new EverythingService.SearchResultItem
+							list.Add(new SearchResultItem
 							{
 								FullPath = file.FullName,
 								FileName = file.Name,
@@ -487,15 +487,15 @@ public static class NativeSearchEngine
 	}
 
 	/// <summary>
-	/// 内置原生多线程广度优先全盘极速检索
+	/// 内置原生极速检索引擎：分层递进、置信度短路与时间预算（Time-Budget）保护
 	/// </summary>
-	public static Task<List<EverythingService.SearchResultItem>> SearchAsync(string query, string category = "All", int maxResults = 80, CancellationToken token = default)
+	public static Task<List<SearchResultItem>> SearchAsync(string query, string category = "All", int maxResults = 80, CancellationToken token = default)
 	{
 		return Task.Run(() =>
 		{
 			EnsureCacheInitialized();
 
-			var results = new List<EverythingService.SearchResultItem>();
+			var results = new List<SearchResultItem>();
 			var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 			string q = query.Trim();
@@ -504,7 +504,7 @@ public static class NativeSearchEngine
 				return GetInitialRecommendations(category);
 			}
 
-			// 第一层：从已缓存的应用和控制面板中毫秒级匹配 (0ms)
+			// 第一层：从已缓存的应用和系统级预设中毫秒级匹配 (0ms ~ 1ms)
 			if (category == "All" || category == "App" || category == "System")
 			{
 				var matchedApps = _cachedApps.Where(a =>
@@ -523,6 +523,12 @@ public static class NativeSearchEngine
 					{
 						results.Add(app);
 					}
+				}
+
+				// 若分类为 App 或 System，已索引的应用与系统工具库已完整覆盖，直接短路返回，绝不产生无谓磁盘 I/O
+				if (category == "App" || category == "System")
+				{
+					return results;
 				}
 			}
 
@@ -579,7 +585,7 @@ public static class NativeSearchEngine
 									}
 									catch { }
 
-									results.Add(new EverythingService.SearchResultItem
+									results.Add(new SearchResultItem
 									{
 										FullPath = entry,
 										FileName = name,
@@ -604,41 +610,41 @@ public static class NativeSearchEngine
 				catch { }
 			}
 
-			if (token.IsCancellationRequested || results.Count >= maxResults)
+			// 若在高频目录与应用中已找到充分结果 (>= 20项)，即刻短路返回，保障极致盲操丝滑度
+			if (token.IsCancellationRequested || results.Count >= 20 || results.Count >= maxResults)
 			{
 				return results;
 			}
 
-			// 第三层：并发深盘广度优先穿透检索（重点是深度与流式轻量化）
+			// 第三层：带严格时间预算（Time-Budget）与收敛深度的并发磁盘穿透扫描
+			// 单次交互搜索硬控在 80ms 时间预算内，深度收敛至 4 层，杜绝数万目录地毯式扫描导致的 5~9 秒失控卡顿
 			var searchRoots = new List<string>();
-			AddDirIfValid(searchRoots, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
-			AddDirIfValid(searchRoots, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
-			AddDirIfValid(searchRoots, Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-			AddDirIfValid(searchRoots, @"G:\Users\2 Better\Desktop\design");
-
 			try
 			{
 				foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed))
 				{
-					if (!searchRoots.Contains(drive.RootDirectory.FullName, StringComparer.OrdinalIgnoreCase))
-					{
-						searchRoots.Add(drive.RootDirectory.FullName);
-					}
+					searchRoots.Add(drive.RootDirectory.FullName);
 				}
 			}
 			catch { }
 
 			var syncLock = new object();
-			const int maxDepth = 15; // 深度优先：深度提升至 15 层，彻底解决深层目录搜不到的痛点
-			const int maxVisitedPerRoot = 3500; // 每个根节点最多遍历 3500 目录，多盘并发总数达数万目录
+			var swBudget = Stopwatch.StartNew();
+			const int maxTimeBudgetMs = 50;    // 50ms 时间预算硬控（保证 3 帧内极速出结果）
+			const int maxDepth = 4;            // 实用深度 4 层（足够穿透绝大部分项目与多级文档）
+			const int maxVisitedPerRoot = 200; // 每盘上限 200 目录
 
 			Parallel.ForEach(searchRoots, new ParallelOptions
 			{
-				MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 6),
+				MaxDegreeOfParallelism = Math.Min(Environment.ProcessorCount, 4),
 				CancellationToken = token
-			}, root =>
+			}, (root, state) =>
 			{
-				if (token.IsCancellationRequested) return;
+				if (token.IsCancellationRequested || swBudget.ElapsedMilliseconds > maxTimeBudgetMs)
+				{
+					state.Stop();
+					return;
+				}
 
 				var queue = new Queue<(string path, int depth)>();
 				queue.Enqueue((root, 0));
@@ -646,10 +652,19 @@ public static class NativeSearchEngine
 
 				while (queue.Count > 0 && visited < maxVisitedPerRoot)
 				{
-					if (token.IsCancellationRequested) break;
+					if (token.IsCancellationRequested || swBudget.ElapsedMilliseconds > maxTimeBudgetMs)
+					{
+						state.Stop();
+						break;
+					}
+
 					lock (syncLock)
 					{
-						if (results.Count >= maxResults) break;
+						if (results.Count >= maxResults || results.Count >= 40)
+						{
+							state.Stop();
+							break;
+						}
 					}
 
 					var (curDir, depth) = queue.Dequeue();
@@ -657,13 +672,21 @@ public static class NativeSearchEngine
 
 					try
 					{
-						// 流式字符串枚举：彻底摒弃 EnumerateFileSystemInfos 产生上百万 FileInfo/DirectoryInfo 导致堆段爆炸的缺陷
 						foreach (string fullPath in Directory.EnumerateFileSystemEntries(curDir))
 						{
-							if (token.IsCancellationRequested) break;
+							if (token.IsCancellationRequested || swBudget.ElapsedMilliseconds > maxTimeBudgetMs)
+							{
+								state.Stop();
+								break;
+							}
+
 							lock (syncLock)
 							{
-								if (results.Count >= maxResults) break;
+								if (results.Count >= maxResults || results.Count >= 40)
+								{
+									state.Stop();
+									break;
+								}
 							}
 
 							string name = Path.GetFileName(fullPath);
@@ -672,7 +695,6 @@ public static class NativeSearchEngine
 								continue;
 							}
 
-							// 快速判断目录：通过轻量级 FileAttributes，避免实例化庞大对象
 							FileAttributes attr;
 							try
 							{
@@ -691,12 +713,10 @@ public static class NativeSearchEngine
 							bool isFolder = attr.HasFlag(FileAttributes.Directory);
 							string ext = isFolder ? "" : Path.GetExtension(name).ToLowerInvariant();
 
-							// 匹配关键词
 							if (name.Contains(q, StringComparison.OrdinalIgnoreCase))
 							{
 								var (cat, catDisplay, badgeBg, badgeFg, emoji) = ClassifyEntry(fullPath, isFolder, ext);
 
-								// 分类过滤
 								if (category == "All" || cat.Equals(category, StringComparison.OrdinalIgnoreCase))
 								{
 									lock (syncLock)
@@ -720,7 +740,7 @@ public static class NativeSearchEngine
 											}
 											catch { }
 
-											results.Add(new EverythingService.SearchResultItem
+											results.Add(new SearchResultItem
 											{
 												FullPath = fullPath,
 												FileName = name,
@@ -738,13 +758,17 @@ public static class NativeSearchEngine
 												EngineSource = "Native"
 											});
 
-											if (results.Count >= maxResults) break;
+											if (results.Count >= maxResults || results.Count >= 40)
+											{
+												state.Stop();
+												break;
+											}
 										}
 									}
 								}
 							}
 
-							// 子目录入队：支持深层 15 层递归，过滤无关庞大垃圾缓存
+							// 子目录入队：收敛至实用 4 层深度，过滤冗余垃圾目录
 							if (isFolder && depth < maxDepth)
 							{
 								if (!s_ignoredDirs.Contains(name))

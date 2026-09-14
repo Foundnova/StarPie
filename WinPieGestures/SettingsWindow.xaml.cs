@@ -16518,6 +16518,7 @@ public partial class SettingsWindow : Window
 					double num42 = num2 + Math.Sin(num39) * num40;
 
 					Geometry data2;
+					double itemR_sub = 0.0;
 					if (isFan)
 					{
 						int slot = RadialWindow.GetFanSlotIndex(num36, activeCount);
@@ -16525,7 +16526,7 @@ public partial class SettingsWindow : Window
 						double ratio = (ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0 && ConfigManager.CurrentConfig.WheelRadius > 0.0)
 							? (ConfigManager.CurrentConfig.SubWheelOuterRadius / (ConfigManager.CurrentConfig.WheelRadius * 1.55))
 							: 1.0;
-						double itemR_sub = (num8 - num9) * 0.40 * Math.Max(0.5, Math.Min(2.5, ratio));
+						itemR_sub = (num8 - num9) * 0.40 * Math.Max(0.5, Math.Min(2.5, ratio));
 						double R_sub = ((num9 + num8) / 2.0 * ratio) + num11;
 						double ux = Math.Cos(num24), uy = Math.Sin(num24);
 						double vx = -Math.Sin(num24), vy = Math.Cos(num24);
@@ -16597,12 +16598,14 @@ public partial class SettingsWindow : Window
 						subSectorPreviewTextBrush = CreateBrushFromHexSafe(actionItem2.CustomTextColor, _previewSubTextBrush);
 					}
 
+					double currentSubIconDim = 0.0;
 					if (subShouldShowIcon)
 					{
 						double subBaseIconSize = (actionItem2 != null && actionItem2.CustomIconSize.HasValue && actionItem2.CustomIconSize.Value > 0.0)
 							? actionItem2.CustomIconSize.Value
 							: ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
 						double num43 = ((subLayout == "IconOnly") ? (subBaseIconSize * 1.35) : subBaseIconSize) * 0.65 * num7;
+						currentSubIconDim = num43;
 						UIElement? subIconEl = null;
 
 						if (!string.IsNullOrEmpty(actionItem2?.CustomIconSvg))
@@ -16700,15 +16703,34 @@ public partial class SettingsWindow : Window
 							stackPanel2.Children.Add(subIconEl);
 						}
 					}
+
+					double subBaseFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
+						? actionItem2.CustomFontSize.Value
+						: ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 10.0);
+
+					double num45;
+					double num46;
+					if (isFan)
+					{
+						double reqHoneyH = (subShouldShowIcon ? currentSubIconDim : 0.0) + subBaseFontSize * 2.6 * num7 + 8.0 * num7;
+						num45 = Math.Max(itemR_sub * 2.2, subBaseFontSize * 5.5 * num7);
+						num46 = Math.Max(itemR_sub * 2.0, reqHoneyH);
+					}
+					else
+					{
+						double previewSubThickness = Math.Max(24.0 * num7, num13 - num12);
+						double previewArcLength = num40 * (num35 * Math.PI / 180.0);
+						num45 = Math.Max((count >= 4 ? 76.0 : 92.0) * num7, Math.Min(140.0 * num7, previewArcLength * 0.90));
+						double minReqH = (subShouldShowIcon ? currentSubIconDim : 0.0) + subBaseFontSize * 2.6 * num7 + 8.0 * num7;
+						num46 = Math.Max((count >= 4 ? 54.0 : 64.0) * num7, Math.Min(130.0 * num7, Math.Max(previewSubThickness * 0.88, minReqH)));
+					}
+
 					if (subShouldShowText && !string.IsNullOrEmpty(actionItem2.Name))
 					{
-						double subBaseFontSize = (actionItem2 != null && actionItem2.CustomFontSize.HasValue && actionItem2.CustomFontSize.Value > 0.0)
-							? actionItem2.CustomFontSize.Value
-							: ((ConfigManager.CurrentConfig.SubWheelFontSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelFontSize : 10.0);
 						string subFontFamily = (actionItem2 != null && !string.IsNullOrWhiteSpace(actionItem2.CustomFontFamily))
 							? actionItem2.CustomFontFamily
 							: (ConfigManager.CurrentConfig.WheelFontFamily ?? "Microsoft YaHei UI, Segoe UI");
-						double subFontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.75 * num7);
+						double subFontSize = Math.Max(5.0, ((subLayout == "TextOnly") ? (subBaseFontSize + 1.0) : subBaseFontSize) * 0.88 * num7);
 						int subCharLen = actionItem2.Name.Length;
 						string subPreviewText = SectorTextFormatter.FormatSectorText(actionItem2.Name, num19, isSubWheel: true);
 						string[] subPreviewLines = subPreviewText.Split('\n');
@@ -16735,12 +16757,11 @@ public partial class SettingsWindow : Window
 							TextTrimming = TextTrimming.CharacterEllipsis,
 							LineHeight = Math.Max(5.5, subFontSize * 1.15),
 							LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-							MaxWidth = 64.0 * num7
+							MaxWidth = Math.Max(48.0 * num7, num45 - 4.0 * num7),
+							MaxHeight = Math.Max(subFontSize * 2.6 + 4.0 * num7, num46 - (subShouldShowIcon ? currentSubIconDim + 4.0 * num7 : 6.0 * num7))
 						};
 						stackPanel2.Children.Add(element8);
 					}
-					double num45 = 68.0 * num7;
-					double num46 = 34.0 * num7;
 					Grid grid3 = new Grid
 					{
 						Width = num45,

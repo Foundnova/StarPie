@@ -2262,8 +2262,11 @@ public partial class RadialWindow : Window
 			_subSectorAngles.Add(num12);
 			_subSectorParentIndices.Add(parentIndex);
 			_subSectorChildIndices.Add(i);
-			double num16 = ((count >= 4) ? 76.0 : 92.0);
-			double num17 = ((count >= 4) ? 54.0 : 64.0);
+			double subArcLength = num13 * (num9 * Math.PI / 180.0);
+			double subThickness = Math.Max(30.0, num4 - num6);
+			double num16 = Math.Max((count >= 4 ? 76.0 : 92.0), Math.Min(140.0, subArcLength * 0.90));
+			double minReqH = (text != "TextOnly" ? num7 : 0.0) + fontSize * 2.6 + 10.0;
+			double num17 = Math.Max((count >= 4 ? 54.0 : 64.0), Math.Min(130.0, Math.Max(subThickness * 0.88, minReqH)));
 			ScaleTransform scaleTransform2 = new ScaleTransform(animateEntrance ? 0.75 : 1.0, animateEntrance ? 0.75 : 1.0, num16 / 2.0, num17 / 2.0);
 			TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup2 = new TransformGroup();
@@ -2461,8 +2464,8 @@ public partial class RadialWindow : Window
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					MaxWidth = num16 - 2.0,
-					MaxHeight = 32.0,
+					MaxWidth = Math.Max(52.0, num16 - 4.0),
+					MaxHeight = Math.Max(subFinalFontSize * 2.6 + 4.0, num17 - (subShouldShowIcon ? subIconSize + 4.0 : 6.0)),
 					LineHeight = Math.Max(8.5, subFinalFontSize * 1.15),
 					LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
 					Effect = (Effect)base.Resources["TextShadow"]
@@ -3306,8 +3309,9 @@ public partial class RadialWindow : Window
 			_subSectorTransforms.Add(translateTransform);
 			_subSectorAngles.Add(midRad);
 
-			double containerW = itemR * 2.2;
-			double containerH = itemR * 2.0;
+			double reqHoneyH = (layoutMode != "TextOnly" ? num7 : 0.0) + fontSize * 2.6 + 10.0;
+			double containerW = Math.Max(itemR * 2.2, fontSize * 5.5);
+			double containerH = Math.Max(itemR * 2.0, reqHoneyH);
 			ScaleTransform scaleTransform2 = new ScaleTransform(0.75, 0.75, containerW / 2.0, containerH / 2.0);
 			TranslateTransform translateTransform2 = new TranslateTransform(0.0, 0.0);
 			TransformGroup transformGroup2 = new TransformGroup();
@@ -3506,8 +3510,8 @@ public partial class RadialWindow : Window
 					TextAlignment = TextAlignment.Center,
 					TextWrapping = TextWrapping.Wrap,
 					TextTrimming = TextTrimming.CharacterEllipsis,
-					MaxWidth = containerW - 2.0,
-					MaxHeight = 28.0,
+					MaxWidth = Math.Max(50.0, containerW - 4.0),
+					MaxHeight = Math.Max(honeyFinalFontSize * 2.6 + 4.0, containerH - (subShouldShowIcon ? subIconSize + 4.0 : 6.0)),
 					LineHeight = Math.Max(8.5, honeyFinalFontSize * 1.15),
 					LineStackingStrategy = LineStackingStrategy.BlockLineHeight
 				};

@@ -174,7 +174,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		{
 			Key = "QuickSearch",
 			Category = "系统工具",
-			DisplayName = "全盘文件与程序秒搜 (Quick Finder / Everything)",
+			DisplayName = "全盘文件与程序秒搜 (Quick Finder)",
 			DefaultName = "快速秒搜",
 			DefaultIconKey = "Search"
 		},

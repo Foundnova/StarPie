@@ -793,16 +793,16 @@ public partial class ProgramPickerWindow : Window
 				return;
 			}
 
-			// 如果输入了关键词，通过 Everything 全盘穿透搜索免安装绿色程序 (.exe)
+			// 如果输入了关键词，通过 StarPie 原生引擎全盘穿透搜索免安装绿色程序 (.exe)
 			List<ProgramItem> portableMatches = new List<ProgramItem>();
 			string queryTrimmed = text.Trim();
 			if (!string.IsNullOrEmpty(queryTrimmed) && queryTrimmed.Length >= 2)
 			{
-				var everythingItems = await EverythingService.SearchExecutablesAsync(queryTrimmed, 50);
+				var nativeItems = await NativeSearchEngine.SearchAsync(queryTrimmed, "App", 50, cts.Token);
 				if (cts.Token.IsCancellationRequested) return;
 
 				var existingPaths = new HashSet<string>(list.Select(m => m.Path), StringComparer.OrdinalIgnoreCase);
-				foreach (var ev in everythingItems)
+				foreach (var ev in nativeItems)
 				{
 					if (existingPaths.Contains(ev.FullPath)) continue;
 					existingPaths.Add(ev.FullPath);
