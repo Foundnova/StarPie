@@ -81,6 +81,27 @@ public class GestureController : IDisposable
 
 	private readonly List<(int dir, double len)> _gestureRuns = new List<(int, double)>();
 
+	// 图样缓存的有效性由“行程列表版本 + 待决段方向 + 待决段是否达到灵敏度阈值 + 当前灵敏度”共同决定。
+	// 待决段长度在未跨越阈值前变化不会改变最终图样，因此可安全复用缓存。
+	private int _gestureRunsVersion;
+
+	private int _patternCacheRunsVersion = -1;
+
+	private int _patternCachePendingDir = -2;
+
+	private bool _patternCachePendingIncluded;
+
+	private double _patternCacheSegmentMin = double.NaN;
+
+	private string _cachedPattern = string.Empty;
+
+	// 提示文本额外绑定图样和配置修订号，避免修改手势映射后继续显示旧动作名。
+	private string _cachedHintPattern = string.Empty;
+
+	private long _cachedHintConfigurationRevision = -1L;
+
+	private string _cachedHint = string.Empty;
+
 	private int _gesturePendingDir = -1;
 
 	private double _gesturePendingLen;
@@ -1001,6 +1022,28 @@ public class GestureController : IDisposable
 		return (int)Math.Round(deg / 45.0) % 8;
 	}
 
+	private void AddGestureRun(int dir, double len, bool trimToMaxCount)
+	{
+		_gestureRuns.Add((dir, len));
+		_gestureRunsVersion++;
+		if (trimToMaxCount && _gestureRuns.Count > 12)
+		{
+			_gestureRuns.RemoveAt(0);
+		}
+	}
+
+	private void InvalidateGesturePatternCaches()
+	{
+		_patternCacheRunsVersion = -1;
+		_patternCachePendingDir = -2;
+		_patternCachePendingIncluded = false;
+		_patternCacheSegmentMin = double.NaN;
+		_cachedPattern = string.Empty;
+		_cachedHintPattern = string.Empty;
+		_cachedHintConfigurationRevision = -1L;
+		_cachedHint = string.Empty;
+	}
+
 	private void BeginGesture(Point pressPoint)
 	{
 		_gestureMode = true;
@@ -1009,6 +1052,8 @@ public class GestureController : IDisposable
 		_gesturePressPoint = pressPoint;
 		_gestureLastSample = pressPoint;
 		_gestureRuns.Clear();
+		_gestureRunsVersion++;
+		InvalidateGesturePatternCaches();
 		_gesturePendingDir = -1;
 		_gesturePendingLen = 0.0;
 		var (tScaleX, tScaleY) = RadialWindow.GetMonitorDpiScale(pressPoint);
@@ -1070,11 +1115,7 @@ public class GestureController : IDisposable
 		{
 			if (_gesturePendingLen > 0.0)
 			{
-				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
-				if (_gestureRuns.Count > 12)
-				{
-					_gestureRuns.RemoveAt(0);
-				}
+				AddGestureRun(_gesturePendingDir, _gesturePendingLen, trimToMaxCount: true);
 			}
 			_gesturePendingDir = dir;
 			_gesturePendingLen = dist;
@@ -1109,8 +1150,16 @@ public class GestureController : IDisposable
 	private string GetPreviewPattern()
 	{
 		double segMin = ConfigManager.CurrentConfig.GestureSegmentSensitivity > 6.0 ? ConfigManager.CurrentConfig.GestureSegmentSensitivity : 12.0;
+		bool pendingIncluded = _gesturePendingDir >= 0 && _gesturePendingLen >= segMin;
+		if (_patternCacheRunsVersion == _gestureRunsVersion
+			&& _patternCachePendingDir == _gesturePendingDir
+			&& _patternCachePendingIncluded == pendingIncluded
+			&& _patternCacheSegmentMin.Equals(segMin))
+		{
+			return _cachedPattern;
+		}
 		List<(int dir, double len)> runs = new List<(int, double)>(_gestureRuns);
-		if (_gesturePendingDir >= 0 && _gesturePendingLen > 0.0)
+		if (pendingIncluded)
 		{
 			runs.Add((_gesturePendingDir, _gesturePendingLen));
 		}
@@ -1131,7 +1180,12 @@ public class GestureController : IDisposable
 				break;
 			}
 		}
-		return string.Join("-", dirs.Select(GestureDirCode));
+		_cachedPattern = dirs.Count == 0 ? string.Empty : string.Join("-", dirs.Select(GestureDirCode));
+		_patternCacheRunsVersion = _gestureRunsVersion;
+		_patternCachePendingDir = _gesturePendingDir;
+		_patternCachePendingIncluded = pendingIncluded;
+		_patternCacheSegmentMin = segMin;
+		return _cachedPattern;
 	}
 
 	/// <summary>图样 → 箭头文本（如 "D-R" → "↓→"）。</summary>
@@ -1151,18 +1205,32 @@ public class GestureController : IDisposable
 	/// <summary>提示文本：图样箭头 + 映射动作名/参数；未映射只显示图样。</summary>
 	private string BuildGestureHint(string pattern)
 	{
+		long configurationRevision = ConfigManager.ConfigurationRevision;
+		if (string.Equals(pattern, _cachedHintPattern, StringComparison.Ordinal)
+			&& _cachedHintConfigurationRevision == configurationRevision)
+		{
+			return _cachedHint;
+		}
 		string glyph = GesturePatternGlyph(pattern);
 		ActionItem? a = FindGestureAction(pattern);
+		string hint;
 		if (a == null)
 		{
-			return glyph;
+			hint = glyph;
 		}
-		string label = (!string.IsNullOrEmpty(a.Name) && a.Name != "手势动作") ? a.Name : (a.Parameter ?? "");
-		if (string.IsNullOrEmpty(label))
+		else
 		{
-			label = a.Type ?? "";
+			string label = (!string.IsNullOrEmpty(a.Name) && a.Name != "手势动作") ? a.Name : (a.Parameter ?? "");
+			if (string.IsNullOrEmpty(label))
+			{
+				label = a.Type ?? "";
+			}
+			hint = string.IsNullOrEmpty(label) ? glyph : $"{glyph}  {label}";
 		}
-		return string.IsNullOrEmpty(label) ? glyph : $"{glyph}  {label}";
+		_cachedHintPattern = pattern;
+		_cachedHintConfigurationRevision = configurationRevision;
+		_cachedHint = hint;
+		return _cachedHint;
 	}
 
 	private void EndGesture(Point current)
@@ -1183,7 +1251,7 @@ public class GestureController : IDisposable
 				{
 					if (_gesturePendingLen > 0.0)
 					{
-						_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+						AddGestureRun(_gesturePendingDir, _gesturePendingLen, trimToMaxCount: false);
 					}
 					_gesturePendingDir = dir;
 					_gesturePendingLen = dist;
@@ -1191,7 +1259,7 @@ public class GestureController : IDisposable
 			}
 			if (_gesturePendingLen > 0.0)
 			{
-				_gestureRuns.Add((_gesturePendingDir, _gesturePendingLen));
+				AddGestureRun(_gesturePendingDir, _gesturePendingLen, trimToMaxCount: false);
 			}
 		}
 		_gesturePendingDir = -1;
