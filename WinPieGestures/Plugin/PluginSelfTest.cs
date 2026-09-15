@@ -36,6 +36,10 @@ internal static class PluginSelfTest
         void Line(string text)
         {
             report.AppendLine(text);
+            // 实时打到终端。这条通道以前只写 Debug（进调试器）与最终的报告文件，
+            // 命令行里跑完什么都看不到 —— 而它存在的意义恰恰是「一条命令拿到全链路证据」，
+            // 前提是那条命令的输出真的看得见（父控制台的接入见 App.AttachParentConsoleIfCli）。
+            Console.WriteLine(text);
             System.Diagnostics.Debug.WriteLine(text);
         }
 
@@ -848,16 +852,56 @@ internal static class PluginSelfTest
 
     private static int Write(StringBuilder report, string? reportPath, bool pass)
     {
-        string path = reportPath ?? Path.Combine(
-            Path.GetTempPath(),
-            $"starpie-plugin-selftest-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        string text = report.ToString();
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
 
-        try
+        // 报告是这条通道唯一的产物，**绝不能写不出去还不作声**。
+        // 这里以前是个空的 catch：结果是「退出码 0、报告却遍寻不着」，而且毫无线索 ——
+        // 一次成功的自检看起来和一次静默失败一模一样。
+        string[] candidates = !string.IsNullOrWhiteSpace(reportPath)
+            ? new[] { reportPath! }
+            : new[]
+            {
+                Path.Combine(Path.GetTempPath(), $"starpie-plugin-selftest-{stamp}.txt"),
+                // 临时目录写不进去（权限受限、被重定向、被清理）时退到日志目录：
+                // 那里必然可写，否则日志本身也写不了。
+                Path.Combine(AppLogger.GetLogFolderPath(), $"starpie-plugin-selftest-{stamp}.txt"),
+            };
+
+        string? written = null;
+        Exception? lastError = null;
+
+        foreach (string candidate in candidates)
         {
-            File.WriteAllText(path, report.ToString(), Encoding.UTF8);
+            try
+            {
+                string? directory = Path.GetDirectoryName(candidate);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                File.WriteAllText(candidate, text, Encoding.UTF8);
+                written = candidate;
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+            }
         }
-        catch
+
+        if (written is null)
         {
+            AppLogger.LogError("自检报告写入失败（已尝试全部候选路径）", lastError ?? new IOException("未知原因"));
+            Console.WriteLine($"[WARN] 自检报告写入失败：{lastError?.Message}");
+            Console.WriteLine("报告未能落盘，以下为完整内容：");
+            Console.WriteLine(text);
+        }
+        else
+        {
+            AppLogger.LogInfo($"自检报告已写入：{written}");
+            Console.WriteLine();
+            Console.WriteLine($"报告已写入：{written}");
         }
 
         return pass ? 0 : 1;
