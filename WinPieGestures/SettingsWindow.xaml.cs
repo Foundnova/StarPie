@@ -5011,11 +5011,10 @@ public partial class SettingsWindow : Window
 			bool isWindowManager = type == "Tile" || type == "ToggleTopmost" || type == "MoveMonitor" || type == "WindowOpacity" || type == "SwitchWindow";
 			if (FocusActionTypeComboBox != null)
 			{
-				// 插件动作的 Tag 不是裸 "Plugin"，而是 Plugin:<贡献点全ID>。
-				// 若这里回退成裸 "Plugin"，下拉框会永远停在兜底项上，
-				// 用户看不到自己真正配置的是哪一个插件动作。
+				// 插件动作在类型下拉里就投影成它自己（只有这一项）；
+				// 具体是哪一个动作由下方的子下拉承载，见 RefreshFocusPluginActionComboBox。
 				string targetTag = type == PluginActionBinding.TypeName
-					? PluginActionBinding.ProjectTag(displayItem)
+					? PluginActionBinding.TypeName
 					: (isWindowManager ? "WindowManager" : type);
 				UpdateFocusActionTypeItemsSource(targetTag);
 				if (FocusActionTypeComboBox.ItemsSource is IEnumerable<ActionTypeItem> typeItems)
@@ -5042,6 +5041,9 @@ public partial class SettingsWindow : Window
 			if (FocusOcrPanel != null) FocusOcrPanel.Visibility = (type == "Ocr" || type == "ScreenOcr") ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusPluginPanel != null) FocusPluginPanel.Visibility = (type == PluginActionBinding.TypeName) ? Visibility.Visible : Visibility.Collapsed;
 			if (type == PluginActionBinding.TypeName) RefreshFocusPluginPanel(displayItem);
+
+			// 插件动作子下拉（按插件分组）。非插件类型时由该方法自行隐藏并清空。
+			RefreshFocusPluginActionComboBox(displayItem);
 			if (FocusShellToolPanel != null)
 			{
 				FocusShellToolPanel.Visibility = (type == "ShellTool") ? Visibility.Visible : Visibility.Collapsed;
@@ -5742,6 +5744,73 @@ public partial class SettingsWindow : Window
 	}
 
 	/// <summary>
+	/// 刷新焦点编辑器的「插件动作」子下拉（按插件分组）。
+	/// <para>
+	/// 候选集合每次重建，以便在插件管理页里启用 / 停用一个插件后立刻反映到这里。
+	/// 重建会让下拉框短暂把 <c>SelectedValue</c> 置空，因此整段用
+	/// <c>_isUpdatingFocusUi</c> 包住 —— 否则那次置空会被 SelectionChanged 当成
+	/// 用户的选择，把已配好的动作清掉。
+	/// </para>
+	/// </summary>
+	private void RefreshFocusPluginActionComboBox(ActionItem item)
+	{
+		if (FocusPluginActionComboBox == null || FocusPluginActionRow == null) return;
+
+		bool isPlugin = item.Type == PluginActionBinding.TypeName;
+		if (!isPlugin)
+		{
+			FocusPluginActionRow.Visibility = Visibility.Collapsed;
+			FocusPluginActionComboBox.ItemsSource = null;
+			return;
+		}
+
+		FocusPluginActionRow.Visibility = Visibility.Visible;
+
+		bool oldUpdating = _isUpdatingFocusUi;
+		try
+		{
+			_isUpdatingFocusUi = true;
+			FocusPluginActionComboBox.ItemsSource = PluginActionBinding.BuildPluginActionView();
+
+			// 引用失效（插件停用 / 卸载）时 ProjectSelectedAction 会返回 null，
+			// 下拉框显示为未选中；具体原因由下方的插件面板如实说明。
+			FocusPluginActionComboBox.SelectedValue = PluginActionBinding.ProjectSelectedAction(item);
+		}
+		finally
+		{
+			_isUpdatingFocusUi = oldUpdating;
+		}
+	}
+
+	/// <summary>
+	/// 用户在子下拉里选定了一个具体的插件动作。
+	/// <para>
+	/// 这里刻意不复用 <c>UpdateFocusEditorUi</c> 之外的路径：<c>Apply</c> 在「名称 / 图标尚未
+	/// 自定义」时会自动填充，必须整体刷新一次界面对齐，否则名称框会停在旧动作的名字上。
+	/// </para>
+	/// </summary>
+	private void FocusPluginActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
+		if (FocusPluginActionComboBox == null) return;
+
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null || item.Type != PluginActionBinding.TypeName) return;
+
+		if (FocusPluginActionComboBox.SelectedValue is not string fullId || string.IsNullOrWhiteSpace(fullId)) return;
+
+		// 写失败说明插件刚好被停用 / 卸载 —— 保持原配置不动，重新拉一次候选让界面回到真实状态。
+		if (!PluginActionBinding.Apply(item, fullId))
+		{
+			RefreshFocusPluginActionComboBox(item);
+			return;
+		}
+
+		UpdateFocusEditorUi();
+		ScheduleAutoSave();
+	}
+
+	/// <summary>
 	/// 刷新焦点编辑器中的「插件动作」面板：动作信息 + 参数表单 + 参数校验结论。
 	/// <para>
 	/// 参数表单完全由插件声明的 <see cref="StarPie.Plugin.ParameterField"/> 驱动，
@@ -5757,7 +5826,12 @@ public partial class SettingsWindow : Window
 		if (reference == null || !reference.IsValid)
 		{
 			FocusPluginTitleText.Text = "🔌 " + I18n.T("ActionTypePluginShort");
-			FocusPluginDetailText.Text = "尚未选定具体的插件动作。请在左侧「触发动作类型」下拉框中选择一个由插件注册的动作。";
+			// 区分「还没选」与「根本没得选」：前者引导去下拉里挑，
+			// 后者让用户对着一个空下拉框找，只会让人以为功能坏了。
+			FocusPluginDetailText.Text = PluginActionBinding.BuildPluginActionItems().Count > 0
+				? "尚未选定具体的插件动作。请在上方「插件动作」下拉框中选择 —— " +
+				  "候选动作按插件分组，同一插件的动作都归在它以自己名字命名的那个分组下。"
+				: "当前没有可用的插件动作。请先到「插件与扩展」页安装并启用插件，再回到这里选择。";
 			if (FocusPluginParamsHintText != null) FocusPluginParamsHintText.Visibility = Visibility.Collapsed;
 			if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Collapsed;
 			ClearFocusPluginParameterForm();
@@ -5771,7 +5845,7 @@ public partial class SettingsWindow : Window
 			FocusPluginDetailText.Text =
 				$"所引用的插件动作当前不可用：{reference.FullId}\n" +
 				"可能是该插件已被停用或卸载，也可能是插件升级后移除了这个动作。\n" +
-				"到「插件与扩展」页确认插件状态即可。";
+				"到「插件与扩展」页确认插件状态，或直接在上方「插件动作」下拉框里改选另一个动作。";
 			if (FocusPluginParamsHintText != null)
 			{
 				FocusPluginParamsHintText.Text = "⚠️ 触发时会明确提示「插件动作不可用」，不会静默无操作。";
@@ -5785,7 +5859,16 @@ public partial class SettingsWindow : Window
 		FocusPluginTitleText.Text = "🔌 " + registration.DisplayName;
 
 		var detail = new System.Text.StringBuilder();
-		detail.Append("提供插件：").Append(registration.PluginId);
+		// 插件名与子下拉的分组标题保持一致，用户才能把两处对上号；ID 另行标注，
+		// 排查问题时仍然需要它。
+		detail.Append("提供插件：").Append(PluginActionBinding.ResolvePluginDisplayName(registration.PluginId));
+		if (!string.Equals(
+				PluginActionBinding.ResolvePluginDisplayName(registration.PluginId),
+				registration.PluginId,
+				StringComparison.Ordinal))
+		{
+			detail.Append("（").Append(registration.PluginId).Append('）');
+		}
 		detail.Append("　|　执行方式：").Append(registration.Kind == StarPie.Plugin.ActionKind.Background
 			? "后台并发（不占用动作线程）"
 			: "串行（占用动作线程）");
@@ -6396,13 +6479,9 @@ public partial class SettingsWindow : Window
 			FocusActionTypeComboBox.ItemsSource = targetList;
 			if (prevSelectedTag != null)
 			{
+				// 插件动作的 Tag 现在固定是裸 "Plugin"，一定在列表里 ——
+				// 不再需要「引用失效时退回兜底项」的退化匹配（那是贡献点 ID 编码进 Tag 时代的产物）。
 				var match = targetList.FirstOrDefault(t => string.Equals(t.Tag, prevSelectedTag, StringComparison.OrdinalIgnoreCase));
-				if (match == null && PluginActionBinding.TryParseTag(prevSelectedTag, out _))
-				{
-					// 原先引用的插件动作已随插件停用 / 卸载而消失 —— 退回到兜底项。
-					// 不这样处理的话下拉框会显示成空白，用户会以为自己的配置丢了。
-					match = targetList.FirstOrDefault(t => string.Equals(t.Tag, PluginActionBinding.TypeName, StringComparison.OrdinalIgnoreCase));
-				}
 				if (match != null)
 				{
 					FocusActionTypeComboBox.SelectedItem = match;
@@ -6422,17 +6501,11 @@ public partial class SettingsWindow : Window
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null && FocusActionTypeComboBox.SelectedValue is string newType)
 		{
-			if (PluginActionBinding.TryParseTag(newType, out string pluginFullId))
+			if (newType == PluginActionBinding.TypeName)
 			{
-				// 选中了某个具体的插件动作。它的身份不在 Type 里（所有插件动作都是 "Plugin"），
-				// 而在 PluginActionRef 里 —— 交给绑定器一次性写全。
-				PluginActionBinding.Apply(item, pluginFullId);
-			}
-			else if (newType == PluginActionBinding.TypeName)
-			{
-				// 兜底项「插件动作（未选择）」：类型保留为 Plugin，但清掉具体引用。
-				// 这样执行时会明确提示「请先选择具体插件动作」，而不是静默无操作。
-				PluginActionBinding.Clear(item);
+				// 只切类型，**刻意不清插件引用**：用户在内置类型与插件动作之间来回切换时，
+				// 已配好的插件动作不应被清掉（改选具体动作是子下拉的事）。
+				// 引用为空只表示「还没选过」，由子下拉的空状态去引导。
 				item.Type = PluginActionBinding.TypeName;
 				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("动作"))
 				{

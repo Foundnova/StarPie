@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using StarPie.Plugin;
@@ -394,6 +395,142 @@ internal static class PluginSelfTest
                 }
             }
         }
+
+        // ---- 3c 选择器接缝 ----
+        line("");
+        line("[3c] 动作选择器接缝（类型收敛 + 按插件分组的子下拉）");
+
+        // 类型下拉里的插件项只能有一项。
+        // 若像早先那样把每个插件动作都平铺进去，装十个插件就会多出上百项，
+        // 把内置动作挤到看不见的地方 —— 而内置项的顺序属于用户的肌肉记忆。
+        List<ActionTypeItem> typeItems = PluginActionBinding.BuildActionTypeItems();
+        line($"    类型下拉里的插件项：{typeItems.Count} 项（应为 1 项）");
+        if (typeItems.Count != 1)
+        {
+            return $"类型下拉里的插件项应为 1 项，实际 {typeItems.Count} 项 —— 装一个插件就多一项会把内置动作挤走。";
+        }
+        if (!string.Equals(typeItems[0].Tag, PluginApi.ActionTypeName, StringComparison.Ordinal))
+        {
+            return $"类型下拉的插件项 Tag 应为 {PluginApi.ActionTypeName}，实际是「{typeItems[0].Tag}」。";
+        }
+
+        // 子下拉候选：每个已注册动作都必须出现，且同一插件的动作落在同一分组。
+        List<PluginActionRegistration> registered = PluginHost.GetRegisteredActions();
+        List<PluginActionItem> options = PluginActionBinding.BuildPluginActionItems();
+
+        line($"    子下拉候选：{options.Count} 项 / 已注册动作 {registered.Count} 项");
+        if (options.Count != registered.Count)
+        {
+            return "子下拉候选数与已注册动作数不一致 —— 用户会看到少了动作，却无从判断少了哪些。";
+        }
+
+        var groupOfPlugin = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (PluginActionRegistration registration in registered)
+        {
+            PluginActionItem? option = options.FirstOrDefault(o => o.FullId == registration.FullId);
+            if (option == null)
+            {
+                return $"已注册动作 {registration.FullId} 未出现在子下拉候选里。";
+            }
+            if (string.IsNullOrWhiteSpace(option.GroupName))
+            {
+                return $"动作 {registration.FullId} 没有分组名 —— 它在下拉里会成为没有归属的孤儿项。";
+            }
+
+            // 同一插件的动作必须归入同一分组。若按动作名去分组，
+            // 一个插件的各个动作会各自成组，界面立刻变成一锅粥。
+            if (groupOfPlugin.TryGetValue(registration.PluginId, out string? existing))
+            {
+                if (!string.Equals(existing, option.GroupName, StringComparison.Ordinal))
+                {
+                    return $"同一插件（{registration.PluginId}）的动作被分到了不同分组：" +
+                           $"「{existing}」与「{option.GroupName}」。";
+                }
+            }
+            else
+            {
+                groupOfPlugin[registration.PluginId] = option.GroupName;
+            }
+        }
+
+        // 插件显示名是否真的互相冲突 —— 只有冲突时，组标题才允许带上插件 ID 后缀。
+        List<string> pluginIds = new List<string>(groupOfPlugin.Keys);
+        var displayNames = pluginIds
+            .Select(id => PluginActionBinding.ResolvePluginDisplayName(id))
+            .ToList();
+        bool nameCollision = displayNames.Count != displayNames.Distinct(StringComparer.Ordinal).Count();
+
+        foreach (string ownerId in pluginIds)
+        {
+            string groupName = groupOfPlugin[ownerId];
+            string expectedName = PluginActionBinding.ResolvePluginDisplayName(ownerId);
+            int count = registered.Count(r => string.Equals(r.PluginId, ownerId, StringComparison.Ordinal));
+            line($"    分组「{groupName}」→ {count} 个动作");
+
+            if (!nameCollision)
+            {
+                // 插件名互不相同是常态，此时组标题必须就是插件名本身。
+                // 多出任何后缀都会让用户以为装了别的什么插件 —— 而这类问题在界面上
+                // 看起来完全正常，只有对着插件列表才发现对不上。
+                if (!string.Equals(groupName, expectedName, StringComparison.Ordinal))
+                {
+                    return $"插件 {ownerId} 的分组名「{groupName}」应为「{expectedName}」—— " +
+                           "插件名并不重复，不该给组标题加后缀。";
+                }
+                continue;
+            }
+
+            if (!groupName.StartsWith(expectedName, StringComparison.Ordinal))
+            {
+                return $"插件 {ownerId} 的分组名「{groupName}」与它的显示名「{expectedName}」不一致 —— " +
+                       "子下拉的组标题会与详情面板里的插件标识对不上号。";
+            }
+        }
+
+        // 写读往返：子下拉选中 → 落库 → 再投影回下拉，必须仍是同一个动作。
+        // 这条路断了会出现最难查的一类故障：界面看着正常，触发时却是另一个动作。
+        foreach (PluginActionRegistration registration in registered)
+        {
+            var probe = new ActionItem
+            {
+                Type = PluginApi.ActionTypeName,
+                ExtensionData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            };
+
+            if (!PluginActionBinding.Apply(probe, registration.FullId))
+            {
+                return $"写入动作 {registration.FullId} 失败。";
+            }
+
+            string? projected = PluginActionBinding.ProjectSelectedAction(probe);
+            if (!string.Equals(projected, registration.FullId, StringComparison.Ordinal))
+            {
+                return $"动作 {registration.FullId} 写入后投影回来变成了「{projected ?? "(空)"}」—— " +
+                       "界面会显示成没选动作。";
+            }
+
+            if (PluginActionBinding.IsReferenceBroken(probe))
+            {
+                return $"刚写入的动作 {registration.FullId} 立刻被判为「引用已失效」。";
+            }
+
+            if (!string.Equals(probe.Type, PluginApi.ActionTypeName, StringComparison.Ordinal))
+            {
+                return $"写入后 Type 变成了「{probe.Type}」，应为 {PluginApi.ActionTypeName} —— 类型下拉会选不中。";
+            }
+        }
+        line($"    写读往返：{registered.Count} 个动作全部一致");
+
+        // 切回内置类型必须清干净，否则留下「内置类型 + 悬挂插件引用 + 插件参数」的混合状态，
+        // 那种配置界面上看不出来，却会在导出与执行时各表现一次。
+        var cleared = new ActionItem { Type = PluginApi.ActionTypeName };
+        PluginActionBinding.Apply(cleared, registered[0].FullId);
+        PluginActionBinding.Clear(cleared);
+        if (cleared.PluginActionRef != null || cleared.ExtensionData != null)
+        {
+            return "Clear 之后仍有插件引用或插件参数残留。";
+        }
+        line("    切回内置类型：插件引用与插件参数均已清空");
 
         // ---- 4 调用 ----
         line("");
