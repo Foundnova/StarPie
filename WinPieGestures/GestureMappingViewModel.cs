@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using WinPieGestures.Plugins;
 
 namespace WinPieGestures;
 
@@ -62,6 +63,12 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		get
 		{
 			string t = Mapping.Action.Type ?? "Hotkey";
+			if (t == PluginActionBinding.TypeName)
+			{
+				// 插件动作的真实身份不在 Type 里（所有插件动作都是 "Plugin"），
+				// 而在 PluginActionRef 里 —— 投影成一串唯一 Tag 才能被下拉框选中。
+				return PluginActionBinding.ProjectTag(Mapping.Action);
+			}
 			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
 			{
 				return "WindowManager";
@@ -72,10 +79,15 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		{
 			if (!string.IsNullOrEmpty(value))
 			{
-				if (value == "WindowManager")
+				if (PluginActionBinding.TryParseTag(value, out string pluginFullId))
+				{
+					PluginActionBinding.Apply(Mapping.Action, pluginFullId);
+				}
+				else if (value == "WindowManager")
 				{
 					if (!IsWindowManagerType)
 					{
+						PluginActionBinding.Clear(Mapping.Action);
 						Type = "Tile";
 						if (string.IsNullOrEmpty(Mapping.Action.Parameter))
 						{
@@ -85,14 +97,21 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 				}
 				else
 				{
+					// 切回内置动作类型时必须清掉插件引用，否则会残留一个
+					// 「Type 是内置类型、却还挂着插件引用」的混合状态。
+					PluginActionBinding.Clear(Mapping.Action);
 					Type = value;
 				}
 				OnPropertyChanged(nameof(AggregatedType));
 				OnPropertyChanged(nameof(IsWindowManagerType));
+				OnPropertyChanged(nameof(IsPluginType));
 				NotifyAllPropertiesChanged();
 			}
 		}
 	}
+
+	/// <summary>当前动作是否为插件动作（用于界面显示对应的编辑面板）。</summary>
+	public bool IsPluginType => Type == PluginActionBinding.TypeName;
 
 	public bool IsWindowManagerType => 
 		Type == "Tile" || Type == "ToggleTopmost" || Type == "MoveMonitor" || 

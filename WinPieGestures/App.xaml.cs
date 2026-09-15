@@ -95,7 +95,7 @@ public partial class App : Application
 		{
 		}
 		string commandLine = Environment.CommandLine;
-		if (!commandLine.Contains("--allow-multiple", StringComparison.OrdinalIgnoreCase) && !commandLine.Contains("--test-instance", StringComparison.OrdinalIgnoreCase))
+		if (!commandLine.Contains("--allow-multiple", StringComparison.OrdinalIgnoreCase) && !commandLine.Contains("--test-instance", StringComparison.OrdinalIgnoreCase) && !commandLine.Contains("--plugin-selftest", StringComparison.OrdinalIgnoreCase))
 		{
 			bool createdNew;
 			try
@@ -160,6 +160,11 @@ public partial class App : Application
 		{
 			ConfigManager.LoadConfig();
 			AppLogger.LogInfo("ConfigManager.LoadConfig completed");
+
+			// 插件系统自检模式：不启动钩子与托盘，跑完全链路直接退出。
+			// 用途：① CI 里做无界面回归；② 用户报「插件装不上」时一条命令拿到全链路证据。
+			if (TryRunPluginSelfTest()) return;
+
 			if (ConfigManager.CurrentConfig?.EnableSoundEffects == true)
 			{
 				SoundEffectManager.Initialize();
@@ -183,6 +188,35 @@ public partial class App : Application
 			MainTrayController.ExitRequested += ExitApplication;
 			MainTrayController.Initialize(MainMouseHook.IsPaused, IsCurrentThemeDark());
 			AppLogger.LogInfo("TrayController initialized");
+
+			// ---- 插件系统 ----
+			// 通知下沉到托盘气泡：插件的失败提示必须是「可忽略的」，绝不能用 MessageBox 打断用户。
+			Plugins.PluginHost.NotificationSink = (title, message) =>
+			{
+				try
+				{
+					MainTrayController?.ShowBalloonTip(5000, title, message, System.Windows.Forms.ToolTipIcon.Info);
+				}
+				catch
+				{
+				}
+			};
+
+			// 初始化延迟到 UI 空闲时执行。Initialize 只做「纯文件读」的静态扫描（不加载任何程序集），
+			// 但放在这里会挤占首帧；而插件系统早一秒晚一秒就绪对用户完全没有感知。
+			Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, new Action(() =>
+			{
+				try
+				{
+					Plugins.PluginHost.Initialize();
+				}
+				catch (Exception ex)
+				{
+					// 插件系统初始化失败绝不允许影响主程序启动
+					AppLogger.LogError("Plugin system initialization failed", ex);
+				}
+			}));
+
 			_startupCompleted = true;
 			if (!SettingsWindow.IsSilentLaunch() || _pendingSettingsRequest)
 			{
@@ -385,6 +419,55 @@ public partial class App : Application
 		}
 	}
 
+	/// <summary>
+	/// 处理 <c>--plugin-selftest &lt;dll&gt; [report]</c>。
+	/// 返回 true 表示已接管本次启动（调用方应直接 return，不要继续装配钩子与托盘）。
+	/// </summary>
+	private bool TryRunPluginSelfTest()
+	{
+		string commandLine = Environment.CommandLine;
+		if (!commandLine.Contains("--plugin-selftest", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		string dllPath = "";
+		string reportPath = "";
+
+		string[] arguments = Environment.GetCommandLineArgs();
+		for (int i = 0; i < arguments.Length; i++)
+		{
+			if (!string.Equals(arguments[i], "--plugin-selftest", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			if (i + 1 < arguments.Length && !arguments[i + 1].StartsWith("--", StringComparison.Ordinal))
+			{
+				dllPath = arguments[i + 1];
+			}
+			if (i + 2 < arguments.Length && !arguments[i + 2].StartsWith("--", StringComparison.Ordinal))
+			{
+				reportPath = arguments[i + 2];
+			}
+			break;
+		}
+
+		int exitCode = 1;
+		try
+		{
+			exitCode = Plugins.PluginSelfTest.Run(dllPath, reportPath);
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Plugin self-test crashed", ex);
+		}
+
+		AppLogger.LogInfo($"=== Plugin self-test finished with exit code {exitCode} ===");
+		Shutdown(exitCode);
+		return true;
+	}
+
 	protected override void OnExit(ExitEventArgs e)
 	{
 		if (_isDuplicateInstance)
@@ -394,6 +477,18 @@ public partial class App : Application
 		}
 		AppLogger.LogInfo("=== StarPie Exiting ===");
 		_isExiting = true;
+
+		// 插件系统收尾：停用全部插件（撤销贡献点 + 剪断事件订阅 + 尽力卸载 ALC），并把健康度落盘。
+		// 必须在托盘与设置窗口释放之前做 —— 插件停用过程可能产生需要用托盘显示的提示。
+		try
+		{
+			Plugins.PluginHost.ShutdownAll();
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("Plugin system shutdown failed", ex);
+		}
+
 		MainTrayController?.Dispose();
 		MainTrayController = null;
 		// 退出前自动还原所有窗口到首次平铺前的样式

@@ -1,0 +1,511 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text;
+using StarPie.Plugin;
+
+namespace WinPieGestures.Plugins;
+
+/// <summary>
+/// 插件系统端到端自检。
+/// <para>
+/// 它把「识别 → 安装 → 启用 → 注册 → 调用 → 停用 → 卸载」整条链路跑一遍并输出报告，
+/// 存在的意义有两个：① 无界面环境下也能验证插件系统是否真的能跑通（CI 回归）；
+/// ② 用户报告「插件装不上」时，一个命令就能拿到全链路证据。
+/// </para>
+/// <para>
+/// 用法：<c>StarPie.exe --plugin-selftest &lt;插件.dll&gt; [报告输出路径]</c>
+/// </para>
+/// </summary>
+internal static class PluginSelfTest
+{
+    public static int Run(string dllPath, string? reportPath)
+    {
+        var report = new StringBuilder();
+        bool pass = true;
+
+        void Line(string text)
+        {
+            report.AppendLine(text);
+            System.Diagnostics.Debug.WriteLine(text);
+        }
+
+        void Fail(string stage, string reason)
+        {
+            pass = false;
+            Line($"  [FAIL] {stage}：{reason}");
+        }
+
+        Line("====================================================");
+        Line("StarPie 插件系统端到端自检");
+        Line($"时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Line($"宿主版本：{PluginManifestReader.HostVersion} / SDK 契约：{PluginApi.ApiVersion}");
+        Line($"目标文件：{dllPath}");
+        Line("====================================================");
+
+        string? installedPluginId = null;
+
+        try
+        {
+            // ---- 0 初始化 ----
+            Line("");
+            Line("[0] 初始化插件系统");
+            var sw = Stopwatch.StartNew();
+            PluginHost.Initialize();
+            sw.Stop();
+            Line($"  插件根目录：{PluginPaths.Root}");
+            Line($"  便携模式：{PluginPaths.IsPortable}");
+            Line($"  初始化耗时：{sw.Elapsed.TotalMilliseconds:F1} ms");
+            Line($"  已登记插件：{PluginHost.InstalledCount} 个");
+
+            // ---- 1 静态识别 ----
+            Line("");
+            Line("[1] 静态识别（不加载程序集）");
+            sw.Restart();
+            PluginScanResult scan = PluginHost.PrepareInstall(dllPath);
+            sw.Stop();
+            Line($"  识别耗时：{sw.Elapsed.TotalMilliseconds:F2} ms");
+            Line($"  结论：{(scan.Accepted ? "通过" : "拒绝")}");
+
+            if (!scan.Accepted)
+            {
+                Line($"  原因码：{scan.Failure}");
+                Line($"  标题：{PluginScanFailureText.Title(scan.Failure)}");
+                Line($"  详情：{scan.ErrorDetail}");
+                Line($"  修复建议：{PluginScanFailureText.Hint(scan.Failure)}");
+                Fail("静态识别", scan.DescribeFailure());
+                return Write(report, reportPath, pass);
+            }
+
+            PluginManifest manifest = scan.Manifest!;
+            Line($"  清单来源：{scan.ManifestSource}");
+            Line($"  ID：{manifest.Id}");
+            Line($"  名称：{manifest.Name} v{manifest.Version}");
+            Line($"  作者：{manifest.Author}");
+            Line($"  许可证：{manifest.License}");
+            Line($"  能力声明：{manifest.ResolveCapabilities()}");
+            Line($"  入口类型：{scan.EntryTypeFullName ?? "(未解析)"}");
+            Line($"  实际 TFM：{scan.TargetFramework}");
+            Line($"  架构：{scan.MachineText}（依赖文件：{(scan.HasDependencyFile ? "有" : "无")}）");
+            Line($"  文件大小：{scan.FileSizeText}");
+            Line($"  SHA256：{scan.Sha256}");
+            Line($"  签名：{(scan.IsSigned ? $"已签名（{scan.SignerSubject}）" : "未签名")}");
+
+            installedPluginId = manifest.Id;
+
+            // ---- 2 安装 ----
+            Line("");
+            Line("[2] 安装（复制落盘 + 登记为 Disabled）");
+            var options = new PluginInstallOptions
+            {
+                Acknowledged = true,
+                OverwriteExisting = true,
+                EnableAfterInstall = false,
+                AcknowledgedCapabilities = manifest.Capabilities,
+            };
+            PluginInstallResult install = PluginHost.CommitInstall(scan, options);
+            if (!install.Success)
+            {
+                Fail("安装", install.Error);
+                return Write(report, reportPath, pass);
+            }
+            Line($"  安装成功：{install.PluginId}");
+
+            PluginInstance? instance = PluginHost.Find(install.PluginId);
+            Line($"  安装后状态：{instance?.State}（已加载：{instance?.IsLoaded}）");
+            if (instance?.IsLoaded == true)
+            {
+                Fail("安装语义", "安装后不应加载程序集，但要保持内存红线");
+            }
+
+            // ---- 3 启用 + 4 调用 ----
+            // 刻意放进独立方法：这两步会拿到 PluginActionRegistration，而它的 Contribution
+            // 指向插件程序集里的类型实例。这些引用若留在 Run 的栈帧上，第 5 步卸载时插件的
+            // ALC 就回收不掉 —— 自检会把自己测挂，报告里出现假的「需要重启才能释放」。
+            string? stageError = RunEnableAndInvoke(install.PluginId, Line);
+            if (stageError != null)
+            {
+                Fail("启用与调用", stageError);
+            }
+
+            // ---- 5 停用 ----
+            Line("");
+            Line("[5] 停用（撤销贡献点 → 剪断订阅 → Shutdown → 卸载 ALC）");
+            sw.Restart();
+            bool disabled = PluginHost.Disable(install.PluginId, out string disableError);
+            sw.Stop();
+            Line($"  停用结果：{(disabled ? "成功" : "失败")}（{sw.Elapsed.TotalMilliseconds:F1} ms）");
+            if (!disabled) Fail("停用", disableError);
+
+            // 等延迟判定给出最终结论。同步探测常常因为调用栈还没展开而回收不掉，
+            // 不等它就会把「其实已经释放」误报成「需要重启」。
+            instance = PluginHost.Find(install.PluginId);
+            bool unloaded = instance?.WaitForUnloadVerdict(5000) ?? false;
+            Line($"  停用后状态：{instance?.State}");
+            Line($"  需要重启才能释放：{instance?.RequiresRestart}");
+            if (!unloaded)
+            {
+                Fail("ALC 卸载", "插件程序集未被回收，停用要重启才能真正生效");
+            }
+            Line($"  剩余已注册动作：{PluginHost.GetRegisteredActions().Count} 个");
+
+            if (PluginHost.GetRegisteredActions().Count != 0)
+            {
+                Fail("贡献点撤销", "停用后仍有动作残留在注册表里");
+            }
+
+            // ---- 6 卸载 ----
+            Line("");
+            Line("[6] 卸载（删除目录 + 移除登记）");
+            bool uninstalled = PluginHost.Uninstall(install.PluginId, removePluginData: true, out string uninstallError);
+            Line($"  卸载结果：{(uninstalled ? "成功" : "失败")}");
+            if (!uninstalled)
+            {
+                Fail("卸载", uninstallError);
+            }
+            else
+            {
+                installedPluginId = null;
+            }
+
+            // ---- 7 环境还原性检查 ----
+            Line("");
+            Line("[7] 环境还原性检查");
+            Line($"  残留登记插件：{PluginHost.InstalledCount} 个");
+            Line($"  残留插件词条：{I18n.ExternalTranslationCount} 条");
+            if (I18n.ExternalTranslationCount != 0)
+            {
+                Fail("词条清理", "卸载后仍有插件词条残留（会造成语言切换时显示脏数据）");
+            }
+        }
+        catch (Exception ex)
+        {
+            Fail("未捕获异常", ex.ToString());
+        }
+        finally
+        {
+            // 自检失败时不要把用户的插件目录弄脏
+            if (installedPluginId != null)
+            {
+                try
+                {
+                    PluginHost.Uninstall(installedPluginId, removePluginData: true, out _);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        Line("");
+        Line("====================================================");
+        Line(pass ? "自检结论：PASS —— 全链路可用" : "自检结论：FAIL —— 见上面 [FAIL] 项");
+        Line("====================================================");
+
+        return Write(report, reportPath, pass);
+    }
+
+    /// <summary>
+    /// 阶段 3（启用）+ 阶段 4（调用）。
+    /// <para>
+    /// <b>必须独立成方法并禁止内联</b>：本方法持有 <see cref="PluginActionRegistration"/>，
+    /// 它间接指向插件程序集里的类型实例。只有让这些引用随本方法的栈帧一起消失，
+    /// 后续「停用 → ALC 卸载」的判定才可能为真。
+    /// </para>
+    /// </summary>
+    /// <returns>失败原因；<c>null</c> 表示两个阶段都通过。</returns>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string? RunEnableAndInvoke(string pluginId, Action<string> line)
+    {
+        // ---- 3 启用 ----
+        line("");
+        line("[3] 启用（加载 → 实例化 → Initialize → 提交贡献点）");
+        var sw = Stopwatch.StartNew();
+        bool enabled = PluginHost.Enable(pluginId, out string enableError);
+        sw.Stop();
+        line($"  启用结果：{(enabled ? "成功" : "失败")}");
+        line($"  启用耗时：{sw.Elapsed.TotalMilliseconds:F1} ms");
+        if (!enabled) return $"启用失败：{enableError}";
+
+        PluginInstance? instance = PluginHost.Find(pluginId);
+        line($"  加载耗时（内部计量）：{instance?.LastLoadMs:F1} ms");
+        line($"  运行时状态：{instance?.State}");
+
+        List<PluginActionRegistration> actions = PluginHost.GetRegisteredActions();
+        line($"  已注册动作：{actions.Count} 个");
+        foreach (PluginActionRegistration action in actions)
+        {
+            line($"    · {action.FullId} | {action.DisplayName} | {action.Kind} | 参数 {action.Parameters.Count} 项");
+        }
+        if (actions.Count == 0) return "插件启用成功但一个动作都没注册";
+
+        // 词条命中率单独成段。显示名有字面文案兜底，所以「词条没接上」在界面上
+        // 与「接上了」长得一模一样 —— 必须在这里显式暴露，否则插件作者要等到
+        // 用户切换语言、发现名字没变，才会意识到自己的 key 一直没生效。
+        int keyed = 0;
+        int resolved = 0;
+        var missed = new List<string>();
+
+        foreach (PluginActionRegistration action in actions)
+        {
+            if (string.IsNullOrEmpty(action.DisplayNameKey)) continue;
+            keyed++;
+            if (action.DisplayNameFromI18n) resolved++;
+            else missed.Add($"{action.ShortId}（{action.DisplayNameKey}）");
+        }
+
+        line("");
+        line($"  词条解析：声明了 DisplayNameKey 的 {keyed} 个动作中，命中 {resolved} 个");
+
+        // 一个 key 都没声明不算问题：字面 DisplayName 是完全合法且推荐的兜底写法。
+        if (keyed > 0 && resolved < keyed)
+        {
+            line($"    ⚠️ 未命中：{string.Join("、", missed)}");
+            line("    这些动作会退回字面 DisplayName 显示，译文不会生效。");
+        }
+
+        // ---- 3b 参数校验 ----
+        //
+        // 这一段验证的是「声明即校验」：插件只声明 ParameterField、一行校验代码都不写，
+        // 宿主也必须能拦下空值、越界值与非法选项。
+        // 之所以要在这里断言，是因为这一层「没生效」时完全没有外在症状 ——
+        // 界面照常渲染、边界值照常存进配置，直到用户触发时插件自己拒绝才暴露。
+        line("");
+        line("[3b] 参数校验（声明驱动的约束）");
+
+        List<PluginActionRegistration> parameterized = actions.Where(a => a.Parameters.Count > 0).ToList();
+
+        if (parameterized.Count == 0)
+        {
+            line("  本插件没有声明任何参数，跳过。");
+        }
+        else
+        {
+            foreach (PluginActionRegistration candidate in parameterized)
+            {
+                line($"  样本动作：{candidate.ShortId}（声明 {candidate.Parameters.Count} 项）");
+
+                foreach (ParameterField field in candidate.Parameters)
+                {
+                    string range = field.Min.HasValue && field.Max.HasValue
+                        ? $"　范围 {FormatBound(field.Min.Value)}~{FormatBound(field.Max.Value)}"
+                        : (field.Max.HasValue ? $"　上限 {FormatBound(field.Max.Value)}" : "");
+
+                    line($"    · {field.Key}｜{field.Type}｜必填={field.Required}{range}");
+                }
+
+                bool hasRequired = candidate.Parameters.Any(
+                    p => p.Required && p.Type != ParameterFieldType.Bool);
+
+                // ① 全空输入：声明了必填就必须被拦下
+                List<PluginParameterIssue> emptyIssues = PluginParameterValidator.Validate(
+                    candidate.Parameters,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+                line($"    ① 全空输入 → {emptyIssues.Count} 项不通过" +
+                     (emptyIssues.Count > 0 ? $"（{emptyIssues[0]}）" : ""));
+
+                if (hasRequired && emptyIssues.Count == 0)
+                {
+                    return $"「{candidate.ShortId}」声明了必填参数，但全空输入未被拦下 —— 空值会直接存进配置。";
+                }
+
+                // ②③④ 都需要一份「除被测字段外其余都合法」的基线。
+                //
+                // 只有当插件为每个字段都声明了 DefaultValue 时这份基线才存在。
+                // 否则我们只能自己编一个值（比如给热键字段填 "x"），而那个值可能
+                // 恰好过不了插件自己的 ValidationRegex —— 于是断言会因为「别的字段」而
+                // 通过或失败，测试自己制造出假阳性与假阴性。自检工具宁可少测一种情形，
+                // 也不能给出不可信的结论。
+                bool baselineAvailable = candidate.Parameters.All(
+                    p => string.IsNullOrEmpty(p.Key) || p.DefaultValue != null);
+
+                if (!baselineAvailable)
+                {
+                    line("    ②～④ 跳过：本动作有字段未声明 DefaultValue，无法构造可信的基线输入。");
+                    continue;
+                }
+
+                Dictionary<string, string> baseline = CollectDefaults(candidate.Parameters);
+
+                // ② 越界输入：把带上限的数值字段设成 上限+1。
+                // 断言的是「该字段名下确实出现了错误」，而不是「错误总数 > 0」——
+                // 后者可能来自另一个字段，让这条断言在错误的原因下通过。
+                ParameterField? ranged = candidate.Parameters.FirstOrDefault(
+                    p => p.Type == ParameterFieldType.Number && p.Max.HasValue);
+
+                if (ranged != null)
+                {
+                    var overflow = new Dictionary<string, string>(baseline, StringComparer.OrdinalIgnoreCase);
+                    string tooBig = FormatBound(ranged.Max!.Value + 1);
+                    overflow[ranged.Key] = tooBig;
+
+                    List<PluginParameterIssue> overflowIssues =
+                        PluginParameterValidator.Validate(candidate.Parameters, overflow);
+
+                    bool attributed = overflowIssues.Any(
+                        i => string.Equals(i.Key, ranged.Key, StringComparison.OrdinalIgnoreCase));
+
+                    line($"    ② {ranged.Key}={tooBig}（上限 {FormatBound(ranged.Max.Value)}）→ " +
+                         (attributed ? "已拦下" : "未拦下"));
+
+                    if (!attributed)
+                    {
+                        return $"「{candidate.ShortId}」的 {ranged.Key} 超过声明上限却未被拦下。";
+                    }
+                }
+
+                // ③ 正向用例：按声明的默认值填充，必须全部通过。
+                // 缺了这条，任何「一律报错」的实现都能骗过上面两条断言。
+                List<PluginParameterIssue> validIssues =
+                    PluginParameterValidator.Validate(candidate.Parameters, baseline);
+
+                line($"    ③ 按声明默认值填充 → {validIssues.Count} 项不通过" +
+                     (validIssues.Count > 0 ? $"（{validIssues[0]}）" : ""));
+
+                if (validIssues.Count > 0)
+                {
+                    return $"「{candidate.ShortId}」合法的默认值被判为不合法，会拦住本可正常使用的配置。";
+                }
+
+                // ④ 两层校验（宿主声明约束 + 插件自定义）必须对同一份输入给出一致结论。
+                // 结论相反时用户会遇到最难自查的一种状态：表单全绿，一触发却被拒。
+                //
+                // 这里只警告、不判失败：有些插件的规则本身就与默认值互斥
+                // （例如「起止时间不能相同」而两者默认值恰好相同），那是声明的写法问题，
+                // 不该被自检判成宿主缺陷。
+                ActionItem? probeItem = PluginHost.CreateActionItem(candidate.FullId, baseline);
+                if (probeItem != null)
+                {
+                    PluginHost.PluginActionValidation unified =
+                        PluginHost.ValidateActionParameters(probeItem);
+
+                    line($"    ④ 走统一入口校验同一份输入 → {(unified.IsValid ? "通过" : "不通过")}");
+
+                    if (!unified.IsValid)
+                    {
+                        line($"       ⚠️ {unified.Describe()}");
+                        line("          声明约束与插件自定义校验结论相反。若两者规则本身互斥（如默认值不满足自定规则），");
+                        line("          属声明写法问题；否则说明有一层漏判。此项不判失败，请作者自行确认。");
+                    }
+                }
+            }
+        }
+
+        // ---- 4 调用 ----
+        line("");
+        line("[4] 调用动作（走与轮盘完全相同的接缝）");
+
+        // 这一节是**真执行**，不是只读检查。
+        // 明写出来是必要的：自检报告通篇读起来像一次静态体检，
+        // 而亮度插件这类动作一旦被执行就会真的改变系统状态 ——
+        // 作者若以为它是只读的，就会在排查问题时反复跑自检，
+        // 结果是把用户的屏幕、音量或剪贴板越改越乱却毫无察觉。
+        line("  ⚠️ 本节会真实调用一次动作，可能改变系统状态（如亮度、音量、剪贴板）。");
+        PluginActionRegistration first = actions[0];
+        ActionItem? actionItem = PluginHost.CreateActionItem(first.FullId);
+        if (actionItem == null) return "CreateActionItem 返回 null";
+
+        line($"  动作 Type：{actionItem.Type}");
+        line($"  引用：{actionItem.PluginActionRef}");
+        line($"  参数：{DescribeParameters(actionItem.ExtensionData)}");
+
+        sw.Restart();
+        PluginExecuteOutcome outcome = PluginHost.ExecutePluginAction(actionItem);
+        sw.Stop();
+
+        line($"  是否被处理：{outcome.Handled}");
+        line($"  成功：{outcome.Success}");
+        line($"  后台执行：{outcome.QueuedToBackground}");
+        line($"  返回信息：{outcome.Message}");
+        line($"  调用耗时：{sw.Elapsed.TotalMilliseconds:F3} ms");
+
+        if (!outcome.Handled || !outcome.Success) return $"动作调用失败：{outcome.Message}";
+
+        // 负向用例：引用一个不存在的贡献点。
+        //
+        // 这里刻意**不用**「缺少必填参数」来构造负例：那需要真的调用一次动作，
+        // 对无参数的动作（例如亮度插件的多数动作）会真的被执行一遍，
+        // 于是「自检」本身产生了副作用 —— 屏幕亮度被多调了一次。
+        // 改用不存在的贡献点，既能验证宿主的防御路径（不崩溃、不静默成功），
+        // 又保证零副作用，而且对任何插件都成立。
+        line("  负向用例：引用不存在的贡献点（零副作用）");
+        var ghost = new ActionItem
+        {
+            Type = PluginApi.ActionTypeName,
+            Name = first.DisplayName,
+            PluginActionRef = new PluginActionRef { PluginId = first.PluginId, ContributionId = "no_such_contribution_zzz" },
+            ExtensionData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+        };
+        PluginExecuteOutcome ghostOutcome = PluginHost.ExecutePluginAction(ghost);
+        line($"    被处理={ghostOutcome.Handled} 成功={ghostOutcome.Success} 信息={ghostOutcome.Message}");
+
+        if (ghostOutcome.Success)
+        {
+            return "宿主防御异常：引用不存在的贡献点却报告成功，用户会看到一个不存在的动作被静默执行。";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 收集插件声明的默认值，作为「应当合法」的基线输入。
+    /// <para>
+    /// 刻意<b>只</b>照抄声明，不为缺失默认值的字段编造任何值：
+    /// 编出来的值（例如给热键字段填 <c>"x"</c>）可能过不了插件自己的
+    /// <c>ValidationRegex</c>，于是自检会因为「测试自己造的输入」而报出宿主缺陷。
+    /// 调用方需先用 <c>baselineAvailable</c> 确认每个字段都有默认值。
+    /// </para>
+    /// </summary>
+    private static Dictionary<string, string> CollectDefaults(IReadOnlyList<ParameterField> fields)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ParameterField field in fields)
+        {
+            if (string.IsNullOrEmpty(field.Key)) continue;
+            if (field.DefaultValue == null) continue;
+            result[field.Key] = field.DefaultValue;
+        }
+
+        return result;
+    }
+
+    /// <summary>把范围边界显示成「0」而不是「0.0」，避免报告里出现无意义的尾数。</summary>
+    private static string FormatBound(double value) =>
+        value == Math.Floor(value) && Math.Abs(value) < 1e15
+            ? ((long)value).ToString(CultureInfo.InvariantCulture)
+            : value.ToString("0.####", CultureInfo.InvariantCulture);
+
+    private static string DescribeParameters(Dictionary<string, string>? parameters)
+    {
+        if (parameters == null || parameters.Count == 0) return "(无)";
+
+        var parts = new List<string>();
+        foreach (KeyValuePair<string, string> pair in parameters)
+        {
+            parts.Add($"{pair.Key}={pair.Value}");
+        }
+        return string.Join(", ", parts);
+    }
+
+    private static int Write(StringBuilder report, string? reportPath, bool pass)
+    {
+        string path = reportPath ?? Path.Combine(
+            Path.GetTempPath(),
+            $"starpie-plugin-selftest-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+
+        try
+        {
+            File.WriteAllText(path, report.ToString(), Encoding.UTF8);
+        }
+        catch
+        {
+        }
+
+        return pass ? 0 : 1;
+    }
+}
