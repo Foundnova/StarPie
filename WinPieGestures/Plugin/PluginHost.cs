@@ -1045,7 +1045,9 @@ internal static class PluginHost
                 }
             }
 
-            // ② 手工放进 plugins\ 目录但尚未登记的
+            // ② 手工放进「可写宿主区」目录（plugin-data\）但尚未登记的。
+            // 注意这里只认「子目录 + plugin.json」——它对应的是「用户已经手工安装好了」，
+            // 与只读来源区 <程序目录>\plugin\ 里那些待安装候选完全不是一回事（见 ScanCandidates）。
             foreach (string directory in Directory.GetDirectories(PluginPaths.Root))
             {
                 string name = Path.GetFileName(directory);
