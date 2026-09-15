@@ -165,6 +165,9 @@ public partial class App : Application
 			// 用途：① CI 里做无界面回归；② 用户报「插件装不上」时一条命令拿到全链路证据。
 			if (TryRunPluginSelfTest()) return;
 
+			// 插件路径诊断：只解析路径与登记，不启动钩子与托盘。
+			if (TryRunPluginPathsReport()) return;
+
 			if (ConfigManager.CurrentConfig?.EnableSoundEffects == true)
 			{
 				SoundEffectManager.Initialize();
@@ -417,6 +420,49 @@ public partial class App : Application
 		catch
 		{
 		}
+	}
+
+	/// <summary>
+	/// 处理 <c>--plugin-paths</c>：解析插件路径、跑一次目录搬迁与登记读取，把结论写进日志后退出。
+	/// <para>
+	/// 存在的意义只有一个：用户报「插件目录不对 / 插件不见了」时，不必让他翻设置界面截图 ——
+	/// 一条命令就能拿到「可写宿主区在哪、只读扫描目录在哪、便携标志在不在、登记了几个插件」。
+	/// 它同样会触发 <c>plugins\ → plugin-data\</c> 的一次性搬迁，而那恰恰是这类问题的第一嫌疑。
+	/// </para>
+	/// </summary>
+	private bool TryRunPluginPathsReport()
+	{
+		if (!Environment.CommandLine.Contains("--plugin-paths", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		try
+		{
+			// 诊断模式是无界面短命进程，不该被计入启动健康统计（否则连跑两次就可能
+			// 触发插件安全模式，把用户正常用着的插件自动禁用掉）。
+			Plugins.PluginHost.HeadlessMode = true;
+			Plugins.PluginHost.Initialize();
+
+			AppLogger.LogInfo("=== 插件路径诊断 ===");
+			AppLogger.LogInfo(
+				$"  可写宿主区　：{Plugins.PluginPaths.Root}" +
+				$"（存在={System.IO.Directory.Exists(Plugins.PluginPaths.Root)}，便携模式={Plugins.PluginPaths.IsPortable}）");
+			AppLogger.LogInfo(
+				$"  只读扫描目录：{Plugins.PluginPaths.ScanRoot}" +
+				$"（存在={Plugins.PluginPaths.ScanRootExists}）");
+			AppLogger.LogInfo($"  便携标志文件：{Plugins.PluginPaths.PortableFlagPresent}");
+			AppLogger.LogInfo($"  已登记插件　：{Plugins.PluginHost.InstalledCount} 个");
+			AppLogger.LogInfo($"  扫描候选　　：{Plugins.PluginHost.ScanCandidates()} 个");
+			AppLogger.LogInfo("=== 插件路径诊断结束 ===");
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("插件路径诊断失败", ex);
+		}
+
+		Shutdown(0);
+		return true;
 	}
 
 	/// <summary>

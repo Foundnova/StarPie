@@ -18,7 +18,12 @@ namespace WinPieGestures.Plugins;
 /// ② 用户报告「插件装不上」时，一个命令就能拿到全链路证据。
 /// </para>
 /// <para>
-/// 用法：<c>StarPie.exe --plugin-selftest &lt;插件.dll&gt; [报告输出路径]</c>
+/// 用法：<c>StarPie.exe --plugin-selftest &lt;插件.dll&gt; [报告输出路径] [--skip-invoke]</c>
+/// </para>
+/// <para>
+/// <b>自检整体跑在临时沙箱里</b>：两个根目录（可写宿主区与只读扫描目录）都会被钉到
+/// <c>%TEMP%\StarPie-PluginSelfTest-&lt;随机&gt;\</c> 下，跑完即删。以前它直接跑在真实插件目录上，
+/// 等于每做一次回归就动一次用户已经装好的插件。
 /// </para>
 /// </summary>
 internal static class PluginSelfTest
@@ -40,6 +45,9 @@ internal static class PluginSelfTest
             Line($"  [FAIL] {stage}：{reason}");
         }
 
+        PluginCandidate? FindCandidate(string fileName) => PluginHost.Candidates.FirstOrDefault(
+            c => string.Equals(c.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
         Line("====================================================");
         Line("StarPie 插件系统端到端自检");
         Line($"时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -51,6 +59,26 @@ internal static class PluginSelfTest
         }
         Line("====================================================");
 
+        // ---- 沙箱：把两个根目录钉到临时位置，跑完即删 ----
+        string sandboxRoot = Path.Combine(
+            Path.GetTempPath(), "StarPie-PluginSelfTest-" + Guid.NewGuid().ToString("N"));
+        string sandboxHostRoot = Path.Combine(sandboxRoot, "plugin-data");
+        string sandboxScanRoot = Path.Combine(sandboxRoot, "plugin");
+
+        try
+        {
+            Directory.CreateDirectory(sandboxHostRoot);
+            Directory.CreateDirectory(sandboxScanRoot);
+            PluginPaths.OverrideRootsForTesting(sandboxHostRoot, sandboxScanRoot);
+            Line($"沙箱目录：{sandboxRoot}（真实插件目录不会被触碰）");
+        }
+        catch (Exception sandboxError)
+        {
+            // 建不出沙箱就如实说明，不要假装自己是隔离的
+            Line($"[WARN] 无法创建自检沙箱（{sandboxError.Message}），本次将直接跑在真实插件目录上。");
+        }
+        Line("====================================================");
+
         string? installedPluginId = null;
 
         try
@@ -59,6 +87,9 @@ internal static class PluginSelfTest
             Line("");
             Line("[0] 初始化插件系统");
             var sw = Stopwatch.StartNew();
+
+            // 自检是无界面短命进程，不该被计入启动健康统计。
+            PluginHost.HeadlessMode = true;
             PluginHost.Initialize();
             sw.Stop();
             Line($"  插件根目录：{PluginPaths.Root}");
@@ -176,6 +207,168 @@ internal static class PluginSelfTest
                 installedPluginId = null;
             }
 
+            // ---- 3d 只读扫描目录（候选识别 → 单枚复制 → 装后状态）----
+            Line("");
+            Line("[3d] 只读扫描目录与候选安装（沙箱内）");
+
+            string candidateFileName = Path.GetFileName(dllPath);
+            const string DecoyFileName = "notaplugin.dll";
+
+            // ① 空目录必须是 0 个候选
+            int emptyCount = PluginHost.ScanCandidates();
+            if (emptyCount != 0)
+            {
+                Fail("候选扫描", $"空的扫描目录里扫出了 {emptyCount} 个候选");
+            }
+
+            // ② 放一枚真插件，再放一枚「看着像 dll 其实不是」的文件
+            File.Copy(dllPath, Path.Combine(sandboxScanRoot, candidateFileName), overwrite: true);
+            File.WriteAllText(Path.Combine(sandboxScanRoot, DecoyFileName), "这只是一个文本文件，不是程序集。");
+            PluginHost.ScanCandidates();
+
+            PluginCandidate? real = FindCandidate(candidateFileName);
+            PluginCandidate? decoy = FindCandidate(DecoyFileName);
+
+            if (real == null)
+            {
+                Fail("候选扫描", $"扫描目录里没有扫出 {candidateFileName}");
+            }
+            else if (real.State != PluginCandidateState.Installable)
+            {
+                Fail("候选扫描", $"未安装过的插件应判为「可安装」，实际是 {real.State}");
+            }
+
+            if (decoy == null)
+            {
+                Fail("候选扫描", "非程序集文件没有被扫出来 —— 用户会以为「放进去了却毫无反应」");
+            }
+            else
+            {
+                Line($"  非程序集文件的结论：{decoy.StateText}｜{decoy.Note}");
+                if (decoy.State != PluginCandidateState.Rejected || decoy.CanInstall)
+                {
+                    Fail("候选扫描", "非程序集文件必须判为「无法识别」且不给安装按钮");
+                }
+            }
+
+            Line($"  候选数：{PluginHost.Candidates.Count} 个（可安装 {PluginHost.Candidates.Count(x => x.CanInstall)} 个）");
+
+            if (real != null)
+            {
+                // ③ 点「安装」—— 与界面上那个按钮完全同一条路
+                bool installedByCandidate = PluginHost.InstallCandidate(real, out string candidateError);
+                if (!installedByCandidate)
+                {
+                    Fail("候选安装", candidateError);
+                }
+                else
+                {
+                    PluginInstance? installed = PluginHost.Find(real.PluginId!);
+                    Line($"  安装后状态：{installed?.State}｜登记来源：{installed?.Entry.Source}");
+
+                    // 裸 DLL 安装必须「装完就能跑」。这里曾经是个真缺陷：裸 dll 安装不回填
+                    // plugin.json，而安装目录的识别要求目录里有清单 —— 于是插件装得上却永远
+                    // 启用不了，报错是一句与真实原因无关的「插件目录里缺少 plugin.json」。
+                    if (installed?.State != PluginRuntimeState.Active)
+                    {
+                        Fail("候选安装启用",
+                            $"候选安装后插件应处于运行态，实际是 {installed?.State}（{installed?.LastError}）");
+                    }
+
+                    string installedManifest = PluginPaths.GetManifestPath(installed?.ManagedDirectory ?? "");
+                    if (!File.Exists(installedManifest))
+                    {
+                        Fail("候选安装启用", $"裸 DLL 安装没有回填清单，后续识别与启用都会失败：{installedManifest}");
+                    }
+
+                    // C1 回归断言：裸 DLL 安装只复制那一枚，绝不能把扫描目录里的邻居一起搬走。
+                    // 搬走邻居的后果不是「多几个文件」这么轻：装了 A 却连带出现 B，
+                    // 而且 B 还会因为目录里存在两枚业务 dll 而识别失败。
+                    string managedDirectory = installed?.ManagedDirectory ?? "";
+                    string[] managedDlls = Directory.Exists(managedDirectory)
+                        ? Directory.GetFiles(managedDirectory, "*.dll", SearchOption.TopDirectoryOnly)
+                        : Array.Empty<string>();
+
+                    Line($"  宿主目录内的程序集：{managedDlls.Length} 枚" +
+                        (managedDlls.Length > 0 ? $"（{string.Join("、", managedDlls.Select(Path.GetFileName))}）" : ""));
+
+                    if (managedDlls.Length != 1
+                        || !string.Equals(Path.GetFileName(managedDlls[0]), candidateFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Fail("单枚复制",
+                            $"裸 DLL 安装只应复制 {candidateFileName} 这一枚，实际宿主目录里有 {managedDlls.Length} 枚");
+                    }
+
+                    if (!string.Equals(installed?.Entry.Source, "ScanDirectory", StringComparison.Ordinal))
+                    {
+                        Fail("安装来源", $"候选安装的登记来源应为 ScanDirectory，实际是 {installed?.Entry.Source}");
+                    }
+
+                    // ④ 重扫：同一枚文件应变成「已装同版本」
+                    PluginHost.ScanCandidates();
+                    PluginCandidate? afterInstall = FindCandidate(candidateFileName);
+                    Line($"  重扫后状态：{afterInstall?.StateText ?? "(消失)"}");
+                    if (afterInstall?.State != PluginCandidateState.Installed)
+                    {
+                        Fail("装后状态",
+                            $"装完之后同一枚文件应判为「已装同版本」，实际是 {afterInstall?.State.ToString() ?? "(消失)"}");
+                    }
+
+                    // ⑤ 同 ID 撞车：两枚都必须是「ID 重复」且都不给安装按钮
+                    string duplicateName = "copy-" + candidateFileName;
+                    File.Copy(dllPath, Path.Combine(sandboxScanRoot, duplicateName), overwrite: true);
+                    PluginHost.ScanCandidates();
+
+                    PluginCandidate? first = FindCandidate(candidateFileName);
+                    PluginCandidate? second = FindCandidate(duplicateName);
+                    Line($"  ID 重复：{first?.StateText ?? "(消失)"} / {second?.StateText ?? "(消失)"}");
+
+                    if (first?.State != PluginCandidateState.Duplicate || second?.State != PluginCandidateState.Duplicate)
+                    {
+                        Fail("ID 重复", "扫描目录里两枚 dll 声明同一 ID 时，两者都必须判为「ID 重复」");
+                    }
+                    else if (first.CanInstall || second.CanInstall)
+                    {
+                        Fail("ID 重复", "ID 重复的候选一律不能给安装按钮 —— 装哪一枚都说不清");
+                    }
+                    else if (first.Note.IndexOf(real.PluginId!, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        Fail("ID 重复", $"冲突说明里应写明撞车的是哪个 ID，实际是：{first.Note}");
+                    }
+                    else if (string.Equals(first.FileName, second.FileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Fail("ID 重复", "两行候选必须各自显示自己的文件名，否则用户看不出该删哪一个");
+                    }
+
+                    // ⑥ 收拾干净：停用 → 等 ALC 回收结论 → 卸载 → 删掉扫描目录
+                    //
+                    // 顺序和 [5]/[6] 一致，不能省掉「等回收」这一步：插件程序集还挂在
+                    // 未卸载的 ALC 上时文件是锁着的，此刻删目录会失败 —— 而失败又只体现在
+                    // 一个被吞掉的异常里，表现就是临时目录里一次次堆出残留沙箱。
+                    PluginHost.Disable(real.PluginId!, out _);
+                    PluginHost.Find(real.PluginId!)?.WaitForUnloadVerdict(5000);
+
+                    if (!PluginHost.Uninstall(real.PluginId!, removePluginData: true, out string cleanupError))
+                    {
+                        Fail("候选安装清理", cleanupError);
+                    }
+                }
+
+                Directory.Delete(sandboxScanRoot, recursive: true);
+                int afterDelete = PluginHost.ScanCandidates();
+                bool recreated = Directory.Exists(sandboxScanRoot);
+
+                Line($"  扫描目录删除后：候选 {afterDelete} 个，目录被重建={recreated}");
+                if (afterDelete != 0)
+                {
+                    Fail("候选扫描", $"扫描目录已删除，却仍扫出 {afterDelete} 个候选");
+                }
+                if (recreated)
+                {
+                    Fail("扫描目录", "扫描目录不存在时被重新创建了 —— 程序装在只读位置会直接变成权限错误");
+                }
+            }
+
             // ---- 7 环境还原性检查 ----
             Line("");
             Line("[7] 环境还原性检查");
@@ -202,6 +395,17 @@ internal static class PluginSelfTest
                 catch
                 {
                 }
+            }
+
+            // 删掉整个沙箱。删不掉要如实说 —— 静默吞掉的话，临时目录会一次次堆出残留，
+            // 而下次排查「磁盘怎么满了」时没人会想到是自检干的。
+            try
+            {
+                Directory.Delete(sandboxRoot, recursive: true);
+            }
+            catch (Exception cleanupError)
+            {
+                Line($"  [WARN] 沙箱未能删除（{cleanupError.Message}）：{sandboxRoot}");
             }
         }
 

@@ -25,6 +25,13 @@ internal sealed class PluginInstallOptions
 
     /// <summary>开发者模式：只登记外部路径，不复制文件（便于附加调试器与热重载）。</summary>
     public bool DeveloperExternalPath { get; set; }
+
+    /// <summary>
+    /// 写进 <c>registry.json</c> 的安装来源：<c>UserSelectedFile</c>（文件对话框）/
+    /// <c>ScanDirectory</c>（只读扫描目录）。
+    /// <para>用途只有一个：日后排查「这个插件是怎么进来的」。不做任何逻辑分支。</para>
+    /// </summary>
+    public string SourceKind { get; set; } = "UserSelectedFile";
 }
 
 internal sealed class PluginInstallResult
@@ -58,6 +65,12 @@ internal static class PluginHost
 
     /// <summary>安全模式：启动时若判定上次是插件导致的崩溃，本次不加载任何插件。</summary>
     private static bool _safeModeActive;
+
+    /// <summary>
+    /// 无界面模式（<c>--plugin-selftest</c> / <c>--plugin-paths</c>）：跑完即退，不参与
+    /// 启动健康记账。必须在 <see cref="Initialize"/> 之前置位。
+    /// </summary>
+    public static bool HeadlessMode { get; set; }
 
     /// <summary>托盘气泡注入点。UI 层设置后插件通知即可显示为气泡。</summary>
     public static Action<string, string>? NotificationSink
@@ -117,7 +130,8 @@ internal static class PluginHost
 
             int discovered = SyncFromDisk();
             AppLogger.LogInfo(
-                $"[plugin] 插件系统就绪：根目录={PluginPaths.Root}，已登记 {Instances.Count} 个插件" +
+                $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
+                $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
                 $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
@@ -125,7 +139,10 @@ internal static class PluginHost
                 SchedulePreload();
             }
 
-            ScheduleStartupHealthCheck();
+            if (!HeadlessMode)
+            {
+                ScheduleStartupHealthCheck();
+            }
         }
         catch (Exception ex)
         {
@@ -233,7 +250,7 @@ internal static class PluginHost
 
                 if (!options.DeveloperExternalPath)
                 {
-                    if (!CopyDirectory(scan.SourceDirectory, targetDirectory, options.OverwriteExisting, out string copyError))
+                    if (!CopyPayload(scan, targetDirectory, options.OverwriteExisting, out string copyError))
                     {
                         return new PluginInstallResult { Success = false, PluginId = manifest.Id, Error = copyError };
                     }
@@ -265,7 +282,7 @@ internal static class PluginHost
                     CapabilitiesAck = new List<string>(options.AcknowledgedCapabilities),
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
-                    Source = options.DeveloperExternalPath ? "DeveloperPath" : "UserSelectedFile",
+                    Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -417,9 +434,25 @@ internal static class PluginHost
 
         Disable(pluginId, out _);
 
-        string directory = instance.Directory;
         try
         {
+            // 外部路径登记：程序集留在开发者自己的目录里，宿主只拥有「登记」这一行数据。
+            // 卸载必须只摘登记、绝不碰磁盘 —— 那条路径下往往就是开发者的编译输出目录。
+            if (instance.IsExternal)
+            {
+                PluginRegistryStore.RemoveEntry(pluginId);
+                lock (Gate)
+                {
+                    Instances.Remove(pluginId);
+                }
+
+                AppLogger.LogInfo(
+                    $"[plugin] 已卸载 {pluginId}（外部路径登记，源文件未删除：{instance.Entry.ExternalPath}）");
+                NotifyPluginSetChanged();
+                return true;
+            }
+
+            string directory = instance.ManagedDirectory;
             if (removePluginData && Directory.Exists(directory))
             {
                 try
@@ -1056,6 +1089,254 @@ internal static class PluginHost
         return discovered;
     }
 
+    // ------------------------------------------------------------------ 只读扫描目录（候选）
+
+    private static IReadOnlyList<PluginCandidate> _candidates = Array.Empty<PluginCandidate>();
+
+    /// <summary>最近一次扫描出的候选插件清单。UI 直接读这个，不要自己去遍历目录。</summary>
+    public static IReadOnlyList<PluginCandidate> Candidates
+    {
+        get { lock (Gate) { return _candidates; } }
+    }
+
+    /// <summary>
+    /// 扫描<b>只读</b>目录 <c>程序目录\plugin</c>，得出「待安装候选」清单。
+    /// <para>
+    /// 与 <see cref="SyncFromDisk"/> 的<b>根本区别</b>：这里发现的东西<b>不会</b>登记、
+    /// <b>不会</b>加载、也<b>不会</b>出现在插件列表里。它只说「这里躺着这些 .dll，
+    /// 你可以装」，装不装由用户点按钮决定。
+    /// </para>
+    /// <para>
+    /// 反过来，<see cref="SyncFromDisk"/> 第 ② 段会自动登记的是<b>可写宿主区</b>里
+    /// 「子目录 + plugin.json」的手工投放 —— 那已经是安装产物了，与这里的候选是两回事。
+    /// </para>
+    /// <para>
+    /// 目录不存在时直接得到空清单，<b>绝不创建它</b>：程序目录可能是只读的，
+    /// 「本机没有随包附带的插件」本来就是完全正常的状态。
+    /// </para>
+    /// </summary>
+    /// <returns>本次识别出的候选数量（含被拒绝、重复的）。</returns>
+    public static int ScanCandidates()
+    {
+        var list = new List<PluginCandidate>();
+
+        try
+        {
+            if (!PluginPaths.ScanRootExists)
+            {
+                lock (Gate) { _candidates = list; }
+                return 0;
+            }
+
+            // 目录名固定从 PluginPaths 取；这里不递归子目录 ——
+            // 扫描目录的约定就是「扁平，只放 .dll」，子目录一律不认。
+            string[] files = Directory.GetFiles(PluginPaths.ScanRoot, "*.dll", SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+            var scans = new List<PluginScanResult>(files.Length);
+            foreach (string file in files)
+            {
+                scans.Add(ScanCandidateFile(file));
+            }
+
+            // 同 ID 计数按扫描目录内部去重统计（大小写不敏感）：这是识别「两枚 dll 撞 ID」的依据。
+            var idCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (PluginScanResult scan in scans)
+            {
+                string? id = scan.Manifest?.Id;
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                idCounts[id!] = idCounts.TryGetValue(id!, out int n) ? n + 1 : 1;
+            }
+
+            var installed = new Dictionary<string, PluginRegistryEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (PluginRegistryEntry entry in PluginRegistryStore.SnapshotEntries())
+            {
+                installed[entry.Id] = entry;
+            }
+
+            foreach (PluginScanResult scan in scans)
+            {
+                (PluginCandidateState state, string note) = ClassifyCandidate(scan, idCounts, installed);
+                list.Add(new PluginCandidate
+                {
+                    DllPath = scan.DllPath,
+                    FileName = Path.GetFileName(scan.DllPath),
+                    Scan = scan,
+                    State = state,
+                    Note = note,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 扫描只读插件目录失败", ex);
+        }
+
+        lock (Gate) { _candidates = list; }
+        return list.Count;
+    }
+
+    /// <summary>识别扫描目录里的一枚 dll。异常一律转成「识别未通过」而不是上抛 —— 一枚坏文件不该让整页空掉。</summary>
+    private static PluginScanResult ScanCandidateFile(string file)
+    {
+        try
+        {
+            return PluginScanner.ScanSelectedDll(file);
+        }
+        catch (Exception ex)
+        {
+            return new PluginScanResult
+            {
+                DllPath = file,
+                SourceDirectory = Path.GetDirectoryName(file) ?? "",
+                Accepted = false,
+                Failure = PluginScanFailure.NotDotNetAssembly,
+                ErrorDetail = ex.Message,
+            };
+        }
+    }
+
+    /// <summary>
+    /// 判定一枚候选与「已装的那份」是什么关系。
+    /// <para>
+    /// 顺序不能换：① 先看识别过没过（没过的连 ID 都没有，谈不上比较）；
+    /// ② 再看扫描目录内部有没有撞 ID（自身有歧义就不该继续比）；
+    /// ③ 再看已装的那份是不是外部路径登记（那种情况下根本不该复制文件进来）；
+    /// ④ 最后才比版本与哈希。
+    /// </para>
+    /// </summary>
+    private static (PluginCandidateState State, string Note) ClassifyCandidate(
+        PluginScanResult scan,
+        IReadOnlyDictionary<string, int> idCounts,
+        IReadOnlyDictionary<string, PluginRegistryEntry> installed)
+    {
+        if (!scan.Accepted || scan.Manifest == null)
+        {
+            return (PluginCandidateState.Rejected, $"无法安装：{scan.DescribeFailure()}");
+        }
+
+        string id = scan.Manifest.Id;
+
+        if (idCounts.TryGetValue(id, out int sameId) && sameId > 1)
+        {
+            return (PluginCandidateState.Duplicate,
+                $"扫描目录里有 {sameId} 枚 .dll 声明了同一个 ID（{id}），无法判断该装哪一枚。请只保留需要的那一个文件。");
+        }
+
+        if (!installed.TryGetValue(id, out PluginRegistryEntry? entry))
+        {
+            return (PluginCandidateState.Installable, "尚未安装，可直接安装。");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.ExternalPath))
+        {
+            return (PluginCandidateState.ExternalRegistered,
+                $"同一个 ID 已被开发者模式的外部路径登记占用：{entry.ExternalPath}。" +
+                "如需改为安装副本，请先在列表里卸载那条登记。");
+        }
+
+        string installedVersion = entry.Version ?? "";
+        string candidateVersion = scan.Manifest.Version ?? "";
+
+        bool sameHash = !string.IsNullOrWhiteSpace(entry.EntrySha256)
+            && string.Equals(entry.EntrySha256, scan.Sha256, StringComparison.OrdinalIgnoreCase);
+
+        if (SimpleVersion.TryParse(installedVersion, out SimpleVersion oldVersion)
+            && SimpleVersion.TryParse(candidateVersion, out SimpleVersion newVersion))
+        {
+            int compare = newVersion.CompareTo(oldVersion);
+
+            if (compare == 0)
+            {
+                return sameHash
+                    ? (PluginCandidateState.Installed, $"已装同一个版本（v{installedVersion}），无需重复安装。")
+                    : (PluginCandidateState.Replaced,
+                        $"已装的 v{installedVersion} 与这枚文件版本号相同但内容不同（哈希不一致）。" +
+                        "覆盖安装会用它替换现有文件。");
+            }
+
+            if (compare > 0)
+            {
+                return (PluginCandidateState.Update, $"已装 v{installedVersion}，这枚是更新的 v{candidateVersion}。");
+            }
+
+            return (PluginCandidateState.Downgrade,
+                $"已装 v{installedVersion}，这枚是更旧的 v{candidateVersion}。一般不建议降级。");
+        }
+
+        return (PluginCandidateState.VersionUnknown,
+            $"已装版本「{installedVersion}」与候选版本「{candidateVersion}」至少有一侧解析不了，无法比较新旧。" +
+            (sameHash ? "内容与已装的一致。" : "内容与已装的不同。"));
+    }
+
+    /// <summary>
+    /// 把一枚候选装进可写宿主区并启用。这是候选卡片上那个按钮的全部逻辑。
+    /// <para>
+    /// 安装动作本身仍复用 <see cref="CommitInstall"/>，这里只负责三件事：
+    /// ① 拦住不允许安装的状态；② 替用户处理「正在运行所以文件被锁」；
+    /// ③ 装完立刻重扫候选，让列表刷新成「已装同版本」。
+    /// </para>
+    /// </summary>
+    public static bool InstallCandidate(PluginCandidate candidate, out string error)
+    {
+        error = "";
+
+        if (candidate == null)
+        {
+            error = "候选为空。";
+            return false;
+        }
+
+        if (!candidate.CanInstall)
+        {
+            error = $"当前状态不允许安装：{candidate.StateText}。{candidate.Note}";
+            return false;
+        }
+
+        PluginScanResult scan = candidate.Scan;
+        if (scan.Manifest == null)
+        {
+            error = "识别结果里没有清单，无法安装。";
+            return false;
+        }
+
+        string pluginId = scan.Manifest.Id;
+
+        // 覆盖安装必须先让文件解锁。插件是惰性加载的（Preload 默认 false），
+        // 但一旦用户已经用过它的动作，程序集就被加载、文件就被占用，
+        // 此时直接覆盖只会得到一句「文件被占用」——对用户就是「更新失败，原因不明」。
+        // 这里主动停用再装：对用户始终只是「一次点击」。
+        PluginInstance? existing = Find(pluginId);
+        if (existing is { IsLoaded: true })
+        {
+            AppLogger.LogInfo($"[plugin] 覆盖安装 {pluginId} 前先行停用以解除文件占用");
+            Disable(pluginId, out _);
+        }
+
+        var options = new PluginInstallOptions
+        {
+            // 能走到这个按钮前，用户已经在候选卡片上看过说明并点了确认。
+            Acknowledged = true,
+            OverwriteExisting = true,
+            EnableAfterInstall = true,
+            SourceKind = "ScanDirectory",
+            AcknowledgedCapabilities = scan.Manifest.Capabilities is { Count: > 0 } capabilities
+                ? new List<string>(capabilities)
+                : new List<string>(),
+        };
+
+        PluginInstallResult result = CommitInstall(scan, options);
+        if (!result.Success)
+        {
+            error = result.Error;
+            ScanCandidates();
+            return false;
+        }
+
+        ScanCandidates();
+        return true;
+    }
+
     /// <summary>重新扫描单个插件（用户点了「刷新」）。</summary>
     public static PluginScanResult Rescan(string pluginId)
     {
@@ -1156,7 +1437,16 @@ internal static class PluginHost
             }
 
             // 标记一次「启动中」，30 秒后若仍存活则清零（见 ScheduleStartupHealthCheck）
-            PluginRegistryStore.MutateHealthFile(h => h.ConsecutiveStartupFailures++);
+            //
+            // 无界面模式（自检 / 路径诊断）不参与记账：它们跑完立刻退出，永远活不到
+            // 30 秒健康检查那一刻，于是计数只增不减。而安全模式的判据是
+            // 「连续两次启动异常 **且** 上次启动加载过插件」—— 用户装好插件正常用着，
+            // 连着跑两次自检就可能被判定为「启动异常」，下次打开 GUI 时插件被自动禁用。
+            // 这种误伤比少记一次数严重得多。
+            if (!HeadlessMode)
+            {
+                PluginRegistryStore.MutateHealthFile(h => h.ConsecutiveStartupFailures++);
+            }
         }
         catch (Exception ex)
         {
@@ -1270,6 +1560,158 @@ internal static class PluginHost
         }
         catch
         {
+        }
+    }
+
+    /// <summary>
+    /// 按识别结果决定「复制什么」。
+    /// <para>
+    /// 规则只有一条，但必须说清为什么：<b>有没有 <c>plugin.json</c>，就是「这个目录是不是一个插件包」的判据</b>。
+    /// </para>
+    /// <list type="bullet">
+    /// <item><c>ManifestSource == "Manifest"</c>：用户指的那个目录里有 <c>plugin.json</c>，
+    /// 也就是在声明「这个目录整体是一个插件包」（可能带依赖 dll、图标、资源）。此时<b>整目录复制</b>。</item>
+    /// <item><c>ManifestSource == "AssemblyMetadata"</c>：裸 DLL，靠程序集元数据兜底。
+    /// 这种情况下 <c>SourceDirectory</c> 只表示「那枚 dll 碰巧躺在哪个目录」，它<b>不是</b>插件包 ——
+    /// 可能正好是「下载」文件夹，也可能就是只读扫描目录 <c>plugin/</c>。
+    /// 此时<b>只复制那一枚 dll</b>。
+    /// <para>
+    /// 早期版本在这里无条件整目录复制，有两个真实后果：从「下载」文件夹装一枚裸 dll
+    /// 会把整个下载目录搬进插件目录；从 <c>plugin/</c> 安装则会把邻居插件的 dll 一起搬走
+    /// —— 于是出现「只装了 A，B 也莫名其妙出现了」。
+    /// </para></item>
+    /// </list>
+    /// </summary>
+    private static bool CopyPayload(PluginScanResult scan, string targetDirectory, bool overwrite, out string error)
+    {
+        if (string.Equals(scan.ManifestSource, "Manifest", StringComparison.Ordinal))
+        {
+            return CopyDirectory(scan.SourceDirectory, targetDirectory, overwrite, out error);
+        }
+
+        if (!CopySingleFile(scan.DllPath, targetDirectory, overwrite, out error))
+        {
+            return false;
+        }
+
+        // 裸 DLL 装完之后必须回填一份清单，否则安装目录「缺 plugin.json」，
+        // 后续识别（进而是启用）会直接失败 —— 表现是「装上了却怎么都启不动」。
+        return WriteGeneratedManifest(scan, targetDirectory, out error);
+    }
+
+    /// <summary>
+    /// 为裸 DLL 安装回填 <c>plugin.json</c>：把扫描阶段已经确认过的事实固化成清单。
+    /// <para>
+    /// 只回填「确定的」：ID、名称、版本、作者、能力、入口程序集文件名。
+    /// <b>EntryType</b> 也一并写上 —— 扫描阶段已经解析出来了，写下来能让后续加载不再依赖
+    /// 「唯一实现」这种约定推断。
+    /// </para>
+    /// </summary>
+    private static bool WriteGeneratedManifest(PluginScanResult scan, string targetDirectory, out string error)
+    {
+        PluginManifest source = scan.Manifest!;
+
+        var manifest = new PluginManifest
+        {
+            SchemaVersion = PluginApi.ManifestSchemaVersion,
+            Id = source.Id,
+            Name = source.Name,
+            Description = source.Description,
+            Author = source.Author,
+            Homepage = source.Homepage,
+            License = source.License,
+            Version = source.Version,
+            ApiVersion = source.ApiVersion,
+            MinHostVersion = source.MinHostVersion,
+            MaxHostVersion = source.MaxHostVersion,
+            TargetFramework = source.TargetFramework,
+            Platform = source.Platform,
+            Assembly = Path.GetFileName(scan.DllPath),
+            EntryType = scan.EntryTypeFullName,
+            Capabilities = new List<string>(source.Capabilities),
+            Contributions = new PluginContributions { Actions = true },
+            Tags = new List<string>(source.Tags),
+        };
+
+        return PluginManifestReader.TryWrite(targetDirectory, manifest, out error);
+    }
+
+    /// <summary>只复制一枚程序集（裸 DLL 安装用）。</summary>
+    private static bool CopySingleFile(string sourceFile, string targetDirectory, bool overwrite, out string error)
+    {
+        error = "";
+        try
+        {
+            if (string.IsNullOrWhiteSpace(sourceFile) || !File.Exists(sourceFile))
+            {
+                error = $"源文件不存在：{sourceFile}";
+                return false;
+            }
+
+            string fileName = Path.GetFileName(sourceFile);
+
+            // 与整目录复制保持同一条规则：SDK 契约程序集由宿主统一提供，插件不该自带一份。
+            if (string.Equals(fileName, PluginApi.AbstractionsAssemblyName + ".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                error = $"{fileName} 是宿主统一提供的 SDK 契约程序集，不能作为插件安装。";
+                return false;
+            }
+
+            if (!Directory.Exists(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+            else if (overwrite)
+            {
+                ClearPreviousPayload(targetDirectory);
+            }
+            else
+            {
+                error = $"目标目录已存在：{targetDirectory}";
+                return false;
+            }
+
+            File.Copy(sourceFile, Path.Combine(targetDirectory, fileName), overwrite: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"复制插件文件失败：{ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 覆盖安装裸 DLL 前，清掉上一次的「程序集 + 清单」。
+    /// <para>
+    /// 不清会踩两个坑：① 目录里留下两枚业务 dll，识别时的「唯一业务 dll」约定直接失效，
+    /// 插件变成「找不到程序集」；② 上一次若是带 <c>plugin.json</c> 的包，残留清单会继续
+    /// 接管识别，新装的裸 dll 会被判成「清单声明的入口类型不存在」。
+    /// </para>
+    /// <para>
+    /// 只清「载荷」，<b>保留插件私有数据</b>：<c>data\</c> 目录与 <c>settings.json</c>
+    /// 都是用户的东西，更新一次版本不该把它们清空。
+    /// </para>
+    /// </summary>
+    private static void ClearPreviousPayload(string targetDirectory)
+    {
+        try
+        {
+            foreach (string file in Directory.GetFiles(targetDirectory, "*", SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(Path.GetFileName(file), "settings.json", StringComparison.OrdinalIgnoreCase)) continue;
+                File.Delete(file);
+            }
+
+            foreach (string directory in Directory.GetDirectories(targetDirectory, "*", SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(Path.GetFileName(directory), "data", StringComparison.OrdinalIgnoreCase)) continue;
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogWarn($"[plugin] 覆盖安装前清理旧载荷失败（将按原样覆盖）：{ex.Message}");
         }
     }
 

@@ -107,7 +107,8 @@ internal static class PluginScanner
             {
                 return Fail(result, PluginScanFailure.IdNotDeclared,
                     $"{Path.GetFileName(dllPath)} 旁边没有 plugin.json，程序集里也没有 {MetaId} 元数据，无法确定插件标识。" +
-                    "请连同 plugin.json 一起安装，或让作者按文档在 csproj 里补上 AssemblyMetadata。");
+                    "请让作者按文档在 csproj 里补上 AssemblyMetadata（推荐，分发时只需一枚 .dll），" +
+                    "或改用带 plugin.json 的完整插件包。");
             }
 
             manifest = PluginManifestReader.CreateFromAssemblyMetadata(

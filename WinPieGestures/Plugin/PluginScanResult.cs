@@ -77,7 +77,9 @@ internal static class PluginScanFailureText
     public static string Hint(PluginScanFailure code) => code switch
     {
         PluginScanFailure.IdNotDeclared =>
-            "这个 .dll 既没有同级的 plugin.json，也没有声明 StarPiePluginId。请连同 plugin.json 一起安装，或让作者按文档补上程序集元数据。",
+            "这个 .dll 既没有同级的 plugin.json，也没有在程序集里声明 StarPiePluginId 元数据。" +
+            "让作者按文档在 csproj 里补上 AssemblyMetadata 是推荐做法（分发时只需一枚 .dll）；" +
+            "带 plugin.json 的完整插件包同样可以安装。",
 
         PluginScanFailure.ManifestInvalid =>
             "请检查 plugin.json 的字段名与类型是否与规范一致（可对照 plugin.schema.json）。",
