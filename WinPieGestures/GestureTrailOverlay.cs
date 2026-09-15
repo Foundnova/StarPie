@@ -20,6 +20,9 @@ public class GestureTrailOverlay : Window
 	private readonly TextBlock _hintText;
 	private double _leftDIP;
 	private double _topDIP;
+	private string _lastHintText = string.Empty;
+	private double _lastHintWidth;
+	private double _lastHintHeight;
 
 	[DllImport("user32.dll")]
 	private static extern nint MonitorFromPoint(POINT pt, uint dwFlags);
@@ -227,9 +230,17 @@ public class GestureTrailOverlay : Window
 		_hintText.Text = text;
 		Canvas.SetLeft(_hintBorder, x);
 		Canvas.SetTop(_hintBorder, y);
-		_hintBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-		double w = _hintBorder.DesiredSize.Width;
-		double h = _hintBorder.DesiredSize.Height;
+		// 文本未变时跳过强制 Measure：同一图样在手势期间会被高频重复调用，
+		// 显式 Measure 会触发布局计算，是轨迹浮层的主要 CPU 开销来源。
+		if (!string.Equals(text, _lastHintText, StringComparison.Ordinal))
+		{
+			_hintBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+			_lastHintWidth = _hintBorder.DesiredSize.Width;
+			_lastHintHeight = _hintBorder.DesiredSize.Height;
+			_lastHintText = text;
+		}
+		double w = _lastHintWidth;
+		double h = _lastHintHeight;
 		if (x + w > Width)
 		{
 			x = Width - w - 6.0;
@@ -246,5 +257,7 @@ public class GestureTrailOverlay : Window
 	public void HideHint()
 	{
 		_hintBorder.Visibility = Visibility.Collapsed;
+		// 下次手势重新测量，避免沿用上一轮的陈旧尺寸
+		_lastHintText = string.Empty;
 	}
 }
