@@ -1156,17 +1156,38 @@ def test_update_ui_elements_and_check(app):
 
     # Click CheckUpdateNowBtn and verify status transitions to latest version
     check_btn.invoke()
-    
-    # Wait for check to complete
-    for _ in range(30):
+
+    # 等这次检查真正走完：按钮回到可用 **且** 徽标离开过程态。
+    #
+    # 只等按钮是不够的：存在「刚 invoke、禁用还没生效」的竞态，
+    # 那时立刻读徽标会读到「正在检查更新...」，断言以一条误导性的信息挂掉 ——
+    # 看起来像功能坏了，其实只是没等够。
+    for _ in range(40):
         time.sleep(0.3)
-        if check_btn.is_enabled():
+        if check_btn.is_enabled() and "正在检查" not in status_text.window_text():
             break
 
-    # Verify button is re-enabled and badge indicates up to date or release detected
+    # 按钮必须回到可用 —— 这条才是真正的回归护栏：
+    # 检查更新若在异常路径上把按钮永久禁用，用户就再也点不动了。
     assert check_btn.is_enabled(), "CheckUpdateNowBtn should be re-enabled after checking"
+
+    # 徽标必须落在一个**终态**上，不能永远停在「正在检查更新...」。
+    #
+    # 这里刻意不把「已是最新 / 发现新版本」写成硬断言：这条用例会真的联网去查
+    # release，在无网 / 代理受限 / CI 里拿到的是「检查更新受阻」——
+    # 那是**环境**结论，不是产品缺陷。徽标全部可能的终态：
+    #   当前已是最新版本 / 发现新版本 x.y.z / 检查更新受阻
+    #   下载完成 · 就绪安装 / 回退包下载完成 · 就绪安装
+    # 早先的写法把成功文案写成三选一硬断言，于是这条用例在离线环境下必红，
+    # 而且红得毫无信息量。现在只守住「检查跑到了终点」这个真契约。
     badge_val = status_text.window_text()
-    assert "最新版本" in badge_val or "新版本" in badge_val or "版本" in badge_val, f"Badge text should indicate version status, got: {badge_val}"
+    assert "正在检查" not in badge_val, (
+        f"检查更新应已结束，徽标却仍停在过程态：{badge_val!r}")
+    if "受阻" in badge_val:
+        print(f"[SKIP] 更新检查因网络不可达而终止（环境结论，非产品缺陷）：{badge_val!r}")
+    else:
+        assert "版本" in badge_val, (
+            f"联网状态下徽标应给出明确的版本结论，实际：{badge_val!r}")
 
 
 def test_left_button_trigger_behavior_and_long_press(app):
