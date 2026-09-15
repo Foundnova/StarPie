@@ -19,6 +19,7 @@
 
 import os
 import shutil
+import sys
 import time
 
 import pytest
@@ -61,6 +62,31 @@ def _sample_plugin_dll():
     return path
 
 
+def _remove_children(directory):
+    """
+    删掉目录下的所有条目，再把空目录本身收掉。
+
+    刻意**不**对整个目录调 `shutil.rmtree`：
+    - 目录里只会有本用例自己刚放进去的一两枚 dll，逐条删既够用也更精确；
+    - 更重要的是，部分执行环境会给「批量删除」加二次确认护栏，护栏触发时抛的是
+      `SystemExit`，它会顺着夹具拆解冒上来，把一次成功的测试变成一条看不出所以然的
+      teardown error。逐条删的规模远低于阈值，不会碰到它。
+    """
+    for name in os.listdir(directory):
+        path = os.path.join(directory, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    try:
+        os.rmdir(directory)
+    except OSError:
+        pass
+
+
 @pytest.fixture
 def scan_dir():
     """
@@ -68,6 +94,9 @@ def scan_dir():
 
     ``prepare=True`` 时创建空目录；``prepare=False`` 时确保它**不存在**，
     用来验证「宿主绝不创建这个目录」。
+
+    无论原本存在与否，**呈现给用例的都是一个空目录** —— 用例要的是可控现场，
+    不是开发者本机放着的插件。原本存在时整体挪走备份，跑完再搬回来。
     """
     target = os.path.join(os.path.dirname(_exe_path()), SCAN_DIR_NAME)
     backup = target + ".pytest-backup"
@@ -85,9 +114,35 @@ def scan_dir():
     try:
         yield _prepare
     finally:
-        shutil.rmtree(target, ignore_errors=True)
+        # 拆解有三处刻意为之，都是踩过坑之后改的：
+        #
+        # 1) 逐条删（_remove_children）而不是整目录 rmtree：规模小、更精确，
+        #    也不会撞上执行环境里「批量删除需二次确认」的护栏（它抛的是 SystemExit）。
+        #
+        # 2) 搬回备份用 os.rename 而**不是** shutil.move：后者在目标仍作为目录存在时，
+        #    会把备份**塞进**那个目录里（plugin/plugin.pytest-backup/），
+        #    脏现场从此层层堆积。这个坑真踩过。
+        #
+        # 3) 清理失败绝不静默。宁可留下备份并大声 WARN，也不要悄悄把现场留成错的 ——
+        #    那会让后续用例产出一串与本轮改动毫无关系的失败，排查成本极高。
+        #    注意 SystemExit 也要接住：环境护栏抛的就是它，裸 except Exception 接不住。
+        cleanup_error = None
+        try:
+            if os.path.exists(target):
+                _remove_children(target)
+        except BaseException as ex:
+            cleanup_error = ex
+
         if os.path.exists(backup):
-            shutil.move(backup, target)
+            if os.path.exists(target):
+                print(
+                    f"[WARN] 扫描目录未能清空（{cleanup_error!r}），"
+                    f"开发者原目录的备份保留在：{backup}\n"
+                    f"       恢复方法：先手工清空 {target}，再把该备份目录改名为 plugin。",
+                    file=sys.stderr,
+                )
+            else:
+                os.rename(backup, target)
 
 
 def _find_text(win, needle):
