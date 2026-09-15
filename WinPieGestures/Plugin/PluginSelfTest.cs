@@ -23,7 +23,7 @@ namespace WinPieGestures.Plugins;
 /// </summary>
 internal static class PluginSelfTest
 {
-    public static int Run(string dllPath, string? reportPath)
+    public static int Run(string dllPath, string? reportPath, bool skipInvoke = false)
     {
         var report = new StringBuilder();
         bool pass = true;
@@ -45,6 +45,10 @@ internal static class PluginSelfTest
         Line($"时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         Line($"宿主版本：{PluginManifestReader.HostVersion} / SDK 契约：{PluginApi.ApiVersion}");
         Line($"目标文件：{dllPath}");
+        if (skipInvoke)
+        {
+            Line("运行模式：--skip-invoke —— 跳过真实调用，不会改变本机环境");
+        }
         Line("====================================================");
 
         string? installedPluginId = null;
@@ -126,7 +130,7 @@ internal static class PluginSelfTest
             // 刻意放进独立方法：这两步会拿到 PluginActionRegistration，而它的 Contribution
             // 指向插件程序集里的类型实例。这些引用若留在 Run 的栈帧上，第 5 步卸载时插件的
             // ALC 就回收不掉 —— 自检会把自己测挂，报告里出现假的「需要重启才能释放」。
-            string? stageError = RunEnableAndInvoke(install.PluginId, Line);
+            string? stageError = RunEnableAndInvoke(install.PluginId, Line, skipInvoke);
             if (stageError != null)
             {
                 Fail("启用与调用", stageError);
@@ -219,7 +223,7 @@ internal static class PluginSelfTest
     /// </summary>
     /// <returns>失败原因；<c>null</c> 表示两个阶段都通过。</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static string? RunEnableAndInvoke(string pluginId, Action<string> line)
+    private static string? RunEnableAndInvoke(string pluginId, Action<string> line, bool skipInvoke = false)
     {
         // ---- 3 启用 ----
         line("");
@@ -535,6 +539,15 @@ internal static class PluginSelfTest
         // ---- 4 调用 ----
         line("");
         line("[4] 调用动作（走与轮盘完全相同的接缝）");
+
+        if (skipInvoke)
+        {
+            // 只想确认识别 / 注册 / 参数校验 / 选择器接缝时应当走这条：「真执行一次动作」
+            // 对亮度、音量、剪贴板这类动作就是实打实的副作用，CI 与排查问题
+            // 都不该顺手改动用户的机器（实测踩过：反复跑自检把屏幕亮度从 15% 推到 75%）。
+            line("  已跳过（--skip-invoke）：识别、注册、参数校验与选择器接缝断言均已跑过，本机环境未被改动。");
+            return null;
+        }
 
         // 这一节是**真执行**，不是只读检查。
         // 明写出来是必要的：自检报告通篇读起来像一次静态体检，

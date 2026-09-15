@@ -231,10 +231,13 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		OnPropertyChanged(nameof(SelectedSystemPreset));
 		OnPropertyChanged(nameof(TileLayout));
 
-		// 插件动作相关：类型一切换，子下拉的可见性、候选集合与当前选中值都要跟着刷新。
-		// 少通知任何一个，界面就会停在旧状态上（例如切到插件动作后子下拉仍是空的）。
+		// 插件动作相关：让子下拉的可见性与选中值跟上类型变化。
+		//
+		// 注意**不要**在这里通知 PluginActionOptions：它的 getter 每次求值都会重建集合视图，
+		// 而本方法在很多路径上被调用（包括用户刚在子下拉里选定动作那一下）。
+		// 一旦纳入全量通知，用户选完动作就会立刻重建候选集并重设 ItemsSource。
+		// 类型切换那处（AggregatedType 的 setter）已经单独通知过它了，那是唯一真正需要的时机。
 		OnPropertyChanged(nameof(IsPluginType));
-		OnPropertyChanged(nameof(PluginActionOptions));
 		OnPropertyChanged(nameof(SelectedPluginActionFullId));
 		OnPropertyChanged(nameof(IsPluginActionBroken));
 	}
@@ -268,6 +271,12 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 				OnPropertyChanged(nameof(IsCommandType));
 				OnPropertyChanged(nameof(IsSwitchWindowType));
 				OnPropertyChanged(nameof(IsTileType));
+
+				// 类型切换是子下拉**唯一**需要重建候选集的时机；
+				// 其余路径（例如用户刚选定了一个动作）刻意不重建，见 NotifyAllPropertiesChanged 的说明。
+				OnPropertyChanged(nameof(IsPluginType));
+				OnPropertyChanged(nameof(PluginActionOptions));
+				OnPropertyChanged(nameof(IsPluginActionBroken));
 			}
 		}
 	}
