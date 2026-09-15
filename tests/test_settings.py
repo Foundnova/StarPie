@@ -16,6 +16,102 @@ def parse_px_value(text):
     """Slider labels now embed units, e.g. '25 px'."""
     return float(re.sub(r"[^0-9.]", "", text))
 
+def _toggle_sidebar(win):
+    """
+    点一下侧边栏的折叠/展开按钮。
+
+    侧边栏**默认是展开态**。两个状态各有一批控件只在对侧可见：
+      - 展开态：NavTab0Text 等文字标签、ConfigMode 模式切换器
+      - 折叠态：SidebarThemeCollapsedButton（折叠态专属的应用主题循环按钮）
+    所以「找不到某个侧边栏控件」时，先想清楚它属于哪个状态。
+    """
+    win.child_window(auto_id="SidebarToggleButton", control_type="Button").click_input()
+    time.sleep(0.9)
+
+def _switch_to_list_mode(win):
+    """
+    把 NavTab2 切到「紧凑全览列表」。配置方案列表（ProfilesListBox 及其增删改名按钮）
+    只在这个模式下存在。
+
+    **要求调用方已切到高级全量模式** —— 简洁模式会整块隐藏这个分段切换器并强制回画布模式。
+    缺了这一步就是「断言一个本就不该存在的控件」，失败与被测功能无关。
+    """
+    radio = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
+    assert radio.exists(timeout=3), (
+        "找不到 MappingsViewModeListRadio —— 简洁模式会整块隐藏它，"
+        "本用例应改用 advanced_mode 夹具而不是 app"
+    )
+    radio.select()
+    time.sleep(0.6)
+
+def _list_item_texts(list_box):
+    """
+    取出 ListBox 每一项的「可见文本」。
+
+    **不要用 `item.window_text()` 直接断言内容**：ListViewItem 的 UIA Name 常常不是
+    用户看到的文字 —— 本项目里黑名单列表返回的就是 ViewModel 的类名字符串
+    （`WinPieGestures.BlacklistProcessItemViewModel`），拿它比字符串必然失败，
+    而那失败纯属取值方式不对，与被测功能无关。
+    稳妥做法是把该项自身文本与其所有 Text 后代的文本合并起来看。
+    """
+    texts = []
+    for item in list_box.children(control_type="ListItem"):
+        parts = []
+        try:
+            own = item.window_text()
+            if own:
+                parts.append(own)
+        except Exception:
+            pass
+        try:
+            for t in item.descendants(control_type="Text"):
+                try:
+                    value = t.window_text()
+                    if value:
+                        parts.append(value)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        texts.append(" ".join(parts))
+    return texts
+
+def _combo_item_texts(combo):
+    """
+    展开下拉并取回全部条目文本。
+
+    两个坑：
+    1. pywinauto 0.6.9 的 `ComboBoxWrapper` **没有** `item_texts()`（那是更新版本的 API）。
+       可用的是 `texts()` / `children_texts()`。写成 `item_texts()` 会得到一个怪异错误
+       （`Neither GUI element (wrapper) nor wrapper method ...`），因为 WindowSpecification
+       会把未知属性当成**子窗口**，而不是方法。
+    2. ComboBox 的下拉是**独立弹窗**，必须先 `expand()` 让它真正渲染出来，
+       否则条目还没生成。刚切页时也可能没就绪，所以要重试而不是一次定生死。
+    3. 读到的条目 ListItem 自身 `window_text()` 是 ViewModel 类名
+       （`WinPieGestures.ActionTypeItem`），所以要从 wrapper 的 `texts()` 取，
+       不要从 ListItem 上取。
+    """
+    wrapper = combo.wrapper_object()
+    for _ in range(4):
+        try:
+            wrapper.expand()
+            time.sleep(0.4)
+            texts = wrapper.texts()
+            if texts:
+                return texts
+        except Exception:
+            pass
+        time.sleep(0.3)
+    return []
+
+def _collapse_combo(combo):
+    """收起下拉，避免留一个展开的弹窗影响后续操作。"""
+    try:
+        combo.wrapper_object().collapse()
+        time.sleep(0.2)
+    except Exception:
+        pass
+
 def test_modify_slider_and_save(app):
     win, local_app_data = app
     
@@ -62,12 +158,14 @@ def test_modify_slider_and_save(app):
     assert config["DragThreshold"] == new_val, f"Saved DragThreshold ({config['DragThreshold']}) should match UI value ({new_val})"
 
 
-def test_switch_all_tabs_smoothly(app):
+def test_switch_all_tabs_smoothly(advanced_mode):
     """
     Test clicking through all 6 navigation radio buttons (NavTab0 ~ NavTab5)
     to guarantee zero crashes, zero freezes, and that controls remain fully responsive.
+
+    用 advanced_mode 而不是 app：本用例末尾要断言配置方案列表，而那是高级 UI。
     """
-    win, local_app_data = app
+    win, local_app_data = advanced_mode
     
     # Iterate through all 6 tabs. 这里是「全页遍历」的唯一出处，
     # 新增页时务必把上界一起推进 —— 否则新页只是没被测，而不是测过了。
@@ -103,10 +201,7 @@ def test_switch_all_tabs_smoothly(app):
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
-    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode.exists(timeout=2):
-        list_mode.select()
-        time.sleep(0.4)
+    _switch_to_list_mode(win)
     profiles_list = win.child_window(auto_id="ProfilesListBox", control_type="List")
     assert profiles_list.exists(timeout=3), "ProfilesListBox should exist in Mappings tab"
     
@@ -175,41 +270,41 @@ def test_blacklist_add_and_delete(app):
     txt_box.set_text("testgame.exe")
     time.sleep(0.2)
     add_btn.invoke()
-    time.sleep(0.3)
+    time.sleep(0.4)
     
     # Check that item was added to listbox
-    items = [item.window_text() for item in list_box.children(control_type="ListItem")]
-    assert "testgame.exe" in items, f"testgame.exe should be in blacklist items: {items}"
+    items = _list_item_texts(list_box)
+    assert any("testgame.exe" in it for it in items), f"testgame.exe should be in blacklist items: {items}"
     
     # Select and remove
-    for item in list_box.children(control_type="ListItem"):
-        if item.window_text() == "testgame.exe":
+    for item, text in zip(list_box.children(control_type="ListItem"), items):
+        if "testgame.exe" in text:
             item.select()
             time.sleep(0.2)
             del_btn.invoke()
-            time.sleep(0.3)
+            time.sleep(0.4)
             break
             
-    items_after = [item.window_text() for item in list_box.children(control_type="ListItem")]
-    assert "testgame.exe" not in items_after, "testgame.exe should have been deleted"
+    items_after = _list_item_texts(list_box)
+    assert not any("testgame.exe" in it for it in items_after), (
+        f"testgame.exe should have been deleted: {items_after}"
+    )
 
 
-def test_profile_management_ui_and_buttons(app):
+def test_profile_management_ui_and_buttons(advanced_mode):
     """
     Test existence, states, and accessibility of profile management controls:
     Add App Profile, Add Custom Profile, Rename Profile, Delete Profile.
+
+    这些控件全在 NavTab2 的「列表模式」里，而列表模式只在高级全量模式下可达 —— 故用 advanced_mode。
     """
-    win, local_app_data = app
+    win, local_app_data = advanced_mode
     
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
 
-    # v1.6.8: profile management controls live in the list view (collapsed by default)
-    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode.exists(timeout=2):
-        list_mode.select()
-        time.sleep(0.4)
+    _switch_to_list_mode(win)
 
     add_app_btn = win.child_window(auto_id="AddProfileButton", control_type="Button")
     add_custom_btn = win.child_window(auto_id="AddCustomProfileButton", control_type="Button")
@@ -224,28 +319,26 @@ def test_profile_management_ui_and_buttons(app):
     assert profiles_list.exists(timeout=3), "ProfilesListBox should exist"
     
     # Verify Global profile is listed
-    items = [item.window_text() for item in profiles_list.children(control_type="ListItem")]
+    items = _list_item_texts(profiles_list)
     assert any("Global" in it for it in items), f"Global profile must be listed: {items}"
 
 
-def test_hotkey_recorder_and_system_presets_catalog(app):
+def test_hotkey_recorder_and_system_presets_catalog(advanced_mode):
     """
     Test v1.2.2 features:
     1. Navigation to Mappings Tab (NavTab2).
     2. Verification that Slots list and profile controls are displayed.
     3. Save and persistence verification.
+
+    配置方案列表只在 NavTab2 的列表模式里，而列表模式只在高级全量模式下可达 —— 故用 advanced_mode。
     """
-    win, local_app_data = app
+    win, local_app_data = advanced_mode
     
     tab2 = win.child_window(auto_id="NavTab2", control_type="RadioButton")
     tab2.select()
     time.sleep(0.4)
     
-    # v1.6.8: profile list lives in the collapsible list view
-    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode.exists(timeout=2):
-        list_mode.select()
-        time.sleep(0.4)
+    _switch_to_list_mode(win)
 
     profiles_list = win.child_window(auto_id="ProfilesListBox", control_type="List")
     assert profiles_list.exists(timeout=3), "ProfilesListBox should exist in Mappings tab"
@@ -282,21 +375,30 @@ def test_v124_app_interface_themes_and_clean_appearance(app):
     tab1.select()
     time.sleep(0.4)
     
-    # 1. Verify sidebar app theme cycle button (v1.6.8 replaced AppThemeComboBox)
-    theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
-    assert theme_btn.exists(timeout=3), "SidebarThemeCollapsedButton should exist"
-    
-    # 2. Verify Wheel Theme dropdown (轮盘配色方案)
+    # 1. Verify Wheel Theme dropdown (轮盘配色方案)
     wheel_theme_combo = win.child_window(auto_id="ThemeComboBox", control_type="ComboBox")
     assert wheel_theme_combo.exists(timeout=3), "ThemeComboBox should exist"
     
-    # 3. Verify Wheel Background images controls are removed
+    # 2. Verify Wheel Background images controls are removed
     wheel_bg_box = win.child_window(auto_id="WheelBgImageTextBox", control_type="Edit")
     assert not wheel_bg_box.exists(timeout=1), "WheelBgImageTextBox should NOT exist (feature canceled)"
     
-    # 4. Cycle app theme once: default is System, one click -> Light
-    theme_btn.invoke()
-    time.sleep(0.5)
+    # 3. 应用主题循环按钮是**折叠态侧边栏专属**的：SidebarThemeCollapsedButton 只在侧边栏
+    #    收起时可见（展开态下由 SidebarThemeExpandedButton 顶替）。侧边栏默认是展开的，
+    #    所以必须先折叠再断言 —— 以前这里直接断言，等于在找一块本就不该存在的按钮。
+    _toggle_sidebar(win)
+    try:
+        theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
+        assert theme_btn.exists(timeout=3), (
+            "SidebarThemeCollapsedButton 应出现在折叠态侧边栏上"
+        )
+
+        # 4. Cycle app theme once: default is System, one click -> Light
+        theme_btn.invoke()
+        time.sleep(0.5)
+    finally:
+        # 恢复展开态，避免影响后续断言与保存
+        _toggle_sidebar(win)
     
     # 5. Save settings and verify config persistence
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
@@ -528,10 +630,17 @@ def test_v134_memory_autosave_and_theme_persistence(app):
     time.sleep(0.4)
     
     # 2. Cycle AppTheme via sidebar button (System -> Light, auto-persisted)
-    theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
-    assert theme_btn.exists(timeout=3), "SidebarThemeCollapsedButton should exist"
-    theme_btn.invoke()
-    time.sleep(0.6)
+    #    该按钮是折叠态侧边栏专属的，侧边栏默认展开 —— 先折叠，点完再恢复。
+    _toggle_sidebar(win)
+    try:
+        theme_btn = win.child_window(auto_id="SidebarThemeCollapsedButton", control_type="Button")
+        assert theme_btn.exists(timeout=3), (
+            "SidebarThemeCollapsedButton 应出现在折叠态侧边栏上"
+        )
+        theme_btn.invoke()
+        time.sleep(0.6)
+    finally:
+        _toggle_sidebar(win)
     
     # 3. Change a slider (WheelRadiusSlider)
     wheel_slider = win.child_window(auto_id="WheelRadiusSlider", control_type="Slider")
@@ -549,7 +658,7 @@ def test_v134_memory_autosave_and_theme_persistence(app):
     assert abs(config.get("WheelRadius", 0) - 145.0) < 1.0, f"Auto-persisted WheelRadius should be 145, got {config.get('WheelRadius')}"
 
 
-def test_v135_program_picker_clean_icons_and_core_customization(app):
+def test_v135_program_picker_clean_icons_and_core_customization(advanced_mode):
     """
     Test v1.3.5 features:
     1. Navigate to Appearance Tab (NavTab1).
@@ -557,8 +666,10 @@ def test_v135_program_picker_clean_icons_and_core_customization(app):
     3. Select a Core Pattern from CoreIconTypeComboBox (e.g., Windows Logo or Crosshair).
     4. Verify configuration auto-persists ShowCoreIcon and CoreIconType.
     5. Navigate to Mappings Tab (NavTab2), open ProgramPickerWindow, verify it opens and closes cleanly.
+
+    第 5 步要用的 AddProfileButton 在 NavTab2 的列表模式里，而列表模式只在高级全量模式下可达 —— 故用 advanced_mode。
     """
-    win, local_app_data = app
+    win, local_app_data = advanced_mode
     
     # 1. Appearance Tab
     tab1 = win.child_window(auto_id="NavTab1", control_type="RadioButton")
@@ -597,11 +708,7 @@ def test_v135_program_picker_clean_icons_and_core_customization(app):
     tab2.select()
     time.sleep(0.4)
     
-    # v1.6.8: AddProfileButton (opens ProgramPickerWindow) lives in the list view
-    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode.exists(timeout=2):
-        list_mode.select()
-        time.sleep(0.4)
+    _switch_to_list_mode(win)
 
     add_btn = win.child_window(auto_id="AddProfileButton", control_type="Button")
     assert add_btn.exists(timeout=3), "AddProfileButton should exist"
@@ -739,12 +846,14 @@ def test_v138_i18n_multilanguage_support(app):
     save_btn = win.child_window(auto_id="SaveButton", control_type="Button")
     assert "Save" in save_btn.window_text(), f"Save button should be in English, got {save_btn.window_text()}"
     
-    # v1.6.8: sidebar is collapsed by default, hiding NavTab texts; expand it first
-    sidebar_toggle = win.child_window(auto_id="SidebarToggleButton", control_type="Button")
-    if sidebar_toggle.exists(timeout=2):
-        sidebar_toggle.invoke()
-        time.sleep(0.4)
+    # 侧边栏**默认就是展开态**，NavTab 的文字标签本来就在。
+    # 这里以前有一句「展开侧边栏」的 invoke()，但它是按「默认折叠」的旧假设写的 ——
+    # 实际效果是**把侧边栏折叠了**，反而让 NavTab0Text 消失，于是断言必然失败。
+    # 侧边栏的折叠态只保留图标，NavTab0Text 这类标签会整块移出自动化树。
     tab0_text = win.child_window(auto_id="NavTab0Text", control_type="Text")
+    assert tab0_text.exists(timeout=3), (
+        "NavTab0Text 找不到：侧边栏处于折叠态？折叠态只留图标，文字标签不进自动化树"
+    )
     assert "Trigger" in tab0_text.window_text() or "🎯" in tab0_text.window_text(), "Tab0 should update"
     
     # 5. Check config file persists Language = "en"
@@ -790,11 +899,28 @@ def test_v139_folder_action_type_and_i18n_consistency(app):
     focus_title = win.child_window(auto_id="FocusSlotTitleText", control_type="Text")
     assert focus_title.exists(timeout=3), "FocusSlotTitleText should exist"
     
-    # 3. Locate the first slot's Action Type ComboBox (9 aggregated action types
-    #    since v1.6.8dev2 added ShellTool, index 3 = Folder) and select "Folder"
+    # 3. Locate the first slot's Action Type ComboBox and select "Folder"
     type_combo = win.child_window(auto_id="FocusActionTypeComboBox", control_type="ComboBox")
     assert type_combo.exists(timeout=3), "FocusActionTypeComboBox should exist"
-    assert type_combo.item_count() == 9, f"FocusActionTypeComboBox should have 9 action types, got {type_combo.item_count()}"
+
+    # 这里以前写死 `item_count() == 9`，是个过时魔数，什么也没守住：
+    # 内置动作类型有 9 个，插件动作类型再追加 1 个；而**简洁模式会过滤掉
+    # Command 与 WindowManager 两个低频类型**，所以默认（简洁）模式下是 7 + 1 = 8。
+    # 一改模式或一加类型它就红，却说不清哪里坏了。改为断言两条真正有意义的不变量：
+    #   a) 插件动作类型必须可见（v1.7.x 新增能力，掉了要有人知道）—— 用语言无关的 🔌 前缀识别；
+    #   b) 内置项顺序契约：内置类型顺序属于用户肌肉记忆，插件动作只追加在末尾
+    #      （见 SlotViewModel.AggregatedActionTypes），因此 index 3 恒为 Folder，
+    #      下面 select(3) 才成立、不会被新增类型顶错位。
+    item_texts = _combo_item_texts(type_combo)
+    assert len(item_texts) >= 4, f"动作类型太少，index 3 不可能是 Folder：{item_texts}"
+    assert any("🔌" in t for t in item_texts), (
+        f"插件动作类型应出现在类型下拉里（简洁模式下也应在）：{item_texts}"
+    )
+    assert "🔌" in item_texts[-1], (
+        f"插件动作类型必须追加在内置类型之后，不能打乱内置顺序：{item_texts}"
+    )
+    _collapse_combo(type_combo)
+
     type_combo.select(3)
     time.sleep(0.3)
     
@@ -851,7 +977,7 @@ def test_v140_custom_icons_and_appearance_collapsible_and_milestones_folding(app
     older_expander = win.child_window(auto_id="OlderMilestonesExpander", control_type="Group")
     assert older_expander.exists(timeout=3), "OlderMilestonesExpander should exist"
 
-def test_v141_outer_escape_cancel_and_rename_capabilities(app):
+def test_v141_outer_escape_cancel_and_rename_capabilities(advanced_mode):
     """
     Test v1.4.1 Features:
     1. Triggers & Scenes Tab (NavTab0):
@@ -861,8 +987,11 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     3. Appearance Tab (NavTab1):
        - Verify custom color expander and theme preset capabilities.
     4. Save configuration and verify persistence of v1.4.1 settings.
+
+    用 advanced_mode：RenameProfileButton 在 NavTab2 的列表模式里，
+    而列表模式只在高级全量模式下可达。
     """
-    win, local_app_data = app
+    win, local_app_data = advanced_mode
     
     # 1. Triggers Tab (Tab 0)
     tab0 = win.child_window(auto_id="NavTab0", control_type="RadioButton")
@@ -885,10 +1014,7 @@ def test_v141_outer_escape_cancel_and_rename_capabilities(app):
     time.sleep(0.4)
     
     # v1.6.8: rename control lives in the list view
-    list_mode = win.child_window(auto_id="MappingsViewModeListRadio", control_type="RadioButton")
-    if list_mode.exists(timeout=2):
-        list_mode.select()
-        time.sleep(0.4)
+    _switch_to_list_mode(win)
 
     rename_profile_btn = win.child_window(auto_id="RenameProfileButton", control_type="Button")
     assert rename_profile_btn.exists(timeout=3), "RenameProfileButton should exist"
@@ -1008,6 +1134,17 @@ def test_update_ui_elements_and_check(app):
     status_text = win.child_window(auto_id="UpdateStatusBadgeText", control_type="Text")
     assert status_text.exists(timeout=3), "UpdateStatusBadgeText should exist"
     
+    # 更新推送通道 / 下载代理两个下拉住在 UpdateAdvancedSettingsExpander 里，
+    # 而它 IsExpanded="False" —— **折叠的 Expander 内容不进自动化树**，
+    # 直接断言会得到「控件不存在」，看着像功能没了，其实只是没展开。
+    advanced_expander = win.child_window(auto_id="UpdateAdvancedSettingsExpander")
+    assert advanced_expander.exists(timeout=3), "UpdateAdvancedSettingsExpander should exist"
+    advanced_expander.expand()
+    time.sleep(0.6)
+
+    channel_combo = win.child_window(auto_id="UpdateChannelComboBox", control_type="ComboBox")
+    assert channel_combo.exists(timeout=3), "UpdateChannelComboBox should exist"
+
     proxy_combo = win.child_window(auto_id="UpdateProxyComboBox", control_type="ComboBox")
     assert proxy_combo.exists(timeout=3), "UpdateProxyComboBox should exist"
     
