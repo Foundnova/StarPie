@@ -96,14 +96,16 @@ def scan_dir():
     用来验证「宿主绝不创建这个目录」。
 
     无论原本存在与否，**呈现给用例的都是一个空目录** —— 用例要的是可控现场，
-    不是开发者本机放着的插件。原本存在时整体挪走备份，跑完再搬回来。
+    不是开发者本机放着的插件。原本存在时整体挪走备份，跑完再搬回来；
+    原本不存在时（宿主本就不会创建它）跑完把这个临时目录收掉。
     """
     target = os.path.join(os.path.dirname(_exe_path()), SCAN_DIR_NAME)
     backup = target + ".pytest-backup"
 
     # 原本就存在时整体挪走并备份，绝不原地删 —— 那可能是开发者自己放插件的地方
     shutil.rmtree(backup, ignore_errors=True)
-    if os.path.exists(target):
+    had_target = os.path.exists(target)
+    if had_target:
         shutil.move(target, backup)
 
     def _prepare(create=True):
@@ -133,16 +135,34 @@ def scan_dir():
         except BaseException as ex:
             cleanup_error = ex
 
+        # 清理失败**无论有没有备份**都要出声。
+        # 这里原先只在「备份还在」的分支里 WARN，于是「原本没有扫描目录」（没有备份）
+        # 这条路径上清理失败是**完全静默**的：脏现场留在原地，下一轮跑出一串
+        # 与本轮改动毫无关系的失败，而屏幕上一点线索都没有。
+        if cleanup_error is not None:
+            print(
+                f"[WARN] 扫描目录未能清空：{target}\n"
+                f"       原因：{cleanup_error!r}\n"
+                f"       该目录现在的状态是脏的，不要据此下结论。",
+                file=sys.stderr,
+            )
+
         if os.path.exists(backup):
             if os.path.exists(target):
                 print(
-                    f"[WARN] 扫描目录未能清空（{cleanup_error!r}），"
-                    f"开发者原目录的备份保留在：{backup}\n"
+                    f"[WARN] 开发者原目录的备份保留在：{backup}\n"
                     f"       恢复方法：先手工清空 {target}，再把该备份目录改名为 plugin。",
                     file=sys.stderr,
                 )
             else:
                 os.rename(backup, target)
+        elif not had_target:
+            # 原本就没有这个目录，是夹具为用例建出来的 —— 收干净。
+            # 留着会给「宿主绝不创建扫描目录」那类断言摆下一枚假的「已被创建」现场。
+            try:
+                os.rmdir(target)
+            except OSError:
+                pass
 
 
 def _find_text(win, needle):
