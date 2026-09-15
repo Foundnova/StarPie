@@ -65,9 +65,9 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 			string t = Mapping.Action.Type ?? "Hotkey";
 			if (t == PluginActionBinding.TypeName)
 			{
-				// 插件动作的真实身份不在 Type 里（所有插件动作都是 "Plugin"），
-				// 而在 PluginActionRef 里 —— 投影成一串唯一 Tag 才能被下拉框选中。
-				return PluginActionBinding.ProjectTag(Mapping.Action);
+				// 类型下拉里插件动作只有一项，类型即自身。
+				// 具体是哪一个动作由子下拉承载，不必再把贡献点 ID 编码进 Tag。
+				return PluginActionBinding.TypeName;
 			}
 			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
 			{
@@ -79,9 +79,12 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		{
 			if (!string.IsNullOrEmpty(value))
 			{
-				if (PluginActionBinding.TryParseTag(value, out string pluginFullId))
+				if (value == PluginActionBinding.TypeName)
 				{
-					PluginActionBinding.Apply(Mapping.Action, pluginFullId);
+					// 只切类型，**刻意不清插件引用**：用户在内置类型与插件动作之间来回切换时，
+					// 已配好的插件动作不应被清掉（改选具体动作是子下拉的事）。
+					// 引用为空只表示「还没选过」，由子下拉的空状态提示去引导。
+					Type = PluginActionBinding.TypeName;
 				}
 				else if (value == "WindowManager")
 				{
@@ -105,13 +108,49 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 				OnPropertyChanged(nameof(AggregatedType));
 				OnPropertyChanged(nameof(IsWindowManagerType));
 				OnPropertyChanged(nameof(IsPluginType));
+				OnPropertyChanged(nameof(PluginActionOptions));
 				NotifyAllPropertiesChanged();
 			}
 		}
 	}
 
-	/// <summary>当前动作是否为插件动作（用于界面显示对应的编辑面板）。</summary>
+	/// <summary>当前动作是否为插件动作（用于界面显示对应的编辑面板与子下拉）。</summary>
 	public bool IsPluginType => Type == PluginActionBinding.TypeName;
+
+	/// <summary>
+	/// 子下拉的候选插件动作，已按插件分组（分组头即插件显示名，本身不可选中）。
+	/// <para>每次求值都重建，以便新启用的插件立刻出现在自己的分组里。</para>
+	/// </summary>
+	public ICollectionView? PluginActionOptions => PluginActionBinding.BuildPluginActionView();
+
+	/// <summary>
+	/// 子下拉当前选中的插件动作全 ID。
+	/// </summary>
+	public string? SelectedPluginActionFullId
+	{
+		get => PluginActionBinding.ProjectSelectedAction(Mapping.Action);
+		set
+		{
+			// ItemsSource 重建时下拉框会把 SelectedValue 置空 —— 那不是用户的意图。
+			// 不忽略的话，每次刷新都会把用户配好的动作清掉。
+			if (string.IsNullOrEmpty(value)) return;
+
+			if (PluginActionBinding.ProjectSelectedAction(Mapping.Action) == value) return;
+
+			if (PluginActionBinding.Apply(Mapping.Action, value))
+			{
+				OnPropertyChanged(nameof(SelectedPluginActionFullId));
+				OnPropertyChanged(nameof(IsPluginActionBroken));
+				NotifyAllPropertiesChanged();
+			}
+		}
+	}
+
+	/// <summary>
+	/// 所引用的插件动作是否已失效（插件被停用或卸载）。
+	/// <para>与「尚未选定」严格区分：这种情况必须显式提示，否则用户会以为自己的配置丢了。</para>
+	/// </summary>
+	public bool IsPluginActionBroken => PluginActionBinding.IsReferenceBroken(Mapping.Action);
 
 	public bool IsWindowManagerType => 
 		Type == "Tile" || Type == "ToggleTopmost" || Type == "MoveMonitor" || 
@@ -191,6 +230,13 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 		OnPropertyChanged(nameof(Name));
 		OnPropertyChanged(nameof(SelectedSystemPreset));
 		OnPropertyChanged(nameof(TileLayout));
+
+		// 插件动作相关：类型一切换，子下拉的可见性、候选集合与当前选中值都要跟着刷新。
+		// 少通知任何一个，界面就会停在旧状态上（例如切到插件动作后子下拉仍是空的）。
+		OnPropertyChanged(nameof(IsPluginType));
+		OnPropertyChanged(nameof(PluginActionOptions));
+		OnPropertyChanged(nameof(SelectedPluginActionFullId));
+		OnPropertyChanged(nameof(IsPluginActionBroken));
 	}
 
 	public string Pattern

@@ -1285,6 +1285,35 @@
                               </StackPanel>
                             </Grid>
 
+                            <!--
+                              2b. 插件动作子下拉：仅当动作类型选为「插件动作」时出现。
+
+                              候选动作按插件分组呈现，分组头就是插件显示名，且分组头本身不可选中 ——
+                              所以不会出现「选中了插件名，但它不是一个动作」这种非法状态。
+                              分组集合视图由 PluginActionBinding.BuildPluginActionView 提供。
+                            -->
+                            <Grid Margin="0,0,0,10" Visibility="{Binding IsPluginType, Converter={StaticResource BoolToVis}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220" />
+                                <ColumnDefinition Width="*" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="插件动作 (按插件分组):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                <ComboBox Height="32" FontSize="11.5" Style="{StaticResource FlatComboBoxStyle}" ItemsSource="{Binding PluginActionOptions}" SelectedValuePath="FullId" DisplayMemberPath="DisplayName" SelectedValue="{Binding SelectedPluginActionFullId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTip="同一插件的动作归入以该插件名命名的分组">
+                                  <ComboBox.GroupStyle>
+                                    <GroupStyle>
+                                      <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                          <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="4,6,0,3" />
+                                        </DataTemplate>
+                                      </GroupStyle.HeaderTemplate>
+                                    </GroupStyle>
+                                  </ComboBox.GroupStyle>
+                                </ComboBox>
+                              </StackPanel>
+                              <TextBlock Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,9" FontSize="11" TextWrapping="Wrap" Foreground="#D97706" Visibility="{Binding IsPluginActionBroken, Converter={StaticResource BoolToVis}}" Text="⚠️ 原先引用的插件动作已不可用（插件可能已被停用或卸载），请重新选择。" />
+                            </Grid>
+
                             <!-- 3. 参数专属配置区 -->
                             <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
                               <StackPanel>
@@ -2886,6 +2915,30 @@
                           <ComboBox Name="FocusActionTypeComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectionChanged="FocusActionTypeComboBox_SelectionChanged" />
                           <Button Name="FocusRestoreInheritBtn" Grid.Column="2" Content="🌐 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="8,0" Margin="8,0,0,0" Visibility="Collapsed" ToolTip="清除当前槽位的专属覆写，恢复继承全局方案对应方位的动作" Click="FocusRestoreInheritBtn_Click" />
                           <Button Name="FocusTestActionBtn" Grid.Column="3" Content="▶ 测试触发" Style="{StaticResource ModernButtonStyle}" Height="30" Padding="10,0" Margin="8,0,0,0" Click="FocusTestActionBtn_Click" />
+                        </Grid>
+
+                        <!--
+                          插件动作子下拉：仅当「触发动作类型」选为「插件动作」时出现。
+                          候选动作按插件分组呈现，分组头就是插件显示名，且分组头本身不可选中 ——
+                          因此不会出现「选中了插件名，但它不是一个动作」这种非法状态。
+                        -->
+                        <Grid Name="FocusPluginActionRow" Margin="0,0,0,10" Visibility="Collapsed">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="插件动作:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
+                          <ComboBox Name="FocusPluginActionComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="30" SelectedValuePath="FullId" DisplayMemberPath="DisplayName" SelectionChanged="FocusPluginActionComboBox_SelectionChanged" ToolTip="同一插件的动作归入以该插件名命名的分组">
+                            <ComboBox.GroupStyle>
+                              <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                  <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="4,6,0,3" />
+                                  </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                              </GroupStyle>
+                            </ComboBox.GroupStyle>
+                          </ComboBox>
                         </Grid>
 
                         <!-- 动态参数面板容器 -->

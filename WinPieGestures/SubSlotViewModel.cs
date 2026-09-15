@@ -123,8 +123,8 @@ public class SubSlotViewModel : INotifyPropertyChanged
 			string t = Type;
 			if (t == PluginActionBinding.TypeName)
 			{
-				// 插件动作的真实身份在 PluginActionRef 里，不在 Type 里。
-				return PluginActionBinding.ProjectTag(Action);
+				// 类型下拉里插件动作只有一项，类型即自身；具体动作由子下拉承载。
+				return PluginActionBinding.TypeName;
 			}
 			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
 			{
@@ -139,9 +139,10 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		set
 		{
 			if (string.IsNullOrEmpty(value)) return;
-			if (PluginActionBinding.TryParseTag(value, out string pluginFullId))
+			if (value == PluginActionBinding.TypeName)
 			{
-				PluginActionBinding.Apply(Action, pluginFullId);
+				// 只切类型，刻意不清插件引用：来回切换类型不该把已配好的动作弄丢。
+				Type = PluginActionBinding.TypeName;
 			}
 			else if (value == "WindowManager")
 			{
@@ -162,8 +163,34 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		}
 	}
 
-	/// <summary>当前子动作是否为插件动作。</summary>
+	/// <summary>当前子动作是否为插件动作（用于界面显示对应的编辑面板与子下拉）。</summary>
 	public bool IsPluginType => Type == PluginActionBinding.TypeName;
+
+	/// <summary>子下拉的候选插件动作，已按插件分组（分组头即插件显示名，本身不可选中）。</summary>
+	public ICollectionView? PluginActionOptions => PluginActionBinding.BuildPluginActionView();
+
+	/// <summary>子下拉当前选中的插件动作全 ID。</summary>
+	public string? SelectedPluginActionFullId
+	{
+		get => PluginActionBinding.ProjectSelectedAction(Action);
+		set
+		{
+			// 下拉框重建时会把 SelectedValue 置空，那不是用户的意图 —— 忽略即可。
+			if (string.IsNullOrEmpty(value)) return;
+
+			if (PluginActionBinding.ProjectSelectedAction(Action) == value) return;
+
+			if (PluginActionBinding.Apply(Action, value))
+			{
+				OnPropertyChanged(nameof(SelectedPluginActionFullId));
+				OnPropertyChanged(nameof(IsPluginActionBroken));
+				NotifyAllPropertiesChanged();
+			}
+		}
+	}
+
+	/// <summary>所引用的插件动作是否已失效（插件被停用或卸载）。</summary>
+	public bool IsPluginActionBroken => PluginActionBinding.IsReferenceBroken(Action);
 
 	public bool IsHotkeyType => Type == "Hotkey";
 
@@ -686,6 +713,12 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		OnPropertyChanged(nameof(IsExpanded));
 		OnPropertyChanged(nameof(ExpandToggleText));
 		OnPropertyChanged(nameof(ExpandToggleArrow));
+
+		// 插件动作相关：类型一换，子下拉的可见性、候选集合与当前选中值全部要跟着刷新。
+		OnPropertyChanged(nameof(IsPluginType));
+		OnPropertyChanged(nameof(PluginActionOptions));
+		OnPropertyChanged(nameof(SelectedPluginActionFullId));
+		OnPropertyChanged(nameof(IsPluginActionBroken));
 	}
 
 	public event PropertyChangedEventHandler? PropertyChanged;

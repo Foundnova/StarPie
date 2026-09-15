@@ -1,19 +1,16 @@
 ﻿namespace WinPieGestures;
 
+/// <summary>
+/// 「动作类型」下拉里的一项。
+/// <para>
+/// 类型下拉只承载<b>类型</b>：内置动作是各自一个类型（<c>"Hotkey"</c> / <c>"Ocr"</c>…），
+/// 而全部插件动作共享同一个类型 <c>"Plugin"</c>。具体选了哪个插件动作由子下拉决定，
+/// 见 <see cref="WinPieGestures.Plugins.PluginActionItem"/>。
+/// </para>
+/// </summary>
 public class ActionTypeItem
 {
 	public string Tag { get; set; } = "";
 
 	public string DisplayText { get; set; } = "";
-
-	/// <summary>
-	/// 插件动作引用。仅当本项代表<b>某个具体的插件动作</b>时非空。
-	/// <para>
-	/// 为什么需要它：所有插件动作的 <see cref="Tag"/> 前缀都是 <c>Plugin:</c>，
-	/// 而下拉框用 <c>SelectedValuePath="Tag"</c> 回写类型，纯靠 Tag 字符串无法还原出
-	/// 「这个动作属于哪个插件的哪个贡献点」。这里把引用随项一起带出来，选中时直接落库，
-	/// 兔去了在 UI 层反查注册表的往返。
-	/// </para>
-	/// </summary>
-	public StarPie.Plugin.PluginActionRef? PluginRef { get; set; }
 }
