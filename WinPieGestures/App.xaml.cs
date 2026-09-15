@@ -59,6 +59,54 @@ public partial class App : Application
 		ref PROCESS_POWER_THROTTLING_STATE processInformation,
 		uint processInformationSize);
 
+	private const int AttachParentProcess = -1;
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern bool AttachConsole(int dwProcessId);
+
+	/// <summary>
+	/// 让命令行通道的输出真正落到调用方的终端上。
+	/// <para>
+	/// StarPie 是 WinExe（没有控制台子系统），<c>Console.WriteLine</c> 默认无处可去。
+	/// 于是 <c>--plugin-paths</c> / <c>--plugin-selftest</c> 这类「一条命令拿到结论」的通道，
+	/// 实际只能去翻日志文件 —— 名不副实。这里把进程附到父进程的控制台并重新接上
+	/// stdout / stderr，输出才看得见。
+	/// </para>
+	/// <para>
+	/// <b>只在命令行里出现这些开关时才调用</b>：普通 GUI 启动完全不碰控制台，行为不变。
+	/// </para>
+	/// </summary>
+	private static void AttachParentConsoleIfCli()
+	{
+		string commandLine = Environment.CommandLine;
+		bool isCliChannel =
+			commandLine.Contains("--plugin-paths", StringComparison.OrdinalIgnoreCase) ||
+			commandLine.Contains("--plugin-selftest", StringComparison.OrdinalIgnoreCase);
+		if (!isCliChannel)
+		{
+			return;
+		}
+
+		try
+		{
+			// 父进程没有控制台（比如从资源管理器或计划任务启动）时返回 false —— 这不是错误，
+			// 此时报告仍然照常落盘，只是终端上看不到而已。
+			if (!AttachConsole(AttachParentProcess))
+			{
+				return;
+			}
+
+			Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+			Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
+		}
+		catch (Exception ex)
+		{
+			// 接不上控制台不影响任何功能：报告与日志都在。但要留下痕迹，
+			// 免得下次又出现「命令跑了、什么也没看见」却查不出原因的情况。
+			AppLogger.LogInfo($"未能接入父控制台，本次仅在日志中输出：{ex.Message}");
+		}
+	}
+
 	private static void DisablePowerThrottling()
 	{
 		try
@@ -160,6 +208,10 @@ public partial class App : Application
 		{
 			ConfigManager.LoadConfig();
 			AppLogger.LogInfo("ConfigManager.LoadConfig completed");
+
+			// 命令行通道（自检 / 路径诊断）要能在调用方的终端上直接看到输出。
+			// 放在最前：晚一步接上，前面打的内容就丢了。
+			AttachParentConsoleIfCli();
 
 			// 插件系统自检模式：不启动钩子与托盘，跑完全链路直接退出。
 			// 用途：① CI 里做无界面回归；② 用户报「插件装不上」时一条命令拿到全链路证据。
@@ -423,11 +475,16 @@ public partial class App : Application
 	}
 
 	/// <summary>
-	/// 处理 <c>--plugin-paths</c>：解析插件路径、跑一次目录搬迁与登记读取，把结论写进日志后退出。
+	/// 处理 <c>--plugin-paths</c>：解析插件路径、跑一次目录搬迁与登记读取，
+	/// 把结论<b>打印到终端</b>（同时写进日志）后退出。
 	/// <para>
 	/// 存在的意义只有一个：用户报「插件目录不对 / 插件不见了」时，不必让他翻设置界面截图 ——
 	/// 一条命令就能拿到「可写宿主区在哪、只读扫描目录在哪、便携标志在不在、登记了几个插件」。
 	/// 它同样会触发 <c>plugins\ → plugin-data\</c> 的一次性搬迁，而那恰恰是这类问题的第一嫌疑。
+	/// </para>
+	/// <para>
+	/// 输出同时走终端与日志两个出口：终端是给人当场看的，日志是给事后回溯用的
+	/// （用户往往只把命令输出贴进 issue，日志留在自己机器上）。
 	/// </para>
 	/// </summary>
 	private bool TryRunPluginPathsReport()
@@ -444,21 +501,29 @@ public partial class App : Application
 			Plugins.PluginHost.HeadlessMode = true;
 			Plugins.PluginHost.Initialize();
 
-			AppLogger.LogInfo("=== 插件路径诊断 ===");
-			AppLogger.LogInfo(
+			string[] lines =
+			{
+				"=== 插件路径诊断 ===",
 				$"  可写宿主区　：{Plugins.PluginPaths.Root}" +
-				$"（存在={System.IO.Directory.Exists(Plugins.PluginPaths.Root)}，便携模式={Plugins.PluginPaths.IsPortable}）");
-			AppLogger.LogInfo(
+					$"（存在={System.IO.Directory.Exists(Plugins.PluginPaths.Root)}，便携模式={Plugins.PluginPaths.IsPortable}）",
 				$"  只读扫描目录：{Plugins.PluginPaths.ScanRoot}" +
-				$"（存在={Plugins.PluginPaths.ScanRootExists}）");
-			AppLogger.LogInfo($"  便携标志文件：{Plugins.PluginPaths.PortableFlagPresent}");
-			AppLogger.LogInfo($"  已登记插件　：{Plugins.PluginHost.InstalledCount} 个");
-			AppLogger.LogInfo($"  扫描候选　　：{Plugins.PluginHost.ScanCandidates()} 个");
-			AppLogger.LogInfo("=== 插件路径诊断结束 ===");
+					$"（存在={Plugins.PluginPaths.ScanRootExists}）",
+				$"  便携标志文件：{Plugins.PluginPaths.PortableFlagPresent}",
+				$"  已登记插件　：{Plugins.PluginHost.InstalledCount} 个",
+				$"  扫描候选　　：{Plugins.PluginHost.ScanCandidates()} 个",
+				"=== 插件路径诊断结束 ===",
+			};
+
+			foreach (string line in lines)
+			{
+				AppLogger.LogInfo(line);
+				Console.WriteLine(line);
+			}
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError("插件路径诊断失败", ex);
+			Console.WriteLine($"[FAIL] 插件路径诊断失败：{ex.Message}");
 		}
 
 		Shutdown(0);
