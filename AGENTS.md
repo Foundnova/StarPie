@@ -71,13 +71,45 @@ g:\Users\2 Better\Desktop\design\
 │   ├── ActiveWindowHelper.cs      # 前台活动窗口探测器
 │   ├── MemoryOptimizer.cs         # 内存整理与工作集压缩工具
 │   ├── I18n.cs                    # 多语言国际化字典 (zh-CN, zh-TW, en-US, ja-JP)
-│   └── Renderers/                 # 轮盘切削形态渲染器策略族
-│       ├── IRadialStyleRenderer.cs    # 渲染器通用抽象接口
-│       ├── BaseStyleRenderer.cs       # 几何切削基础类
-│       ├── StyleRendererFactory.cs    # 渲染器工厂
-│       ├── ClassicRingRenderer.cs     # 经典圆弧与圆角胶囊渲染器
-│       ├── CleanSectorsRenderer.cs    # 悬浮圆角矩形渲染器
-│       └── GlassmorphismRenderer.cs   # 液态毛玻璃渲染器
+│   ├── Renderers/                 # 轮盘切削形态渲染器策略族
+│   │   ├── IRadialStyleRenderer.cs    # 渲染器通用抽象接口
+│   │   ├── BaseStyleRenderer.cs       # 几何切削基础类
+│   │   ├── StyleRendererFactory.cs    # 渲染器工厂
+│   │   ├── ClassicRingRenderer.cs     # 经典圆弧与圆角胶囊渲染器
+│   │   ├── CleanSectorsRenderer.cs    # 悬浮圆角矩形渲染器
+│   │   └── GlassmorphismRenderer.cs   # 液态毛玻璃渲染器
+│   └── Plugin/                    # ★ 插件系统宿主实现（详见 3.7）
+│       ├── PluginHost.cs              # 执行/校验/安装的唯一入口接缝
+│       ├── PluginCatalog.cs           # 贡献点注册表 + 注册会话（暂存→提交的原子性）
+│       ├── PluginLoadContext.cs       # 可回收 ALC（停用即卸载，需重启比例是硬指标）
+│       ├── PluginInstance.cs          # 单个插件的运行时状态机与加载计量
+│       ├── PluginScanner.cs           # 纯静态 PE 识别（不加载程序集即可读清单与 TFM）
+│       ├── PluginManifestReader.cs    # plugin.json / 程序集元数据双通道清单读取
+│       ├── PluginInvoker.cs           # 动作调用与超时/取消/串行化调度
+│       ├── PluginParameterValidator.cs # 声明式参数约束校验（Required/MaxLength/Min/Max/Regex）
+│       ├── PluginParameterForm.cs     # 参数表单动态渲染（9 种 ParameterFieldType）
+│       ├── PluginActionBinding.cs     # 「Type + PluginActionRef ⇄ 单 Tag」双向投影
+│       ├── PluginI18n.cs              # 插件词条 key 的统一解析（短键 ⇄ 全键）
+│       ├── PluginListItem.cs          # 插件管理页的列表项 DTO
+│       ├── PluginSelfTest.cs          # --plugin-selftest 无界面端到端自检通道
+│       ├── PluginSettings.cs          # 插件私有持久化（settings.json）
+│       ├── PluginPaths.cs             # 插件目录/清单/日志/便携模式判定
+│       ├── PluginRegistryStore.cs     # 启用状态与哈希登记（registry.json）
+│       ├── PluginLogger.cs            # 按插件分文件的日志
+│       ├── PluginContext.cs           # IPluginContext 实现 + 能力门禁 + 词条注册表
+│       └── PluginHostServices.cs      # 动作执行/窗口/剪贴板/通知等宿主服务实现
+├── StarPie.Plugin.Abstractions/   # ★ 插件 SDK 契约层（插件唯一允许引用的 StarPie 程序集）
+│   ├── IStarPiePlugin.cs          # 插件入口契约（Initialize / Shutdown）
+│   ├── IPluginContext.cs          # 插件可见的宿主能力集合
+│   ├── Actions.cs                 # ActionDescriptor / ParameterField / ActionResult
+│   ├── Registries.cs              # 动作、图标、词条注册表契约
+│   ├── Services.cs                # 宿主服务契约（窗口、剪贴板、通知、事件）
+│   ├── PluginManifest.cs          # plugin.json 清单模型
+│   ├── PluginMetadata.cs          # 程序集元数据兜底模型
+│   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
+├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
+│   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
+│   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
 ├── releases/                      # 正式发行包构建归档目录
 │   └── vX.Y.Z/
 │       ├── Lightweight/           # 依赖运行时的轻量绿色包 (~2.5MB)
@@ -161,6 +193,32 @@ g:\Users\2 Better\Desktop\design\
   - 最终释放后只允许调用 `MemoryOptimizer.TrimMemory(force: false)`，不得在日常关闭路径执行 Full GC 与强制工作集剥离，避免下一次轮盘唤起发生硬缺页或卡顿。
 - **初始化不得产生系统副作用**：WPF 给 `CheckBox.IsChecked` 赋值时也可能触发 `Checked/Unchecked`。加载自启动状态时必须同时使用 `_isUpdatingUi`、`_isUiInitializing` 与 `_isLoadingAutoStartState` 防护，并比较已加载状态；只有用户实际修改开关时才能调用 `ConfigManager.SetAutoStart()`，严禁打开控制台时创建或删除计划任务。
 - **显式退出模式**：`App.xaml` 必须保持 `ShutdownMode="OnExplicitShutdown"`，关闭最后一个设置窗口不能结束后台 Hook 与托盘进程；只有托盘退出、提权重启或明确的应用退出流程可以调用 `Shutdown()`。
+
+### 3.7 插件系统 (`StarPie.Plugin.Abstractions` + `WinPieGestures/Plugin/`)
+- **三层分界，任何一层都不许越界**：
+  - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
+  - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
+  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
+- **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
+  1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
+  2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
+  3. 只允许引用 SDK 与 BCL，**严禁引用主程序 `StarPie.dll`**；
+  4. **零 NuGet 依赖**（项目内存红线的一部分，也是「插件不得成为新的依赖黑洞」的保证）。
+- **注册会话的原子性**：插件在 `Initialize` 期间的一切注册（动作、图标、词条）都只是**暂存**，必须等 `Initialize` 成功返回后才由 `PluginCatalog.Commit` 一次性落表。失败则 `Discard`，绝不留下半套贡献点。
+- **⚠️ 词条时序坑（易复发）**：显示名解析发生在 `Actions.Register` 的当时，而词条要等 `Commit` 才写进 `I18n`。若只在注册当时解析，带 `DisplayNameKey` 的动作会**全部落空并静默退回字面文案** —— 而字面文案与译文常常一模一样，所以这个缺陷在中文环境下不露面，等用户切成英文才发现。修法是 `Commit` 落完词条后调用 `ResolveStagedDisplayNames` 补解析一次。**不要**改成「让解析去读暂存表」，那会要求插件遵守「词条必须写在动作之前」这种没人记得的顺序约定。
+- **参数契约 = 声明式，插件不提供 XAML**：
+  - 插件只声明 `ParameterField`（9 种类型：`Text` / `MultilineText` / `Number` / `Bool` / `Folder` / `File` / `Enum` / `Hotkey` / `Color`），控件由 `PluginParameterForm` 用主程序的隐式样式创建 —— 深浅色、字体、圆角因此由宿主统一保证，主程序改版也不会让插件界面错位；
+  - **两层校验，同一入口**：`PluginHost.ValidateActionParameters` 先跑宿主底线 `PluginParameterValidator`（只认 `Required` / `MaxLength` / `Min` / `Max` / `ValidationRegex` 声明，不依赖插件是否记得自查），再跑插件自定义 `IActionContribution.Validate`。**「保存动作」与「执行前」必须都走这一个方法**，否则迟早分叉成「存的时候没事、一触发说参数不合法」。
+  - `Bool` 字段未填视为 `false`，**不算必填失败**，也不要「空值即删除」——取消勾选必须显式落盘 `false`，否则插件读到的会是它自己的兜底值（可能为 `true`），表现为「取消勾选没生效」。
+  - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。
+- **动作调度类别 `ActionKind`**：`Sequential` 占用唯一的动作线程，**任何可能上百毫秒的操作（DDC/CI、网络、目录遍历）都必须声明为 `Background`**，否则用户会明显感到「触发后轮盘卡一下」，直接违背零延迟红线。
+- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。
+- **界面接缝与 Tag 投影**：插件动作在设置面板统一走 `ActionItem.Type = "Plugin"` + `PluginActionRef`（`PluginId` + `ContributionId` + `FullId`）。动作类型下拉用 `SelectedValuePath="Tag"`，只能传一个字符串，故必须由 `PluginActionBinding` 做 `Type + Ref ⇄ 单 Tag` 的双向投影（Tag 形如 `Plugin:<贡献点全ID>`）。**引用失效时 `ProjectTag` 必须退化成裸 `Plugin` 兜底项**，否则 WPF 匹配不到项会把下拉框显示成空白，用户会以为配置丢了。
+- **图标 key 前缀**：插件图标形如 `plugin:<pluginId>:<shortKey>`，由 `IconHelper.GetSvgPathByKey` 在 `IconMap` 命中之后、裸 path 判定之前解析。插件 SVG 必须用最朴素的 `M/A/L/H/V/Z` 构造 —— 语法一错会让轮盘几何解析抛异常，收益远小于风险。
+- **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
+- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
+  - **注意第 [4] 节是真实调用**，会改变系统状态（亮度/音量/剪贴板都可能被改动）；作者若误以为它是只读检查，反复跑自检会把用户的环境越改越乱。
+  - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
 
 ---
 

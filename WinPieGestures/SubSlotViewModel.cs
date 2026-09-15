@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Media;
+using WinPieGestures.Plugins;
 
 namespace WinPieGestures;
 
@@ -120,6 +121,11 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		get
 		{
 			string t = Type;
+			if (t == PluginActionBinding.TypeName)
+			{
+				// 插件动作的真实身份在 PluginActionRef 里，不在 Type 里。
+				return PluginActionBinding.ProjectTag(Action);
+			}
 			if (t == "Tile" || t == "ToggleTopmost" || t == "MoveMonitor" || t == "WindowOpacity" || t == "SwitchWindow" || t == "WindowManager")
 			{
 				return "WindowManager";
@@ -133,21 +139,31 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		set
 		{
 			if (string.IsNullOrEmpty(value)) return;
-			if (value == "WindowManager")
+			if (PluginActionBinding.TryParseTag(value, out string pluginFullId))
+			{
+				PluginActionBinding.Apply(Action, pluginFullId);
+			}
+			else if (value == "WindowManager")
 			{
 				if (!IsWindowManagerType)
 				{
+					PluginActionBinding.Clear(Action);
 					Type = "Tile";
 					if (string.IsNullOrEmpty(Parameter)) Parameter = "2L";
 				}
 			}
 			else
 			{
+				// 切回内置类型时清掉插件引用，避免「内置类型 + 残留插件引用」的混合状态。
+				PluginActionBinding.Clear(Action);
 				Type = value;
 			}
 			NotifyAllPropertiesChanged();
 		}
 	}
+
+	/// <summary>当前子动作是否为插件动作。</summary>
+	public bool IsPluginType => Type == PluginActionBinding.TypeName;
 
 	public bool IsHotkeyType => Type == "Hotkey";
 
