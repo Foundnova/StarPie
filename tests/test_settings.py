@@ -64,18 +64,20 @@ def test_modify_slider_and_save(app):
 
 def test_switch_all_tabs_smoothly(app):
     """
-    Test clicking through all 5 navigation radio buttons (NavTab0 ~ NavTab4)
+    Test clicking through all 6 navigation radio buttons (NavTab0 ~ NavTab5)
     to guarantee zero crashes, zero freezes, and that controls remain fully responsive.
     """
     win, local_app_data = app
     
-    # Iterate through all 5 tabs:
+    # Iterate through all 6 tabs. 这里是「全页遍历」的唯一出处，
+    # 新增页时务必把上界一起推进 —— 否则新页只是没被测，而不是测过了。
     # 0: 触发与场景 (NavTab0)
     # 1: 外观与形态 (NavTab1)
     # 2: 手势与动作 (NavTab2)
     # 3: 高级与系统 (NavTab3)
     # 4: 关于与更新 (NavTab4)
-    for i in range(5):
+    # 5: 插件与扩展 (NavTab5)
+    for i in range(6):
         tab_btn = win.child_window(auto_id=f"NavTab{i}", control_type="RadioButton")
         assert tab_btn.exists(timeout=5), f"NavTab{i} must exist"
         tab_btn.select()
