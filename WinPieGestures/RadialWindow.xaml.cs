@@ -2207,6 +2207,9 @@ public partial class RadialWindow : Window
 
 	private void ActivateCachedSubTier(int parentIndex, SubTierVisuals visuals)
 	{
+		// 缓存组可能追加到累计活动列表末尾，只播放本次新增区间的动画。
+		int pathStart = _subSectorPaths.Count;
+		int containerStart = _subContentContainers.Count;
 		_activeSubTierParentSector = parentIndex;
 		_subSectorPaths.AddRange(visuals.Paths);
 		_subContentContainers.AddRange(visuals.Containers);
@@ -2219,7 +2222,7 @@ public partial class RadialWindow : Window
 			_subSectorChildIndices.Add(i);
 		}
 
-		for (int i = 0; i < _subSectorPaths.Count; i++)
+		for (int i = pathStart; i < _subSectorPaths.Count; i++)
 		{
 			System.Windows.Shapes.Path path = _subSectorPaths[i];
 			path.Visibility = Visibility.Visible;
@@ -2233,7 +2236,7 @@ public partial class RadialWindow : Window
 				_subSectorTransforms[i].Y = 0.0;
 			}
 		}
-		for (int i = 0; i < _subContentContainers.Count; i++)
+		for (int i = containerStart; i < _subContentContainers.Count; i++)
 		{
 			Grid container = _subContentContainers[i];
 			container.Visibility = Visibility.Visible;
@@ -2247,6 +2250,18 @@ public partial class RadialWindow : Window
 				_subContainerTransforms[i].Y = 0.0;
 			}
 		}
+	}
+
+	private SubTierVisuals SnapshotSubTierVisuals(int startIndex)
+	{
+		// 只截取本次主扇区新增的视觉元素，避免把此前扇区的累计列表混入缓存。
+		int count = _subSectorPaths.Count - startIndex;
+		return new SubTierVisuals(
+			_subSectorPaths.GetRange(startIndex, count),
+			_subContentContainers.GetRange(startIndex, count),
+			_subSectorTransforms.GetRange(startIndex, count),
+			_subContainerTransforms.GetRange(startIndex, count),
+			_subSectorAngles.GetRange(startIndex, count));
 	}
 
 	private void RenderWheelSubTierForSector(int parentIndex, bool animateEntrance)
@@ -2600,13 +2615,9 @@ public partial class RadialWindow : Window
 			return;
 		}
 		_activeSubTierParentSector = parentIndex;
+		int snapshotStart = _subSectorPaths.Count;
 		RenderWheelSubTierForSector(parentIndex, animateEntrance: true);
-		_subTierCache[parentIndex] = new SubTierVisuals(
-			new List<System.Windows.Shapes.Path>(_subSectorPaths),
-			new List<Grid>(_subContentContainers),
-			new List<TranslateTransform>(_subSectorTransforms),
-			new List<TranslateTransform>(_subContainerTransforms),
-			new List<double>(_subSectorAngles));
+		_subTierCache[parentIndex] = SnapshotSubTierVisuals(snapshotStart);
 	}
 
 	private void ShowAllSubTiers()
@@ -2624,7 +2635,9 @@ public partial class RadialWindow : Window
 			ActionItem? actionItem = _profile.GetEffectiveAction(p);
 			if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
 			{
+				int snapshotStart = _subSectorPaths.Count;
 				RenderWheelSubTierForSector(p, animateEntrance: false);
+				_subTierCache[p] = SnapshotSubTierVisuals(snapshotStart);
 			}
 		}
 	}
@@ -3286,6 +3299,7 @@ public partial class RadialWindow : Window
 		{
 			return;
 		}
+		int snapshotStart = _subSectorPaths.Count;
 		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
 		{
 			ActivateCachedSubTier(parentIndex, cachedVisuals);
@@ -3639,12 +3653,7 @@ public partial class RadialWindow : Window
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleXProperty, doubleAnimation2);
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, doubleAnimation2);
 		}
-		_subTierCache[parentIndex] = new SubTierVisuals(
-			new List<System.Windows.Shapes.Path>(_subSectorPaths),
-			new List<Grid>(_subContentContainers),
-			new List<TranslateTransform>(_subSectorTransforms),
-			new List<TranslateTransform>(_subContainerTransforms),
-			new List<double>(_subSectorAngles));
+		_subTierCache[parentIndex] = SnapshotSubTierVisuals(snapshotStart);
 	}
 
 }
