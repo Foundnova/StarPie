@@ -8515,11 +8515,14 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
+		// MouseHook 复用同一事件实例派发，严禁跨线程持有：先取出原始值再入 Dispatcher 队列
+		string mouseButton = e.MouseButton;
+		uint mouseData = e.MouseData;
 		((DispatcherObject)this).Dispatcher.BeginInvoke((Delegate)(Action)delegate
 		{
 			if (!_resourcesReleased)
 			{
-				ProcessRawMouseButton(e.MouseButton, e.MouseData);
+				ProcessRawMouseButton(mouseButton, mouseData);
 			}
 		}, Array.Empty<object>());
 	}
