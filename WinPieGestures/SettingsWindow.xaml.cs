@@ -6145,6 +6145,20 @@ public partial class SettingsWindow : Window
 			}
 		}
 
+		// 候选列表每次都重扫。扫描目录里的 .dll 是用户随时会替换的东西，
+		// 缓存一次再复用只会让界面显示上一个版本的信息；而且通常只有寥寥几枚文件。
+		if (PluginHost.IsInitialized)
+		{
+			try
+			{
+				PluginHost.ScanCandidates();
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogWarn($"[plugin] 扫描候选目录失败：{ex.Message}");
+			}
+		}
+
 		var items = new List<PluginListItem>();
 		try
 		{
@@ -6174,7 +6188,7 @@ public partial class SettingsWindow : Window
 		if (PluginsStatusSummaryText != null)
 		{
 			int enabledCount = items.Count(i => i.IsEnabled);
-			string directoryHint = $"插件目录：{PluginPaths.Root}";
+			string directoryHint = $"数据目录：{PluginPaths.Root}";
 			PluginsStatusSummaryText.Text = items.Count == 0
 				? $"尚未安装任何插件。{directoryHint}"
 				: $"共 {items.Count} 个插件，{enabledCount} 个已启用。{directoryHint}";
@@ -6187,6 +6201,166 @@ public partial class SettingsWindow : Window
 			{
 				PluginsSafeModeText.Text = "⚠️ 安全模式：上次启动时插件引发异常，已自动禁用问题插件，避免反复崩溃。";
 			}
+		}
+
+		RefreshPluginCandidatesUi();
+	}
+
+	/// <summary>
+	/// 刷新「只读扫描目录」那一块。
+	/// <para>
+	/// 目录不存在时也要显示这一块（而不是整块藏起来）：用户按文档把 .dll 放进
+	/// 「程序目录\plugin」，结果发现界面上什么都没有，是最容易让人以为功能坏了的情形。
+	/// 所以这里始终把<b>实际路径</b>写出来，并明确说明宿主不会替用户创建它。
+	/// </para>
+	/// </summary>
+	private void RefreshPluginCandidatesUi()
+	{
+		if (PluginCandidatesPanel == null) return;
+
+		IReadOnlyList<PluginCandidate> candidates;
+		try
+		{
+			candidates = PluginHost.Candidates;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"[plugin] 读取候选列表失败：{ex.Message}");
+			candidates = Array.Empty<PluginCandidate>();
+		}
+
+		int installable = candidates.Count(c => c.CanInstall);
+
+		if (PluginCandidatesHeaderText != null)
+		{
+			PluginCandidatesHeaderText.Text = PluginPaths.ScanRootExists
+				? (installable > 0
+					? $"扫描目录里发现 {candidates.Count} 个 .dll，其中 {installable} 个可以安装"
+					: "扫描目录里没有可安装的插件")
+				: "扫描目录不存在（宿主不会创建它）";
+		}
+
+		if (PluginCandidatesPathText != null)
+		{
+			PluginCandidatesPathText.Text = PluginPaths.ScanRootExists
+				? PluginPaths.ScanRoot
+				: $"{PluginPaths.ScanRoot}　—　把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。" +
+				  "该目录由你自己创建：StarPie 装在只读位置时无权创建它。";
+		}
+
+		if (PluginCandidateItemsControl != null)
+		{
+			PluginCandidateItemsControl.ItemsSource = candidates.Count == 0 ? null : candidates;
+		}
+
+		PluginCandidatesPanel.Visibility = Visibility.Visible;
+	}
+
+	/// <summary>点候选卡片上的「安装 / 更新 / 降级安装」。</summary>
+	private void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button button) return;
+		string? dllPath = button.Tag as string;
+		if (string.IsNullOrWhiteSpace(dllPath)) return;
+
+		PluginCandidate? candidate = PluginHost.Candidates
+			.FirstOrDefault(c => string.Equals(c.DllPath, dllPath, StringComparison.OrdinalIgnoreCase));
+
+		if (candidate == null)
+		{
+			System.Windows.MessageBox.Show(this,
+				"这枚候选已经不在扫描目录里了（可能刚被移走或改名）。已重新扫描，请再试一次。",
+				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+			RefreshPluginManagerUi();
+			return;
+		}
+
+		if (!ConfirmCandidateInstall(candidate)) return;
+
+		bool ok = PluginHost.InstallCandidate(candidate, out string error);
+
+		if (!ok)
+		{
+			System.Windows.MessageBox.Show(this,
+				$"安装失败：{error}", "StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+		else if (candidate.State == PluginCandidateState.Update)
+		{
+			System.Windows.MessageBox.Show(this,
+				$"{candidate.DisplayName} 已更新到 {candidate.VersionText} 并已启用。\n\n" +
+				"如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。",
+				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		RefreshPluginManagerUi();
+	}
+
+	/// <summary>候选安装确认卡。文案随状态变化，把「会发生什么」说清楚而不是只问一句「确定吗」。</summary>
+	private bool ConfirmCandidateInstall(PluginCandidate candidate)
+	{
+		var text = new System.Text.StringBuilder();
+		text.AppendLine($"即将安装：{candidate.DisplayName} {candidate.VersionText}");
+		text.AppendLine($"文件：{candidate.DllPath}");
+		text.AppendLine();
+
+		if (candidate.Scan.Manifest?.Capabilities is { Count: > 0 } capabilities)
+		{
+			text.AppendLine("该插件声明了以下能力：");
+			text.AppendLine(DescribeCapabilities(candidate.Scan.Manifest.ResolveCapabilities()));
+			text.AppendLine();
+		}
+
+		if (candidate.HasNote)
+		{
+			text.AppendLine($"扫描结果：{candidate.Note}");
+			text.AppendLine();
+		}
+
+		text.AppendLine(candidate.State switch
+		{
+			PluginCandidateState.Update =>
+				"点击「确定」后将用扫描目录里的新版覆盖现有安装并立即启用。" +
+				"如果插件正在运行，宿主会先自动停用它再替换文件。",
+			PluginCandidateState.Downgrade =>
+				"点击「确定」后将用更旧的版本覆盖现有安装。除非你明确需要退回旧版，否则不建议这样做。",
+			PluginCandidateState.Replaced =>
+				"点击「确定」后将用扫描目录里的文件覆盖现有安装（版本号相同但内容不同）。",
+			_ => "点击「确定」后插件将被复制到 StarPie 的数据目录并立即启用。",
+		});
+		text.AppendLine();
+		text.Append("插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。");
+
+		return System.Windows.MessageBox.Show(this, text.ToString(),
+			"确认安装插件", MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+	}
+
+	/// <summary>打开只读扫描目录。目录不存在时只提示路径，绝不代为创建。</summary>
+	private void OpenPluginScanFolderButton_Click(object sender, RoutedEventArgs e)
+	{
+		string scanRoot = PluginPaths.ScanRoot;
+
+		if (!PluginPaths.ScanRootExists)
+		{
+			System.Windows.MessageBox.Show(this,
+				$"扫描目录还不存在：\n{scanRoot}\n\n" +
+				"StarPie 不会替你创建它 —— 程序可能装在只读位置，宿主对这里只读不写。\n" +
+				"如需使用随包附带的插件，请手工创建该文件夹，把插件 .dll 放进去，再点「重新扫描」。",
+				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		try
+		{
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+			{
+				FileName = scanRoot,
+				UseShellExecute = true,
+			});
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, $"打开扫描目录失败：{ex.Message}", "StarPie 插件",
+				MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 	}
 
@@ -6402,12 +6576,19 @@ public partial class SettingsWindow : Window
 	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
 	{
 		int discovered = PluginHost.SyncFromDisk();
+
+		// 刷新界面时内部会重扫候选目录，这里跑完就能读到最新结果。
 		RefreshPluginManagerUi();
+
+		int installable = PluginHost.Candidates.Count(c => c.CanInstall);
+		string candidateHint = installable > 0
+			? $"扫描目录里另有 {installable} 个可安装项。"
+			: "";
 
 		PluginHost.NotifyUser("StarPie 插件",
 			discovered > 0
-				? $"扫描完成，新发现 {discovered} 个插件。"
-				: "扫描完成，没有发现新插件。");
+				? $"扫描完成，新发现 {discovered} 个插件。{candidateHint}"
+				: $"扫描完成，没有发现新插件。{candidateHint}");
 	}
 
 	private void OpenPluginsFolderButton_Click(object sender, RoutedEventArgs e)

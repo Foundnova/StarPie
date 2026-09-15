@@ -23,6 +23,15 @@ internal static class PluginManifestReader
         AllowTrailingCommas = true,
     };
 
+    /// <summary>
+    /// 写清单时的选项。缩进写出，方便用户直接打开 <c>plugin-data\&lt;id&gt;\plugin.json</c>
+    /// 看清「宿主观测到的这个插件到底是什么」；属性名保持 PascalCase，与规范一致。
+    /// </summary>
+    private static readonly JsonSerializerOptions WriteOptions = new()
+    {
+        WriteIndented = true,
+    };
+
     /// <summary>宿主自身的目标框架。插件 TFM 不得高于它。</summary>
     public const string HostTargetFramework = "net8.0-windows10.0.19041.0";
 
@@ -303,4 +312,39 @@ internal static class PluginManifestReader
     }
 
     private static string Trim(string raw, int max) => raw.Length <= max ? raw : raw.Substring(0, max);
+
+    /// <summary>
+    /// 把一份清单写进插件目录（<c>plugin.json</c>）。
+    /// <para>
+    /// 目前只有一个用途：<b>裸 DLL 安装后回填一份自描述清单</b>。这一步是必需的，不是锦上添花 ——
+    /// 安装目录的识别走的是 <see cref="PluginScanner.ScanInstalledPlugin"/>，而它要求目录里有清单；
+    /// 不写这份文件，裸 dll 会「装得上但永远启用不了」，报错是「插件目录里缺少 plugin.json」。
+    /// </para>
+    /// <para>
+    /// 写出的清单是<b>纯数据</b>，不执行任何插件代码；<c>Sha256</c> 刻意留空，
+    /// 让日后手工替换程序集不会被误报成「文件已损坏」。哈希比对交给
+    /// <see cref="PluginRegistryEntry.EntrySha256"/>（候选列表据此判断「内容已变」）。
+    /// </para>
+    /// </summary>
+    public static bool TryWrite(string pluginDirectory, PluginManifest manifest, out string error)
+    {
+        error = "";
+        try
+        {
+            if (string.IsNullOrWhiteSpace(pluginDirectory) || !Directory.Exists(pluginDirectory))
+            {
+                error = $"插件目录不存在：{pluginDirectory}";
+                return false;
+            }
+
+            string json = JsonSerializer.Serialize(manifest, WriteOptions);
+            File.WriteAllText(PluginPaths.GetManifestPath(pluginDirectory), json);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"写入插件清单失败：{ex.Message}";
+            return false;
+        }
+    }
 }

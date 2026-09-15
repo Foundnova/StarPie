@@ -86,16 +86,37 @@ internal sealed class PluginInstance
     /// <summary>本插件注册的动作数量（加载后有效）。</summary>
     public int ActionCount { get; private set; }
 
-    /// <summary>插件根目录。开发者模式的外部路径优先。</summary>
-    public string Directory
-    {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(Entry.ExternalPath)) return Entry.ExternalPath!;
-            string installPath = string.IsNullOrWhiteSpace(Entry.InstallPath) ? PluginId : Entry.InstallPath;
-            return Path.Combine(PluginPaths.Root, installPath);
-        }
-    }
+    /// <summary>
+    /// 该插件是否为「外部路径登记」（开发者模式）：文件留在原处，宿主<b>不拥有</b>它的文件。
+    /// </summary>
+    public bool IsExternal => !string.IsNullOrWhiteSpace(Entry.ExternalPath);
+
+    /// <summary>
+    /// <b>宿主拥有</b>的安装目录（可安全删除、可改名挂起）。外部路径登记时返回空串。
+    /// <para>
+    /// 凡是「删除 / 改名 / 写入」这类会动到磁盘的操作，都必须走这个属性而<b>不能</b>走
+    /// <see cref="Directory"/>：外部登记指向的是开发者自己的工程输出目录，
+    /// 按 <see cref="Directory"/> 去删会把开发者的源码目录整棵删掉。
+    /// </para>
+    /// </summary>
+    public string ManagedDirectory => IsExternal
+        ? ""
+        : Path.Combine(
+            PluginPaths.Root,
+            string.IsNullOrWhiteSpace(Entry.InstallPath) ? PluginId : Entry.InstallPath);
+
+    /// <summary>
+    /// 插件所在目录，<b>仅供展示</b>。外部路径登记时返回该 .dll 所在的目录。
+    /// <para>
+    /// 注意：这个属性历史上曾被拿去当「可删除的安装目录」用，而外部登记分支返回的其实是
+    /// <b>dll 文件路径</b> —— 当时只是靠 <c>Directory.Exists(文件路径)</c> 恒为 false
+    /// 才「恰好」没删错东西。现在语义已经拆开：展示用 <see cref="Directory"/>，
+    /// 落盘操作用 <see cref="ManagedDirectory"/>。
+    /// </para>
+    /// </summary>
+    public string Directory => IsExternal
+        ? (Path.GetDirectoryName(Entry.ExternalPath!) ?? "")
+        : ManagedDirectory;
 
     // ---- 加载后短暂持有的引用。停用时必须全部清空，否则 ALC 无法回收 ----
     private PluginLoadContext? _loadContext;
