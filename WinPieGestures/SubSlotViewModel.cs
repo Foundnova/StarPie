@@ -110,6 +110,9 @@ public class SubSlotViewModel : INotifyPropertyChanged
 					IconKey = "Tile";
 				}
 				NotifyAllPropertiesChanged();
+
+				// 类型切换是子下拉唯一需要重建候选集的时机（见 NotifyAllPropertiesChanged 的说明）。
+				OnPropertyChanged(nameof(PluginActionOptions));
 			}
 		}
 	}
@@ -714,9 +717,13 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		OnPropertyChanged(nameof(ExpandToggleText));
 		OnPropertyChanged(nameof(ExpandToggleArrow));
 
-		// 插件动作相关：类型一换，子下拉的可见性、候选集合与当前选中值全部要跟着刷新。
+		// 插件动作相关：让子下拉的可见性与选中值跟上类型变化。
+		//
+		// 这里**不通知** PluginActionOptions：它的 getter 每次求值都会重建集合视图，
+		// 而本方法在一个动作被修改后会被反复调用。纳入全量通知的话，
+		// 用户每选定一次动作都会立刻重建候选集并重设 ItemsSource。
+		// 类型切换那处（AggregatedType 的 setter）已单独通知过它。
 		OnPropertyChanged(nameof(IsPluginType));
-		OnPropertyChanged(nameof(PluginActionOptions));
 		OnPropertyChanged(nameof(SelectedPluginActionFullId));
 		OnPropertyChanged(nameof(IsPluginActionBroken));
 	}

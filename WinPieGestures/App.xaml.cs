@@ -420,8 +420,9 @@ public partial class App : Application
 	}
 
 	/// <summary>
-	/// 处理 <c>--plugin-selftest &lt;dll&gt; [report]</c>。
+	/// 处理 <c>--plugin-selftest &lt;dll&gt; [report] [--skip-invoke]</c>。
 	/// 返回 true 表示已接管本次启动（调用方应直接 return，不要继续装配钩子与托盘）。
+	/// 附加 <c>--skip-invoke</c> 时跳过最后的真实调用段，自检不再改变本机环境（亮度/音量等）。
 	/// </summary>
 	private bool TryRunPluginSelfTest()
 	{
@@ -433,6 +434,11 @@ public partial class App : Application
 
 		string dllPath = "";
 		string reportPath = "";
+
+		// --skip-invoke 是个开关而非位置参数，故不参与上面的位置解析，直接整串探测。
+		// 目的：自检的 [4] 段会真实下发键鼠/调节系统状态（实测会把屏幕亮度推高），
+		// 日常回归只要识别、注册与选择器接缝结论，不该动用户的机器。
+		bool skipInvoke = commandLine.Contains("--skip-invoke", StringComparison.OrdinalIgnoreCase);
 
 		string[] arguments = Environment.GetCommandLineArgs();
 		for (int i = 0; i < arguments.Length; i++)
@@ -456,7 +462,7 @@ public partial class App : Application
 		int exitCode = 1;
 		try
 		{
-			exitCode = Plugins.PluginSelfTest.Run(dllPath, reportPath);
+			exitCode = Plugins.PluginSelfTest.Run(dllPath, reportPath, skipInvoke);
 		}
 		catch (Exception ex)
 		{
