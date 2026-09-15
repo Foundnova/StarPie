@@ -7,7 +7,7 @@ using StarPie.Plugin;
 namespace WinPieGestures.Plugins;
 
 /// <summary>
-/// 插件私有配置（<c>plugins\&lt;id&gt;\settings.json</c>）。
+/// 插件私有配置（<c>plugin-data\&lt;id&gt;\settings.json</c>）。
 /// <para>
 /// 与主 <c>config.json</c> 彻底隔离的理由（设计决策 D6）：
 /// 主配置被钩子线程高频读取且写盘无锁，把插件数据并进去会直接放大既有的 H1 竞态；

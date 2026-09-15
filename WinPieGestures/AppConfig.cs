@@ -386,7 +386,7 @@ public class AppConfig
 	public OcrSettings OcrConfig { get; set; } = new OcrSettings();
 
 	/// <summary>
-	/// 插件系统偏好。只放用户偏好，插件启停状态在 plugins\registry.json（理由见 PluginsPreference 注释）。
+	/// 插件系统偏好。只放用户偏好，插件启停状态在 plugin-data\registry.json（理由见 PluginsPreference 注释）。
 	/// 给了默认值实例，保证旧配置升级后无需任何迁移即可直接使用。
 	/// </summary>
 	public PluginsPreference Plugins { get; set; } = new PluginsPreference();

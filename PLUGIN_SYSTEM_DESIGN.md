@@ -8,6 +8,26 @@
 
 ---
 
+> ## ⚠️ 目录模型已变更（2026-09-15），正文路径请勿照抄
+>
+> 本文档是**设计期草案**，正文采用的是当时的目录模型 —— 单一插件根目录 `plugins\`。
+> 实现已改为**两个目录职责分离**：
+>
+> | 目录 | 角色 |
+> |---|---|
+> | `<程序目录>\plugin\` | **只读来源区**：随包分发的待安装候选，扁平且只放 `.dll`。宿主**不创建、不写入、不删除** |
+> | `%LOCALAPPDATA%\StarPie\plugin-data\` | **可写宿主区**：安装副本、`registry.json`、`health.json`、插件私有 `data\`。便携模式只改变这里的落点 |
+>
+> 于是：
+> 1. 下文所有 `<...>\plugins\` 一律读作 `<...>\plugin-data\`（唯一例外是插件日志 `logs\plugins\`，它没变）；
+> 2. 新增了「只读来源区 → 候选列表 → 用户点安装」这条流程：来源区里的 `.dll` 不登记、不加载、不出现在插件列表；
+> 3. 安装时的复制策略改为按清单来源分叉（有 `plugin.json` 整目录复制，裸 DLL 只复制那一枚）。
+>
+> 权威定义见 `AGENTS.md` 第 3.7 节与 `WinPieGestures/Plugin/PluginPaths.cs`。
+> **保留正文原样是为了留住设计推理过程，不要照着正文里的路径写新代码。**
+
+---
+
 ## 目录
 
 1. [项目现状分析（插件系统的边界条件）](#1-项目现状分析插件系统的边界条件)
@@ -270,6 +290,11 @@ ParameterField { Key, Label(i18n key), Type(Text|Number|Bool|Path|File|Folder|En
 ## 5. 加载、识别、启用与手动选择机制
 
 ### 5.1 扫描目录（三层优先级）
+
+> **本节已被实际实现取代（2026-09-15）**，下面保留原设计供对照。现行模型见文首横幅：
+> ① `%LOCALAPPDATA%\StarPie\plugin-data\<id>\plugin.json` = 已安装插件的识别入口（等价于原优先级 1）；
+> ② `<程序目录>\plugin\*.dll`（**扁平、顶层、只放 dll**）= 只读来源区，产出的是**待安装候选**而非已安装插件；
+> ③ 用户自定义附加目录（`PluginsPreference.ExtraScanDirectories`）**仍是预留字段，尚未接入**。
 
 | 优先级 | 目录 | 用途 | 说明 |
 |---|---|---|---|
@@ -592,6 +617,10 @@ public interface IActionContribution
 
 ### 8.3 数据落盘分区（决策 D6）
 
+> **路径已变更（2026-09-15）**：下表 `%LOCALAPPDATA%\StarPie\plugins\` 一路读作
+> `%LOCALAPPDATA%\StarPie\plugin-data\`；便携模式下为 `<程序目录>\plugin-data\`。
+> 分区原则本身没有变，唯一例外是插件日志（`logs\plugins\`）位置未动。
+
 | 数据 | 位置 | 归谁管 | 理由 |
 |---|---|---|---|
 | 插件启用状态、版本、哈希、能力确认 | `%LOCALAPPDATA%\StarPie\plugins\registry.json` | **宿主**（原子写） | 独立文件，规避 H1 的 `config.json` 竞态 |
@@ -600,6 +629,7 @@ public interface IActionContribution
 | 插件私有数据（缓存/数据库） | `%LOCALAPPDATA%\StarPie\plugins\<id>\data\` | 插件 | 卸载时可选择是否保留 |
 | 插件日志 | `%LOCALAPPDATA%\StarPie\logs\plugins\<id>_yyyy-MM-dd.log` | 宿主 | 与被限流的写入逻辑统一 |
 | 主 `config.json` 中的 `Plugins` 段 | 仅存**用户偏好**（是否允许插件、扫描目录、开发者模式） | 宿主 | 极小、低频 |
+| **只读来源区**（新增） | `<程序目录>\plugin\*.dll` | 发行方 / 用户，**宿主只读** | 随包分发的待安装候选；宿主绝不在只读的程序目录里写文件 |
 
 ### 8.4 配置 JSON 契约与向后兼容
 
