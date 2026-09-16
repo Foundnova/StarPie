@@ -113,6 +113,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 }
+$OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
+if (-not [string]::IsNullOrWhiteSpace($SourceDir)) {
+    $SourceDir = [System.IO.Path]::GetFullPath($SourceDir)
+}
 
 $outputBaseName = "StarPie-v$cleanVersion-Setup-win-x64"
 $numericVersion = ($cleanVersion -replace '-.*$', '')

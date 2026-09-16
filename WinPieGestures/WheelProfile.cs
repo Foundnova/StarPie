@@ -303,13 +303,18 @@ public class WheelProfile : INotifyPropertyChanged
 	}
 
 	/// <summary>
-	/// 获取当前方案在指定槽位及子槽位上的最终生效动作（若当前专属方案未配置且开启了全局继承，则级联继承 Global 对应方位的动作）
+	/// 获取当前方案在指定层、指定槽位及子槽位上的最终生效动作（若当前专属方案未配置且开启了全局继承，则级联继承 Global 对应层/方位的动作）
 	/// </summary>
-	public ActionItem? GetEffectiveAction(int sectorIndex, int subSectorIndex = -1, WheelProfile? globalProfile = null)
+	public ActionItem? GetEffectiveAction(int sectorIndex, int subSectorIndex = -1, WheelProfile? globalProfile = null, int layerIndex = -1)
 	{
 		if (sectorIndex < 0) return null;
 
-		ActionItem? localAction = (Actions != null && sectorIndex < Actions.Count) ? Actions[sectorIndex] : null;
+		EnsureLayers();
+		int actualLayerIndex = (layerIndex >= 0 && layerIndex < Layers.Count) ? layerIndex : ActiveLayerIndex;
+		WheelLayer localLayer = (actualLayerIndex >= 0 && actualLayerIndex < Layers.Count) ? Layers[actualLayerIndex] : GetActiveLayer();
+		var localActions = localLayer.Actions ?? this.Actions;
+
+		ActionItem? localAction = (localActions != null && sectorIndex < localActions.Count) ? localActions[sectorIndex] : null;
 
 		// 1. 如果是 Global 方案自身，直接读取本地动作（只要不是 None 禁用即返回）
 		if (string.Equals(ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
@@ -358,40 +363,56 @@ public class WheelProfile : INotifyPropertyChanged
 			return null;
 		}
 
-		// 4. 若开启了全局继承，且当前槽位留空，尝试回退继承 Global 方案对应槽位
+		// 4. 若开启了全局继承，且当前槽位留空，尝试回退继承 Global 方案对应层/对应槽位
 		if (ConfigManager.CurrentConfig?.EnableGlobalInheritance == true)
 		{
 			globalProfile ??= ConfigManager.GetGlobalProfile();
-			if (globalProfile != null && !ReferenceEquals(this, globalProfile) && globalProfile.Actions != null)
+			if (globalProfile != null && !ReferenceEquals(this, globalProfile))
 			{
-				int targetGlobalIndex = sectorIndex;
-				if (this.SectorCount != globalProfile.SectorCount && this.SectorCount > 0 && globalProfile.SectorCount > 0)
+				globalProfile.EnsureLayers();
+				if (globalProfile.Layers != null && globalProfile.Layers.Count > 0)
 				{
-					// 跨扇区数映射（如 4 键映射到 8 键十字正交方位）
-					double myAngle = sectorIndex * (360.0 / this.SectorCount);
-					targetGlobalIndex = (int)Math.Round(myAngle / (360.0 / globalProfile.SectorCount)) % globalProfile.SectorCount;
-				}
+					// 同层优先对应继承：若全局方案拥有相同序号的层，优先对应继承该层；若全局层数较少，则优雅回退至全局第 1 层 (Layers[0])
+					int targetGlobalLayerIdx = (actualLayerIndex >= 0 && actualLayerIndex < globalProfile.Layers.Count)
+						? actualLayerIndex
+						: 0;
+					WheelLayer globalLayer = globalProfile.Layers[targetGlobalLayerIdx];
+					var globalActions = globalLayer.Actions ?? globalProfile.Actions;
+					int globalSectorCount = globalLayer.SectorCount > 0 ? globalLayer.SectorCount : globalProfile.SectorCount;
+					int mySectorCount = localLayer.SectorCount > 0 ? localLayer.SectorCount : this.SectorCount;
 
-				if (targetGlobalIndex >= 0 && targetGlobalIndex < globalProfile.Actions.Count)
-				{
-					ActionItem? globalAction = globalProfile.Actions[targetGlobalIndex];
-					if (IsActionConfigured(globalAction))
+					if (globalActions != null && globalActions.Count > 0)
 					{
-						if (subSectorIndex >= 0 && globalAction!.SubActions != null && subSectorIndex < globalAction.SubActions.Count)
+						int targetGlobalIndex = sectorIndex;
+						if (mySectorCount != globalSectorCount && mySectorCount > 0 && globalSectorCount > 0)
 						{
-							var globalSub = globalAction.SubActions[subSectorIndex];
-							if (IsActionConfigured(globalSub))
-							{
-								var clonedSub = globalSub.Clone();
-								clonedSub.IsInherited = true;
-								return clonedSub;
-							}
+							// 跨扇区数映射（如 4 键映射到 8 键十字正交方位）
+							double myAngle = sectorIndex * (360.0 / mySectorCount);
+							targetGlobalIndex = (int)Math.Round(myAngle / (360.0 / globalSectorCount)) % globalSectorCount;
 						}
-						else if (subSectorIndex < 0)
+
+						if (targetGlobalIndex >= 0 && targetGlobalIndex < globalActions.Count)
 						{
-							var cloned = globalAction!.Clone();
-							cloned.IsInherited = true;
-							return cloned;
+							ActionItem? globalAction = globalActions[targetGlobalIndex];
+							if (IsActionConfigured(globalAction))
+							{
+								if (subSectorIndex >= 0 && globalAction!.SubActions != null && subSectorIndex < globalAction.SubActions.Count)
+								{
+									var globalSub = globalAction.SubActions[subSectorIndex];
+									if (IsActionConfigured(globalSub))
+									{
+										var clonedSub = globalSub.Clone();
+										clonedSub.IsInherited = true;
+										return clonedSub;
+									}
+								}
+								else if (subSectorIndex < 0)
+								{
+									var cloned = globalAction!.Clone();
+									cloned.IsInherited = true;
+									return cloned;
+								}
+							}
 						}
 					}
 				}
@@ -402,28 +423,48 @@ public class WheelProfile : INotifyPropertyChanged
 	}
 
 	/// <summary>
-	/// 获取中心死区生效动作（支持从 Global 继承）
+	/// 获取中心死区生效动作（支持按层从 Global 对应层继承）
 	/// </summary>
-	public ActionItem? GetEffectiveCenterAction(WheelProfile? globalProfile = null)
+	public ActionItem? GetEffectiveCenterAction(WheelProfile? globalProfile = null, int layerIndex = -1)
 	{
-		if (this.EnableCenterAction && this.CenterAction != null && !string.Equals(this.CenterAction.Type, "None", StringComparison.OrdinalIgnoreCase))
+		EnsureLayers();
+		int actualLayerIndex = (layerIndex >= 0 && layerIndex < Layers.Count) ? layerIndex : ActiveLayerIndex;
+		WheelLayer localLayer = (actualLayerIndex >= 0 && actualLayerIndex < Layers.Count) ? Layers[actualLayerIndex] : GetActiveLayer();
+		bool localEnableCenter = localLayer.EnableCenterAction;
+		ActionItem? localCenter = localLayer.CenterAction ?? this.CenterAction;
+
+		if (localEnableCenter && localCenter != null && !string.Equals(localCenter.Type, "None", StringComparison.OrdinalIgnoreCase))
 		{
-			return this.CenterAction;
+			return localCenter;
 		}
 
 		if (string.Equals(ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
 		{
-			return (this.EnableCenterAction && this.CenterAction != null && !string.Equals(this.CenterAction.Type, "None", StringComparison.OrdinalIgnoreCase)) ? this.CenterAction : null;
+			return (localEnableCenter && localCenter != null && !string.Equals(localCenter.Type, "None", StringComparison.OrdinalIgnoreCase)) ? localCenter : null;
 		}
 
 		if (ConfigManager.CurrentConfig?.EnableGlobalInheritance == true)
 		{
 			globalProfile ??= ConfigManager.GetGlobalProfile();
-			if (globalProfile != null && globalProfile.EnableCenterAction && globalProfile.CenterAction != null && !string.Equals(globalProfile.CenterAction.Type, "None", StringComparison.OrdinalIgnoreCase))
+			if (globalProfile != null && !ReferenceEquals(this, globalProfile))
 			{
-				var cloned = globalProfile.CenterAction!.Clone();
-				cloned.IsInherited = true;
-				return cloned;
+				globalProfile.EnsureLayers();
+				if (globalProfile.Layers != null && globalProfile.Layers.Count > 0)
+				{
+					int targetGlobalLayerIdx = (actualLayerIndex >= 0 && actualLayerIndex < globalProfile.Layers.Count)
+						? actualLayerIndex
+						: 0;
+					WheelLayer globalLayer = globalProfile.Layers[targetGlobalLayerIdx];
+					bool globalEnableCenter = globalLayer.EnableCenterAction;
+					ActionItem? globalCenter = globalLayer.CenterAction;
+
+					if (globalEnableCenter && globalCenter != null && !string.Equals(globalCenter.Type, "None", StringComparison.OrdinalIgnoreCase))
+					{
+						var cloned = globalCenter.Clone();
+						cloned.IsInherited = true;
+						return cloned;
+					}
+				}
 			}
 		}
 

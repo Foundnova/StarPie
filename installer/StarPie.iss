@@ -10,7 +10,7 @@
 #define MyAppExeName "StarPie.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.7.4-beta.3"
+  #define MyAppVersion "1.7.4-beta.4"
 #endif
 
 #ifndef SourceDir
