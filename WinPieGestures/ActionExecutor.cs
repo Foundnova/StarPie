@@ -273,6 +273,17 @@ public static class ActionExecutor
 		try
 		{
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
+
+			// 【内建动作 · 统一接缝】
+			// 已向插件模型收敛的内建动作在这里被接走，不再落进下面的 switch。
+			// 尚未收敛的动作 TryGet 会失败、照旧走 switch —— 所以迁移可以一个动作一个动作地做，
+			// 中途任何一个动作出问题都能单独回退，不必整体回滚。
+			if (Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtinAction))
+			{
+				ExecuteBuiltinActionItem(action, builtinAction);
+				return;
+			}
+
 			switch (action.Type.Trim())
 			{
 			case "Launch":
@@ -338,6 +349,75 @@ public static class ActionExecutor
 			AppLogger.LogError($"Failed to execute action '{action.Name}' (Type: {action.Type}, Param: {action.Parameter})", ex);
 			MessageBox.Show("Failed to execute action '" + action.Name + "': " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
+	}
+
+	/// <summary>
+	/// 内建动作的统一执行包装。
+	/// <para>
+	/// 与 <see cref="ExecutePluginActionItem"/> 并列，但<b>刻意不复用同一段代码</b> ——
+	/// 两者对失败的诉求正好相反：
+	/// <list type="bullet">
+	/// <item>插件是社区代码：失败必须可诊断、可忽略，走日志 + 托盘气泡，绝不打断用户；</item>
+	/// <item>内建动作是用户亲手配的：失败必须立刻让他知道，异常照常冒泡到外层 <c>catch</c> 弹 MessageBox。</item>
+	/// </list>
+	/// 把两者统一成一种，无论选哪一种都是错的。
+	/// </para>
+	/// </summary>
+	/// <remarks>
+	/// 可见性放宽到 <c>internal</c> 是为了让自检（<c>PluginSelfTest</c>）能调用<b>同一个方法</b> ——
+	/// 它在无界面进程里跑，不能走 <see cref="Execute"/>：那一层的 <c>catch</c> 会弹 MessageBox，
+	/// 一旦探针命令出意外，自检会卡死在无人应答的对话框上。
+	/// </remarks>
+	internal static void ExecuteBuiltinActionItem(ActionItem action, Plugins.BuiltinActionRegistration registration)
+	{
+		string actionName = registration.Contribution.Descriptor.DisplayName;
+		var parameters = registration.ProjectParameters(action);
+
+		// 与插件侧同一个次序：先校验、再执行。用户填了空命令、按下去「什么也没发生」，
+		// 是这套动作最容易出现的静默失效，校验就是专门防它的。
+		string? invalid = registration.Contribution.Validate(parameters);
+		if (invalid != null)
+		{
+			AppLogger.LogWarn($"Builtin action validation failed: {registration.FullId}, Reason='{invalid}'");
+			Plugins.PluginHost.NotifyUser(actionName, invalid);
+			return;
+		}
+
+		var input = new StarPie.Plugin.PluginActionInput
+		{
+			ContributionId = registration.FullId,
+			Parameters = parameters,
+
+			// 内建动作在宿主内部，直接访问宿主 API 即可。ActionContext 是给插件的
+			// 「沙箱视图」（用户在哪个程序里、鼠标在哪），内建动作不需要它 ——
+			// 留空是刻意的，不是漏填。
+			Context = new StarPie.Plugin.ActionContext(),
+		};
+
+		// 同步等待：本方法跑在唯一的动作线程上，而内建动作的实现被约定为「全程同步」
+		// （见 BuiltinActionCommand.ExecuteAsync 的线程约束说明），
+		// 因此这里不会与别的上下文互相卡死。
+		var result = registration.Contribution
+			.ExecuteAsync(input, CancellationToken.None)
+			.GetAwaiter()
+			.GetResult();
+
+		if (result.Success)
+		{
+			AppLogger.LogInfo($"Builtin action succeeded: {registration.FullId}");
+
+			// 成功且明确要求发声时才提示：绝大多数动作是静默的，
+			// 每按一次扇区弹一次气泡，只会让用户干脆把通知关掉。
+			if (!result.Silent && !string.IsNullOrWhiteSpace(result.Message))
+			{
+				Plugins.PluginHost.NotifyUser(actionName, result.Message);
+			}
+
+			return;
+		}
+
+		AppLogger.LogWarn($"Builtin action failed: {registration.FullId}, Reason='{result.Message}'");
+		Plugins.PluginHost.NotifyUser($"{actionName} 执行失败", result.Message ?? "未提供原因。");
 	}
 
 	/// <summary>
@@ -1373,8 +1453,16 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
-	private static void ExecuteCommand(string command, string? terminal)
+	/// <summary>
+	/// 在指定终端里执行一条命令（cmd / PowerShell / WSL），可带窗口也可无窗口。
+	/// <para>
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「运行命令」的实现
+	/// （<c>Plugins.BuiltinActions.BuiltinActionCommand</c>）现在也走这条路。
+	/// 统一的是动作的<b>形状</b>（描述 / 参数 / 校验 / 执行入口），执行体本身不搬家 ——
+	/// 把 2500 行的执行器按动作拆成九个文件是纯搬运，回归面极大而收益有限。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
 		{

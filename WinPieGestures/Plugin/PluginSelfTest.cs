@@ -373,6 +373,223 @@ internal static class PluginSelfTest
                 }
             }
 
+            // ---- 3e 内建动作接缝 ----
+            // 内建动作正在向插件模型收敛（统一下形状，执行体不搬家）。这一段验证收敛后的
+            // 「运行命令」与收敛前等价，并确认它确实被那条新接缝接走了。
+            Line("");
+            Line("[3e] 内建动作接缝（注册 / 参数投影 / 校验 / 真实执行）");
+
+            if (!BuiltinActionCatalog.TryGet("Command", out BuiltinActionRegistration builtinCommand))
+            {
+                Fail("内建动作注册", "「Command」不在内建动作表里 —— 用户配好的运行命令动作会落回旧路径");
+            }
+            else
+            {
+                Line($"  已登记：{builtinCommand.FullId}｜{builtinCommand.Contribution.Descriptor.DisplayName}");
+
+                // ① 参数声明。将来统一表单就是按这份 schema 渲染的，字段数与键都不能错。
+                var fields = builtinCommand.Contribution.Parameters;
+                Line($"  参数声明：{fields.Count} 项" +
+                    (fields.Count > 0 ? $"（{string.Join("、", fields.Select(f => $"{f.Key}「{f.Label}」"))}）" : ""));
+
+                if (fields.Count != 2
+                    || !fields.Any(f => f.Key == "commandLine")
+                    || !fields.Any(f => f.Key == "terminal"))
+                {
+                    Fail("内建动作参数", "「运行命令」应恰好声明 commandLine 与 terminal 两个参数");
+                }
+                else if (!fields.First(f => f.Key == "commandLine").Required)
+                {
+                    // 命令行是必填项。不标必填，统一表单就不会把它当必填校验 ——
+                    // 于是「空命令」这种配置又能顺着界面溜进去，绕开下面那条拦截。
+                    Fail("内建动作参数", "commandLine 必须标为必填，否则空命令会重新变成可保存的状态");
+                }
+
+                // ② 裸字段投影。这是「零迁移」成立的前提：参数仍存在 ActionItem 的裸字段上，
+                //    由这一层现读现装成参数字典，所以持久化侧一行都没动。
+                var legacyAction = new ActionItem
+                {
+                    Type = "Command",
+                    Name = "自检用",
+                    Parameter = "echo builtin-probe",
+                    CommandTerminal = "wsl",
+                };
+
+                Dictionary<string, string> projected = builtinCommand.ProjectParameters(legacyAction);
+                Line($"  裸字段投影：commandLine='{projected.GetValueOrDefault("commandLine")}'｜" +
+                    $"terminal='{projected.GetValueOrDefault("terminal")}'");
+
+                if (!string.Equals(projected.GetValueOrDefault("commandLine"), "echo builtin-probe", StringComparison.Ordinal)
+                    || !string.Equals(projected.GetValueOrDefault("terminal"), "wsl", StringComparison.Ordinal))
+                {
+                    Fail("内建动作参数投影", "裸字段没有正确投影成参数字典 —— 用户配的命令送不到执行体");
+                }
+
+                // ③ 校验。空命令必须被拦下：收敛前这里是静默 return（按了扇区什么也不发生、
+                //    也没有任何提示），本轮的刻意行为变更就是这一处。
+                string? emptyVerdict = builtinCommand.Contribution.Validate(
+                    new Dictionary<string, string> { ["commandLine"] = "   ", ["terminal"] = "cmd" });
+
+                if (emptyVerdict == null)
+                {
+                    Fail("内建动作校验", "空命令行没有被拦下 —— 静默失效又回来了");
+                }
+                else
+                {
+                    Line($"  空命令拦截：{emptyVerdict}");
+                }
+
+                if (builtinCommand.Contribution.Validate(projected) != null)
+                {
+                    Fail("内建动作校验", "合法的命令行被误判为不合法");
+                }
+
+                // ④ 真实执行。产物必须真的出现，否则「接缝通了」只是纸面结论 ——
+                //    这一类「断言写到用户真正会走到的那一步」的教训在这个项目里已经有过两次。
+                //
+                //    刻意<b>不受 --skip-invoke 控制</b>：探针命令是无害的（往自检沙箱里写一个文件），
+                //    而它恰恰是本次改动的核心，跳过它等于什么都没验。
+                string probeOutput = Path.Combine(sandboxRoot, "builtin-action-result.txt");
+                var liveAction = new ActionItem
+                {
+                    Type = "Command",
+                    Name = "自检用",
+                    Parameter = $"echo builtin-ok>\"{probeOutput}\"",
+                    CommandTerminal = "cmd_hidden",
+                };
+
+                try
+                {
+                    // 走的是 ActionExecutor 里那个 internal 的接缝方法本体，而不是 Execute()：
+                    // Execute 的外层 catch 会弹 MessageBox，在无人应答的自检进程里会卡死。
+                    ActionExecutor.ExecuteBuiltinActionItem(liveAction, builtinCommand);
+
+                    // 命令行进程是异步拉起的（ExecuteCommand 不等它结束），轮询等产物落地。
+                    for (int wait = 0; wait < 30 && !File.Exists(probeOutput); wait++)
+                    {
+                        System.Threading.Thread.Sleep(100);
+                    }
+
+                    if (!File.Exists(probeOutput))
+                    {
+                        Fail("内建动作执行", $"命令没有产生预期产物（{probeOutput}）—— 接缝没把动作真的送下去");
+                    }
+                    else
+                    {
+                        Line($"  真实执行：产物已生成（{new FileInfo(probeOutput).Length} 字节）");
+                    }
+                }
+                catch (Exception executeError)
+                {
+                    Fail("内建动作执行", $"抛出异常：{executeError.Message}");
+                }
+            }
+
+            // ---- 3f 内建动作批量接缝 ----
+            //
+            // 其余动作只验「注册 / 别名 / 投影 / 校验」四件事，刻意不做真实执行 ——
+            // 它们一旦真跑就会去按热键、拉起程序、打开浏览器、弹出资源管理器，
+            // 在自检进程里全是实打实的副作用。这正是 --skip-invoke 的用意：
+            // 把「接缝连通性」与「动作真实效果」分成两件事，前者每次都验，
+            // 后者由用户在真机上自己确认。
+            Line("");
+            Line("[3f] 内建动作批量接缝（注册 / 别名 / 投影 / 校验）");
+
+            var builtinCases = new (string Type, string? Alias, ActionItem Probe, int Fields, string Key, string Expect, string EmptyLabel)[]
+            {
+                ("Hotkey", null,
+                    new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
+                    1, "hotkey", "Ctrl+Alt+S", "快捷键"),
+
+                ("Launch", null,
+                    new ActionItem { Type = "Launch", Parameter = @"C:\probe\app.exe", Arguments = "--portable", RunAsStandardUser = true },
+                    3, "path", @"C:\probe\app.exe", "程序路径"),
+
+                ("WebUrl", "Url",
+                    new ActionItem { Type = "WebUrl", Parameter = "https://example.com", BrowserChoice = "Edge", BrowserPath = @"C:\probe\browser.exe" },
+                    3, "url", "https://example.com", "网址"),
+
+                ("Folder", "OpenFolder",
+                    new ActionItem { Type = "Folder", Parameter = @"C:\probe\dir" },
+                    1, "path", @"C:\probe\dir", "文件夹路径"),
+            };
+
+            int builtinVerified = 0;
+
+            foreach (var (caseType, caseAlias, caseProbe, caseFields, caseKey, caseExpect, caseEmptyLabel) in builtinCases)
+            {
+                if (!BuiltinActionCatalog.TryGet(caseType, out BuiltinActionRegistration caseReg))
+                {
+                    Fail("内建动作注册", $"「{caseType}」不在内建动作表里 —— 用户配好的该动作会落回旧路径");
+                    continue;
+                }
+
+                string caseLabel = $"{caseType}｜{caseReg.FullId}";
+
+                // 别名是这里最该盯的一处：丢了不会有任何报错，只会让老配置里的动作静默失效 ——
+                // 用户看到的是「这个扇区按下去没反应」，而原因藏在两个字符串不相等上。
+                if (caseAlias != null)
+                {
+                    if (!BuiltinActionCatalog.TryGet(caseAlias, out BuiltinActionRegistration byAlias)
+                        || !string.Equals(byAlias.FullId, caseReg.FullId, StringComparison.Ordinal))
+                    {
+                        Fail("内建动作别名", $"别名「{caseAlias}」没能解析回 {caseReg.FullId} —— 老配置里的该写法会失效");
+                    }
+                    else
+                    {
+                        caseLabel += $"（别名 {caseAlias} ✓）";
+                    }
+                }
+
+                if (caseReg.Contribution.Parameters.Count != caseFields)
+                {
+                    Fail("内建动作参数", $"{caseType} 应声明 {caseFields} 个参数，实际 {caseReg.Contribution.Parameters.Count} 个");
+                    continue;
+                }
+
+                // 必填项漏标，统一表单就会放行空值，等于把静默失效的门重新打开。
+                if (!caseReg.Contribution.Parameters.Any(f => f.Key == caseKey && f.Required))
+                {
+                    Fail("内建动作参数", $"{caseType} 的 {caseKey} 必须标为必填");
+                }
+
+                Dictionary<string, string> projectedTestCase = caseReg.ProjectParameters(caseProbe);
+                string projectedValue = projectedTestCase.GetValueOrDefault(caseKey) ?? "";
+
+                if (!string.Equals(projectedValue, caseExpect, StringComparison.Ordinal))
+                {
+                    Fail("内建动作参数投影", $"{caseType} 的 {caseKey} 没有正确投影（得到 '{projectedValue}'）—— 用户配的值送不到执行体");
+                }
+
+                string? emptyVerdict = caseReg.Contribution.Validate(
+                    new Dictionary<string, string> { [caseKey] = "   " });
+
+                if (emptyVerdict == null)
+                {
+                    Fail("内建动作校验", $"{caseType} 的{caseEmptyLabel}为空时没有被拦下 —— 静默失效又回来了");
+                }
+
+                if (caseReg.Contribution.Validate(projectedTestCase) != null)
+                {
+                    Fail("内建动作校验", $"{caseType} 的合法参数被误判为不合法");
+                }
+
+                // 额外确认 Launch 的布尔参数投影：它比字符串多一层「不变文化字面量」的约定，
+                // 投影成 "True"/"False" 之类的写法在别的区域设置下会静默退回默认值。
+                if (caseType == "Launch"
+                    && !string.Equals(projectedTestCase.GetValueOrDefault("runAsStandardUser"), "true", StringComparison.Ordinal))
+                {
+                    Fail("内建动作参数投影", $"Launch 的 runAsStandardUser 应投影为 \"true\"，实际 '{projectedTestCase.GetValueOrDefault("runAsStandardUser")}'");
+                }
+
+                builtinVerified++;
+            }
+
+            if (builtinVerified == builtinCases.Length)
+            {
+                Line($"  全部 {builtinVerified} 个动作：注册 ✓｜别名 ✓｜投影 ✓｜必填 ✓｜空值拦截 ✓");
+            }
+
             // ---- 7 环境还原性检查 ----
             Line("");
             Line("[7] 环境还原性检查");
