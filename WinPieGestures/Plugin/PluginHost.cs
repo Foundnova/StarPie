@@ -61,7 +61,7 @@ internal static class PluginHost
     /// <summary>
     /// 三条 SPP 调用路径的统一运行时入口。动作路径先适配现有实现，交互与轮盘结构路径先建立空接缝。
     /// </summary>
-    private static readonly PluginRuntime Runtime = new(ExecutePluginActionCore);
+    private static readonly PluginRuntime Runtime = new(Catalog, Find, static () => _enabled);
 
     private static bool _initialized;
     private static bool _enabled = true;
@@ -340,47 +340,25 @@ internal static class PluginHost
 
     // ------------------------------------------------------------------ 启用 / 停用
 
-    /// <summary>启用插件：加载 → 实例化 → Initialize → 贡献点提交。</summary>
+    /// <summary>用户显式启用插件：运行时加载成功后再持久化 Enabled 偏好。</summary>
     public static bool Enable(string pluginId, out string error)
     {
         error = "";
 
-        if (!_enabled)
+        PluginActivationResult activation = Runtime.EnsurePluginLoaded(
+            pluginId,
+            PluginActivationReason.ManualEnable,
+            requireEnabled: false);
+
+        if (!activation.IsReady)
         {
-            error = "插件系统已在设置中关闭。";
+            error = activation.Error;
             return false;
         }
 
-        PluginInstance? instance = Find(pluginId);
-        if (instance == null)
-        {
-            error = $"插件未安装：{pluginId}";
-            return false;
-        }
-
-        if (instance.IsLoaded)
-        {
-            return true;
-        }
-
-        lock (Gate)
-        {
-            if (!instance.Load(out string failure))
-            {
-                error = failure;
-                return false;
-            }
-
-            instance.Entry.Enabled = true;
-            PluginRegistryStore.UpsertEntry(instance.Entry);
-
-            // 启用的插件需要重新注册它的事件订阅（Load 里已经通过 Events 服务登记，无需额外动作）
-            foreach (PluginActionRegistration action in instance.OwnedActions)
-            {
-                // 占位：注册 token 由 PluginContext 内部持有，这里只做日志
-                _ = action;
-            }
-        }
+        PluginInstance instance = activation.Instance!;
+        instance.Entry.Enabled = true;
+        PluginRegistryStore.UpsertEntry(instance.Entry);
 
         NotifyPluginSetChanged();
         return true;
@@ -399,6 +377,10 @@ internal static class PluginHost
 
         try
         {
+            // 先关闭用户启用偏好，使动作路径从这一刻起不再触发惰性加载。
+            instance.Entry.Enabled = false;
+            PluginRegistryStore.UpsertEntry(instance.Entry);
+
             // 卸载结论是**异步**得出的：同步那一瞬间调用栈往往还没展开，此时下结论多半是错的。
             // 所以这里只登记回调，等最终结论出来再决定要不要提示用户「重启」。
             instance.UnloadVerdictFinalized = collected =>
@@ -427,9 +409,6 @@ internal static class PluginHost
                 Runtime.NotifyPluginStopped(pluginId);
             }
             instance.FlushHealth();
-
-            instance.Entry.Enabled = false;
-            PluginRegistryStore.UpsertEntry(instance.Entry);
 
             NotifyPluginSetChanged();
             return true;
@@ -519,225 +498,14 @@ internal static class PluginHost
 
     // ------------------------------------------------------------------ 参数校验接缝
 
-    private static readonly IReadOnlyDictionary<string, string> EmptyParameters =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// 插件动作的参数校验结果。
-    /// <para>
-    /// 刻意把「宿主发现的声明违规」与「插件自己给的说法」分成两份：
-    /// 前者能精确对应到某个字段，可以就地标红；后者只是一句话，只能整体展示。
-    /// 混成一个字符串会丢掉字段定位能力。
-    /// </para>
-    /// </summary>
-    public sealed class PluginActionValidation
-    {
-        /// <summary>违反 <see cref="ParameterField"/> 声明约束的字段。</summary>
-        public List<PluginParameterIssue> DeclaredIssues { get; init; } = new();
-
-        /// <summary><see cref="IActionContribution.Validate"/> 返回的原因。</summary>
-        public string? PluginMessage { get; init; }
-
-        public bool IsValid => DeclaredIssues.Count == 0 && string.IsNullOrEmpty(PluginMessage);
-
-        /// <summary>压成一句给用户看的中文。</summary>
-        public string? Describe()
-        {
-            if (DeclaredIssues.Count > 0) return DeclaredIssues[0].ToString();
-            return string.IsNullOrEmpty(PluginMessage) ? null : PluginMessage;
-        }
-    }
-
-    /// <summary>
-    /// <b>插件动作参数校验的唯一入口。</b>
-    /// <para>
-    /// <see cref="IActionContribution.Validate"/> 的注释写着「宿主会在<b>保存动作</b>与<b>执行前</b>各调用一次」，
-    /// 但如果两条路径各写一遍，它们迟早会分叉 —— 用户就会遇到
-    /// 「保存时一切正常、触发时却说参数不合法」这种最令人困惑的状态。
-    /// 因此两处都走这里，顺序固定为：先宿主底线（声明的约束），再插件自定义。
-    /// </para>
-    /// <para>
-    /// 本方法<b>保证不抛异常</b>。
-    /// </para>
-    /// </summary>
-    public static PluginActionValidation ValidateActionParameters(ActionItem? action)
-    {
-        if (action?.PluginActionRef == null || !action.PluginActionRef.IsValid)
-        {
-            return new PluginActionValidation();
-        }
-
-        try
-        {
-            if (!Catalog.TryGetAction(action.PluginActionRef.FullId, out PluginActionRegistration registration))
-            {
-                // 贡献点已不在目录里时不做参数校验。
-                // 真正的问题是「这个动作已经不可用」，此时报参数错误会把用户引向完全错误的方向。
-                return new PluginActionValidation();
-            }
-
-            IReadOnlyDictionary<string, string> parameters = action.ExtensionData ?? EmptyParameters;
-
-            // ① 宿主底线：只认 ParameterField 声明的约束，不依赖插件是否记得自查。
-            List<PluginParameterIssue> declaredIssues =
-                PluginParameterValidator.Validate(registration.Parameters, parameters);
-
-            // ② 插件自定义：处理声明表达不了的规则（例如「起止时间不能相同」）。
-            string? pluginMessage = null;
-            try
-            {
-                string? result = registration.Contribution.Validate(parameters);
-                if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result!.Trim();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.LogError($"[plugin] 动作 {registration.FullId} 的参数校验抛出异常", ex);
-                pluginMessage = $"插件自身的校验逻辑出错：{ex.GetBaseException().Message}（这是插件的问题，请反馈给插件作者）";
-            }
-
-            return new PluginActionValidation
-            {
-                DeclaredIssues = declaredIssues,
-                PluginMessage = pluginMessage,
-            };
-        }
-        catch (Exception ex)
-        {
-            // 校验器自己坏掉时放行。宁可让插件在执行里自行拒绝，
-            // 也不要因为宿主这一环出错就让用户的手势彻底点不动。
-            AppLogger.LogError("[plugin] 参数校验流程异常（已放行）", ex);
-            return new PluginActionValidation();
-        }
-    }
+    /// <summary>保存动作与执行前共用的参数校验入口；设置页校验不会触发惰性加载。</summary>
+    public static PluginActionValidation ValidateActionParameters(ActionItem? action) =>
+        Runtime.ValidateActionParameters(action);
 
     // ------------------------------------------------------------------ 执行接缝
 
-    /// <summary>
-    /// <b>主程序唯一的调用入口。</b><see cref="ActionExecutor"/> 在 <c>switch</c> 未命中时调用它。
-    /// <para>
-    /// 这个方法<b>保证不抛异常</b>，并且绝不把插件异常冒泡给 <see cref="ActionExecutor.Execute"/> ——
-    /// 因为那里的 <c>catch</c> 会弹 <c>MessageBox</c>，在无人值守时会把动作线程卡死。
-    /// </para>
-    /// </summary>
+    /// <summary>主程序唯一的插件动作入口，具体行为由动作路径模块负责。</summary>
     public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
-
-    /// <summary>
-    /// 动作路径的现有实现。暂由 <see cref="ActionExecutionPathModule"/> 适配；
-    /// 下一阶段会把解析、惰性加载、参数校验和调用租约逐步迁入动作路径模块。
-    /// </summary>
-    internal static PluginExecuteOutcome ExecutePluginActionCore(ActionItem action)
-    {
-        if (action?.PluginActionRef == null || !action.PluginActionRef.IsValid)
-        {
-            return PluginExecuteOutcome.NotHandled;
-        }
-
-        try
-        {
-            PluginActionRef reference = action.PluginActionRef;
-            string fullId = reference.FullId;
-
-            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
-            {
-                return new PluginExecuteOutcome
-                {
-                    Handled = true,
-                    Success = false,
-                    Message = $"动作「{action.Name}」所属的插件动作未注册：{fullId}。插件可能已被禁用或卸载。",
-                };
-            }
-
-            PluginInstance? instance = Find(reference.PluginId);
-
-            // 惰性加载：Enabled 但尚未加载（内存红线的代价就是首次调用要额外等一次加载）
-            if (instance == null || !instance.IsLoaded)
-            {
-                if (instance == null)
-                {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件「{reference.PluginId}」未安装。",
-                    };
-                }
-
-                if (!instance.Entry.Enabled)
-                {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件「{instance.Entry.Name}」当前未启用，请在「插件」页启用后再试。",
-                    };
-                }
-
-                AppLogger.LogInfo($"[plugin] 首次引用触发惰性加载：{reference.PluginId}");
-                if (!Enable(reference.PluginId, out string loadError))
-                {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件「{instance.Entry.Name}」加载失败：{loadError}",
-                    };
-                }
-
-                if (!Catalog.TryGetAction(fullId, out registration))
-                {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件已加载，但没有注册动作 {fullId}。插件版本可能已变化，请重新编辑该槽位。",
-                    };
-                }
-            }
-
-            if (instance.State == PluginRuntimeState.Quarantined)
-            {
-                return new PluginExecuteOutcome
-                {
-                    Handled = true,
-                    Success = false,
-                    Message = $"插件「{instance.Entry.Name}」因连续出错已被自动禁用，已跳过本次执行。",
-                };
-            }
-
-            // 参数校验：与设置面板共用同一个入口。
-            // 这样「保存时通过」与「执行时通过」永远是同一个判断，
-            // 不会出现用户填好参数、存下了、触发却说不合法的情况。
-            PluginActionValidation validation = ValidateActionParameters(action);
-            if (!validation.IsValid)
-            {
-                return new PluginExecuteOutcome
-                {
-                    Handled = true,
-                    Success = false,
-                    Message = $"{registration.DisplayName} 参数不合法：{validation.Describe()}",
-                };
-            }
-
-            // 交给插件的是参数的一份拷贝：即使它在 ExecuteAsync 里改写字典，
-            // 也污染不到用户正在编辑的配置对象。
-            Dictionary<string, string> parameters = action.ExtensionData != null
-                ? new Dictionary<string, string>(action.ExtensionData, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            return PluginInvoker.Invoke(instance, registration, parameters);
-        }
-        catch (Exception ex)
-        {
-            // 最外层兜底：这里无论如何都不能抛出去
-            AppLogger.LogError("[plugin] 执行插件动作时发生未预期异常（已拦截）", ex);
-            return new PluginExecuteOutcome
-            {
-                Handled = true,
-                Success = false,
-                Message = "插件动作执行时发生内部错误，详情见日志。",
-            };
-        }
-    }
 
     // ------------------------------------------------------------------ 界面数据
 
@@ -1473,9 +1241,13 @@ internal static class PluginHost
 
                     try
                     {
-                        if (!instance.Load(out string failure))
+                        PluginActivationResult activation = Runtime.EnsurePluginLoaded(
+                            instance.PluginId,
+                            PluginActivationReason.StartupPreload,
+                            requireEnabled: true);
+                        if (!activation.IsReady)
                         {
-                            AppLogger.LogWarn($"[plugin] 预加载 {instance.PluginId} 失败：{failure}");
+                            AppLogger.LogWarn($"[plugin] 预加载 {instance.PluginId} 失败：{activation.Error}");
                         }
                     }
                     catch (Exception ex)

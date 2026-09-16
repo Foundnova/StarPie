@@ -52,6 +52,7 @@ internal enum PluginRuntimeState
 internal sealed class PluginInstance
 {
     private readonly object _gate = new();
+    private readonly object _loadGate = new();
 
     public PluginInstance(string pluginId, PluginRegistryEntry entry, PluginScanResult scan)
     {
@@ -166,10 +167,41 @@ internal sealed class PluginInstance
     // ------------------------------------------------------------------ 加载
 
     /// <summary>
-    /// 加载并启用插件。全过程在调用线程上同步完成（UI 线程或首次被动作引用时的动作线程）。
+    /// 加载插件运行时。全过程在调用线程上同步完成，但不会修改用户持久化的 Enabled 偏好。
+    /// 同一实例的并发加载在此处合并，确保 Initialize 与贡献提交最多执行一次。
     /// </summary>
-    /// <param name="failureReason">失败原因（用户可读）。</param>
-    public bool Load(out string failureReason)
+    public bool Load(out string failureReason) =>
+        EnsureLoaded(requireEnabled: false, out _, out failureReason);
+
+    /// <summary>
+    /// 在实例级加载锁内再次检查 Enabled，避免停用与首次惰性加载交错后把插件重新拉起。
+    /// </summary>
+    internal bool EnsureLoaded(
+        bool requireEnabled,
+        out bool disabledDuringLoad,
+        out string failureReason)
+    {
+        lock (_loadGate)
+        {
+            disabledDuringLoad = false;
+            if (requireEnabled && !Entry.Enabled)
+            {
+                disabledDuringLoad = true;
+                failureReason = $"插件「{Entry.Name}」当前未启用，请在「插件」页启用后再试。";
+                return false;
+            }
+
+            if (IsLoaded)
+            {
+                failureReason = "";
+                return true;
+            }
+
+            return LoadCore(out failureReason);
+        }
+    }
+
+    private bool LoadCore(out string failureReason)
     {
         failureReason = "";
         SetState(PluginRuntimeState.Loading);
@@ -398,6 +430,14 @@ internal sealed class PluginInstance
     /// </para>
     /// </summary>
     public void Unload()
+    {
+        lock (_loadGate)
+        {
+            UnloadCore();
+        }
+    }
+
+    private void UnloadCore()
     {
         // 每一步都刻意放进**独立的、禁止内联的**方法里，而不是写在本方法体里。
         //

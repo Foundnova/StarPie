@@ -108,6 +108,134 @@ internal sealed class PluginPathRegistry
     }
 }
 
+/// <summary>触发插件加载的宿主场景，用于诊断和后续策略区分。</summary>
+internal enum PluginActivationReason
+{
+    ManualEnable,
+    StartupPreload,
+    ActionExecution,
+    WheelStructureQuery,
+}
+
+internal enum PluginActivationStatus
+{
+    Ready,
+    PluginSystemDisabled,
+    NotInstalled,
+    Disabled,
+    Quarantined,
+    Incompatible,
+    LoadFailed,
+}
+
+/// <summary>一次运行时激活的结果。加载机制公用，是否触发加载由各条路径自行决定。</summary>
+internal sealed class PluginActivationResult
+{
+    public PluginActivationStatus Status { get; init; }
+    public PluginInstance? Instance { get; init; }
+    public string Error { get; init; } = "";
+
+    public bool IsReady => Status == PluginActivationStatus.Ready && Instance != null;
+}
+
+/// <summary>
+/// 插件运行时激活协调器。它只负责检查状态并确保已启用插件完成加载，
+/// 不负责修改用户的 Enabled 偏好，也不决定哪一条路径应该惰性加载。
+/// </summary>
+internal sealed class PluginActivationCoordinator
+{
+    private readonly Func<string, PluginInstance?> _findInstance;
+    private readonly Func<bool> _isPluginSystemEnabled;
+
+    public PluginActivationCoordinator(
+        Func<string, PluginInstance?> findInstance,
+        Func<bool> isPluginSystemEnabled)
+    {
+        _findInstance = findInstance ?? throw new ArgumentNullException(nameof(findInstance));
+        _isPluginSystemEnabled = isPluginSystemEnabled ?? throw new ArgumentNullException(nameof(isPluginSystemEnabled));
+    }
+
+    public PluginActivationResult EnsureLoaded(
+        string pluginId,
+        PluginActivationReason reason,
+        bool requireEnabled)
+    {
+        if (!_isPluginSystemEnabled())
+        {
+            return Failure(PluginActivationStatus.PluginSystemDisabled, null, "插件系统已在设置中关闭。");
+        }
+
+        PluginInstance? instance = _findInstance(pluginId);
+        if (instance == null)
+        {
+            return Failure(PluginActivationStatus.NotInstalled, null, $"插件未安装：{pluginId}");
+        }
+
+        if (instance.State == PluginRuntimeState.Quarantined)
+        {
+            return Failure(
+                PluginActivationStatus.Quarantined,
+                instance,
+                $"插件「{instance.Entry.Name}」因连续出错已被自动禁用。");
+        }
+
+        if (instance.State == PluginRuntimeState.Incompatible)
+        {
+            return Failure(
+                PluginActivationStatus.Incompatible,
+                instance,
+                string.IsNullOrWhiteSpace(instance.LastError)
+                    ? $"插件「{instance.Entry.Name}」与当前宿主不兼容。"
+                    : instance.LastError!);
+        }
+
+        if (requireEnabled && !instance.Entry.Enabled)
+        {
+            return Failure(
+                PluginActivationStatus.Disabled,
+                instance,
+                $"插件「{instance.Entry.Name}」当前未启用，请在「插件」页启用后再试。");
+        }
+
+        if (instance.IsLoaded)
+        {
+            return Ready(instance);
+        }
+
+        AppLogger.LogInfo($"[plugin] {reason} 触发运行时加载：{pluginId}");
+        if (!instance.EnsureLoaded(requireEnabled, out bool disabledDuringLoad, out string failure))
+        {
+            if (disabledDuringLoad)
+            {
+                return Failure(PluginActivationStatus.Disabled, instance, failure);
+            }
+
+            return Failure(
+                PluginActivationStatus.LoadFailed,
+                instance,
+                string.IsNullOrWhiteSpace(failure) ? $"插件「{instance.Entry.Name}」加载失败。" : failure);
+        }
+
+        return Ready(instance);
+    }
+
+    private static PluginActivationResult Ready(PluginInstance instance) => new()
+    {
+        Status = PluginActivationStatus.Ready,
+        Instance = instance,
+    };
+
+    private static PluginActivationResult Failure(
+        PluginActivationStatus status,
+        PluginInstance? instance,
+        string error) => new()
+    {
+        Status = status,
+        Instance = instance,
+        Error = error,
+    };
+}
+
 /// <summary>
 /// 三条路径共享的调用协调器。当前先统一异常隔离和诊断入口；后续活动调用租约、取消与超时
 /// 会在这里扩展，而不复制到每一条路径。
@@ -177,10 +305,15 @@ internal sealed class PluginRuntime
 {
     private readonly PluginPathRegistry _paths = new();
     private readonly PluginCallCoordinator _calls = new();
+    private readonly PluginActivationCoordinator _activation;
 
-    public PluginRuntime(Func<ActionItem, PluginExecuteOutcome> legacyActionExecutor)
+    public PluginRuntime(
+        PluginCatalog catalog,
+        Func<string, PluginInstance?> findInstance,
+        Func<bool> isPluginSystemEnabled)
     {
-        Actions = new ActionExecutionPathModule(legacyActionExecutor);
+        _activation = new PluginActivationCoordinator(findInstance, isPluginSystemEnabled);
+        Actions = new ActionExecutionPathModule(catalog, _activation);
         Interactions = new InteractionEventPathModule();
         WheelStructures = new WheelStructurePathModule();
 
@@ -196,6 +329,14 @@ internal sealed class PluginRuntime
     public WheelStructurePathModule WheelStructures { get; }
 
     public IReadOnlyList<string> SupportedPathIds => _paths.SnapshotPathIds();
+
+    public PluginActivationResult EnsurePluginLoaded(
+        string pluginId,
+        PluginActivationReason reason,
+        bool requireEnabled) =>
+        _activation.EnsureLoaded(pluginId, reason, requireEnabled);
+
+    public PluginActionValidation ValidateActionParameters(ActionItem? action) => Actions.Validate(action);
 
     public PluginExecuteOutcome ExecuteAction(ActionItem action) =>
         _calls.Invoke(

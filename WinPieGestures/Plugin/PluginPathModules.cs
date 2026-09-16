@@ -1,26 +1,180 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
 namespace WinPieGestures.Plugins;
 
+/// <summary>插件动作参数校验结果。声明式字段问题与插件自定义说明分开保存。</summary>
+internal sealed class PluginActionValidation
+{
+    public List<PluginParameterIssue> DeclaredIssues { get; init; } = new();
+    public string? PluginMessage { get; init; }
+
+    public bool IsValid => DeclaredIssues.Count == 0 && string.IsNullOrEmpty(PluginMessage);
+
+    public string? Describe()
+    {
+        if (DeclaredIssues.Count > 0) return DeclaredIssues[0].ToString();
+        return string.IsNullOrEmpty(PluginMessage) ? null : PluginMessage;
+    }
+}
+
+/// <summary>从持久化动作复制出的不可变执行请求，插件调用期间不再读取可变 ActionItem。</summary>
+internal sealed class PluginActionRequest
+{
+    private PluginActionRequest(
+        string pluginId,
+        string contributionId,
+        string actionName,
+        IReadOnlyDictionary<string, string> parameters)
+    {
+        PluginId = pluginId;
+        ContributionId = contributionId;
+        ActionName = actionName;
+        Parameters = parameters;
+    }
+
+    public string PluginId { get; }
+    public string ContributionId { get; }
+    public string FullId => $"{PluginId}.{ContributionId}";
+    public string ActionName { get; }
+    public IReadOnlyDictionary<string, string> Parameters { get; }
+
+    public static bool TryCreate(ActionItem? action, out PluginActionRequest? request)
+    {
+        request = null;
+        PluginActionRef? reference = action?.PluginActionRef;
+        if (reference == null || !reference.IsValid) return false;
+
+        var parameters = action!.ExtensionData != null
+            ? new Dictionary<string, string>(action.ExtensionData, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        request = new PluginActionRequest(
+            reference.PluginId.Trim(),
+            reference.ContributionId.Trim(),
+            action.Name ?? "",
+            new ReadOnlyDictionary<string, string>(parameters));
+        return true;
+    }
+}
+
 /// <summary>
-/// 动作执行路径模块。当前先适配既有动作实现，下一阶段再把解析、惰性加载、校验和调用租约迁入本模块。
+/// 动作执行路径：请求快照 → 公用激活 → 动作查询 → 统一参数校验 → 调度执行。
+/// 惰性加载机制来自公共激活协调器，但只有动作路径决定在执行时触发它。
 /// </summary>
 internal sealed class ActionExecutionPathModule : PluginPathModule
 {
-    private readonly Func<ActionItem, PluginExecuteOutcome> _legacyExecutor;
+    private readonly PluginCatalog _catalog;
+    private readonly PluginActivationCoordinator _activation;
 
-    public ActionExecutionPathModule(Func<ActionItem, PluginExecuteOutcome> legacyExecutor)
+    public ActionExecutionPathModule(PluginCatalog catalog, PluginActivationCoordinator activation)
     {
-        _legacyExecutor = legacyExecutor ?? throw new ArgumentNullException(nameof(legacyExecutor));
+        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        _activation = activation ?? throw new ArgumentNullException(nameof(activation));
     }
 
     public override string PathId => PluginPathIds.ActionExecution;
 
-    public PluginExecuteOutcome Execute(ActionItem action) => _legacyExecutor(action);
+    public PluginActionValidation Validate(ActionItem? action)
+    {
+        if (!PluginActionRequest.TryCreate(action, out PluginActionRequest? request))
+        {
+            return new PluginActionValidation();
+        }
+
+        try
+        {
+            if (!_catalog.TryGetAction(request!.FullId, out PluginActionRegistration registration))
+            {
+                // 设置页校验不应为了展示错误而加载或启用插件。
+                return new PluginActionValidation();
+            }
+
+            return ValidateResolved(registration, request.Parameters);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 参数校验流程异常（已放行）", ex);
+            return new PluginActionValidation();
+        }
+    }
+
+    public PluginExecuteOutcome Execute(ActionItem action)
+    {
+        if (!PluginActionRequest.TryCreate(action, out PluginActionRequest? request))
+        {
+            return PluginExecuteOutcome.NotHandled;
+        }
+
+        PluginActivationResult activation = _activation.EnsureLoaded(
+            request!.PluginId,
+            PluginActivationReason.ActionExecution,
+            requireEnabled: true);
+
+        if (!activation.IsReady)
+        {
+            return new PluginExecuteOutcome
+            {
+                Handled = true,
+                Success = false,
+                Message = activation.Error,
+            };
+        }
+
+        PluginInstance instance = activation.Instance!;
+        if (!_catalog.TryGetAction(request.FullId, out PluginActionRegistration registration))
+        {
+            return new PluginExecuteOutcome
+            {
+                Handled = true,
+                Success = false,
+                Message = $"插件已加载，但没有注册动作 {request.FullId}。插件版本可能已变化，请重新编辑该槽位。",
+            };
+        }
+
+        PluginActionValidation validation = ValidateResolved(registration, request.Parameters);
+        if (!validation.IsValid)
+        {
+            return new PluginExecuteOutcome
+            {
+                Handled = true,
+                Success = false,
+                Message = $"{registration.DisplayName} 参数不合法：{validation.Describe()}",
+            };
+        }
+
+        return PluginInvoker.Invoke(instance, registration, request.Parameters);
+    }
+
+    private static PluginActionValidation ValidateResolved(
+        PluginActionRegistration registration,
+        IReadOnlyDictionary<string, string> parameters)
+    {
+        List<PluginParameterIssue> declaredIssues =
+            PluginParameterValidator.Validate(registration.Parameters, parameters);
+
+        string? pluginMessage = null;
+        try
+        {
+            string? result = registration.Contribution.Validate(parameters);
+            if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result.Trim();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError($"[plugin] 动作 {registration.FullId} 的参数校验抛出异常", ex);
+            pluginMessage = $"插件自身的校验逻辑出错：{ex.GetBaseException().Message}（这是插件的问题，请反馈给插件作者）";
+        }
+
+        return new PluginActionValidation
+        {
+            DeclaredIssues = declaredIssues,
+            PluginMessage = pluginMessage,
+        };
+    }
 }
 
 /// <summary>交互事件的只读信封。当前为宿主内部模型，不属于公共 SDK 契约。</summary>

@@ -5936,7 +5936,7 @@ public partial class SettingsWindow : Window
 
 		try
 		{
-			PluginHost.PluginActionValidation validation =
+			PluginActionValidation validation =
 				PluginHost.ValidateActionParameters(GetCurrentFocusActionItem());
 
 			// 字段级错误交给表单就地标红，此处只给「字段之外的结论」+ 未通过字段的计数，

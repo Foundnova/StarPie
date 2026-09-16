@@ -201,7 +201,7 @@ internal static class PluginSelfTest
             // 刻意放进独立方法：这两步会拿到 PluginActionRegistration，而它的 Contribution
             // 指向插件程序集里的类型实例。这些引用若留在 Run 的栈帧上，第 5 步卸载时插件的
             // ALC 就回收不掉 —— 自检会把自己测挂，报告里出现假的「需要重启才能释放」。
-            string? stageError = RunEnableAndInvoke(install.PluginId, Line, skipInvoke);
+            string? stageError = RunEnableAndInvoke(install.PluginId, Line, out ActionItem? lazyLoadProbe, skipInvoke);
             if (stageError != null)
             {
                 Fail("启用与调用", stageError);
@@ -231,6 +231,12 @@ internal static class PluginSelfTest
             if (PluginHost.GetRegisteredActions().Count != 0)
             {
                 Fail("贡献点撤销", "停用后仍有动作残留在注册表里");
+            }
+
+            string? lazyLoadError = RunLazyLoadProbe(install.PluginId, lazyLoadProbe, Line);
+            if (lazyLoadError != null)
+            {
+                Fail("首次惰性调用", lazyLoadError);
             }
 
             // ---- 6 卸载 ----
@@ -467,8 +473,13 @@ internal static class PluginSelfTest
     /// </summary>
     /// <returns>失败原因；<c>null</c> 表示两个阶段都通过。</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static string? RunEnableAndInvoke(string pluginId, Action<string> line, bool skipInvoke = false)
+    private static string? RunEnableAndInvoke(
+        string pluginId,
+        Action<string> line,
+        out ActionItem? lazyLoadProbe,
+        bool skipInvoke = false)
     {
+        lazyLoadProbe = null;
         // ---- 3 启用 ----
         line("");
         line("[3] 启用（加载 → 实例化 → Initialize → 提交贡献点）");
@@ -490,6 +501,21 @@ internal static class PluginSelfTest
             line($"    · {action.FullId} | {action.DisplayName} | {action.Kind} | 参数 {action.Parameters.Count} 项");
         }
         if (actions.Count == 0) return "插件启用成功但一个动作都没注册";
+
+        // 为重启后的首次惰性调用准备一条无副作用负例：移除声明为必填的参数，
+        // 让执行管线在加载并解析贡献后停在参数校验，不会真正调用插件动作。
+        PluginActionRegistration? lazyCandidate = actions.FirstOrDefault(action =>
+            action.Parameters.Any(field => field.Required && field.Type != ParameterFieldType.Bool));
+        if (lazyCandidate != null)
+        {
+            ActionItem? candidateItem = PluginHost.CreateActionItem(
+                lazyCandidate.FullId,
+                CollectDefaults(lazyCandidate.Parameters));
+            ParameterField requiredField = lazyCandidate.Parameters.First(
+                field => field.Required && field.Type != ParameterFieldType.Bool);
+            candidateItem?.ExtensionData?.Remove(requiredField.Key);
+            lazyLoadProbe = candidateItem;
+        }
 
         // 词条命中率单独成段。显示名有字面文案兜底，所以「词条没接上」在界面上
         // 与「接上了」长得一模一样 —— 必须在这里显式暴露，否则插件作者要等到
@@ -629,7 +655,7 @@ internal static class PluginSelfTest
                 ActionItem? probeItem = PluginHost.CreateActionItem(candidate.FullId, baseline);
                 if (probeItem != null)
                 {
-                    PluginHost.PluginActionValidation unified =
+                    PluginActionValidation unified =
                         PluginHost.ValidateActionParameters(probeItem);
 
                     line($"    ④ 走统一入口校验同一份输入 → {(unified.IsValid ? "通过" : "不通过")}");
@@ -843,6 +869,84 @@ internal static class PluginSelfTest
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// 模拟“重启后插件已启用但尚未加载”的首次动作调用。探针缺少必填参数，
+    /// 因此只验证惰性加载与贡献查询，不会进入插件 ExecuteAsync。
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string? RunLazyLoadProbe(string pluginId, ActionItem? probe, Action<string> line)
+    {
+        line("");
+        line("[5b] 重启后首次惰性调用（已启用、未加载、Catalog 为空）");
+
+        if (probe == null)
+        {
+            line("  插件没有带必填字段的动作，无法构造零副作用探针，跳过。");
+            return null;
+        }
+
+        PluginInstance? instance = PluginHost.Find(pluginId);
+        if (instance == null) return "停用后找不到插件实例。";
+        if (instance.IsLoaded) return "探针开始前插件仍处于加载状态，无法模拟重启现场。";
+        if (PluginHost.GetRegisteredActions().Count != 0) return "探针开始前 Catalog 仍有动作残留。";
+
+        PluginExecuteOutcome disabledOutcome = PluginHost.ExecutePluginAction(probe);
+        line($"  禁用状态调用：处理={disabledOutcome.Handled} 成功={disabledOutcome.Success} 信息={disabledOutcome.Message}");
+        if (instance.IsLoaded) return "用户已禁用插件却被动作路径自动加载。";
+        if (disabledOutcome.Success || string.IsNullOrWhiteSpace(disabledOutcome.Message) ||
+            !disabledOutcome.Message.Contains("未启用", StringComparison.Ordinal))
+        {
+            return $"禁用插件的动作没有被明确拒绝：{disabledOutcome.Message}";
+        }
+
+        instance.Entry.Enabled = true;
+        PluginRegistryStore.UpsertEntry(instance.Entry);
+
+        PluginExecuteOutcome outcome = PluginHost.ExecutePluginAction(probe);
+        bool loadedByAction = instance.IsLoaded;
+
+        line($"  调用结果：处理={outcome.Handled} 成功={outcome.Success} 信息={outcome.Message}");
+        line($"  动作触发加载：{loadedByAction}");
+
+        string? failure = null;
+        if (!outcome.Handled)
+        {
+            failure = "有效插件动作引用没有被动作路径处理。";
+        }
+        else if (!loadedByAction)
+        {
+            failure = "动作路径没有先加载已启用插件。";
+        }
+        else if (outcome.Success)
+        {
+            failure = "缺少必填参数的探针被执行成功，参数校验未在插件调用前生效。";
+        }
+        else if (string.IsNullOrWhiteSpace(outcome.Message) || !outcome.Message.Contains("参数不合法", StringComparison.Ordinal))
+        {
+            failure = $"插件虽然被加载，但没有进入预期的参数校验分支：{outcome.Message}";
+        }
+
+        bool disabled = PluginHost.Disable(pluginId, out string disableError);
+        if (!disabled)
+        {
+            return failure ?? $"惰性加载探针结束后停用失败：{disableError}";
+        }
+
+        bool unloaded = PluginHost.Find(pluginId)?.WaitForUnloadVerdict(5000) ?? false;
+        if (!unloaded)
+        {
+            return failure ?? "惰性加载探针结束后 ALC 未被回收。";
+        }
+
+        if (PluginHost.GetRegisteredActions().Count != 0)
+        {
+            return failure ?? "惰性加载探针停用后仍有动作残留。";
+        }
+
+        line("  首次调用已完成加载并命中参数校验，随后再次成功停用。");
+        return failure;
     }
 
     /// <summary>
