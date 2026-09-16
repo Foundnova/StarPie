@@ -372,6 +372,44 @@ internal static class PluginHost
         return true;
     }
 
+    /// <summary>
+    /// 把「已启用但尚未加载」的插件全部拉起来。幂等，重复调用是廉价的空转。
+    /// <para>
+    /// <b>为什么需要它</b>：贡献点目录只在插件加载后才被填充，而插件默认是惰性加载的 ——
+    /// 于是「已启用、但本次会话还没被用到过」的插件，它的动作在界面上根本列不出来。
+    /// 用户打开设置看到的是「动作下拉是空的」，而他的配置明明还引用着那些动作。
+    /// </para>
+    /// <para>
+    /// 调用时机是「界面即将枚举贡献点」的那一刻，也就是真正需要目录非空的时候。
+    /// 这是<b>同步</b>加载，而调用方通常是 UI 线程：插件多、或某个插件初始化慢时会有可感停顿。
+    /// 随主程序分发的插件都是小程序集，可以接受；将来接入体积大的第三方插件时，
+    /// 这里应改成后台加载 + 加载完成后通知界面重建列表。
+    /// </para>
+    /// </summary>
+    public static void EnsureEnabledPluginsLoaded()
+    {
+        if (!_initialized || !_enabled || _safeModeActive) return;
+
+        List<PluginInstance> targets = ListInstances()
+            .Where(instance => instance.Entry.Enabled && !instance.IsLoaded)
+            .ToList();
+
+        foreach (PluginInstance instance in targets)
+        {
+            try
+            {
+                if (!instance.Load(out string failure))
+                {
+                    AppLogger.LogWarn($"[plugin] 按需加载 {instance.PluginId} 失败：{failure}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError($"[plugin] 按需加载 {instance.PluginId} 异常", ex);
+            }
+        }
+    }
+
     /// <summary>停用插件：撤销贡献点 → 剪断订阅 → Shutdown → 尽力卸载 ALC。</summary>
     public static bool Disable(string pluginId, out string error)
     {
@@ -609,31 +647,26 @@ internal static class PluginHost
             PluginActionRef reference = action.PluginActionRef;
             string fullId = reference.FullId;
 
-            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
+            // 【顺序至关重要】必须先找到实例、必要时把它拉起来，再去查贡献点目录。
+            // 反过来的话会得出一个**错误归因**的结论：目录里查不到 ≠「插件没了」，
+            // 也可能是「插件已启用、只是还没被惰性加载」—— 而惰性加载恰恰是本设计
+            // 为了守住内存红线（R1）刻意做的。
+            // 曾经这里的顺序是反的，于是每次重启后用户配好的插件动作都会拿到一句
+            // 「插件可能已被禁用或卸载」，而插件其实好好的 —— 100% 复现的假故障。
+            PluginInstance? instance = Find(reference.PluginId);
+
+            if (instance == null)
             {
                 return new PluginExecuteOutcome
                 {
                     Handled = true,
                     Success = false,
-                    Message = $"动作「{action.Name}」所属的插件动作未注册：{fullId}。插件可能已被禁用或卸载。",
+                    Message = $"插件「{reference.PluginId}」未安装。",
                 };
             }
 
-            PluginInstance? instance = Find(reference.PluginId);
-
-            // 惰性加载：Enabled 但尚未加载（内存红线的代价就是首次调用要额外等一次加载）
-            if (instance == null || !instance.IsLoaded)
+            if (!instance.IsLoaded)
             {
-                if (instance == null)
-                {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件「{reference.PluginId}」未安装。",
-                    };
-                }
-
                 if (!instance.Entry.Enabled)
                 {
                     return new PluginExecuteOutcome
@@ -644,6 +677,7 @@ internal static class PluginHost
                     };
                 }
 
+                // 惰性加载：Enabled 但尚未加载（内存红线的代价就是首次调用要额外等一次加载）
                 AppLogger.LogInfo($"[plugin] 首次引用触发惰性加载：{reference.PluginId}");
                 if (!Enable(reference.PluginId, out string loadError))
                 {
@@ -654,16 +688,19 @@ internal static class PluginHost
                         Message = $"插件「{instance.Entry.Name}」加载失败：{loadError}",
                     };
                 }
+            }
 
-                if (!Catalog.TryGetAction(fullId, out registration))
+            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
+            {
+                // 走到这里的含义是确定的：插件要么本来就在跑、要么刚被拉起来，
+                // 而它确实没有提供这个贡献点 —— 只有这种情形才配得上「动作没了」的结论。
+                return new PluginExecuteOutcome
                 {
-                    return new PluginExecuteOutcome
-                    {
-                        Handled = true,
-                        Success = false,
-                        Message = $"插件已加载，但没有注册动作 {fullId}。插件版本可能已变化，请重新编辑该槽位。",
-                    };
-                }
+                    Handled = true,
+                    Success = false,
+                    Message = $"插件「{instance.Entry.Name}」没有提供动作「{action.Name}」（{fullId}）。" +
+                              "插件版本可能已变化，请重新编辑该槽位。",
+                };
             }
 
             if (instance.State == PluginRuntimeState.Quarantined)
@@ -733,6 +770,35 @@ internal static class PluginHost
 
     public static bool TryGetAction(string fullId, out PluginActionRegistration registration) =>
         Catalog.TryGetAction(fullId, out registration);
+
+    /// <summary>
+    /// 某个引用<b>本来就应该可用吗</b> —— 用来把「已失效」与「只是还没加载」分开。
+    /// <para>
+    /// 这两个状态在界面上必须表现不同，因为成因差别很大：
+    /// <list type="bullet">
+    /// <item><b>已失效</b>：插件被停用 / 卸载 / 因连续出错被自动隔离，或插件升级后去掉了那个贡献点。
+    /// 用户需要知道「你配的东西不在了」。</item>
+    /// <item><b>还没加载</b>：插件已启用，只是惰性加载尚未发生。<b>这是本设计的正常中间态</b> ——
+    /// 每次重启后所有插件都处在这个状态。此时判它失效，就是在冤枉用户。</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// 所以判据必须分层：先问「贡献点的作者还在不在」（登记表），再问「目录里有没有」（贡献点目录）。
+    /// 单看目录是不行的 —— 目录在插件未加载时本来就是空的。
+    /// </para>
+    /// </summary>
+    public static bool IsContributionExpected(string pluginId, string fullId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(fullId)) return false;
+
+        PluginInstance? instance = Find(pluginId);
+        if (instance == null) return false;                                 // 插件不在了
+        if (!instance.Entry.Enabled) return false;                          // 被用户停用
+        if (instance.State == PluginRuntimeState.Quarantined) return false; // 连续出错被自动隔离
+        if (!instance.IsLoaded) return true;                                // 已启用但未加载：不能断言失效
+
+        return Catalog.TryGetAction(fullId, out _);                         // 正在跑：以目录为准
+    }
 
     /// <summary>预览文案。失败时返回空串，绝不抛异常。</summary>
     public static string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters)

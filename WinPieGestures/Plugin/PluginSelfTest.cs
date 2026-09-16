@@ -344,6 +344,80 @@ internal static class PluginSelfTest
                         Fail("ID 重复", "两行候选必须各自显示自己的文件名，否则用户看不出该删哪一个");
                     }
 
+                    // ⑤.5 重启等价态 —— 「已启用但尚未加载」这条路径
+                    //
+                    // 每次重启后插件都处在这个状态：SyncFromDisk 按登记表把实例造出来，
+                    // 但只要没开预加载，程序集就不会被加载，贡献点目录里自然也没有它。
+                    // 修复前这条路径上会同时出两种错，都属于「看起来像用户配置丢了」：
+                    //   ① 界面上把用户配好的动作标成「已失效」—— 用户什么都没做；
+                    //   ② 按下动作回一句「插件动作未注册……可能已被禁用或卸载」—— 与事实不符。
+                    PluginActionRegistration? restartTarget = installed?.OwnedActions.FirstOrDefault();
+
+                    if (restartTarget == null)
+                    {
+                        Fail("重启等价态", "插件没有注册任何动作，无法验证「已启用但尚未加载」这条路径");
+                    }
+                    else
+                    {
+                        // 先把「用户配好的那个动作」照原样造出来 —— 停用会清空 OwnedActions。
+                        var restartProbe = new ActionItem
+                        {
+                            Type = PluginActionBinding.TypeName,
+                            Name = restartTarget.DisplayName,
+                            PluginActionRef = new PluginActionRef
+                            {
+                                PluginId = real.PluginId!,
+                                ContributionId = restartTarget.ShortId,
+                            },
+                            ExtensionData = CollectDefaults(restartTarget.Parameters),
+                        };
+
+                        string restartFullId = restartTarget.FullId;
+
+                        // 模拟重启：停用（连带卸载程序集）→ 只把登记态改回「已启用」→ 与磁盘对账。
+                        // 全程不调 Enable，程序集因此保持未加载 —— 这正是真实重启后的状态。
+                        PluginHost.Disable(real.PluginId!, out _);
+                        installed!.WaitForUnloadVerdict(5000);
+                        PluginRegistryStore.SetEnabled(real.PluginId!, true);
+                        PluginHost.SyncFromDisk();
+
+                        bool loadedAfterRestart = installed.IsLoaded;
+                        Line($"  重启等价态：程序集已加载={loadedAfterRestart}，" +
+                            $"登记启用={installed.Entry.Enabled}，目录内动作={PluginHost.Catalog.SnapshotActionIds().Count} 个");
+
+                        if (loadedAfterRestart)
+                        {
+                            Fail("重启等价态", "模拟方式失效：本该未加载的程序集却已加载，本段前提不成立");
+                        }
+                        else if (!installed.Entry.Enabled)
+                        {
+                            Fail("重启等价态", "模拟方式失效：登记态未回到「已启用」，本段前提不成立");
+                        }
+                        else
+                        {
+                            if (PluginActionBinding.IsReferenceBroken(restartProbe))
+                            {
+                                Fail("重启等价态",
+                                    "仅仅因为「尚未惰性加载」，用户配好的动作就被判成「已失效」。" +
+                                    "用户什么都没做，界面上却显示配置丢了 —— " +
+                                    "必须区分「插件没了」与「插件还没加载」这两种完全不同的情况");
+                            }
+
+                            PluginExecuteOutcome restartOutcome = PluginHost.ExecutePluginAction(restartProbe);
+                            bool recovered = PluginHost.TryGetAction(restartFullId, out _);
+
+                            Line($"  重启后按下动作：Handled={restartOutcome.Handled}，Success={restartOutcome.Success}，" +
+                                $"惰性加载后目录内动作={PluginHost.Catalog.SnapshotActionIds().Count} 个");
+
+                            if (!recovered)
+                            {
+                                Fail("重启等价态",
+                                    $"按下动作后插件仍未被拉起、贡献点仍不在目录里：{restartFullId}。" +
+                                    $"执行结论：{restartOutcome.Message}");
+                            }
+                        }
+                    }
+
                     // ⑥ 收拾干净：停用 → 等 ALC 回收结论 → 卸载 → 删掉扫描目录
                     //
                     // 顺序和 [5]/[6] 一致，不能省掉「等回收」这一步：插件程序集还挂在

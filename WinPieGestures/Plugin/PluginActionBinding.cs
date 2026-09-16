@@ -49,8 +49,11 @@ internal static class PluginActionBinding
         PluginActionRef? reference = action?.PluginActionRef;
         if (reference == null || !reference.IsValid) return null;
 
-        // 查一次注册表：贡献点仍在才返回，否则下拉框会显示一个「不存在的选项」。
-        return PluginHost.TryGetAction(reference.FullId, out _) ? reference.FullId : null;
+        // 判据与 IsReferenceBroken 共用同一个：插件只要「已启用」就该如实投影出来，
+        // 哪怕它还没被惰性加载。改查目录的话，每次重启后都会把用户选过的动作投影成「没选过」。
+        return PluginHost.IsContributionExpected(reference.PluginId, reference.FullId)
+            ? reference.FullId
+            : null;
     }
 
     /// <summary>动作是否已选定一个<b>当前可用</b>的插件动作。</summary>
@@ -62,13 +65,19 @@ internal static class PluginActionBinding
     /// 与「从未选定」严格区分：前者要报警，后者只是中间态。
     /// 用户「先配好图标和名称、再把插件停用」是很常见的操作，那条配置不该被静默丢弃。
     /// </para>
+    /// <para>
+    /// <b>判据必须问登记表，不能只问贡献点目录。</b> 目录在插件未加载时本来就是空的，
+    /// 而「已启用但尚未惰性加载」是每次重启后的<b>正常状态</b> —— 只查目录会把所有配置
+    /// 在重启后一律标成「已失效」，用户什么都没做却看到配置像丢了。
+    /// 详见 <see cref="PluginHost.IsContributionExpected"/>。
+    /// </para>
     /// </summary>
     public static bool IsReferenceBroken(ActionItem? action)
     {
         PluginActionRef? reference = action?.PluginActionRef;
         if (reference == null || !reference.IsValid) return false;
 
-        return !PluginHost.TryGetAction(reference.FullId, out _);
+        return !PluginHost.IsContributionExpected(reference.PluginId, reference.FullId);
     }
 
     // ------------------------------------------------------------------ 写路径
@@ -163,6 +172,11 @@ internal static class PluginActionBinding
 
         try
         {
+            // 贡献点目录里只有「已加载」插件的条目，而插件默认是惰性加载的 ——
+            // 不先把已启用的插件拉起来，这个列表在重启后就是空的：
+            // 用户会看到「一个插件动作都选不了」，而他的配置明明还引用着它们。
+            PluginHost.EnsureEnabledPluginsLoaded();
+
             List<PluginActionRegistration> registrations = PluginHost.GetRegisteredActions();
             if (registrations.Count == 0) return items;
 
