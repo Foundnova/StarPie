@@ -75,7 +75,7 @@ internal sealed class BuiltinActionRegistration
 	/// </para>
 	/// </summary>
 	public Func<ActionItem, Dictionary<string, string>> ProjectParameters { get; init; } =
-		_ => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+		BuiltinActionCatalog.SeedFromExtensionData;
 }
 
 /// <summary>
@@ -147,15 +147,22 @@ internal static class BuiltinActionCatalog
 	{
 		var list = new List<BuiltinActionRegistration>
 		{
-			// 本批收敛的是「顶层动作类型」里参数面最清晰的一批：单层参数、无子模式。
-			// 尚未收敛的 Ocr / ShellTool / System / WindowManager 留在原 switch 分支上，
-			// 它们的参数要么是空、要么是从预设表里挑一个、要么是「子模式 + 每个子模式各自的参数」，
-			// 用声明式 schema 表达要先想清楚取舍（见 BuiltinActionWebUrl 里关于条件显示的说明）。
+			// 顶层动作类型里参数面最清晰的一批：单层参数、无子模式。
 			BuiltinActionHotkey.Create(),
 			BuiltinActionLaunch.Create(),
 			BuiltinActionWebUrl.Create(),
 			BuiltinActionFolder.Create(),
 			BuiltinActionCommand.Create(),
+			BuiltinActionOcr.Create(),
+			BuiltinActionSystem.Create(),
+			BuiltinActionShellTool.Create(),
+
+			// 尚未收敛的是窗口类动作（Tile / TileCycle / TileRestore / SwitchWindow /
+			// MoveMonitor / ToggleTopmost / WindowOpacity）与 Text。
+			// 它们的 Parameter 里编码的是「子模式 + 该子模式的取值」这种复合含义
+			// （例如 Tile 的 "2L" 表示左半屏、CycleParam 表示轮换），
+			// 拆成声明式 schema 之前得先想清楚这套编码要不要一并改掉 ——
+			// 那是另一件事，不塞进这批里做。
 		};
 
 		var map = new Dictionary<string, BuiltinActionRegistration>(StringComparer.OrdinalIgnoreCase);

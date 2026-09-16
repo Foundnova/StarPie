@@ -495,7 +495,7 @@ internal static class PluginSelfTest
             Line("");
             Line("[3f] 内建动作批量接缝（注册 / 别名 / 投影 / 校验）");
 
-            var builtinCases = new (string Type, string? Alias, ActionItem Probe, int Fields, string Key, string Expect, string EmptyLabel)[]
+            var builtinCases = new (string Type, string? Alias, ActionItem Probe, int Fields, string? Key, string Expect, string EmptyLabel)[]
             {
                 ("Hotkey", null,
                     new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
@@ -512,6 +512,20 @@ internal static class PluginSelfTest
                 ("Folder", "OpenFolder",
                     new ActionItem { Type = "Folder", Parameter = @"C:\probe\dir" },
                     1, "path", @"C:\probe\dir", "文件夹路径"),
+
+                ("System", null,
+                    new ActionItem { Type = "System", Parameter = "Minimize" },
+                    1, "preset", "Minimize", "系统功能"),
+
+                ("ShellTool", null,
+                    new ActionItem { Type = "ShellTool", Parameter = "copy_path" },
+                    1, "verb", "copy_path", "工具标识"),
+
+                // 无参数动作：Key 传 null，只验「已登记 + 参数声明确实为空」。
+                // 它没有必填项，也没有「空值」这一说 —— 硬套下面的必填 / 空值检查只会得到假失败。
+                ("Ocr", "ScreenOcr",
+                    new ActionItem { Type = "Ocr" },
+                    0, null, "", ""),
             };
 
             int builtinVerified = 0;
@@ -545,6 +559,28 @@ internal static class PluginSelfTest
                 {
                     Fail("内建动作参数", $"{caseType} 应声明 {caseFields} 个参数，实际 {caseReg.Contribution.Parameters.Count} 个");
                     continue;
+                }
+
+                if (caseKey == null)
+                {
+                    // 无参数动作到此为止。
+                    builtinVerified++;
+                    Line($"  {caseLabel}｜参数 0 项（无需参数）");
+                    continue;
+                }
+
+                // System 的选项是从 SlotViewModel 的预设表即时生成的。这条断言守的是
+                // 「将来有人图省事把它改回硬编码」—— 那样每加一个系统预设就会漏掉同步，
+                // 而且不会有任何报错，只是新预设在这个面板里选不到。
+                if (caseType == "System")
+                {
+                    int optionCount = caseReg.Contribution.Parameters[0].Options?.Count ?? 0;
+
+                    if (optionCount != SlotViewModel.SystemPresetList.Count)
+                    {
+                        Fail("内建动作参数",
+                            $"System 的选项数（{optionCount}）与预设表（{SlotViewModel.SystemPresetList.Count}）不一致 —— 预设表已不是唯一数据源");
+                    }
                 }
 
                 // 必填项漏标，统一表单就会放行空值，等于把静默失效的门重新打开。
@@ -583,6 +619,7 @@ internal static class PluginSelfTest
                 }
 
                 builtinVerified++;
+                Line($"  {caseLabel}｜参数 {caseFields} 项｜投影「{projectedValue}」✓｜必填 ✓｜空值拦截 ✓");
             }
 
             if (builtinVerified == builtinCases.Length)

@@ -1854,7 +1854,15 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteSystem(string presetName)
+	/// <summary>
+	/// 执行一个系统预设（最小化 / 关机 / 音量 …）。
+	/// <para>
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「系统控制」的实现
+	/// （<c>Plugins.BuiltinActions.BuiltinActionSystem</c>）现在也走这条路。
+	/// 与 <see cref="ExecuteCommand"/> 同理，统一的是动作形状，执行体不搬家。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteSystem(string presetName)
 	{
 		if (string.IsNullOrEmpty(presetName))
 		{
