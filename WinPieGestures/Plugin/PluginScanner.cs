@@ -50,6 +50,7 @@ internal static class PluginScanner
     private const string MetaCapabilities = "StarPiePluginCapabilities";
     private const string MetaLicense = "StarPiePluginLicense";
     private const string MetaHomepage = "StarPiePluginHomepage";
+    private const string MetaTypeClaims = PluginApi.TypeClaimsMetadataKey;
 
     // ------------------------------------------------------------------ 公开入口
 
@@ -58,7 +59,7 @@ internal static class PluginScanner
     /// 这是「手动选 .dll」产品语义的入口，必须能处理两种分发形态：
     /// ① 目录里带 <c>plugin.json</c>（推荐）；② 只有一枚裸 DLL（靠程序集元数据兜底）。
     /// </summary>
-    public static PluginScanResult ScanSelectedDll(string dllPath)
+    public static PluginScanResult ScanSelectedDll(string dllPath, bool allowReservedIdPrefix = false)
     {
         var result = new PluginScanResult
         {
@@ -121,9 +122,10 @@ internal static class PluginScanner
                 license: facts.MetadataLicense,
                 capabilities: SplitCapabilities(facts.MetadataCapabilities),
                 targetFramework: facts.TargetFrameworkRaw ?? PluginManifestReader.HostTargetFramework,
-                entryType: null);
+                entryType: null,
+                typeClaims: facts.MetadataTypeClaims);
 
-            if (!PluginManifestReader.Validate(manifest, out PluginScanFailure mf2, out string me2))
+            if (!PluginManifestReader.Validate(manifest, out PluginScanFailure mf2, out string me2, allowReservedIdPrefix))
             {
                 return Fail(result, mf2, me2);
             }
@@ -147,7 +149,13 @@ internal static class PluginScanner
     /// 识别一个<b>已安装</b>的插件目录。与 <see cref="ScanSelectedDll"/> 的区别是：
     /// 主程序集由清单的 <c>assembly</c> 字段（或命名约定）决定，而不是由用户选择。
     /// </summary>
-    public static PluginScanResult ScanInstalledPlugin(string pluginDirectory)
+    /// <param name="allowReservedIdPrefix">
+    /// 是否放行保留 ID 前缀。装载已登记的插件时传 <c>true</c>：
+    /// 这个 ID 在它进入系统那一刻（扫描 / 导入）已经查过一次，
+    /// 装载时复查只会让「装得上」与「起不来」同时成立。理由详见
+    /// <see cref="PluginManifestReader.Validate"/>。
+    /// </param>
+    public static PluginScanResult ScanInstalledPlugin(string pluginDirectory, bool allowReservedIdPrefix = false)
     {
         var result = new PluginScanResult
         {
@@ -167,7 +175,7 @@ internal static class PluginScanner
                 "插件目录里缺少 plugin.json。若这是手工放入的插件，请重新通过「从 .dll 安装」导入。");
         }
 
-        if (!PluginManifestReader.TryLoad(manifestPath, out PluginManifest manifest, out PluginScanFailure mf, out string me))
+        if (!PluginManifestReader.TryLoad(manifestPath, out PluginManifest manifest, out PluginScanFailure mf, out string me, allowReservedIdPrefix))
         {
             return Fail(result, mf, me);
         }
@@ -353,6 +361,7 @@ internal static class PluginScanner
                             case MetaCapabilities: facts.MetadataCapabilities = value; break;
                             case MetaLicense: facts.MetadataLicense = value; break;
                             case MetaHomepage: facts.MetadataHomepage = value; break;
+                            case MetaTypeClaims: facts.MetadataTypeClaims = value; break;
                         }
                     }
                     break;
@@ -844,6 +853,16 @@ internal static class PluginScanner
         public string? MetadataCapabilities;
         public string? MetadataLicense;
         public string? MetadataHomepage;
+
+        /// <summary>
+        /// 顶层动作类型的认领串（<c>"Command=command;Hotkey=hotkey"</c>）。
+        /// <para>
+        /// 这一段元数据是<b>整条认领链路的前提</b>：宿主必须在不加载程序集的前提下
+        /// 知道「<c>Type="Command"</c> 归谁」，才能决定启动时预加载哪个插件。
+        /// 读它靠的是既有的 PE 元数据解析，不触发任何托管代码执行。
+        /// </para>
+        /// </summary>
+        public string? MetadataTypeClaims;
 
         public readonly List<string> ContractTypes = new();
         public readonly List<string> EntryCandidates = new();

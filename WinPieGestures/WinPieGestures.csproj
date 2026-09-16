@@ -43,4 +43,43 @@
     <None Include="tray_icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    随包分发的动作包
+    ==================================================================
+    ReferenceOutputAssembly=false：主程序**不引用**它。这个方向是反的 ——
+    插件引用 SDK，宿主引用 SDK，宿主与插件之间没有任何类型引用。
+    这里只是借 MSBuild 的项目图让它跟着一起构建，再从它的产物里把那一枚 dll
+    放进 plugin\ 来源区（来源区的约定是「扁平，只放 .dll」）。
+
+    为什么必须有这一步：plugin\ 目录在磁盘上一项都不存在时，
+    AutoInstallBundledPlugins 会直接返回 0，随包动作包于是永远不会被装上 ——
+    表现是「配置里配好的启动程序扇区，触发时提示找不到提供方」。
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\plugins\StarPie.Plugin.BasicActions\StarPie.Plugin.BasicActions.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- 随包动作包的产物目录。跟着宿主的 Configuration 走，避免 Debug/Release 混用。 -->
+    <BundledPluginOutputRoot>$(MSBuildThisFileDirectory)..\plugins\StarPie.Plugin.BasicActions\bin\$(Configuration)\net8.0-windows\</BundledPluginOutputRoot>
+  </PropertyGroup>
+
+  <Target Name="CopyBundledPlugins" AfterTargets="Build">
+    <ItemGroup>
+      <BundledPluginPayload Include="$(BundledPluginOutputRoot)StarPie.Plugin.BasicActions.dll" />
+    </ItemGroup>
+    <!--
+      只拷这一枚 dll。刻意不做「整个目录一扫全拷」：那会把
+      StarPie.Plugin.Abstractions.dll 之类的东西一并塞进来源区，
+      而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
+    -->
+    <Copy SourceFiles="@(BundledPluginPayload)"
+          DestinationFolder="$(OutDir)plugin"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(BundledPluginPayload.FullPath)')" />
+  </Target>
+
 </Project>

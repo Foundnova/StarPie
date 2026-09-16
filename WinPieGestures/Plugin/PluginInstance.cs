@@ -177,7 +177,10 @@ internal sealed class PluginInstance
         try
         {
             // ① 加载前重新静态识别一次：文件可能在上次识别之后被替换或损坏
-            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(Directory);
+            //    allowReservedIdPrefix: true —— 这枚插件已经登记在册，它的 ID 在进入系统
+            //    那一刻（扫描 / 导入）就查过保留前缀了。装载时复查会让随包插件
+            //    「装得上、永远起不来」，是本项目最忌讳的那种自相矛盾。
+            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(Directory, allowReservedIdPrefix: true);
             if (!scan.Accepted)
             {
                 LastError = scan.DescribeFailure();

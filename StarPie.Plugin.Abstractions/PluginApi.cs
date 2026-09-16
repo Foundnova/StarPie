@@ -28,6 +28,25 @@ public static class PluginApi
     /// </summary>
     public const string ActionTypeName = "Plugin";
 
+    /// <summary>
+    /// 顶层动作类型认领的<b>程序集元数据键</b>。
+    /// <para>
+    /// 宿主需要<b>在不加载程序集的前提下</b>知道「用户配置里的 <c>Type="Command"</c> 归哪个插件」——
+    /// 这决定了启动时该预加载谁，也决定了轮盘触发时能不能避免一次几百毫秒的现场加载。
+    /// 裸 DLL 的识别本来就走静态元数据读取，认领声明搭同一班车即可，代价是几微秒的字节读。
+    /// </para>
+    /// <para>
+    /// 值形如 <c>"Command=command;Hotkey=hotkey;WebUrl=webUrl"</c> —— 分号分隔的
+    /// <c>顶层类型名=插件内短 ID</c> 对。写成显式配对而不是只列类型名，
+    /// 是为了不去猜「第几个类型对应第几个贡献点」这种顺序假设。
+    /// </para>
+    /// <para>
+    /// <b>只有随包分发的插件可以认领</b>（见 <see cref="ReservedIdPrefixes"/> 的同一动机）：
+    /// 否则任何第三方插件都能声明自己认领 <c>"Command"</c>，把用户配好的命令行扇区整体接管过去。
+    /// </para>
+    /// </summary>
+    public const string TypeClaimsMetadataKey = "StarPiePluginTypeClaims";
+
     /// <summary>插件语言词条的完整 key 前缀，最终形如 <c>plugin.&lt;pluginId&gt;.&lt;key&gt;</c>。</summary>
     public const string I18nKeyPrefix = "plugin.";
 

@@ -197,6 +197,12 @@ internal static class PluginActionBinding
 
             foreach (PluginActionRegistration registration in registrations)
             {
+                // 被随包插件认领的顶层类型动作不进这个子下拉：它们已经出现在
+                // 「动作类型」主下拉里（用自己的 Type 名，如「启动程序」），
+                // 而两处的持久化形态完全不同（Type="Launch" vs Type="Plugin" + 引用）——
+                // 同一个动作在两个地方各配一次，会写出两套互不兼容的配置。
+                if (PluginHost.IsClaimedContribution(registration.FullId)) continue;
+
                 string pluginName = ResolvePluginDisplayName(registration.PluginId);
                 string groupName = nameCounts[pluginName] > 1
                     ? $"{pluginName} ({registration.PluginId})"

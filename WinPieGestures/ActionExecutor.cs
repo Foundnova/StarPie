@@ -284,7 +284,19 @@ public static class ActionExecutor
 				return;
 			}
 
-			// 走到这里，说明这个 Type 不在内建动作表里。只剩三类：
+			// 【随包动作包 · 顶层类型认领接缝】
+			// 认领了顶层类型的随包插件（如「基础动作包」认领 Launch / WebUrl / Folder）在
+			// 用户配置里仍然是 Type="Launch" 这种老形态，走不到下面 switch 的 "Plugin" 分支，
+			// 所以这一步必须在 switch 之前。
+			// 认领表在启动期就建好了（只读登记表，不加载任何程序集），这里只做一次字典命中 ——
+			// 轮盘触发路径上不允许出现任何 IO 或程序集加载。
+			if (Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginHost.PluginTypeClaimBinding claim))
+			{
+				ExecuteClaimedActionItem(action, claim);
+				return;
+			}
+
+			// 走到这里，说明这个 Type 既不在内建动作表里，也没被任何随包插件认领。只剩三类：
 			//
 			//   一、尚未收敛的动作。目前只有 Text / String —— 它不在「动作类型」下拉的
 			//       九个顶层类型里，是给二级子动作与程序化场景用的。
@@ -313,6 +325,15 @@ public static class ActionExecutor
 				// PluginHost.ExecutePluginAction 内部保证不抛异常：绝不能让插件异常冒泡到本方法末尾的
 				// catch —— 那里会弹 MessageBox，在无人值守时会把整个动作线程卡死在弹窗上。
 				ExecutePluginActionItem(action);
+				break;
+			default:
+				// 【必须出声】认领链路上唯一剩下的洞：配置里写着一个谁都不认识的 Type。
+				// 从前这里是一条 break —— 用户按下去什么都不会发生，也没有任何提示，
+				// 正是那种「界面一切正常、行为却悄悄退化」的静默失效。
+				// 需要提醒的是：<b>占位扇区走不到这里</b> —— 未配置的新扇区 Type 是 "Hotkey"，
+				// 而 Hotkey 刻意留在内建动作表里（理由见 BuiltinActionCatalog.Build），
+				// 所以这里报出来的一定是真正的异常配置。
+				ReportUnknownActionType(action);
 				break;
 			}
 		}
@@ -411,20 +432,84 @@ public static class ActionExecutor
 			return;
 		}
 
+		ReportPluginOutcome(outcome, action, $"Ref='{action.PluginActionRef}'");
+	}
+
+	/// <summary>
+	/// 【随包动作包】认领了顶层类型的动作的执行包装。
+	/// <para>
+	/// 与 <see cref="ExecutePluginActionItem"/> 共用同一个结果上报（<see cref="ReportPluginOutcome"/>）：
+	/// 走到这里时，动作代码已经是一段<b>进程内运行的独立程序集</b>，
+	/// 对失败的诉求与社区插件完全一致 —— 走日志 + 托盘气泡，绝不弹 MessageBox 打断用户。
+	/// 这一条是与「内建动作」的分界线，不是与「插件动作」的。
+	/// </para>
+	/// <para>
+	/// 参数投影由 <see cref="Plugins.ActionParameterProjection"/> 在宿主内完成，
+	/// 所以这个动作包读到的参数与它当年作为内建动作时是同一份值 ——
+	/// 这是「外移」在用户侧完全不可见的前提。
+	/// </para>
+	/// </summary>
+	private static void ExecuteClaimedActionItem(ActionItem action, Plugins.PluginHost.PluginTypeClaimBinding claim)
+	{
+		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecuteClaimedAction(action, claim);
+
+		if (!outcome.Handled)
+		{
+			AppLogger.LogWarn(
+				$"Claimed action not handled: Type='{action.Type}', Claim='{claim.FullId}'");
+			return;
+		}
+
+		ReportPluginOutcome(outcome, action, $"Type='{action.Type}' → {claim.FullId}");
+	}
+
+	/// <summary>
+	/// 插件侧执行结果的统一上报。两条路径（社区插件 / 认领类型）共用，
+	/// 于是「成功写什么、失败提示什么」永远只有一处定义。
+	/// </summary>
+	private static void ReportPluginOutcome(
+		Plugins.PluginExecuteOutcome outcome,
+		ActionItem action,
+		string subject)
+	{
 		if (outcome.QueuedToBackground)
 		{
-			AppLogger.LogInfo($"Plugin action queued to background: {action.PluginActionRef}, Name='{action.Name}'");
+			AppLogger.LogInfo($"Plugin action queued to background: {subject}, Name='{action.Name}'");
 			return;
 		}
 
 		if (outcome.Success)
 		{
-			AppLogger.LogInfo($"Plugin action succeeded: {action.PluginActionRef}");
+			AppLogger.LogInfo($"Plugin action succeeded: {subject}");
 			return;
 		}
 
-		AppLogger.LogWarn($"Plugin action failed: {action.PluginActionRef}, Reason='{outcome.Message}'");
-		Plugins.PluginHost.NotifyUser("插件动作执行失败", outcome.Message);
+		AppLogger.LogWarn($"Plugin action failed: {subject}, Reason='{outcome.Message}'");
+		Plugins.PluginHost.NotifyUser("动作执行失败", outcome.Message);
+	}
+
+	/// <summary>
+	/// 报告一个<b>谁都不认识</b>的动作类型。
+	/// <para>
+	/// 这一类从前是彻底静默的：<c>switch</c> 无匹配分支直接落空，用户按下扇区、
+	/// 什么都不发生、也没有任何提示，日志里也只有一行「Executing Action」。
+	/// 它是最难自查的一类缺陷 —— 所以这里既写 Warn 也发托盘提示。
+	/// </para>
+	/// <para>
+	/// 典型成因有三：配置文件被手工改错；从旧版本导入了本机已不再提供的动作；
+	/// 或者某个随包动作包被<b>卸载</b>后配置仍引用它的动作（正常路径下不会发生 ——
+	/// 随包插件不可卸载、只可停用，而停用会走另一条明确报错的路径）。
+	/// </para>
+	/// </summary>
+	private static void ReportUnknownActionType(ActionItem action)
+	{
+		AppLogger.LogWarn(
+			$"Unknown action type: Type='{action.Type}', Name='{action.Name}', Param='{action.Parameter}'.");
+
+		Plugins.PluginHost.NotifyUser(
+			"无法识别的动作类型",
+			$"动作「{action.Name}」的类型 \"{action.Type}\" 无法识别，本次触发没有执行任何操作。" +
+			"请到「设置 → 手势与动作」重新为该扇区选择一个动作。");
 	}
 
 	public static bool TryToggleProcessWindow(string processOrExePath)

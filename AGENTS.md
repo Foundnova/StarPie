@@ -107,6 +107,8 @@ g:\Users\2 Better\Desktop\design\
 │   ├── PluginManifest.cs          # plugin.json 清单模型
 │   ├── PluginMetadata.cs          # 程序集元数据兜底模型
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
+├── plugins/                       # ★ 随包动作包（与主程序同源构建，随发行包分发到 程序目录\plugin\）
+│   └── StarPie.Plugin.BasicActions/  # S1：启动程序 / 打开网址 / 打开文件夹（认领顶层类型 Launch / WebUrl / Folder）
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
 │   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
@@ -231,10 +233,23 @@ g:\Users\2 Better\Desktop\design\
   3. 覆盖安装裸 DLL 前要**清掉上一次的载荷**（程序集与清单），否则目录里留下两枚业务 dll 会让「唯一业务 dll」的识别约定失效；但必须**保留 `data\` 与 `settings.json`** —— 更新一次版本不该清空用户数据。
 - **`PluginInstance` 的两个目录属性不能混用**：`ManagedDirectory` 是宿主拥有的安装目录（删除/改名/写入只能用它）；`Directory` 仅供展示（外部路径登记时返回 `ExternalPath` **所在目录**）。历史上只有 `Directory` 一个属性，而外部登记分支返回的其实是**dll 文件路径**，当时只是靠 `Directory.Exists(文件路径)` 恒为 `false` 才「恰好」没把开发者的输出目录删掉。现在 `Uninstall` 走 `IsExternal` 分支：外部登记只摘登记、不碰磁盘。
 - **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
-- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
+- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 真实调用 → 停用并核对 ALC 回收 → 卸载 → 顶层类型认领（`[3i]`）→ 环境还原。
   - **自检整体跑在临时沙箱里**：`PluginPaths.OverrideRootsForTesting` 会把两个根目录钉到 `%TEMP%\StarPie-PluginSelfTest-<随机>\`，跑完即删。**`Configure` 见到根目录已被钉住必须直接返回**，否则沙箱会被覆盖回真实目录，自检就成了「每跑一次回归就动一次用户已装插件」。
   - **附加 `--skip-invoke` 可跳过第 [4] 段真实调用**：那一节会真的下发键鼠/调节系统状态（实测会把屏幕亮度推高 10%）。日常只关心识别、注册与接缝结论的回归应带上这个开关。
   - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
+  - **等待 ALC 回收结论的代码，绝不能和持有插件侧对象的代码处在同一个栈帧上**。`PluginActionRegistration` 指向插件程序集里的类型实例，是本栈帧的 GC 根；它还活着时结论永远是「需要重启」，文件锁不释放，而**删沙箱恰恰发生在 `Run` 内部** —— 于是每跑一次自检就在 `%TEMP%` 里留下一坨删不掉的 `.pending-delete` 残留。这就是 `RunEnableAndInvoke` / `RunRestartEquivalenceProbe` / `RunTypeClaimChecks` 全部标注 `[MethodImpl(MethodImplOptions.NoInlining)]` 的唯一理由；新增自检段时请照此办理。删沙箱前还要先催一次 GC 并退避重试（ALC 卸载是异步的，判定跑完不等于 CLR 已放开句柄）。
+- **顶层类型认领（Type Claim）：外移的内建动作如何对用户完全不可见**：
+  - **`ActionItem.Type` 是不可变身份**，全项目近两百处引用；要外移动作就必须让插件反过来声明「我负责哪些 `Type`」，而不是改配置形态。声明写在清单里（`StarPiePluginTypeClaims` 元数据，形如 `Launch=launch;WebUrl=webUrl`），落进登记表 `PluginRegistryEntry.ClaimedTypes`。
+  - **认领表必须在不加载任何程序集的前提下可建**（`RebuildClaimTable` 只读登记表）：轮盘首次触发路径上不允许出现 IO 或程序集加载。调用顺序上它必须在 `SyncFromDisk()` **之后** —— 实例由后者建立。
+  - **只有 `Bundled=true` 的随包插件能认领**。写入侧 `ClaimWire` 与读取侧 `RebuildClaimTable` 各拦一次（后者是因为 `registry.json` 是用户能手改的纯文本）。认领等于接管用户配置里的一整类动作，这个权力不给第三方。
+  - **内建优先**：仍留在 `BuiltinActionCatalog` 里的类型，任何认领一律拒绝 —— 同一 `Type` 挂两条执行路径（双轨制）正是这套机制要消除的东西。
+  - **`Hotkey` 永远不许外移**：它既是 `ActionItem.Type` 的默认值，也是未配置扇区的占位类型（`WheelLayer.EnsureLayers`）。外移之后用户一停用动作包，所有空扇区都会报「包已停用」。
+  - **多提供方整对拒绝**：两个插件抢同一个类型时全部丢弃并记 Error，绝不「后者覆盖前者」——那是静默劫持。
+  - **认领 ≠ 可用**：插件停用时认领仍留在表里，`IsClaimedTypeAvailable` 才判断此刻能不能干活并给出可操作文案。`ActionExecutor.Execute` 的认领接缝必须在 `switch` **之前**（认领类型走不到 `case "Plugin"`），`switch` 的 `default:` 必须出声报「无法识别的动作类型」而不是静默 `break`。
+  - **被认领的贡献点要从「🔌 插件」子下拉里排除**（`IsClaimedContribution`），否则同一个动作在两处都能配，而两处的持久化形态互不兼容（`Type="Launch"` vs `Type="Plugin"` + 引用）。
+  - **参数零迁移**：认领类型的动作在配置里仍是老形态，参数散在 `ActionItem` 裸字段上，由宿主 `ActionParameterProjection`（**显式白名单，不是反射**）现读现装成字典；键名的事实来源是 SDK 侧常量类 `HostActionFields`，用 `const` 是为了让宿主改名时插件侧变成**编译错误**而不是运行期读到空值。只投影动作参数，**不投影外观字段**（`Name` / `IconKey` / `CustomTextColor` …）。
+  - **保留 ID 前缀（`starpie.*` 等）的检查只在「进入系统」那一刻做**（扫描 / 导入），放行条件是「来自只读来源区」或「该插件已登记」。**装载路径不得复查**（`ScanInstalledPlugin(dir, allowReservedIdPrefix: true)`）—— 否则同一枚随包 DLL 会「装得上、永远起不来」，而报错还指着 ID 说事，与真实原因毫无关系。边界查一次，系统内部不复查。
+  - **认领类型的失败上报走插件路径**（日志 + 托盘气泡），**不弹 `MessageBox`**。判据是「代码是否在独立程序集里」，不是「是否官方」：内建动作是用户亲手配的，失败要立刻打断他；认领类型已是插件，异常冒泡到 `ActionExecutor.Execute` 的 `catch` 会把无人值守的动作线程卡死在对话框上。
 
 ---
 

@@ -57,6 +57,17 @@ internal sealed class PluginRegistryEntry
     /// </summary>
     public bool Bundled { get; set; }
 
+    /// <summary>
+    /// 本插件认领的顶层动作类型，形如 <c>"Command=command"</c>（见 <see cref="PluginTypeClaim.ToWire"/>）。
+    /// <para>
+    /// <b>为什么不现读程序集元数据</b>：这张表要在<b>启动最早期、且一个插件都没加载时</b>就可用 ——
+    /// 宿主靠它决定「配置里引用到的类型该预加载谁」，这是轮盘首次触发不产生几百毫秒停顿的前提。
+    /// 落在登记表里，读取就是一次 JSON 反序列化，与程序集完全解耦：
+    /// 宿主区的 DLL 被误删、正在被替换、或读取失败，都不影响「谁认领了什么」这个事实。
+    /// </para>
+    /// </summary>
+    public List<string> ClaimedTypes { get; set; } = new();
+
     public string? InstalledAt { get; set; }
 
     public PluginRegistryEntry Clone() => new()
@@ -79,6 +90,7 @@ internal sealed class PluginRegistryEntry
         AckedHostVersion = AckedHostVersion,
         Source = Source,
         Bundled = Bundled,
+        ClaimedTypes = new List<string>(ClaimedTypes),
         InstalledAt = InstalledAt,
     };
 }

@@ -148,6 +148,12 @@ internal static class PluginHost
             int bundledInstalled = AutoInstallBundledPlugins();
 
             int discovered = SyncFromDisk();
+
+            // 认领表必须在 SyncFromDisk 之后建：它读的是实例上的登记条目，
+            // 而实例是 SyncFromDisk 按登记表建立的。顺序反了这个表就是空的，
+            // 表现是「随包动作包明明装上了，配置里的 Command 却没人认领」。
+            RebuildClaimTable();
+
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
@@ -207,7 +213,10 @@ internal static class PluginHost
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(dllPath);
+            // 与候选扫描走同一条来源区判定。少了这一步会自相矛盾：同一枚随包 dll
+            // 放在来源区能被自动装上，手工选中它却被告知「占用了保留前缀」——
+            // 用户拿到的是两条互相打架的结论，而两条都出自同一个宿主。
+            return PluginScanner.ScanSelectedDll(dllPath, allowReservedIdPrefix: IsInOfficialSourceDirectory(dllPath));
         }
         catch (Exception ex)
         {
@@ -303,6 +312,7 @@ internal static class PluginHost
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
                     Bundled = options.Bundled,
+                    ClaimedTypes = ClaimWire(manifest, options.Bundled),
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -318,6 +328,10 @@ internal static class PluginHost
                 AppLogger.LogInfo(
                     $"[plugin] 已安装 {manifest.Id} v{manifest.Version}{source}，" +
                     $"SHA256={scan.Sha256Short}，签名={scan.IsSigned}，能力={string.Join(",", entry.CapabilitiesAck)}");
+
+                // 新装的插件可能带来认领（目前只有随包插件能成功认领，这里照常重算一次，
+                // 免得将来放宽这条规则时漏掉这个入口）。
+                RebuildClaimTable();
 
                 bool enabled = false;
                 if (options.EnableAfterInstall)
@@ -498,6 +512,298 @@ internal static class PluginHost
             $"[plugin] 随包插件 {existing.Id} 的宿主区文件缺失，已从程序目录补回" +
             $"（启用状态保持为 {existing.Enabled}，不因补文件而改变）");
         return true;
+    }
+
+    // ------------------------------------------------------------------ 顶层类型认领
+
+    /// <summary>
+    /// 一条已生效的认领：用户配置里 <c>Type="Launch"</c> 这个字符串由哪个插件的哪个贡献点负责。
+    /// </summary>
+    public readonly struct PluginTypeClaimBinding
+    {
+        /// <summary><see cref="ActionItem.Type"/> 的取值，如 <c>Launch</c>。</summary>
+        public string TypeName { get; init; }
+
+        /// <summary>认领它的插件 ID。</summary>
+        public string PluginId { get; init; }
+
+        /// <summary>认领它的贡献点全 ID，形如 <c>starpie.builtin.basicactions.launch</c>。</summary>
+        public string FullId { get; init; }
+    }
+
+    private static readonly object ClaimGate = new();
+
+    private static Dictionary<string, PluginTypeClaimBinding> s_claimedTypes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 重建顶层类型认领表。<b>幂等</b>，登记表或启用状态变动后随时可重跑。
+    /// <para>
+    /// <b>全程不加载任何程序集</b> —— 认领来自登记表里持久化的那一份字符串（见
+    /// <see cref="PluginRegistryEntry.ClaimedTypes"/>），读取就是一次反序列化。
+    /// 这是「轮盘首次触发不产生几百毫秒停顿」这条要求的前提：宿主必须在启动最早期、
+    /// 一个插件都还没加载时，就知道配置里引用到的类型该由哪个插件负责。
+    /// </para>
+    /// </summary>
+    public static void RebuildClaimTable()
+    {
+        var table = new Dictionary<string, PluginTypeClaimBinding>(StringComparer.OrdinalIgnoreCase);
+        var wanted = new List<WantedClaim>();
+        var rejected = new List<string>();
+
+        List<PluginRegistryEntry> entries;
+        lock (Gate)
+        {
+            entries = new List<PluginRegistryEntry>(Instances.Count);
+            foreach (PluginInstance instance in Instances.Values) entries.Add(instance.Entry);
+        }
+
+        foreach (PluginRegistryEntry entry in entries)
+        {
+            if (entry.ClaimedTypes == null || entry.ClaimedTypes.Count == 0) continue;
+
+            // 双保险：写入时已经拦过一次（ClaimWire），这里再拦一次是因为 registry.json
+            // 是用户能手改的纯文本文件，不能把「只有随包插件能认领」这条规则只押在写入路径上。
+            if (!entry.Bundled)
+            {
+                rejected.Add(
+                    $"插件 {entry.Id} 声明了 {entry.ClaimedTypes.Count} 项顶层类型认领，" +
+                    "但它不是随包插件 —— 整条拒绝");
+                continue;
+            }
+
+            foreach (string wire in entry.ClaimedTypes)
+            {
+                List<PluginTypeClaim> parsed = PluginTypeClaim.ParseAll(wire, out List<string> malformed);
+                if (parsed.Count != 1 || malformed.Count > 0)
+                {
+                    rejected.Add($"插件 {entry.Id} 的认领项 \"{wire}\" 格式非法，已跳过");
+                    continue;
+                }
+
+                PluginTypeClaim claim = parsed[0];
+
+                // "Plugin" 是社区插件动作的保留类型名，认领它会把两条完全不同的执行路径
+                // 挤到同一个 Type 上。
+                if (string.Equals(claim.TypeName, PluginApi.ActionTypeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    rejected.Add($"插件 {entry.Id} 试图认领保留类型名 \"{PluginApi.ActionTypeName}\"，已拒绝");
+                    continue;
+                }
+
+                // 内建动作优先：还留在 BuiltinActionCatalog 里的类型不许被认领。
+                // 否则同一个 Type 会同时挂着两条执行路径，哪条生效取决于调用顺序 ——
+                // 这正是整个改造要消除的「双轨制」本身。
+                if (BuiltinActionCatalog.TryGet(claim.TypeName, out BuiltinActionRegistration stillBuiltin))
+                {
+                    rejected.Add(
+                        $"插件 {entry.Id} 认领的 \"{claim.TypeName}\" 仍由内建动作 {stillBuiltin.FullId} 提供，" +
+                        "认领已拒绝");
+                    continue;
+                }
+
+                wanted.Add(new WantedClaim(claim.TypeName, entry.Id, $"{entry.Id}.{claim.ContributionId}"));
+            }
+        }
+
+        // 裁决阶段刻意与收集阶段分开：两个插件抢同一个类型时，先来的赢得毫无道理，
+        // 而后来的盖掉先来的更糟 —— 那是静默劫持。整对拒绝 + 一条 Error，
+        // 让这个错误在日志里一眼可见（它一定是打包错误，不是用户操作）。
+        foreach (IGrouping<string, WantedClaim> group in wanted.GroupBy(w => w.TypeName, StringComparer.OrdinalIgnoreCase))
+        {
+            List<WantedClaim> items = group.ToList();
+
+            if (items.Count > 1)
+            {
+                rejected.Add(
+                    $"类型 \"{group.Key}\" 被多个插件同时认领" +
+                    $"（{string.Join("、", items.Select(i => i.PluginId))}），已全部拒绝 —— " +
+                    "这属于打包错误，请只保留一个提供方");
+                continue;
+            }
+
+            WantedClaim item = items[0];
+            table[item.TypeName] = new PluginTypeClaimBinding
+            {
+                TypeName = item.TypeName,
+                PluginId = item.PluginId,
+                FullId = item.FullId,
+            };
+        }
+
+        lock (ClaimGate)
+        {
+            s_claimedTypes = table;
+        }
+
+        foreach (string message in rejected)
+        {
+            AppLogger.LogError($"[plugin] 顶层类型认领被拒绝：{message}");
+        }
+
+        if (table.Count > 0)
+        {
+            AppLogger.LogInfo(
+                $"[plugin] 顶层类型认领表已建立（{table.Count} 项）：" +
+                string.Join("、", table.Values.Select(b => $"{b.TypeName}→{b.PluginId}")));
+        }
+    }
+
+    private readonly struct WantedClaim
+    {
+        public WantedClaim(string typeName, string pluginId, string fullId)
+        {
+            TypeName = typeName;
+            PluginId = pluginId;
+            FullId = fullId;
+        }
+
+        public string TypeName { get; }
+        public string PluginId { get; }
+        public string FullId { get; }
+    }
+
+    /// <summary>
+    /// 查某个 <c>ActionItem.Type</c> 是否被随包插件认领。
+    /// <para>
+    /// <b>认领与可用是两件事</b>：插件被停用时这里照样返回 true（登记表里认领还在），
+    /// 于是调用方能把「动作所属的包被停用了」这句话说给用户听，
+    /// 而不是让这个扇区落进 switch 的无匹配分支、无声无息地什么都不做。
+    /// 可用性判断见 <see cref="IsClaimedTypeAvailable"/>。
+    /// </para>
+    /// </summary>
+    public static bool TryResolveClaimedType(string? type, out PluginTypeClaimBinding binding)
+    {
+        binding = default;
+        if (string.IsNullOrWhiteSpace(type)) return false;
+
+        Dictionary<string, PluginTypeClaimBinding> table;
+        lock (ClaimGate)
+        {
+            table = s_claimedTypes;
+        }
+
+        return table.TryGetValue(type!.Trim(), out binding);
+    }
+
+    /// <summary>当前生效的全部认领（界面与自检用）。</summary>
+    public static List<PluginTypeClaimBinding> SnapshotClaims()
+    {
+        lock (ClaimGate)
+        {
+            return new List<PluginTypeClaimBinding>(s_claimedTypes.Values);
+        }
+    }
+
+    /// <summary>某个插件认领的类型名（界面与自检用）；它没认领任何类型时返回空表。</summary>
+    public static List<string> ClaimedTypeNamesOf(string pluginId)
+    {
+        var names = new List<string>();
+        if (string.IsNullOrWhiteSpace(pluginId)) return names;
+
+        foreach (PluginTypeClaimBinding binding in SnapshotClaims())
+        {
+            if (string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            {
+                names.Add(binding.TypeName);
+            }
+        }
+
+        return names;
+    }
+
+    /// <summary>
+    /// 这个贡献点是不是「被认领的顶层类型」。
+    /// <para>
+    /// 用途只有一个：把它从插件动作子下拉里<b>排除掉</b>。被认领的动作已经出现在
+    /// 「动作类型」主下拉里（用它们自己的 Type 名），如果同时也列进「🔌 插件」子下拉，
+    /// 用户会在两个地方看到同一个动作，而它们的持久化形态完全不同
+    /// （一个是 <c>Type="Launch"</c>，另一个是 <c>Type="Plugin"</c> + 引用）——
+    /// 换个地方配同一个动作会写出两套不兼容的配置。
+    /// </para>
+    /// </summary>
+    public static bool IsClaimedContribution(string? fullId)
+    {
+        if (string.IsNullOrWhiteSpace(fullId)) return false;
+
+        foreach (PluginTypeClaimBinding binding in SnapshotClaims())
+        {
+            if (string.Equals(binding.FullId, fullId, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 认领某个类型的插件此刻<b>能不能干活</b>。不能时返回 false，并给出给用户看的原因。
+    /// <para>
+    /// 三种不可用：插件没登记、被用户停用、因连续出错被自动隔离。
+    /// 返回的 <paramref name="reason"/> 会原样显示给用户 —— 所以它必须说清「该怎么办」，
+    /// 而不是「不可用」三个字。
+    /// </para>
+    /// </summary>
+    public static bool IsClaimedTypeAvailable(string? type, out string reason)
+    {
+        reason = "";
+
+        if (!TryResolveClaimedType(type, out PluginTypeClaimBinding binding))
+        {
+            return true; // 不是认领类型，不归这里管
+        }
+
+        PluginInstance? instance = Find(binding.PluginId);
+        if (instance == null)
+        {
+            reason = $"该动作由随包插件「{binding.PluginId}」提供，但宿主里找不到它的登记记录。" +
+                     "请重启 StarPie；若仍不行，说明插件文件已损坏。";
+            return false;
+        }
+
+        if (!instance.Entry.Enabled)
+        {
+            reason = $"该动作属于内置动作包「{instance.Entry.Name}」，它当前已被停用。" +
+                     "到「设置 → 插件」重新启用即可恢复。";
+            return false;
+        }
+
+        if (instance.State == PluginRuntimeState.Quarantined)
+        {
+            reason = $"内置动作包「{instance.Entry.Name}」因连续出错被自动停用，已跳过本次执行。";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 把清单里的认领声明转成登记表用的线格式。
+    /// <para>
+    /// <b>非随包插件一律返回空表。</b> 认领顶层类型等于接管用户配置里的一整类动作 ——
+    /// 用户配好的启动项、网址、文件夹扇区会整体改由这个插件执行。
+    /// 这个权力只给随主程序一起分发、与宿主同一个构建产出的插件。
+    /// 不在这里拦的话，任何第三方插件都能声明自己认领 <c>"Launch"</c>。
+    /// </para>
+    /// </summary>
+    private static List<string> ClaimWire(PluginManifest manifest, bool bundled)
+    {
+        if (manifest.ClaimedTypes == null || manifest.ClaimedTypes.Count == 0)
+        {
+            return new List<string>();
+        }
+
+        if (!bundled)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] {manifest.Id} 声明了 {manifest.ClaimedTypes.Count} 项顶层类型认领，" +
+                "但它不是随包插件，认领已忽略。");
+            return new List<string>();
+        }
+
+        return manifest.ClaimedTypes
+            .Where(claim => !string.IsNullOrWhiteSpace(claim.TypeName)
+                         && !string.IsNullOrWhiteSpace(claim.ContributionId))
+            .Select(claim => claim.ToWire())
+            .ToList();
     }
 
     // ------------------------------------------------------------------ 启用 / 停用
@@ -780,26 +1086,44 @@ internal static class PluginHost
             return new PluginActionValidation();
         }
 
+        // 社区插件动作的参数来源固定是 ExtensionData。
+        // 认领了顶层类型的随包插件不走这里 —— 它的参数由宿主的字段投影器给出，
+        // 由 ExecuteClaimedAction 直接调下面那个按全 ID 校验的重载。
+        return ValidateActionParameters(action.PluginActionRef.FullId, action.ExtensionData ?? EmptyParameters);
+    }
+
+    /// <summary>
+    /// 按<b>贡献点全 ID + 一份参数</b>校验。
+    /// <para>
+    /// 存在这个重载是为了让两条执行路径（社区插件动作 / 认领类型）共用同一段校验，
+    /// 而不是各自组装一遍。参数从哪来是调用方的事，怎么判合不合规是这里的事。
+    /// </para>
+    /// <para>本方法<b>保证不抛异常</b>。</para>
+    /// </summary>
+    public static PluginActionValidation ValidateActionParameters(
+        string fullId,
+        IReadOnlyDictionary<string, string> parameters)
+    {
         try
         {
-            if (!Catalog.TryGetAction(action.PluginActionRef.FullId, out PluginActionRegistration registration))
+            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
             {
                 // 贡献点已不在目录里时不做参数校验。
                 // 真正的问题是「这个动作已经不可用」，此时报参数错误会把用户引向完全错误的方向。
                 return new PluginActionValidation();
             }
 
-            IReadOnlyDictionary<string, string> parameters = action.ExtensionData ?? EmptyParameters;
+            IReadOnlyDictionary<string, string> actual = parameters ?? EmptyParameters;
 
             // ① 宿主底线：只认 ParameterField 声明的约束，不依赖插件是否记得自查。
             List<PluginParameterIssue> declaredIssues =
-                PluginParameterValidator.Validate(registration.Parameters, parameters);
+                PluginParameterValidator.Validate(registration.Parameters, actual);
 
             // ② 插件自定义：处理声明表达不了的规则（例如「起止时间不能相同」）。
             string? pluginMessage = null;
             try
             {
-                string? result = registration.Contribution.Validate(parameters);
+                string? result = registration.Contribution.Validate(actual);
                 if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result!.Trim();
             }
             catch (Exception ex)
@@ -839,18 +1163,62 @@ internal static class PluginHost
             return PluginExecuteOutcome.NotHandled;
         }
 
+        PluginActionRef reference = action.PluginActionRef;
+
+        // 社区插件动作的参数一律来自 ExtensionData：键由插件自己起语义化名字，
+        // 宿主一个都不知道，也不该知道。
+        Dictionary<string, string> parameters = action.ExtensionData != null
+            ? new Dictionary<string, string>(action.ExtensionData, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        return ExecuteRegisteredAction(reference.PluginId, reference.FullId, action.Name, parameters);
+    }
+
+    /// <summary>
+    /// <b>认领了顶层类型的随包插件</b>的执行入口。
+    /// <para>
+    /// 与 <see cref="ExecutePluginAction"/> 只差一件事：参数从哪来。
+    /// 认领类型的动作在用户配置里仍然是 <c>Type="Launch"</c> 这种老形态，参数散在
+    /// <see cref="ActionItem"/> 的裸字段上，所以走宿主的字段投影器现读现装
+    /// （见 <see cref="ActionParameterProjection"/>）。除此之外，找实例 → 必要时拉起 →
+    /// 查目录 → 校验 → 调用，与社区插件动作是<b>同一条</b>链路。
+    /// </para>
+    /// </summary>
+    public static PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding)
+    {
+        if (action == null) return PluginExecuteOutcome.NotHandled;
+
+        string displayName = string.IsNullOrWhiteSpace(action.Name) ? binding.TypeName : action.Name;
+
+        return ExecuteRegisteredAction(
+            binding.PluginId,
+            binding.FullId,
+            displayName,
+            ActionParameterProjection.Project(action));
+    }
+
+    /// <summary>
+    /// 插件贡献点的统一执行链路，两条入口（社区插件 / 认领类型）共用。
+    /// <para>
+    /// 这个方法<b>保证不抛异常</b>，并且绝不把插件异常冒泡给 <see cref="ActionExecutor.Execute"/> ——
+    /// 因为那里的 <c>catch</c> 会弹 <c>MessageBox</c>，在无人值守时会把动作线程卡死。
+    /// </para>
+    /// </summary>
+    private static PluginExecuteOutcome ExecuteRegisteredAction(
+        string pluginId,
+        string fullId,
+        string displayName,
+        Dictionary<string, string> parameters)
+    {
         try
         {
-            PluginActionRef reference = action.PluginActionRef;
-            string fullId = reference.FullId;
-
             // 【顺序至关重要】必须先找到实例、必要时把它拉起来，再去查贡献点目录。
             // 反过来的话会得出一个**错误归因**的结论：目录里查不到 ≠「插件没了」，
             // 也可能是「插件已启用、只是还没被惰性加载」—— 而惰性加载恰恰是本设计
             // 为了守住内存红线（R1）刻意做的。
             // 曾经这里的顺序是反的，于是每次重启后用户配好的插件动作都会拿到一句
             // 「插件可能已被禁用或卸载」，而插件其实好好的 —— 100% 复现的假故障。
-            PluginInstance? instance = Find(reference.PluginId);
+            PluginInstance? instance = Find(pluginId);
 
             if (instance == null)
             {
@@ -858,7 +1226,7 @@ internal static class PluginHost
                 {
                     Handled = true,
                     Success = false,
-                    Message = $"插件「{reference.PluginId}」未安装。",
+                    Message = $"插件「{pluginId}」未安装。",
                 };
             }
 
@@ -875,8 +1243,8 @@ internal static class PluginHost
                 }
 
                 // 惰性加载：Enabled 但尚未加载（内存红线的代价就是首次调用要额外等一次加载）
-                AppLogger.LogInfo($"[plugin] 首次引用触发惰性加载：{reference.PluginId}");
-                if (!Enable(reference.PluginId, out string loadError))
+                AppLogger.LogInfo($"[plugin] 首次引用触发惰性加载：{pluginId}");
+                if (!Enable(pluginId, out string loadError))
                 {
                     return new PluginExecuteOutcome
                     {
@@ -895,7 +1263,7 @@ internal static class PluginHost
                 {
                     Handled = true,
                     Success = false,
-                    Message = $"插件「{instance.Entry.Name}」没有提供动作「{action.Name}」（{fullId}）。" +
+                    Message = $"插件「{instance.Entry.Name}」没有提供动作「{displayName}」（{fullId}）。" +
                               "插件版本可能已变化，请重新编辑该槽位。",
                 };
             }
@@ -913,7 +1281,7 @@ internal static class PluginHost
             // 参数校验：与设置面板共用同一个入口。
             // 这样「保存时通过」与「执行时通过」永远是同一个判断，
             // 不会出现用户填好参数、存下了、触发却说不合法的情况。
-            PluginActionValidation validation = ValidateActionParameters(action);
+            PluginActionValidation validation = ValidateActionParameters(fullId, parameters);
             if (!validation.IsValid)
             {
                 return new PluginExecuteOutcome
@@ -926,11 +1294,12 @@ internal static class PluginHost
 
             // 交给插件的是参数的一份拷贝：即使它在 ExecuteAsync 里改写字典，
             // 也污染不到用户正在编辑的配置对象。
-            Dictionary<string, string> parameters = action.ExtensionData != null
-                ? new Dictionary<string, string>(action.ExtensionData, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            return PluginInvoker.Invoke(instance, registration, parameters);
+            // （上游两处已经各建了一份字典，这里再拷一次是刻意的 —— 它让「拷贝」这件事
+            //   只依赖本方法的入参，将来多一个入口也不会漏。）
+            return PluginInvoker.Invoke(
+                instance,
+                registration,
+                new Dictionary<string, string>(parameters, StringComparer.OrdinalIgnoreCase));
         }
         catch (Exception ex)
         {
@@ -1446,7 +1815,7 @@ internal static class PluginHost
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(file);
+            return PluginScanner.ScanSelectedDll(file, allowReservedIdPrefix: IsInOfficialSourceDirectory(file));
         }
         catch (Exception ex)
         {
@@ -1458,6 +1827,56 @@ internal static class PluginHost
                 Failure = PluginScanFailure.NotDotNetAssembly,
                 ErrorDetail = ex.Message,
             };
+        }
+    }
+
+    /// <summary>
+    /// 这枚文件是不是躺在<b>随程序分发的只读来源区</b>里（<c>&lt;程序目录&gt;\plugin\</c>）。
+    /// <para>
+    /// 用途只有一个：让来自来源区的清单放行保留 ID 前缀（官方包用 <c>starpie.*</c> 命名，
+    /// 这正是保留命名空间的用途）。用户自己挑的 dll、以及开发者登记的外部路径一律为 false，
+    /// 于是社区插件照旧拿不到官方命名空间。
+    /// </para>
+    /// <para>
+    /// 判定同时接受「当前生效的来源区」（<see cref="PluginPaths.ScanRoot"/>）与
+    /// 「主程序目录下的 <c>plugin\</c>」—— 前者是为了让自检的沙箱能真实模拟来源区，
+    /// 后者是规则的本义。两者在正常运行时是同一个目录。
+    /// </para>
+    /// </summary>
+    private static bool IsInOfficialSourceDirectory(string file)
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(Path.GetFullPath(file));
+            if (string.IsNullOrEmpty(directory)) return false;
+
+            directory = Path.TrimEndingDirectorySeparator(directory);
+
+            // 两个候选，任一命中即可：
+            //
+            //   ① 当前生效的来源区（PluginPaths.ScanRoot）。自检会把根目录钉到临时沙箱，
+            //      那时沙箱里的 plugin\ 正是「我们正在模拟的那个来源区」，必须算 ——
+            //      否则随包安装这条路径在自检里根本跑不起来。
+            //   ② 主程序目录下的 plugin\。这是规则的本义。用 BaseDirectory 而不是 ScanRoot，
+            //      是因为即便根目录被重定向，真实程序目录里的那一份仍然是随包分发的那一份；
+            //      用户跑 --plugin-selftest 时指的通常也正是它。
+            if (PluginPaths.ScanRootExists
+                && string.Equals(
+                    directory,
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(PluginPaths.ScanRoot)),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string programSourceRoot = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, PluginPaths.ScanDirectoryName)));
+
+            return string.Equals(directory, programSourceRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1639,7 +2058,10 @@ internal static class PluginHost
                 PluginPaths.Root,
                 string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
 
-            return PluginScanner.ScanInstalledPlugin(directory);
+            // 已登记的插件：保留前缀在它进入系统那一刻就查过了，这里不再复查。
+            // 「扫描时放行、装载时拒绝」会让随包插件装得上却永远起不来，
+            // 而错误信息指着 ID 说事，与真实原因毫无关系。
+            return PluginScanner.ScanInstalledPlugin(directory, allowReservedIdPrefix: true);
         }
         catch (Exception ex)
         {
@@ -1793,8 +2215,16 @@ internal static class PluginHost
         }
     }
 
+    /// <summary>
+    /// 登记表或启用状态变了。所有变更路径（安装 / 启用 / 停用 / 卸载）都汇聚到这里，
+    /// 于是「变更之后要重算什么」只有这一处需要维护。
+    /// </summary>
     private static void NotifyPluginSetChanged()
     {
+        // 认领表必须跟着登记表走：卸载一个随包动作包之后，它认领的那些 Type
+        // 若还留在表里，宿主会继续按「已停用」去解释它们 —— 而插件其实已经不存在了。
+        RebuildClaimTable();
+
         try
         {
             ConfigManager.MarkConfigurationChanged();
