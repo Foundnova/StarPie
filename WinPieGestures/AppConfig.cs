@@ -83,7 +83,7 @@ public class AppConfig
 
 	public double OuterEscapeDistance { get; set; } = 186.0;
 
-	public string AppTheme { get; set; } = "System";
+	public string AppTheme { get; set; } = "Light";
 
 	/// <summary>设置控制台界面整体缩放比例（1.0 = 100%，有效范围 0.8 ~ 2.0，按 5% 步进对齐）。</summary>
 	public double SettingsUiScale { get; set; } = 1.0;
@@ -96,13 +96,13 @@ public class AppConfig
 	public bool EnableMultiTier { get; set; } = true;
 
 	/// <summary>当启用外圈子环二级菜单时，呼出轮盘是否直接同时展开所有一二级轮盘（无需划出触发距离）。</summary>
-	public bool AutoExpandSubRingsOnPopup { get; set; } = true;
+	public bool AutoExpandSubRingsOnPopup { get; set; } = false;
 
 	/// <summary>在设置控制台拖拽对调一级扇区时，是否连同其绑定的二级级联子动作一块换位（默认 true）。</summary>
 	public bool LinkSubActionsWhenDragging { get; set; } = true;
 
-	/// <summary>动作配置交互画布是否开启“图文并茂”复合展示（即使未配置自定义图标，也直观呈现动作名称文本，默认 true）。</summary>
-	public bool MappingsCanvasShowText { get; set; } = true;
+	/// <summary>动作配置交互画布是否开启“图文并茂”复合展示（即使未配置自定义图标，也直观呈现动作名称文本，默认关闭）。</summary>
+	public bool MappingsCanvasShowText { get; set; } = false;
 
 	/// <summary>手势动作页（Tab 2）右侧交互画布列宽度（0 表示自适应比例 1*，大于 0 表示用户自定义拖拽宽度）。</summary>
 	public double MappingsCanvasColumnWidth { get; set; } = 0.0;
@@ -147,7 +147,7 @@ public class AppConfig
 
 	public double SubWheelRadiusRatio { get; set; } = 1.55;
 
-	public double SubWheelTriggerDistance { get; set; } = 95.0;
+	public double SubWheelTriggerDistance { get; set; } = 141.0;
 	/// <summary>音量拖距调音：缩回中心取消的迟滞系数（触发距离 × 该系数）。越大需缩回越多才取消，防止边缘抖动误取消。</summary>
 	public double VolumeCancelHysteresisRatio { get; set; } = 0.6;
 
@@ -157,31 +157,31 @@ public class AppConfig
 	/// <summary>音量拖距调音：甩出取消的单帧距离跳变阈值（px）。超过此值视为快速甩动。</summary>
 	public double VolumeFlickCancelDistance { get; set; } = 120.0;
 
-	public double SubWheelOuterRadius { get; set; } = 210.0;
+	public double SubWheelOuterRadius { get; set; } = 196.0;
 
-	public double SubWheelInnerGap { get; set; } = 4.0;
+	public double SubWheelInnerGap { get; set; } = 7.0;
 
-	public double SubWheelCornerRadius { get; set; } = 4.0;
+	public double SubWheelCornerRadius { get; set; } = 14.0;
 
-	public double SubWheelIconSize { get; set; } = 18.0;
+	public double SubWheelIconSize { get; set; } = 16.0;
 
 	public double SubWheelFontSize { get; set; } = 9.5;
 
 	public bool UseIndependentSubWheelTheme { get; set; }
 
-	public string SubWheelUiStyle { get; set; } = "ClassicRing";
+	public string SubWheelUiStyle { get; set; } = "FollowPrimary";
 
 	public string SubWheelTheme { get; set; } = "FollowPrimary";
 
 	public string SubWheelCustomSectorBg { get; set; } = "#9016161A";
 
-	public string SubWheelCustomSectorBorder { get; set; } = "#35FFFFFF";
+	public string SubWheelCustomSectorBorder { get; set; } = "#FFAF9DA2";
 
-	public string SubWheelCustomHighlightBg { get; set; } = "#E06C4DFF";
+	public string SubWheelCustomHighlightBg { get; set; } = "#FF2563EB";
 
-	public string SubWheelCustomHighlightBorder { get; set; } = "#A0FFFFFF";
+	public string SubWheelCustomHighlightBorder { get; set; } = "#FF60A5FA";
 
-	public string SubWheelCustomText { get; set; } = "#E0FFFFFF";
+	public string SubWheelCustomText { get; set; } = "#FF0F172A";
 
 	public string SubWheelHighlightGlowPreset { get; set; } = "FollowPrimary";
 
@@ -193,9 +193,9 @@ public class AppConfig
 
 	public bool AutoStartAsAdmin { get; set; }
 
-	public bool ShowText { get; set; } = true;
+	public bool ShowText { get; set; } = false;
 
-	public bool ShowSelectedActionText { get; set; }
+	public bool ShowSelectedActionText { get; set; } = true;
 
 	// ==================== 多层轮盘指示徽标配置 ====================
 	/// <summary>是否在切换轮盘层时显示浮动提示徽标（默认 true）</summary>
@@ -228,17 +228,17 @@ public class AppConfig
 	/// <summary>层级指示徽标停留时长（毫秒，默认 1200ms）</summary>
 	public double LayerIndicatorDurationMs { get; set; } = 1200.0;
 
-	public double WheelRadius { get; set; } = 138.0;
+	public double WheelRadius { get; set; } = 133.0;
 
-	public double InnerRadius { get; set; } = 52.0;
+	public double InnerRadius { get; set; } = 70.0;
 
-	public double CoreRadius { get; set; } = 50.0;
+	public double CoreRadius { get; set; } = 36.0;
 
 	public string Shape { get; set; } = "Original";
 
-	public double SectorGap { get; set; } = 2.0;
+	public double SectorGap { get; set; } = 4.0;
 
-	public double SectorCornerRadius { get; set; } = 4.0;
+	public double SectorCornerRadius { get; set; } = 13.0;
 
 	public string IconLayoutMode { get; set; } = "IconOnly";
 
@@ -252,7 +252,7 @@ public class AppConfig
 
 	public double SectorIconSize { get; set; } = 20.0;
 
-	public double SectorFontSize { get; set; } = 11.0;
+	public double SectorFontSize { get; set; } = 13.0;
 
 	public string CoreFontFamily { get; set; } = "Microsoft YaHei UI, Segoe UI";
 
@@ -267,9 +267,9 @@ public class AppConfig
 
 	public string CoreSubtitle { get; set; } = "RMB Drag";
 
-	public bool ShowCoreIcon { get; set; } = true;
+	public bool ShowCoreIcon { get; set; } = false;
 
-	public string CoreIconType { get; set; } = "Exit";
+	public string CoreIconType { get; set; } = "Image";
 
 	public string CoreCustomIconKey { get; set; } = "";
 

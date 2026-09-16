@@ -531,6 +531,43 @@ public class Program
             Console.WriteLine("FAIL: ExecuteFolder method not found!");
         }
 
+        // 10. Test v1.7.4-beta.3 Defaults
+        Console.WriteLine("\n--- Testing v1.7.4-beta.3 Default Configuration ---");
+        var defCfg = ConfigManager.CreateDefaultConfig();
+        if (defCfg.MappingsCanvasShowText != false)
+            throw new Exception($"FAIL: MappingsCanvasShowText expected false but was {defCfg.MappingsCanvasShowText}");
+        if (defCfg.WheelRadius != 133.0)
+            throw new Exception($"FAIL: WheelRadius expected 133.0 but was {defCfg.WheelRadius}");
+        if (defCfg.InnerRadius != 70.0)
+            throw new Exception($"FAIL: InnerRadius expected 70.0 but was {defCfg.InnerRadius}");
+        if (defCfg.CoreRadius != 36.0)
+            throw new Exception($"FAIL: CoreRadius expected 36.0 but was {defCfg.CoreRadius}");
+        if (defCfg.SectorGap != 4.0)
+            throw new Exception($"FAIL: SectorGap expected 4.0 but was {defCfg.SectorGap}");
+        if (defCfg.SectorCornerRadius != 13.0)
+            throw new Exception($"FAIL: SectorCornerRadius expected 13.0 but was {defCfg.SectorCornerRadius}");
+        if (defCfg.SectorFontSize != 13.0)
+            throw new Exception($"FAIL: SectorFontSize expected 13.0 but was {defCfg.SectorFontSize}");
+        if (defCfg.SubWheelTriggerDistance != 141.0)
+            throw new Exception($"FAIL: SubWheelTriggerDistance expected 141.0 but was {defCfg.SubWheelTriggerDistance}");
+        if (defCfg.SubWheelOuterRadius != 196.0)
+            throw new Exception($"FAIL: SubWheelOuterRadius expected 196.0 but was {defCfg.SubWheelOuterRadius}");
+        if (defCfg.SubWheelInnerGap != 7.0)
+            throw new Exception($"FAIL: SubWheelInnerGap expected 7.0 but was {defCfg.SubWheelInnerGap}");
+        if (defCfg.SubWheelCornerRadius != 14.0)
+            throw new Exception($"FAIL: SubWheelCornerRadius expected 14.0 but was {defCfg.SubWheelCornerRadius}");
+        if (defCfg.SubWheelIconSize != 16.0)
+            throw new Exception($"FAIL: SubWheelIconSize expected 16.0 but was {defCfg.SubWheelIconSize}");
+        if (defCfg.SubWheelUiStyle != "FollowPrimary")
+            throw new Exception($"FAIL: SubWheelUiStyle expected FollowPrimary but was {defCfg.SubWheelUiStyle}");
+        if (defCfg.AutoExpandSubRingsOnPopup != false)
+            throw new Exception($"FAIL: AutoExpandSubRingsOnPopup expected false but was {defCfg.AutoExpandSubRingsOnPopup}");
+        if (defCfg.ShowCoreIcon != false)
+            throw new Exception($"FAIL: ShowCoreIcon expected false but was {defCfg.ShowCoreIcon}");
+        if (defCfg.CoreIconType != "Image")
+            throw new Exception($"FAIL: CoreIconType expected Image but was {defCfg.CoreIconType}");
+        Console.WriteLine("SUCCESS: All v1.7.4-beta.3 default configuration assertions passed!");
+
         Console.WriteLine("\n=== ALL V1.7.0 COMPREHENSIVE TESTS PASSED! ===");
     }
 }
