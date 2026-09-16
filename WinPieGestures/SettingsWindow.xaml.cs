@@ -6392,6 +6392,14 @@ public partial class SettingsWindow : Window
 			summaryText += $"\n声明能力：{string.Join("、", entry.CapabilitiesAck)}";
 		}
 
+		// 随包插件必须与用户自己装的插件在界面上看得出区别。否则用户点「卸载」
+		// 只会拿到一句拒绝，却不知道这是设计如此 —— 这里把「不可卸载」连同替代方案
+		// （停用）一次说清，省得他再试一次。
+		if (entry.Bundled)
+		{
+			summaryText += "\n随 StarPie 分发　·　不可卸载，可停用";
+		}
+
 		var detail = new List<string> { $"ID {instance.PluginId}" };
 		if (!string.IsNullOrWhiteSpace(instance.Scan.TargetFramework)) detail.Add(instance.Scan.TargetFramework);
 		if (!string.IsNullOrWhiteSpace(instance.Scan.MachineText)) detail.Add(instance.Scan.MachineText);

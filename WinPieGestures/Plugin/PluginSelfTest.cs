@@ -776,6 +776,123 @@ internal static class PluginSelfTest
                 Fail("端到端派发", $"Execute 抛出异常：{dispatchError.Message}");
             }
 
+            // ---- 3h 随包分发的插件 ----
+            //
+            // 随包插件与用户自己装的插件，差别全在那三条规则上：首启自动装并启用、
+            // 用户停用后绝不被偷偷启用、不可卸载只可停用。
+            // 第二条是这一段最要紧的 —— 它是「我明明关过它」这类投诉的唯一来源，
+            // 而且这种错在开发机上永远不会自己暴露（开发者不会去停用自己的插件）。
+            Line("");
+            Line("[3h] 随包分发的插件（自动安装 / 尊重停用 / 不可卸载）");
+
+            const string BundledPluginId = "com.example.hello";
+
+            if (!Directory.Exists(sandboxScanRoot))
+            {
+                Directory.CreateDirectory(sandboxScanRoot);
+            }
+            File.Copy(dllPath, Path.Combine(sandboxScanRoot, candidateFileName), overwrite: true);
+
+            int bundledFirst = PluginHost.AutoInstallBundledPlugins();
+            PluginInstance? bundled = PluginHost.Find(BundledPluginId);
+
+            if (bundled == null)
+            {
+                Fail("随包安装", "程序目录 plugin\\ 里的插件没有被自动装上 —— 用户打开会发现轮盘里是空的");
+            }
+            else
+            {
+                Line($"  首次启动：随包装入 {bundledFirst} 个｜随包标记={bundled.Entry.Bundled}｜" +
+                    $"登记启用={bundled.Entry.Enabled}｜程序集已加载={bundled.IsLoaded}");
+
+                if (!bundled.Entry.Bundled)
+                {
+                    Fail("随包安装", "自动装上来的插件没被标记为随包 —— 不可卸载与文件补回都依赖这个标记");
+                }
+
+                if (!bundled.Entry.Enabled)
+                {
+                    Fail("随包安装", "随包插件应默认启用，否则用户一打开就发现自带动作是缺的");
+                }
+
+                // 自动安装不许顺带加载程序集：它跑在启动最早期，这里加载会让启动开销
+                // 随随包插件数量线性增长（R1 红线）。
+                if (bundled.IsLoaded)
+                {
+                    Fail("随包安装", "自动安装过程中加载了程序集 —— 启动开销会随随包插件数量线性增长");
+                }
+
+                int bundledAgain = PluginHost.AutoInstallBundledPlugins();
+                Line($"  重复启动：再装入 {bundledAgain} 个（应为 0，幂等）");
+                if (bundledAgain != 0)
+                {
+                    Fail("随包安装", $"重复自动安装应无事可做，实际又处理了 {bundledAgain} 个");
+                }
+
+                // 用户停用之后，启动流程绝不能把它重新启用。
+                PluginHost.Disable(BundledPluginId, out _);
+                bundled.WaitForUnloadVerdict(5000);
+                int bundledAfterDisable = PluginHost.AutoInstallBundledPlugins();
+
+                Line($"  用户停用后再启动：再装入 {bundledAfterDisable} 个｜登记启用={bundled.Entry.Enabled}");
+
+                if (bundled.Entry.Enabled || bundledAfterDisable != 0)
+                {
+                    Fail("随包安装",
+                        "用户停用过的随包插件被启动流程重新启用了 —— 「我明明关过它」只能来自这里");
+                }
+
+                // 宿主区文件被删：应当补回，且「停用」这个选择不受影响。
+                string managedDirectory = bundled.ManagedDirectory;
+                if (Directory.Exists(managedDirectory)) Directory.Delete(managedDirectory, recursive: true);
+
+                int bundledRestored = PluginHost.AutoInstallBundledPlugins();
+                bool payloadBack = Directory.Exists(managedDirectory)
+                    && Directory.GetFiles(managedDirectory, "*.dll", SearchOption.TopDirectoryOnly).Length > 0;
+
+                Line($"  宿主区文件被删后再启动：补回 {bundledRestored} 个｜文件已回={payloadBack}｜" +
+                    $"登记启用={bundled.Entry.Enabled}");
+
+                if (!payloadBack)
+                {
+                    Fail("随包安装", "随包插件的宿主区文件被删后没有补回 —— 它会一直显示成「加载失败」");
+                }
+
+                if (bundled.Entry.Enabled)
+                {
+                    Fail("随包安装", "补文件把用户「停用」的选择改掉了 —— 补文件不是让它复活的理由");
+                }
+
+                // 不可卸载：必须拒绝，并且说清「改用停用」。
+                bool bundledUninstalled = PluginHost.Uninstall(BundledPluginId, removePluginData: true, out string bundledUninstallError);
+                Line($"  卸载随包插件的结论：{bundledUninstallError}");
+
+                if (bundledUninstalled)
+                {
+                    Fail("随包安装", "随包插件被卸载掉了 —— 它下次启动还会回来，等于骗用户白点一下");
+                }
+                else if (bundledUninstallError.IndexOf("停用", StringComparison.Ordinal) < 0)
+                {
+                    Fail("随包安装", $"拒绝卸载时必须告诉用户该改用什么，实际文案：{bundledUninstallError}");
+                }
+            }
+
+            // 清理现场：走 UninstallCore(respectBundledGuard: false) 而不是用户路径 ——
+            // 用户路径上的那道守卫正是本段被测的东西，拿它来收尾就成了用被测对象验证它自己。
+            PluginHost.Disable(BundledPluginId, out _);
+            PluginHost.Find(BundledPluginId)?.WaitForUnloadVerdict(5000);
+
+            if (!PluginHost.UninstallCore(BundledPluginId, removePluginData: true,
+                    respectBundledGuard: false, out string bundledCleanupError))
+            {
+                Fail("随包安装清理", bundledCleanupError);
+            }
+
+            if (Directory.Exists(sandboxScanRoot))
+            {
+                Directory.Delete(sandboxScanRoot, recursive: true);
+            }
+
             // ---- 7 环境还原性检查 ----
             Line("");
             Line("[7] 环境还原性检查");

@@ -32,6 +32,21 @@ internal sealed class PluginInstallOptions
     /// <para>用途只有一个：日后排查「这个插件是怎么进来的」。不做任何逻辑分支。</para>
     /// </summary>
     public string SourceKind { get; set; } = "UserSelectedFile";
+
+    /// <summary>
+    /// 本次安装的是<b>随主程序分发的插件</b>。
+    /// <para>
+    /// 这一类与用户自己装的插件有三处行为差异，都在登记表里用这个标记驱动：
+    /// 首启自动安装并启用（不必用户逐个点安装）、不可卸载（只可停用）、
+    /// 被从宿主区删掉后会在下次启动时补回来。
+    /// </para>
+    /// <para>
+    /// 刻意不复用 <see cref="SourceKind"/> 来判分支：那个字段的注释写明「不做任何逻辑分支」，
+    /// 只用于事后排查。要分支就单独立一个字段，免得日后有人往 Source 里加个新取值
+    /// 就悄悄改变了安装语义。
+    /// </para>
+    /// </summary>
+    public bool Bundled { get; set; }
 }
 
 internal sealed class PluginInstallResult
@@ -128,11 +143,15 @@ internal static class PluginHost
 
             CheckSafeMode();
 
+            // 随包分发的插件：先装进来，再让 SyncFromDisk 按登记表建立实例。
+            // 顺序不能反 —— 反了的话这次装上的插件要等下次启动才出现在列表里。
+            int bundledInstalled = AutoInstallBundledPlugins();
+
             int discovered = SyncFromDisk();
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
-                $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
+                $"（本次扫描新发现 {discovered} 个，随包装入 {bundledInstalled} 个），安全模式={_safeModeActive}");
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -283,6 +302,7 @@ internal static class PluginHost
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
+                    Bundled = options.Bundled,
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -322,6 +342,162 @@ internal static class PluginHost
                 return new PluginInstallResult { Success = false, PluginId = manifest.Id, Error = ex.Message };
             }
         }
+    }
+
+    // ------------------------------------------------------------------ 随包分发的插件
+
+    /// <summary>
+    /// 把「随主程序分发」的插件装进来 —— 也就是程序目录下只读扫描目录里的那些 <c>.dll</c>。
+    /// <para>
+    /// 与用户在插件页手动点「安装」的区别只有一处：这些<b>不等用户点</b>。
+    /// 它们随发行包一起来，属于「打开就该有」的东西；要求用户先点十几次安装，
+    /// 才让轮盘里出现本来自带的动作，是把打包方的分内事推给了用户。
+    /// </para>
+    /// <para>
+    /// <b>三条规则</b>：
+    /// <list type="number">
+    /// <item>登记表里<b>没有</b>这个 ID：自动安装并启用。</item>
+    /// <item>登记表里<b>已有</b>这个 ID（无论当前是启用还是停用）：一律不动。
+    /// 用户停用过的插件绝不能在下次启动时被偷偷启用 —— 那是这一类设计最容易犯、
+    /// 也最让人恼火的错（「我明明关过它」）。</item>
+    /// <item>登记表里有、但宿主区的文件没了：补回来，并<b>保留原来的启用状态</b>。
+    /// 随包插件不可卸载只可停用，文件不见了属于「坏了」，不是「卸载了」。</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// 必须在 <see cref="SyncFromDisk"/> <b>之前</b>调用：安装往登记表里写条目，
+    /// 而实例是 SyncFromDisk 按登记表建立的 —— 顺序反过来，这次装上的插件得等下次启动才露面。
+    /// </para>
+    /// <para>
+    /// 全程不加载任何程序集、不执行任何插件代码（识别只读静态元数据）。
+    /// 因此「程序目录下没有插件」的用户，启动开销与接入插件系统之前完全一致（R1 红线）。
+    /// </para>
+    /// </summary>
+    /// <returns>本次新装或补回的插件数量。</returns>
+    public static int AutoInstallBundledPlugins()
+    {
+        if (!PluginPaths.ScanRootExists) return 0;
+
+        int acted = 0;
+
+        try
+        {
+            // 与 ScanCandidates 同样的约定：扁平，只认顶层 *.dll，不递归子目录。
+            string[] files = Directory.GetFiles(PluginPaths.ScanRoot, "*.dll", SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+            foreach (string file in files)
+            {
+                try
+                {
+                    if (EnsureBundledPlugin(file)) acted++;
+                }
+                catch (Exception ex)
+                {
+                    // 一枚坏文件绝不能拖垮启动 —— 这条路径跑在最早期，抛出去就是整个程序起不来。
+                    AppLogger.LogWarn($"[plugin] 随包插件 {Path.GetFileName(file)} 处理失败（已跳过）：{ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 扫描随包插件目录失败", ex);
+        }
+
+        return acted;
+    }
+
+    /// <summary>处理随包目录里的一枚 <c>.dll</c>；返回是否真的动了登记表或磁盘。</summary>
+    private static bool EnsureBundledPlugin(string file)
+    {
+        PluginScanResult scan = ScanCandidateFile(file);
+
+        if (!scan.Accepted || scan.Manifest == null)
+        {
+            // 认不出来就装不上。这里必须出声：它不会出现在候选列表里（那需要扫描目录这一侧
+            // 的完整分类），用户既装不上也不知道为什么，只能靠日志。
+            AppLogger.LogWarn(
+                $"[plugin] 随包目录里的 {Path.GetFileName(file)} 无法识别，已跳过：{scan.DescribeFailure()}。" +
+                "随包插件装不上是打包问题，需要重新打包。");
+            return false;
+        }
+
+        PluginManifest manifest = scan.Manifest;
+        PluginRegistryEntry? existing = PluginRegistryStore.FindEntry(manifest.Id);
+
+        if (existing != null)
+        {
+            // 已登记 —— 用户对它的启用/停用选择必须原样保留，一个字都不改。
+            // 唯一要做的是「文件还在不在」。
+            return RestoreBundledPayload(existing, scan);
+        }
+
+        PluginInstallResult result = CommitInstall(scan, new PluginInstallOptions
+        {
+            Acknowledged = true,        // 随包插件没有「用户确认」这一步可言
+            OverwriteExisting = false,
+            EnableAfterInstall = false, // 见下方注释：不能走 Enable，它会立刻加载程序集
+            SourceKind = "Bundled",
+            Bundled = true,
+            AcknowledgedCapabilities = manifest.Capabilities is { Count: > 0 } capabilities
+                ? new List<string>(capabilities)
+                : new List<string>(),
+        });
+
+        if (!result.Success)
+        {
+            AppLogger.LogWarn($"[plugin] 随包插件 {manifest.Id} 自动安装失败：{result.Error}");
+            return false;
+        }
+
+        // 「已启用」只写登记态，**刻意不调用 Enable** —— Enable 会同步加载程序集，
+        // 而 Initialize 阶段的契约是「不加载任何程序集」（R1 内存与启动红线）。
+        // 程序集交由首次执行、或界面枚举贡献点时按需拉起；那条路径由自检 [3d] 的
+        // 「重启等价态」段守着，不是假设。
+        PluginRegistryStore.SetEnabled(manifest.Id, true);
+        PluginInstance? installed = Find(manifest.Id);
+        if (installed != null)
+        {
+            installed.Entry.Enabled = true;   // 与 SetEnabled 双写：不假设登记表存的是同一份引用
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 已自动安装随包插件 {manifest.Id} v{manifest.Version}（来源：程序目录 {PluginPaths.ScanDirectoryName}\\）");
+        return true;
+    }
+
+    /// <summary>
+    /// 随包插件的文件补回：登记表里已有条目，但宿主区的程序集不在了。
+    /// <para>
+    /// <b>绝不改动 <c>Enabled</c></b> —— 用户停用过就是停用，补文件不是让它复活的理由。
+    /// 只对「本来就标记为随包」的条目生效：用户自己装的插件被他删掉是他的自由，
+    /// 宿主没有义务（也不该）把它变回来。
+    /// </para>
+    /// </summary>
+    private static bool RestoreBundledPayload(PluginRegistryEntry existing, PluginScanResult scan)
+    {
+        if (!existing.Bundled) return false;
+        if (!string.IsNullOrWhiteSpace(existing.ExternalPath)) return false;
+
+        string directory = Path.Combine(
+            PluginPaths.Root,
+            string.IsNullOrWhiteSpace(existing.InstallPath) ? existing.Id : existing.InstallPath);
+
+        bool payloadMissing = !Directory.Exists(directory)
+            || Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly).Length == 0;
+
+        if (!payloadMissing) return false;
+
+        if (!CopyPayload(scan, directory, overwrite: true, out string error))
+        {
+            AppLogger.LogWarn($"[plugin] 随包插件 {existing.Id} 的文件补回失败：{error}");
+            return false;
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {existing.Id} 的宿主区文件缺失，已从程序目录补回" +
+            $"（启用状态保持为 {existing.Enabled}，不因补文件而改变）");
+        return true;
     }
 
     // ------------------------------------------------------------------ 启用 / 停用
@@ -458,8 +634,19 @@ internal static class PluginHost
         }
     }
 
-    /// <summary>卸载插件（停用 + 删除目录 + 移除登记）。</summary>
-    public static bool Uninstall(string pluginId, bool removePluginData, out string error)
+    /// <summary>卸载插件（停用 + 删除目录 + 移除登记）。随包插件会被拒绝，见下方守卫。</summary>
+    public static bool Uninstall(string pluginId, bool removePluginData, out string error) =>
+        UninstallCore(pluginId, removePluginData, respectBundledGuard: true, out error);
+
+    /// <summary>
+    /// 卸载的实际实现。
+    /// <para>
+    /// <paramref name="respectBundledGuard"/> 为 <c>false</c> 时无视「随包插件不可卸载」这条规则。
+    /// 目前只有自检会用到 —— 它必须把现场收拾干净，而收拾现场恰恰<b>不能</b>走用户路径，
+    /// 因为那条路径上的守卫正是被测对象。用户界面永远只走 <see cref="Uninstall"/>。
+    /// </para>
+    /// </summary>
+    internal static bool UninstallCore(string pluginId, bool removePluginData, bool respectBundledGuard, out string error)
     {
         error = "";
 
@@ -467,6 +654,16 @@ internal static class PluginHost
         if (instance == null)
         {
             error = $"插件未安装：{pluginId}";
+            return false;
+        }
+
+        // 随包插件不可卸载。它的文件随发行包一起来，卸载只会让它下次启动又出现 ——
+        // 给一个「点了没用」的按钮，比诚实地说明原因糟糕得多。
+        // 用户真正想要的（别让它挡路）用「停用」就能达成：动作从可选列表消失，配置仍保留。
+        if (respectBundledGuard && instance.Entry.Bundled)
+        {
+            error = $"「{instance.Entry.Name}」随 StarPie 一起分发，不能卸载。"
+                  + "如果不想用它，请改用「停用」—— 停用后它的动作会从可选列表里消失，已有配置也不会丢。";
             return false;
         }
 
