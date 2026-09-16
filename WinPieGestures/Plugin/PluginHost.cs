@@ -58,6 +58,11 @@ internal static class PluginHost
     private static readonly object Gate = new();
     private static readonly Dictionary<string, PluginInstance> Instances = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 三条 SPP 调用路径的统一运行时入口。动作路径先适配现有实现，交互与轮盘结构路径先建立空接缝。
+    /// </summary>
+    private static readonly PluginRuntime Runtime = new(ExecutePluginActionCore);
+
     private static bool _initialized;
     private static bool _enabled = true;
     private static bool _developerMode;
@@ -168,7 +173,16 @@ internal static class PluginHost
             try
             {
                 if (!instance.IsLoaded) continue;
-                instance.Unload();
+
+                Runtime.NotifyPluginStopping(instance.PluginId);
+                try
+                {
+                    instance.Unload();
+                }
+                finally
+                {
+                    Runtime.NotifyPluginStopped(instance.PluginId);
+                }
                 instance.FlushHealth();
             }
             catch (Exception ex)
@@ -403,7 +417,15 @@ internal static class PluginHost
                 });
             };
 
-            instance.Unload();
+            Runtime.NotifyPluginStopping(pluginId);
+            try
+            {
+                instance.Unload();
+            }
+            finally
+            {
+                Runtime.NotifyPluginStopped(pluginId);
+            }
             instance.FlushHealth();
 
             instance.Entry.Enabled = false;
@@ -597,7 +619,13 @@ internal static class PluginHost
     /// 因为那里的 <c>catch</c> 会弹 <c>MessageBox</c>，在无人值守时会把动作线程卡死。
     /// </para>
     /// </summary>
-    public static PluginExecuteOutcome ExecutePluginAction(ActionItem action)
+    public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
+
+    /// <summary>
+    /// 动作路径的现有实现。暂由 <see cref="ActionExecutionPathModule"/> 适配；
+    /// 下一阶段会把解析、惰性加载、参数校验和调用租约逐步迁入动作路径模块。
+    /// </summary>
+    internal static PluginExecuteOutcome ExecutePluginActionCore(ActionItem action)
     {
         if (action?.PluginActionRef == null || !action.PluginActionRef.IsValid)
         {
@@ -873,116 +901,51 @@ internal static class PluginHost
         }
     }
 
-    // ------------------------------------------------------------------ 轮盘事件广播
+    // ------------------------------------------------------------------ 统一路径入口
 
-    private static readonly Dictionary<string, List<Action<ActionContext>>> WheelOpeningHandlers = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, List<Action>> WheelClosedHandlers = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>宿主当前登记的 SPP 路径，用于自检与后续清单兼容判断。</summary>
+    public static IReadOnlyList<string> GetSupportedPathIds() => Runtime.SupportedPathIds;
 
-    public static IDisposable RegisterWheelOpening(string pluginId, Action<ActionContext> handler)
-    {
-        lock (Gate)
-        {
-            if (!WheelOpeningHandlers.TryGetValue(pluginId, out List<Action<ActionContext>>? list))
-            {
-                list = new List<Action<ActionContext>>();
-                WheelOpeningHandlers[pluginId] = list;
-            }
-            list.Add(handler);
-        }
+    // 旧版 Opening / Closed 接口暂时作为统一交互路径的兼容适配层。
+    public static IDisposable RegisterWheelOpening(string pluginId, Action<ActionContext> handler) =>
+        Runtime.RegisterWheelOpening(pluginId, handler);
 
-        return new RegistrationToken(() =>
-        {
-            lock (Gate)
-            {
-                if (WheelOpeningHandlers.TryGetValue(pluginId, out List<Action<ActionContext>>? list))
-                {
-                    list.Remove(handler);
-                }
-            }
-        });
-    }
-
-    public static IDisposable RegisterWheelClosed(string pluginId, Action handler)
-    {
-        lock (Gate)
-        {
-            if (!WheelClosedHandlers.TryGetValue(pluginId, out List<Action>? list))
-            {
-                list = new List<Action>();
-                WheelClosedHandlers[pluginId] = list;
-            }
-            list.Add(handler);
-        }
-
-        return new RegistrationToken(() =>
-        {
-            lock (Gate)
-            {
-                if (WheelClosedHandlers.TryGetValue(pluginId, out List<Action>? list))
-                {
-                    list.Remove(handler);
-                }
-            }
-        });
-    }
+    public static IDisposable RegisterWheelClosed(string pluginId, Action handler) =>
+        Runtime.RegisterWheelClosed(pluginId, handler);
 
     /// <summary>
-    /// 广播「轮盘即将呈现」。
-    /// <para>
-    /// <b>必须由 UI 线程调用</b>（调用点应使用 <c>Dispatcher.BeginInvoke</c> 投递），
-    /// 因为轮盘的呈现路径直接挂在鼠标钩子之后，插件代码绝不允许出现在那条路径上（红线 R2）。
-    /// </para>
+    /// 广播「轮盘即将呈现」。当前沿用旧同步回调；正式的有界事件队列将在交互路径阶段实现。
     /// </summary>
     public static void RaiseWheelOpening(ActionContext context)
     {
         if (!_enabled) return;
-
-        List<Action<ActionContext>> handlers = new();
-        lock (Gate)
-        {
-            foreach (List<Action<ActionContext>> list in WheelOpeningHandlers.Values)
-            {
-                handlers.AddRange(list);
-            }
-        }
-
-        foreach (Action<ActionContext> handler in handlers)
-        {
-            try
-            {
-                handler(context);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.LogError("[plugin] OnWheelOpening 回调异常（已拦截）", ex);
-            }
-        }
+        Runtime.RaiseWheelOpening(context);
     }
 
     public static void RaiseWheelClosed()
     {
         if (!_enabled) return;
+        Runtime.RaiseWheelClosed();
+    }
 
-        List<Action> handlers = new();
-        lock (Gate)
-        {
-            foreach (List<Action> list in WheelClosedHandlers.Values)
-            {
-                handlers.AddRange(list);
-            }
-        }
+    /// <summary>
+    /// 统一交互事件入口。当前尚未开放统一事件贡献，调用安全返回 0（没有订阅者接收）。
+    /// </summary>
+    public static int PublishInteractionEvent(PluginInteractionEventEnvelope interactionEvent)
+    {
+        if (!_enabled) return 0;
+        return Runtime.PublishInteractionEvent(interactionEvent);
+    }
 
-        foreach (Action handler in handlers)
-        {
-            try
-            {
-                handler();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.LogError("[plugin] OnWheelClosed 回调异常（已拦截）", ex);
-            }
-        }
+    /// <summary>
+    /// 统一轮盘结构入口。当前尚未开放结构提供者，调用安全返回空快照。
+    /// </summary>
+    public static ValueTask<PluginWheelStructureSnapshot> QueryWheelStructureAsync(
+        PluginWheelStructureRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_enabled) return ValueTask.FromResult(PluginWheelStructureSnapshot.Empty);
+        return Runtime.QueryWheelStructureAsync(request, cancellationToken);
     }
 
     // ------------------------------------------------------------------ 磁盘同步

@@ -101,6 +101,42 @@ internal static class PluginSelfTest
             Line($"  初始化耗时：{sw.Elapsed.TotalMilliseconds:F1} ms");
             Line($"  已登记插件：{PluginHost.InstalledCount} 个");
 
+            IReadOnlyList<string> supportedPaths = PluginHost.GetSupportedPathIds();
+            Line($"  已登记调用路径：{string.Join(", ", supportedPaths)}");
+            foreach (string requiredPath in new[]
+                     {
+                         PluginPathIds.ActionExecution,
+                         PluginPathIds.InteractionEvent,
+                         PluginPathIds.WheelStructure,
+                     })
+            {
+                if (!supportedPaths.Contains(requiredPath, StringComparer.OrdinalIgnoreCase))
+                {
+                    Fail("调用路径架构", $"宿主未登记协议路径：{requiredPath}");
+                }
+            }
+
+            // 空置路径必须可以安全调用，不应因为尚无贡献实现而影响主程序。
+            int eventReceivers = PluginHost.PublishInteractionEvent(new PluginInteractionEventEnvelope
+            {
+                EventType = "selftest.runtime.ready",
+                SessionId = 0,
+                Sequence = 0,
+                Context = new ActionContext(),
+            });
+            if (eventReceivers != 0)
+            {
+                Fail("交互路径占位", $"尚未开放统一交互贡献时应返回 0，实际为 {eventReceivers}。");
+            }
+
+            PluginWheelStructureSnapshot emptyStructure = PluginHost.QueryWheelStructureAsync(
+                    new PluginWheelStructureRequest { ProviderId = "selftest.none" })
+                .AsTask().GetAwaiter().GetResult();
+            if (emptyStructure.IsAvailable)
+            {
+                Fail("轮盘结构路径占位", "尚未开放结构提供者时应返回空快照。");
+            }
+
             // ---- 1 静态识别 ----
             Line("");
             Line("[1] 静态识别（不加载程序集）");

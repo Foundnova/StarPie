@@ -199,6 +199,7 @@ g:\Users\2 Better\Desktop\design\
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
   - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
   - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
+- **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
 - **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
   1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
   2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
