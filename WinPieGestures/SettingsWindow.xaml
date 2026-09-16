@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="WinPieGestures.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:WinPieGestures" xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options" Title="StarPie 设置控制台 (Preferences)" Icon="app_icon.ico" Height="740" Width="1220" MinWidth="1060" MinHeight="660" WindowStartupLocation="CenterScreen" Background="{DynamicResource WindowBackgroundBrush}" FontFamily="Segoe UI, Microsoft YaHei UI, Arial" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" RenderOptions.ClearTypeHint="Enabled" RenderOptions.BitmapScalingMode="HighQuality" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown">
+<Window x:Class="WinPieGestures.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:WinPieGestures" xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options" Title="StarPie 设置控制台" Icon="app_icon.ico" Height="740" Width="1220" MinWidth="1060" MinHeight="660" WindowStartupLocation="CenterScreen" Background="{DynamicResource WindowBackgroundBrush}" FontFamily="Segoe UI, Microsoft YaHei UI, Arial" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" RenderOptions.ClearTypeHint="Enabled" RenderOptions.BitmapScalingMode="HighQuality" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown">
   <FrameworkElement.Resources>
     <ResourceDictionary>
       <!-- 共享冻结阴影：原 41 处内联 DropShadowEffect 各自生成独立渲染资源，改为全局共享单实例 -->
@@ -597,31 +597,31 @@
           <RadioButton Name="NavTab0" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="0" IsChecked="True" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab0Text}">
             <StackPanel Orientation="Horizontal">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8Z" />
-              <TextBlock Name="NavTab0Text" Text="触发与场景" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Name="NavTab0Text" Text="触发设置" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab1" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="1" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab1Text}">
             <StackPanel Orientation="Horizontal">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,3C7.03,3 3,7.03 3,12C3,16.97 7.03,21 12,21C12.83,21 13.5,20.33 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.49C12.88,18.23 12.73,17.88 12.73,17.5C12.73,16.67 13.4,16 14.23,16H16C18.76,16 21,13.76 21,11C21,6.58 16.97,3 12,3M6.5,12C5.67,12 5,11.33 5,10.5C5,9.67 5.67,9 6.5,9C7.33,9 8,9.67 8,10.5C8,11.33 7.33,12 6.5,12M9.5,8C8.67,8 8,7.33 8,6.5C8,5.67 8.67,5 9.5,5C10.33,5 11,5.67 11,6.5C11,7.33 10.33,8 9.5,8M14.5,8C13.67,8 13,7.33 13,6.5C13,5.67 13.67,5 14.5,5C15.33,5 16,5.67 16,6.5C16,7.33 15.33,8 14.5,8M17.5,12C16.67,12 16,11.33 16,10.5C16,9.67 16.67,9 17.5,9C18.33,9 19,9.67 19,10.5C19,11.33 18.33,12 17.5,12Z" />
-              <TextBlock Name="NavTab1Text" Text="外观与形态" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Name="NavTab1Text" Text="外观样式" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab2" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="2" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab2Text}">
             <StackPanel Orientation="Horizontal">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M19,3H5C3.89,3 3,3.89 3,5V19C3,20.1 3.89,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z" />
-              <TextBlock Name="NavTab2Text" Text="手势与动作" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Name="NavTab2Text" Text="手势动作" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab3" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="3" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab3Text}">
             <StackPanel Orientation="Horizontal">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
-              <TextBlock Name="NavTab3Text" Text="高级与系统" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Name="NavTab3Text" Text="系统设置" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
           <RadioButton Name="NavTab4" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="4" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab4Text}">
             <StackPanel Orientation="Horizontal">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
-              <TextBlock Name="NavTab4Text" Text="关于与更新" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Name="NavTab4Text" Text="关于软件" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
         </StackPanel>
@@ -635,25 +635,25 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
-              <RadioButton Name="ThemeBtnSystem" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="System" ToolTip="跟随系统 (System Auto)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnSystem" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="System" ToolTip="跟随系统" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="🌓" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="系统" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnLight" Grid.Column="1" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Light" ToolTip="极简纯白 (Modern Light)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnLight" Grid.Column="1" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Light" ToolTip="极简纯白" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="☀️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="浅色" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnDark" Grid.Column="2" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Dark" ToolTip="极夜曜黑 (Obsidian Dark)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnDark" Grid.Column="2" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="Dark" ToolTip="极夜曜黑" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="🌙" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="曜黑" FontSize="11" VerticalAlignment="Center" />
                 </StackPanel>
               </RadioButton>
-              <RadioButton Name="ThemeBtnGray" Grid.Column="3" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="TitaniumGray" ToolTip="钛金深灰 (Titanium Gray)" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
+              <RadioButton Name="ThemeBtnGray" Grid.Column="3" GroupName="SidebarAppThemeGroup" Style="{StaticResource SidebarThemeSegmentRadioStyle}" Tag="TitaniumGray" ToolTip="钛金深灰" Click="ThemeSegmentButton_Click" Checked="ThemeSegmentButton_Click">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                   <TextBlock Text="⚙️" FontSize="11" Margin="0,0,2,0" VerticalAlignment="Center" />
                   <TextBlock Text="钛灰" FontSize="11" VerticalAlignment="Center" />
@@ -683,12 +683,9 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.4-beta.2&#x0a;© 2026 StarPie">
-            <Border Name="SidebarModeBadge" Background="{DynamicResource AccentPrimaryBrush}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" Margin="0,0,0,5" Cursor="Hand" ToolTip="点击快速切换简单/高级模式" MouseLeftButtonUp="SidebarModeBadge_Click">
-              <TextBlock Name="SidebarModeText" Text="💡 简单模式" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.4-beta.3&#x0a;© 2026 StarPie">
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.4-beta.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.4-beta.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -703,29 +700,12 @@
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
-      <!-- 全局顶部控制台栏：模式切换胶囊与状态 -->
+      <!-- 全局顶部控制台栏：模式切换胶囊单选组 -->
       <Grid Grid.Row="0" Margin="0,0,0,14">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        
-        <!-- 左侧：模式状态与提示徽标 -->
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <Border Name="ConfigModeStatusBadge" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Name="ConfigModeStatusIcon" Text="💡" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center" />
-              <TextBlock Name="ConfigModeStatusText" Text="简单模式 (精简聚焦)" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-            </StackPanel>
-          </Border>
-          <TextBlock Name="ConfigModeHintText" Text="已隐藏低频高级微调参数，保留核心极速配置体验" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" Margin="10,0,0,0" VerticalAlignment="Center" />
-        </StackPanel>
-
-        <!-- 右侧：模式切换胶囊单选组 -->
-        <Border Grid.Column="1" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+        <Border HorizontalAlignment="Right" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal">
             <RadioButton Name="ConfigModeSimpleRadio" Content="💡 简单模式" GroupName="ConfigModeGroup" Style="{StaticResource ModernSegmentRadioButtonStyle}" IsChecked="True" Checked="ConfigModeRadio_Checked" />
-            <RadioButton Name="ConfigModeProRadio" Content="⚙️ 高级全量模式" GroupName="ConfigModeGroup" Style="{StaticResource ModernSegmentRadioButtonStyle}" Margin="4,0,0,0" Checked="ConfigModeRadio_Checked" />
+            <RadioButton Name="ConfigModeProRadio" Content="⚙️ 高级模式" GroupName="ConfigModeGroup" Style="{StaticResource ModernSegmentRadioButtonStyle}" Margin="4,0,0,0" Checked="ConfigModeRadio_Checked" />
           </StackPanel>
         </Border>
       </Grid>
@@ -758,7 +738,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Name="CurrentBindingLabelText" Text="当前生效触发键：" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                       <Border Name="CurrentTriggerBadgeBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="14,6" VerticalAlignment="Center">
-                        <TextBlock Name="CurrentTriggerBadgeText" AutomationProperties.AutomationId="CurrentTriggerBadgeText" Text="🖱️ 鼠标右键 (Right Button)" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Name="CurrentTriggerBadgeText" AutomationProperties.AutomationId="CurrentTriggerBadgeText" Text="🖱️ 鼠标右键" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       </Border>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -808,7 +788,7 @@
                   
                   <!-- 1. 一级轮盘拖动触发距离 -->
                   <Grid Margin="0,0,0,4">
-                    <TextBlock Text="一级轮盘呼出触发位移 (Drag Threshold):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="一级轮盘呼出触发位移:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <TextBlock Name="ThresholdValueLabel" Text="25 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                   </Grid>
                   <Slider Name="ThresholdSlider" Minimum="5" Maximum="120" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="ThresholdSlider_ValueChanged" />
@@ -818,7 +798,7 @@
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                     <StackPanel>
                       <Grid Margin="0,0,0,4">
-                        <TextBlock Text="🎯 核心圆唤醒与死区灵敏度 (Core Deadzone Radius):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="🎯 核心圆唤醒与死区灵敏度:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                         <TextBlock Name="CoreDeadzoneValueLabel" Text="35 px" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                       <Slider Name="CoreDeadzoneSlider" Minimum="10" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreDeadzoneSlider_ValueChanged" />
@@ -855,8 +835,8 @@
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="多级轮盘与级联子菜单 (Multi-Tier Sub-Wheels)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
-                  <CheckBox Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单 (Multi-Tier)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed" />
+                  <TextBlock Text="多级轮盘与级联子菜单" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                  <CheckBox Name="EnableMultiTierCheckBox" Content="启用多级轮盘与级联子菜单" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="EnableMultiTierCheckBox_Changed" Unchecked="EnableMultiTierCheckBox_Changed" />
                   <TextBlock Text="开启后，若扇区配置了二级子动作，光标悬停时外圈将平滑展开扇形级联子菜单，向外划动即可精准触发子功能。在动作配置中点击各扇区右侧【⚙️ 级联】按钮可自由添加或编辑二级动作。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,0" />
 
                   <StackPanel Name="SubmenuStylePanel" Margin="0,12,0,0">
@@ -867,35 +847,35 @@
                           <ColumnDefinition Width="220" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                          <TextBlock Text="二级菜单样式 (Submenu Style)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Text="二级菜单样式" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                           <TextBlock Name="SubmenuStyleDescTextBlock" Text="外圈子环：子动作沿选中扇区外侧环形展开（最多4个）；蜂窝扇：子动作以选中项为中心呈扇形排列（最多3个）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Name="SubmenuStyleComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SubmenuStyleComboBox_SelectionChanged">
-                          <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环 (Sub-Ring)" IsSelected="True" />
-                          <ComboBoxItem Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇 (Honeycomb Fan)" />
+                          <ComboBoxItem Name="SubmenuStyleWheelItem" Tag="Wheel" Content="🌐 外圈子环" IsSelected="True" />
+                          <ComboBoxItem Name="SubmenuStyleFanItem" Tag="Fan" Content="🍯 蜂窝扇" />
                         </ComboBox>
                       </Grid>
                     </Border>
                   </StackPanel>
                   <StackPanel Name="AutoExpandSubRingsPanel" Margin="0,10,0,0">
-                    <CheckBox Name="AutoExpandSubRingsCheckBox" Content="唤出时直接同时展开一二级轮盘 (Auto-Expand Sub-Rings)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,4" Checked="AutoExpandSubRingsCheckBox_Changed" Unchecked="AutoExpandSubRingsCheckBox_Changed" />
+                    <CheckBox Name="AutoExpandSubRingsCheckBox" Content="唤出时直接同时展开一二级轮盘" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,4" Checked="AutoExpandSubRingsCheckBox_Changed" Unchecked="AutoExpandSubRingsCheckBox_Changed" />
                     <TextBlock Name="AutoExpandSubRingsDescText" Text="开启后，呼出轮盘时所有已配置二级动作的外圈子环将与一级扇区同时呈现，无需向外划出触发距离即可一览全部操作。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                   </StackPanel>
                   <StackPanel Name="SubWheelTriggerDistancePanel" Margin="0,10,0,0">
                     <Grid Margin="0,0,0,4">
-                      <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离 (Trigger Distance):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <TextBlock Name="SubWheelTriggerDistanceValueText" Text="95 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
+                      <TextBlock Name="SubWheelTriggerDistLabel" Text="二级轮盘展开触发距离:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="SubWheelTriggerDistanceValueText" Text="141 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                     </Grid>
-                    <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="95" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
+                    <Slider Name="SubWheelTriggerDistanceSlider" Minimum="30" Maximum="260" SmallChange="1" LargeChange="5" Value="141" ValueChanged="SubWheelTriggerDistanceSlider_ValueChanged" />
                     <TextBlock Name="SubWheelTriggerDistDesc" Text="调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                   </StackPanel>
                   <Border Name="Tab0_VolumeDragCardBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,8,0,0" SnapsToDevicePixels="True" UseLayoutRounding="True">
                     <StackPanel>
-                      <TextBlock Name="VolumeDragTitleText" Text="音量拖距调音 (Volume Drag-Adjust)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Name="VolumeDragTitleText" Text="音量拖距调音" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <TextBlock Name="VolumeDragDescText" Text="长按音量加/减扇区向外拖出可连续调音，以下距离参数实时生效，无需重启。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
                       <StackPanel Name="VolumeCancelRatioPanel" Margin="0,2,0,0">
                         <Grid Margin="0,0,0,4">
-                          <TextBlock Name="VolumeCancelRatioLabel" Text="缩回取消系数 (Cancel Hysteresis):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeCancelRatioLabel" Text="缩回取消系数:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <TextBlock Name="VolumeCancelRatioValueText" Text="60%" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                         </Grid>
                         <Slider Name="VolumeCancelRatioSlider" Minimum="0.2" Maximum="0.9" SmallChange="0.05" LargeChange="0.1" Value="0.6" ValueChanged="VolumeCancelRatioSlider_ValueChanged" />
@@ -903,7 +883,7 @@
                       </StackPanel>
                       <StackPanel Name="VolumeFlickFarPanel" Margin="0,10,0,0">
                         <Grid Margin="0,0,0,4">
-                          <TextBlock Name="VolumeFlickFarLabel" Text="甩出取消距离下限 (Flick Far):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeFlickFarLabel" Text="甩出取消距离下限:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <TextBlock Name="VolumeFlickFarValueText" Text="360 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                         </Grid>
                         <Slider Name="VolumeFlickFarSlider" Minimum="200" Maximum="800" SmallChange="10" LargeChange="50" Value="360" ValueChanged="VolumeFlickFarSlider_ValueChanged" />
@@ -911,7 +891,7 @@
                       </StackPanel>
                       <StackPanel Name="VolumeFlickJumpPanel" Margin="0,10,0,0">
                         <Grid Margin="0,0,0,4">
-                          <TextBlock Name="VolumeFlickJumpLabel" Text="甩动跳变阈值 (Flick Jump):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="VolumeFlickJumpLabel" Text="甩动跳变阈值:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <TextBlock Name="VolumeFlickJumpValueText" Text="120 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                         </Grid>
                         <Slider Name="VolumeFlickJumpSlider" Minimum="60" Maximum="300" SmallChange="5" LargeChange="20" Value="120" ValueChanged="VolumeFlickJumpSlider_ValueChanged" />
@@ -926,7 +906,7 @@
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="GestureTitleText" Text="鼠标手势 (Mouse Gestures)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="GestureTitleText" Text="鼠标手势" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Name="GestureDescText" Text="启用后，按住手势触发键画出轨迹（如 ↓、→、L 形），释放即执行对应动作；支持单段、双段与三段图样。轻点仍透传原生点击。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,12" TextWrapping="Wrap" />
                   <CheckBox Name="GestureEnabledCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="GestureEnabledCheckBox_Changed" Unchecked="GestureEnabledCheckBox_Changed">
                     <StackPanel Margin="6,0,0,0">
@@ -1067,7 +1047,7 @@
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="SoundEffectsTitleText" Text="轮盘触发交互音效 (Sound &amp; Haptic Feedback)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="SoundEffectsTitleText" Text="轮盘交互音效" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Name="SoundEffectsDescText" Text="基于原生 Win32 非托管内存音频管线与极微波形合成，为轮盘唤醒、划过扇区、二级展开与触发确认提供毫秒级零延迟微动音效，建立盲操听觉闭环。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
                   
                   <CheckBox Name="EnableSoundEffectsCheckBox" AutomationProperties.AutomationId="EnableSoundEffectsCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="EnableSoundEffectsCheckBox_Changed" Unchecked="EnableSoundEffectsCheckBox_Changed">
@@ -1086,16 +1066,16 @@
                           <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                          <TextBlock Name="SoundThemeLabelText" Text="音效风格主题 (Sound Theme)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                          <TextBlock Name="SoundThemeLabelText" Text="音效主题" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                           <TextBlock Name="SoundThemeDescText" Text="可选机械轴体敲击、现代手机触感微点、轻盈水滴气泡或极简脉冲短音。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                           <ComboBox Name="SoundThemeComboBox" Width="220" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="SoundThemeComboBox_SelectionChanged">
-                            <ComboBoxItem Tag="Mechanical" Content="⚙️ 机械手感 (轴体微动/刻度)" IsSelected="True" />
-                            <ComboBoxItem Tag="Crisp" Content="✨ 现代清脆 (数码触感)" />
-                            <ComboBoxItem Tag="Bubble" Content="🫧 柔和气泡 (水滴轻音)" />
-                            <ComboBoxItem Tag="Minimalist" Content="⚡ 极简短音 (超微脉冲)" />
-                            <ComboBoxItem Tag="Custom" Content="🎛️ 自定义音效方案 (Custom...)" />
+                            <ComboBoxItem Tag="Mechanical" Content="⚙️ 机械手感" IsSelected="True" />
+                            <ComboBoxItem Tag="Crisp" Content="✨ 现代清脆" />
+                            <ComboBoxItem Tag="Bubble" Content="🫧 柔和气泡" />
+                            <ComboBoxItem Tag="Minimalist" Content="⚡ 极简短音" />
+                            <ComboBoxItem Tag="Custom" Content="🎛️ 自定义方案" />
                           </ComboBox>
                           <Button Name="OpenCustomSoundConfigButton" Margin="8,0,0,0" Content="🎛️ 方案配置" Height="34" Padding="10,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="OpenCustomSoundConfigButton_Click" ToolTip="展开或关闭自定义交互音效调音台" Visibility="Collapsed" />
                         </StackPanel>
@@ -1176,7 +1156,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock Name="SoundVolumeTitleText" Text="交互音量 (Volume):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Name="SoundVolumeTitleText" Text="交互音量:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                           <TextBlock Name="SoundVolumeLabel" Grid.Column="2" Text="60%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0" />
                           <Button Name="SoundPreviewButton" Grid.Column="3" Content="🔊 试听全套音效" Height="28" Padding="12,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="SoundPreviewButton_Click" ToolTip="依次播放当前主题的唤出、划过、展开、确认与取消音效" />
                         </Grid>
@@ -1199,7 +1179,7 @@
                     <!-- 细项事件独立开关 -->
                     <Border Name="SoundSubEventsBorder" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
                       <StackPanel>
-                        <TextBlock Name="SoundSubEventsTitleText" Text="细项事件声音独立开关 (Event Toggles)" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <TextBlock Name="SoundSubEventsTitleText" Text="细项事件独立开关" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                         <WrapPanel Orientation="Horizontal">
                           <CheckBox Name="SoundOnPopupCheckBox" Content="呼出轮盘" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
                           <CheckBox Name="SoundOnHoverCheckBox" Content="扇区切换/划过" Margin="0,0,20,6" IsChecked="True" Checked="SoundSubEvent_Changed" Unchecked="SoundSubEvent_Changed" />
@@ -1217,7 +1197,7 @@
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Name="OuterEscapeTitleText" Text="顺势外甩脱离取消 (Outer Escape Cancel)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="OuterEscapeTitleText" Text="顺势外甩脱离取消" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                   <TextBlock Name="OuterEscapeDescText" Text="手势划出后若想放弃，无需拉回中心，直接顺势向外快速划出即可安全取消，0 误触。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" TextWrapping="Wrap" />
                   <CheckBox Name="EnableOuterEscapeCheckBox" AutomationProperties.AutomationId="EnableOuterEscapeCheckBox" Style="{StaticResource ToggleSwitchStyle}" Margin="0,4,0,4" Checked="OuterEscapeCheckBox_Checked" Unchecked="OuterEscapeCheckBox_Unchecked">
                     <StackPanel Margin="6,0,0,0">
@@ -1228,7 +1208,7 @@
                   <StackPanel Name="OuterEscapeDistancePanel" Margin="0,10,0,0" Visibility="Collapsed">
                     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                       <StackPanel>
-                        <TextBlock Name="OuterEscapeDistanceTitleText" Text="外甩取消距离灵敏度 (Escape Distance):" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Name="OuterEscapeDistanceTitleText" Text="外甩取消距离灵敏度:" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <TextBlock Name="OuterEscapeDistanceDescText" Text="设定光标划出距离中心多远时触发安全取消。数值越小越灵敏（更易甩出取消），数值越大越沉稳（需甩得更远）。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,8" TextWrapping="Wrap" />
                         <Grid Margin="0,2,0,0">
                           <Grid.ColumnDefinitions>
@@ -1256,7 +1236,7 @@
                           <StackPanel>
                             <!-- 1. 外甩高频极速预设芯片 -->
                             <StackPanel Margin="0,0,0,12">
-                              <TextBlock Text="⚡ 外甩高频极速预设 (一键秒选):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="0,0,0,6" />
+                              <TextBlock Text="⚡ 外甩常用预设:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" Margin="0,0,0,6" />
                               <WrapPanel>
                                 <Button Content="🖥️ 显示桌面 (Win+D)" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" Margin="0,0,6,6" FontSize="11" Click="CancelPresetDesktop_Click" ToolTip="外甩快速显示桌面，查阅文件或切换任务" />
                                 <Button Content="📑 任务视图 (Win+Tab)" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" Margin="0,0,6,6" FontSize="11" Click="CancelPresetTaskView_Click" ToolTip="外甩浏览多虚拟桌面与所有活动任务窗口" />
@@ -1274,7 +1254,7 @@
                                 <ColumnDefinition Width="*" />
                               </Grid.ColumnDefinitions>
                               <StackPanel Margin="0,0,8,0">
-                                <TextBlock Text="动作类型 (7大精简分类):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                                <TextBlock Text="动作类型:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                                 <ComboBox Height="32" FontSize="11.5" ItemsSource="{Binding AggregatedActionTypes}" SelectedValuePath="Tag" DisplayMemberPath="DisplayText" SelectedValue="{Binding AggregatedType, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}" />
                               </StackPanel>
                               <StackPanel Grid.Column="1">
@@ -1430,7 +1410,7 @@
                             <ColumnDefinition Width="220" />
                           </Grid.ColumnDefinitions>
                           <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
-                            <TextBlock Text="防溢出处理策略 (Policy):" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="防溢出处理策略:" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Text="智能贴边：自动推入屏幕并对齐光标；屏幕中心：直接在当前显示器正中展现。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                           </StackPanel>
                           <ComboBox Name="EdgeOverflowPolicyComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" Height="34" VerticalAlignment="Center" SelectionChanged="EdgeOverflowPolicyComboBox_SelectionChanged">
@@ -1446,7 +1426,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock Text="X 轴边缘安全边距 (水平容差区域):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Text="X 轴边缘安全边距:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                           <TextBlock Name="EdgeSafeMarginXValueText" Grid.Column="1" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                         <Slider Name="EdgeSafeMarginXSlider" Minimum="0" Maximum="80" SmallChange="2" LargeChange="5" Value="16" TickFrequency="4" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginXSlider_ValueChanged" />
@@ -1458,7 +1438,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock Text="Y 轴边缘安全边距 (垂直容差区域):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Text="Y 轴边缘安全边距:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                           <TextBlock Name="EdgeSafeMarginYValueText" Grid.Column="1" Text="16 px" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                         <Slider Name="EdgeSafeMarginYSlider" Minimum="0" Maximum="80" SmallChange="2" LargeChange="5" Value="16" TickFrequency="4" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="EdgeSafeMarginYSlider_ValueChanged" />
@@ -1484,7 +1464,7 @@
                   </CheckBox>
                   <Border Name="Tab0_ModifierBypassPanel" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,4,0,0">
                     <StackPanel>
-                      <TextBlock Name="ModifierPassTitleText" Text="快捷键旁路穿透 (按住以下修饰键拖拽时不触发手势):" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
+                      <TextBlock Name="ModifierPassTitleText" Text="快捷键旁路穿透:" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" />
                       <WrapPanel>
                         <CheckBox Name="CtrlModifierCheckBox" Content="按住 Ctrl 键时旁路" Margin="0,0,20,8" Checked="ModifierCheckBox_Changed" Unchecked="ModifierCheckBox_Changed" />
                         <CheckBox Name="ShiftModifierCheckBox" Content="按住 Shift 键时旁路" Margin="0,0,20,8" Checked="ModifierCheckBox_Changed" Unchecked="ModifierCheckBox_Changed" />
@@ -1510,7 +1490,7 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                           <TextBlock Text="🚫" FontSize="20" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
                           <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="排除黑名单模式 (默认)" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="排除黑名单模式" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Text="全局生效，仅在名单内程序放行右键" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           </StackPanel>
                         </StackPanel>
@@ -1605,12 +1585,12 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                           <TextBlock Text="当前专属触发键：" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                           <Border Name="ProcessCurrentTriggerBadgeBorder" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="12,5" VerticalAlignment="Center">
-                            <TextBlock Name="ProcessCurrentTriggerBadgeText" Text="🚫 未配置 (完全放行右键)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Name="ProcessCurrentTriggerBadgeText" Text="🚫 未配置" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                           </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                           <Button Name="RecordProcessTriggerButton" Content="🔴 点击录制专属按键 / 组合键" Height="34" Padding="14,0" Style="{StaticResource PrimaryButtonStyle}" Cursor="Hand" Click="RecordProcessTriggerButton_Click" />
-                          <Button Name="ResetProcessTriggerButton" Content="🔄 恢复默认 (完全放行)" Height="34" Padding="12,0" Margin="8,0,0,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="ResetProcessTriggerButton_Click" />
+                          <Button Name="ResetProcessTriggerButton" Content="🔄 恢复默认" Height="34" Padding="12,0" Margin="8,0,0,0" Style="{StaticResource ModernButtonStyle}" Cursor="Hand" Click="ResetProcessTriggerButton_Click" />
                         </StackPanel>
                       </Grid>
 
@@ -1642,8 +1622,8 @@
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Name="AppearancePageHeader" Text="外观、主题与实时画布" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-            <TextBlock Name="AppearancePageSubheader" Text="微调轮盘视觉风格、几何形态、光学切缝与配色方案，右侧支持 60FPS 所见即所得交互测试。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+            <TextBlock Name="AppearancePageHeader" Text="外观样式" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Name="AppearancePageSubheader" Text="调整轮盘视觉风格、几何形态与配色方案，右侧支持实时交互预览。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
           </StackPanel>
           <Grid Row="1">
             <Grid.ColumnDefinitions>
@@ -1658,23 +1638,23 @@
                     <StaticResource ResourceKey="CardShadowEffect" />
                   </UIElement.Effect>
                   <StackPanel>
-                    <TextBlock Name="VisualThemeCardTitleText" Text="轮盘视觉风格与色彩配置 (一级主轮盘)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                    <TextBlock Name="VisualThemeCardTitleText" Text="轮盘风格与配色 (一级主轮盘)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
                     <StackPanel Name="Tier1ThemePanel" Visibility="Visible">
-                      <TextBlock Text="主题风格 (UiStyle):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Text="主题风格:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="UiStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="UiStyleComboBox_SelectionChanged">
-                        <ComboBoxItem Content="经典圆环 (Classic Ring)" Tag="ClassicRing" IsSelected="True" />
-                        <ComboBoxItem Content="极简扇区 (Clean Sectors)" Tag="CleanSectors" />
-                        <ComboBoxItem Content="液态毛玻璃 (Glassmorphism)" Tag="Glassmorphism" />
+                        <ComboBoxItem Content="经典圆环" Tag="ClassicRing" IsSelected="True" />
+                        <ComboBoxItem Content="极简扇区" Tag="CleanSectors" />
+                        <ComboBoxItem Content="液态毛玻璃" Tag="Glassmorphism" />
                       </ComboBox>
-                      <TextBlock Text="轮盘配色方案 (Wheel Theme):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Text="配色方案:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="ThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,6" SelectionChanged="ThemeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System" />
-                        <ComboBoxItem Content="深色模式 (Dark)" Tag="Dark" />
-                        <ComboBoxItem Content="浅色模式 (Light)" Tag="Light" />
-                        <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
-                        <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
-                        <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
-                        <ComboBoxItem Name="ThemeCustomItem" Content="🎨 自定义配色 (Custom Colors)" Tag="Custom" />
+                        <ComboBoxItem Content="跟随系统" Tag="System" />
+                        <ComboBoxItem Content="深色模式" Tag="Dark" />
+                        <ComboBoxItem Content="浅色模式" Tag="Light" />
+                        <ComboBoxItem Content="抹茶森林" Tag="MatchaForest" />
+                        <ComboBoxItem Content="冰川透蓝" Tag="GlacialIce" />
+                        <ComboBoxItem Content="莫兰迪柔灰" Tag="MorandiMuted" />
+                        <ComboBoxItem Name="ThemeCustomItem" Content="🎨 自定义配色" Tag="Custom" />
                       </ComboBox>
                       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
                         <Button Name="NewCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewCustomColorPresetButton_Click" />
@@ -1688,12 +1668,12 @@
                         <Expander Name="CustomColorExpander" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0" Expanded="CustomColorExpander_Expanded" Collapsed="CustomColorExpander_Collapsed">
                           <HeaderedContentControl.Header>
                             <StackPanel Margin="0,2,0,2">
-                              <TextBlock Name="CustomColorsExpanderTitleText" Text="🎨 自定义高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                              <TextBlock Name="CustomColorsExpanderTitleText" Text="🎨 自定义高级配色" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                               <TextBlock Name="CustomColorsExpanderDescText" Text="展开后可精准微调扇区底色、高亮光晕、边框线条、文字与光弧等各项色彩。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
                             </StackPanel>
                           </HeaderedContentControl.Header>
                           <StackPanel Name="CustomColorsPanel" Margin="0,12,0,4">
-                            <TextBlock Text="自定义十六进制色彩 (色盘调色 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                            <TextBlock Text="自定义颜色 (色盘调色 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                             <Grid Margin="0,0,0,6">
                               <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="68" />
@@ -1777,17 +1757,17 @@
                           </StackPanel>
                         </Expander>
                       </Border>
-                      <TextBlock Text="高亮边缘光晕模式 (Highlight Glow):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,4" />
+                      <TextBlock Text="高亮边缘光晕模式:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,4" />
                       <ComboBox Name="HighlightGlowPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,8" SelectionChanged="HighlightGlowPresetComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🌈 跟随主题高亮色 (Auto / Follow Theme)" Tag="Auto" IsSelected="True" />
-                        <ComboBoxItem Content="💜 丁香晶紫 (Lilac Violet #A855F7)" Tag="Lilac" />
-                        <ComboBoxItem Content="💙 冰川湛蓝 (Glacial Blue #3B82F6)" Tag="Blue" />
-                        <ComboBoxItem Content="💚 翡翠荧绿 (Emerald Green #10B981)" Tag="Emerald" />
-                        <ComboBoxItem Content="💖 樱花粉晕 (Sakura Rose #EC4899)" Tag="Rose" />
-                        <ComboBoxItem Content="🧡 琥珀金光 (Amber Gold #F59E0B)" Tag="Amber" />
-                        <ComboBoxItem Content="🔴 珊瑚赤光 (Coral Red #EF4444)" Tag="Red" />
-                        <ComboBoxItem Content="⚪ 冰魄纯白 (Pure Ice White #FFFFFF)" Tag="White" />
-                        <ComboBoxItem Content="🎨 自定义光晕颜色 (Custom Glow Color)" Tag="Custom" />
+                        <ComboBoxItem Content="🌈 跟随主题高亮色" Tag="Auto" IsSelected="True" />
+                        <ComboBoxItem Content="💜 丁香晶紫" Tag="Lilac" />
+                        <ComboBoxItem Content="💙 冰川湛蓝" Tag="Blue" />
+                        <ComboBoxItem Content="💚 翡翠荧绿" Tag="Emerald" />
+                        <ComboBoxItem Content="💖 樱花粉晕" Tag="Rose" />
+                        <ComboBoxItem Content="🧡 琥珀金光" Tag="Amber" />
+                        <ComboBoxItem Content="🔴 珊瑚赤光" Tag="Red" />
+                        <ComboBoxItem Content="⚪ 冰魄纯白" Tag="White" />
+                        <ComboBoxItem Content="🎨 自定义光晕颜色" Tag="Custom" />
                       </ComboBox>
                       <Grid Name="CustomHighlightGlowPanel" Visibility="Collapsed" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
@@ -1803,7 +1783,7 @@
                         </Button>
                         <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取光晕颜色" Tag="HighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
                       </Grid>
-                      <TextBlock Text="光晕弥散半径 (Glow Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="光晕弥散半径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -1812,7 +1792,7 @@
                         <Slider Name="HighlightGlowRadiusSlider" Minimum="8" Maximum="48" Value="24" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="HighlightGlowRadiusSlider_ValueChanged" />
                         <TextBlock Name="HighlightGlowRadiusLabel" Grid.Column="1" Text="24 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <TextBlock Text="光晕不透明度 (Glow Opacity):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="光晕不透明度:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -1823,28 +1803,28 @@
                       </Grid>
                     </StackPanel>
                     <Border Name="Tier2ThemeExpanderBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,8,0,0">
-                      <Expander Name="Tier2ThemeExpander" Header="🌐 二级级联轮盘视觉风格与配色 (展开定制)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
+                      <Expander Name="Tier2ThemeExpander" Header="🌐 二级轮盘风格与配色 (展开定制)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
                         <StackPanel Name="Tier2ThemePanel" Margin="0,8,0,0">
                           <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
                             <TextBlock Text="🌟 当前正在单独定制二级级联轮盘专属视觉风格与色彩，支持与一级主轮盘自由组合！" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
                           </Border>
-                          <TextBlock Text="二级轮盘视觉风格 (Sub Wheel Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                          <TextBlock Text="二级轮盘视觉风格:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                           <ComboBox Name="SubWheelUiStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="SubWheelUiStyleComboBox_SelectionChanged">
-                            <ComboBoxItem Content="跟随一级主轮盘风格 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                            <ComboBoxItem Content="经典圆环 (Classic Ring)" Tag="ClassicRing" />
-                            <ComboBoxItem Content="极简扇区 (Clean Sectors)" Tag="CleanSectors" />
-                            <ComboBoxItem Content="液态毛玻璃 (Glassmorphism)" Tag="Glassmorphism" />
+                            <ComboBoxItem Content="跟随一级主轮盘风格" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="经典圆环" Tag="ClassicRing" />
+                            <ComboBoxItem Content="极简扇区" Tag="CleanSectors" />
+                            <ComboBoxItem Content="液态毛玻璃" Tag="Glassmorphism" />
                           </ComboBox>
-                          <TextBlock Text="二级轮盘配色方案 (Sub Wheel Theme):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                          <TextBlock Text="二级轮盘配色方案:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                           <ComboBox Name="SubWheelThemeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,6" SelectionChanged="SubWheelThemeComboBox_SelectionChanged">
-                            <ComboBoxItem Content="跟随一级主轮盘配色 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                            <ComboBoxItem Content="跟随系统 (System Auto)" Tag="System" />
-                            <ComboBoxItem Content="深色模式 (Dark)" Tag="Dark" />
-                            <ComboBoxItem Content="浅色模式 (Light)" Tag="Light" />
-                            <ComboBoxItem Content="抹茶森林 (Matcha Forest)" Tag="MatchaForest" />
-                            <ComboBoxItem Content="冰川透蓝 (Glacial Ice)" Tag="GlacialIce" />
-                            <ComboBoxItem Content="莫兰迪柔灰 (Morandi Muted)" Tag="MorandiMuted" />
-                            <ComboBoxItem Name="SubThemeCustomItem" Content="🎨 自定义配色 (Custom Colors)" Tag="Custom" />
+                            <ComboBoxItem Content="跟随一级主轮盘配色" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="跟随系统" Tag="System" />
+                            <ComboBoxItem Content="深色模式" Tag="Dark" />
+                            <ComboBoxItem Content="浅色模式" Tag="Light" />
+                            <ComboBoxItem Content="抹茶森林" Tag="MatchaForest" />
+                            <ComboBoxItem Content="冰川透蓝" Tag="GlacialIce" />
+                            <ComboBoxItem Content="莫兰迪柔灰" Tag="MorandiMuted" />
+                            <ComboBoxItem Name="SubThemeCustomItem" Content="🎨 自定义配色" Tag="Custom" />
                           </ComboBox>
                           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10">
                             <Button Name="NewSubCustomColorPresetButton" Content="➕ 新建配色" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" ToolTip="基于当前色彩创建全新的自定义配色方案预设" Click="NewSubCustomColorPresetButton_Click" />
@@ -1858,7 +1838,7 @@
                             <Expander Name="SubCustomColorExpander" IsExpanded="False" Background="#00FFFFFF" BorderThickness="0">
                               <HeaderedContentControl.Header>
                                 <StackPanel Margin="0,2,0,2">
-                                  <TextBlock Name="SubCustomColorsExpanderTitleText" Text="🎨 二级轮盘高级配色与色彩微调" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                  <TextBlock Name="SubCustomColorsExpanderTitleText" Text="🎨 二级轮盘高级配色" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                                   <TextBlock Name="SubCustomColorsExpanderDescText" Text="展开后可精准微调二级扇区底色、高亮光晕、边框线条、文字等各项色彩。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
                                 </StackPanel>
                               </HeaderedContentControl.Header>
@@ -1947,19 +1927,19 @@
                               </StackPanel>
                             </Expander>
                           </Border>
-                          <TextBlock Text="二级轮盘高亮边缘光晕 (Sub Highlight Glow):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,4" />
+                          <TextBlock Text="二级轮盘高亮边缘光晕:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,4" />
                           <ComboBox Name="SubHighlightGlowPresetComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,8" SelectionChanged="SubHighlightGlowPresetComboBox_SelectionChanged">
-                            <ComboBoxItem Content="🔘 跟随一级主轮盘光晕 (Follow Primary)" Tag="FollowPrimary" IsSelected="True" />
-                            <ComboBoxItem Content="🌈 跟随二级主题高亮色 (Auto / Follow Sub Theme)" Tag="Auto" />
-                            <ComboBoxItem Content="💜 丁香晶紫 (Lilac Violet #A855F7)" Tag="Lilac" />
-                            <ComboBoxItem Content="💙 冰川湛蓝 (Glacial Blue #3B82F6)" Tag="Blue" />
-                            <ComboBoxItem Content="💚 翡翠荧绿 (Emerald Green #10B981)" Tag="Emerald" />
-                            <ComboBoxItem Content="💖 樱花粉晕 (Sakura Rose #EC4899)" Tag="Rose" />
-                            <ComboBoxItem Content="🧡 琥珀金光 (Amber Gold #F59E0B)" Tag="Amber" />
-                            <ComboBoxItem Content="🔴 珊瑚赤光 (Coral Red #EF4444)" Tag="Red" />
-                            <ComboBoxItem Content="⚪ 冰魄纯白 (Pure Ice White #FFFFFF)" Tag="White" />
-                            <ComboBoxItem Content="🚫 关闭边缘光晕 (Disable Glow)" Tag="None" />
-                            <ComboBoxItem Content="🎨 自定义光晕颜色 (Custom Glow Color)" Tag="Custom" />
+                            <ComboBoxItem Content="🔘 跟随一级主轮盘光晕" Tag="FollowPrimary" IsSelected="True" />
+                            <ComboBoxItem Content="🌈 跟随二级主题高亮色" Tag="Auto" />
+                            <ComboBoxItem Content="💜 丁香晶紫" Tag="Lilac" />
+                            <ComboBoxItem Content="💙 冰川湛蓝" Tag="Blue" />
+                            <ComboBoxItem Content="💚 翡翠荧绿" Tag="Emerald" />
+                            <ComboBoxItem Content="💖 樱花粉晕" Tag="Rose" />
+                            <ComboBoxItem Content="🧡 琥珀金光" Tag="Amber" />
+                            <ComboBoxItem Content="🔴 珊瑚赤光" Tag="Red" />
+                            <ComboBoxItem Content="⚪ 冰魄纯白" Tag="White" />
+                            <ComboBoxItem Content="🚫 关闭边缘光晕" Tag="None" />
+                            <ComboBoxItem Content="🎨 自定义光晕颜色" Tag="Custom" />
                           </ComboBox>
                           <Grid Name="SubCustomHighlightGlowPanel" Visibility="Collapsed" Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
@@ -1975,7 +1955,7 @@
                             </Button>
                             <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取光晕颜色" Tag="SubHighlightGlowColor" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
                           </Grid>
-                          <TextBlock Text="光晕弥散半径 (Glow Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="光晕弥散半径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -1984,7 +1964,7 @@
                             <Slider Name="SubHighlightGlowRadiusSlider" Minimum="8" Maximum="48" Value="24" TickFrequency="2" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubHighlightGlowRadiusSlider_ValueChanged" />
                             <TextBlock Name="SubHighlightGlowRadiusLabel" Grid.Column="1" Text="24 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Text="光晕不透明度 (Glow Opacity):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="光晕不透明度:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2005,105 +1985,105 @@
                   </UIElement.Effect>
                   <StackPanel>
                     <Grid Margin="0,0,0,10">
-                      <TextBlock Name="DimensionsCardTitleText" Text="几何形态与尺寸微调 (一级主轮盘)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Name="DimensionsCardTitleText" Text="几何形态与尺寸 (一级主轮盘)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </Grid>
                     <StackPanel Name="Tier1DimensionsPanel" Visibility="Visible">
-                      <TextBlock Text="扇区切削形态 (Shape):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Text="扇区切削形态:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="ShapeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="ShapeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="经典紧凑扇区 (Original)" Tag="Original" IsSelected="True" />
-                        <ComboBoxItem Content="独立圆形卡片 (Circle)" Tag="Circle" />
-                        <ComboBoxItem Content="悬浮圆角胶囊 (Capsule)" Tag="RoundedCapsule" />
-                        <ComboBoxItem Content="蜂巢六边形矩阵 (HexagonHive)" Tag="HexagonHive" />
+                        <ComboBoxItem Content="经典紧凑扇区" Tag="Original" IsSelected="True" />
+                        <ComboBoxItem Content="独立圆形卡片" Tag="Circle" />
+                        <ComboBoxItem Content="悬浮圆角胶囊" Tag="RoundedCapsule" />
+                        <ComboBoxItem Content="蜂巢六边形矩阵" Tag="HexagonHive" />
                       </ComboBox>
-                      <TextBlock Text="扇区光学缝隙间距 (Gap):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="扇区缝隙间距:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="SectorGapSlider" Minimum="0" Maximum="12" Value="2" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorGapSlider_ValueChanged" />
-                        <TextBlock Name="SectorGapLabel" Grid.Column="1" Text="2 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <Slider Name="SectorGapSlider" Minimum="0" Maximum="12" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorGapSlider_ValueChanged" />
+                        <TextBlock Name="SectorGapLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <TextBlock Text="扇区边缘平滑倒角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="扇区边缘平滑倒角:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="SectorCornerRadiusSlider" Minimum="0" Maximum="16" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorCornerRadiusSlider_ValueChanged" />
-                        <TextBlock Name="SectorCornerRadiusLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <Slider Name="SectorCornerRadiusSlider" Minimum="0" Maximum="16" Value="13" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorCornerRadiusSlider_ValueChanged" />
+                        <TextBlock Name="SectorCornerRadiusLabel" Grid.Column="1" Text="13 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <TextBlock Text="轮盘整体半径 (外径):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="轮盘整体半径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="WheelRadiusSlider" Minimum="70" Maximum="280" Value="138" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged" />
-                        <TextBlock Name="WheelRadiusLabel" Grid.Column="1" Text="138" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <Slider Name="WheelRadiusSlider" Minimum="70" Maximum="280" Value="133" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="WheelRadiusSlider_ValueChanged" />
+                        <TextBlock Name="WheelRadiusLabel" Grid.Column="1" Text="133" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <TextBlock Text="扇区内半径 (Inner):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="扇区内半径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="InnerRadiusSlider" Minimum="20" Maximum="180" Value="52" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged" />
-                        <TextBlock Name="InnerRadiusLabel" Grid.Column="1" Text="52" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <Slider Name="InnerRadiusSlider" Minimum="20" Maximum="180" Value="70" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="InnerRadiusSlider_ValueChanged" />
+                        <TextBlock Name="InnerRadiusLabel" Grid.Column="1" Text="70" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
-                      <TextBlock Text="中心核心圆半径 (Core):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Text="中心核心圆半径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="45" />
                         </Grid.ColumnDefinitions>
-                        <Slider Name="CoreRadiusSlider" Minimum="15" Maximum="140" Value="50" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged" />
-                        <TextBlock Name="CoreRadiusLabel" Grid.Column="1" Text="50" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <Slider Name="CoreRadiusSlider" Minimum="15" Maximum="140" Value="36" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreRadiusSlider_ValueChanged" />
+                        <TextBlock Name="CoreRadiusLabel" Grid.Column="1" Text="36" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
                     </StackPanel>
                     <Border Name="Tier2DimensionsExpanderBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,8,0,0">
-                      <Expander Name="Tier2DimensionsExpander" Header="🌐 二级级联轮盘几何形态与尺寸 (展开微调)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
+                      <Expander Name="Tier2DimensionsExpander" Header="🌐 二级轮盘几何形态与尺寸 (展开微调)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="12" Expanded="Tier2Expander_ExpandedCollapsed" Collapsed="Tier2Expander_ExpandedCollapsed">
                         <StackPanel Name="Tier2DimensionsPanel" Margin="0,8,0,0">
                           <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
                             <TextBlock Text="🌟 当前正在单独调节二级级联轮盘专属尺寸，与一级轮盘完全独立互不影响。" FontSize="11" Foreground="{DynamicResource AccentPrimaryBrush}" TextWrapping="Wrap" />
                           </Border>
-                          <TextBlock Text="二级轮盘整体外径 (Sub Outer Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="二级轮盘整体外径:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <Slider Name="SubWheelOuterRadiusSlider" Minimum="120" Maximum="480" Value="210" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
-                            <TextBlock Name="SubWheelOuterRadiusLabel" Grid.Column="1" Text="210 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <Slider Name="SubWheelOuterRadiusSlider" Minimum="120" Maximum="480" Value="196" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelOuterRadiusSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelOuterRadiusLabel" Grid.Column="1" Text="196 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Text="二级与一级轮盘间距 (Gap):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="二级与一级轮盘间距:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <Slider Name="SubWheelInnerGapSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelInnerGapSlider_ValueChanged" />
-                            <TextBlock Name="SubWheelInnerGapLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <Slider Name="SubWheelInnerGapSlider" Minimum="0" Maximum="20" Value="7" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelInnerGapSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelInnerGapLabel" Grid.Column="1" Text="7 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Text="二级扇区边缘平滑倒角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="二级扇区边缘平滑倒角:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <Slider Name="SubWheelCornerRadiusSlider" Minimum="0" Maximum="20" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelCornerRadiusSlider_ValueChanged" />
-                            <TextBlock Name="SubWheelCornerRadiusLabel" Grid.Column="1" Text="4 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <Slider Name="SubWheelCornerRadiusSlider" Minimum="0" Maximum="20" Value="14" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelCornerRadiusSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelCornerRadiusLabel" Grid.Column="1" Text="14 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Text="二级轮盘图标尺寸 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="二级轮盘图标尺寸:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
                               <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <Slider Name="SubWheelIconSizeSlider" Minimum="10" Maximum="32" Value="18" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelIconSizeSlider_ValueChanged" />
-                            <TextBlock Name="SubWheelIconSizeLabel" Grid.Column="1" Text="18 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <Slider Name="SubWheelIconSizeSlider" Minimum="10" Maximum="32" Value="16" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SubWheelIconSizeSlider_ValueChanged" />
+                            <TextBlock Name="SubWheelIconSizeLabel" Grid.Column="1" Text="16 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Text="二级轮盘字体字号 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Text="二级轮盘字体字号:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,10">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2149,29 +2129,29 @@
                         <Button Name="ResetSlotLayoutButton" Grid.Column="1" Content="🔄 恢复继承全局" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" VerticalAlignment="Center" Click="ResetSlotLayoutButton_Click" />
                       </Grid>
                     </Border>
-                    <TextBlock Name="IconLayoutModeTitleText" Text="排版模式 (Layout Mode):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Name="IconLayoutModeTitleText" Text="排版模式:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <ComboBox Name="IconLayoutModeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="IconLayoutModeComboBox_SelectionChanged">
                       <ComboBoxItem Content="图标 + 文字 (双行居中)" Tag="IconAndText" IsSelected="True" />
                       <ComboBoxItem Content="仅显示图标 (极大化居中)" Tag="IconOnly" />
                       <ComboBoxItem Content="仅显示文字 (纯文字居中)" Tag="TextOnly" />
                     </ComboBox>
                     <StackPanel Name="Tab1_FontFamilyPanel">
-                      <TextBlock Name="WheelFontFamilyTitleText" Text="轮盘文字字体 (Font Family):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Name="WheelFontFamilyTitleText" Text="轮盘文字字体:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="WheelFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="WheelFontFamilyComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
-                        <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
-                        <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
-                        <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
-                        <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
-                        <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
-                        <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
+                        <ComboBoxItem Content="🖥️ 系统默认" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
+                        <ComboBoxItem Content="🔤 微软雅黑" Tag="Microsoft YaHei UI" />
+                        <ComboBoxItem Content="🔤 Segoe UI" Tag="Segoe UI" />
+                        <ComboBoxItem Content="🔤 鸿蒙字体" Tag="HarmonyOS Sans SC" />
+                        <ComboBoxItem Content="🔤 苹方字体" Tag="PingFang SC" />
+                        <ComboBoxItem Content="🔤 小米兰亭" Tag="MiSans" />
+                        <ComboBoxItem Content="🔤 Inter" Tag="Inter" />
                         <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
-                        <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
-                        <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
-                        <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
+                        <ComboBoxItem Content="🔤 黑体" Tag="SimHei" />
+                        <ComboBoxItem Content="🔤 楷体" Tag="KaiTi" />
+                        <ComboBoxItem Content="🔤 等宽代码体" Tag="Consolas, Cascadia Code" />
                       </ComboBox>
                     </StackPanel>
-                    <TextBlock Name="SectorTextColorTitleText" Text="轮盘文字颜色 (Sector Text Color):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                    <TextBlock Name="SectorTextColorTitleText" Text="轮盘文字颜色:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                     <Grid Margin="0,0,0,10">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="28" />
@@ -2184,7 +2164,7 @@
                       <Button Grid.Column="2" Content="🎨" Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="打开调色板选取颜色" Tag="SectorCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickCustomColor_Click" />
                       <Button Grid.Column="3" Content="🔍" Width="28" Height="28" Padding="0" ToolTip="从屏幕任意位置吸取颜色" Tag="SectorCustomText" Style="{StaticResource ModernButtonStyle}" Click="PickEyedropper_Click" />
                     </Grid>
-                    <TextBlock Name="SectorIconSizeTitleText" Text="图标尺寸大小 (Icon Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Name="SectorIconSizeTitleText" Text="图标尺寸大小:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <Grid Margin="0,2,0,8">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -2193,14 +2173,14 @@
                       <Slider Name="SectorIconSizeSlider" Minimum="14" Maximum="36" Value="20" SmallChange="1" LargeChange="2" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorIconSizeSlider_ValueChanged" />
                       <TextBlock Name="SectorIconSizeLabel" Grid.Column="1" Text="20 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
-                    <TextBlock Name="SectorFontSizeTitleText" Text="文字字号大小 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Name="SectorFontSizeTitleText" Text="文字字号大小:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                     <Grid Margin="0,2,0,8">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="45" />
                       </Grid.ColumnDefinitions>
-                      <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="11.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
-                      <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="11.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                      <Slider Name="SectorFontSizeSlider" Minimum="8" Maximum="18" Value="13.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="SectorFontSizeSlider_ValueChanged" />
+                      <TextBlock Name="SectorFontSizeLabel" Grid.Column="1" Text="13.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
 
                     <!-- 文字相对位置与偏移微调 (支持归位复位) -->
@@ -2211,12 +2191,12 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock Name="SectorTextPlacementTitleText" Text="文字相对位置 (Text Position):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Name="SectorTextPlacementTitleText" Text="文字相对位置:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                           <Button Name="ResetTextOffsetBtn" Grid.Column="1" Content="🔄 位置归位" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="8,0" FontSize="11" ToolTip="一键将文字相对位置与水平/垂直偏移恢复为默认" Click="ResetTextOffsetBtn_Click" />
                         </Grid>
                         <ComboBox Name="SectorTextPlacementComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="SectorTextPlacementComboBox_SelectionChanged">
-                          <ComboBoxItem Content="⬇️ 图标下方 (Below - 默认)" Tag="Below" IsSelected="True" />
-                          <ComboBoxItem Content="⬆️ 图标上方 (Above)" Tag="Above" />
+                          <ComboBoxItem Content="⬇️ 图标下方 (默认)" Tag="Below" IsSelected="True" />
+                          <ComboBoxItem Content="⬆️ 图标上方" Tag="Above" />
                         </ComboBox>
 
                         <Grid Margin="0,2,0,4">
@@ -2251,18 +2231,18 @@
                     <TextBlock Name="CoreSectionTitle" Text="中心核心圆与图案文字设置" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
                     <CheckBox Name="ShowCoreIconCheckBox" Content="启用中心图案/图标显示" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowCoreIconCheckBox_Changed" Unchecked="ShowCoreIconCheckBox_Changed" />
                     <StackPanel Name="CoreIconConfigPanel" Visibility="Visible">
-                      <TextBlock Text="图案类型 (Pattern Type):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Text="图案类型:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="CoreIconTypeComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="CoreIconTypeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="取消手势图标 (Exit / Cancel)" Tag="Exit" IsSelected="True" />
-                        <ComboBoxItem Content="精准十字准星 (Crosshair)" Tag="Crosshair" />
-                        <ComboBoxItem Content="Windows 徽标 (Windows)" Tag="Windows" />
-                        <ComboBoxItem Content="中心呼吸光点 (Dot)" Tag="Dot" />
-                        <ComboBoxItem Content="主页与返回 (Home)" Tag="Home" />
-                        <ComboBoxItem Content="电源图标 (Power)" Tag="Power" />
-                        <ComboBoxItem Content="八向罗盘星芒 (Compass)" Tag="Compass" />
-                        <ComboBoxItem Content="猫爪肉垫图案 (CatPaw)" Tag="CatPaw" />
-                        <ComboBoxItem Content="矢量图标库选择 (Custom SVG)" Tag="Custom" />
-                        <ComboBoxItem Content="本地自定义图片/贴图 (Raster Image)" Tag="Image" />
+                        <ComboBoxItem Content="取消手势图标" Tag="Exit" IsSelected="True" />
+                        <ComboBoxItem Content="精准十字准星" Tag="Crosshair" />
+                        <ComboBoxItem Content="Windows 徽标" Tag="Windows" />
+                        <ComboBoxItem Content="中心呼吸光点" Tag="Dot" />
+                        <ComboBoxItem Content="主页与返回" Tag="Home" />
+                        <ComboBoxItem Content="电源图标" Tag="Power" />
+                        <ComboBoxItem Content="八向罗盘星芒" Tag="Compass" />
+                        <ComboBoxItem Content="猫爪肉垫图案" Tag="CatPaw" />
+                        <ComboBoxItem Content="矢量图标库选择" Tag="Custom" />
+                        <ComboBoxItem Content="本地自定义图片" Tag="Image" />
                       </ComboBox>
                       <Grid Name="CustomCoreIconPanel" Visibility="Collapsed" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -2294,7 +2274,7 @@
                       <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
                         <StackPanel>
                           <TextBlock Name="CoreTransformSectionTitle" Text="图案与贴图尺寸及显示位置微调" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
-                          <TextBlock Name="CoreIconScaleTitleText" Text="中心图案大小缩放 (Scale / Zoom):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="CoreIconScaleTitleText" Text="中心图案大小缩放:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2303,7 +2283,7 @@
                             <Slider Name="CoreIconScaleSlider" AutomationProperties.AutomationId="CoreIconScaleSlider" Minimum="0.4" Maximum="2.5" Value="1.0" TickFrequency="0.05" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreIconScaleSlider_ValueChanged" />
                             <TextBlock Name="CoreIconScaleLabel" Grid.Column="1" Text="100%" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Name="CoreImageOffsetXTitleText" Text="水平显示位置偏移 (Offset X):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="CoreImageOffsetXTitleText" Text="水平显示位置偏移:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2312,7 +2292,7 @@
                             <Slider Name="CoreImageOffsetXSlider" AutomationProperties.AutomationId="CoreImageOffsetXSlider" Minimum="-60" Maximum="60" Value="0" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreImageOffsetSlider_ValueChanged" />
                             <TextBlock Name="CoreImageOffsetXLabel" Grid.Column="1" Text="0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <TextBlock Name="CoreImageOffsetYTitleText" Text="垂直显示位置偏移 (Offset Y):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="CoreImageOffsetYTitleText" Text="垂直显示位置偏移:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,10">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2328,26 +2308,26 @@
                     <!-- 中心文字独立解耦设置面板 -->
                     <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,10,0,0">
                       <StackPanel>
-                        <TextBlock Name="CoreTextOptionsSectionTitle" Text="中心文字与选中显示定制 (Center Text &amp; Selection)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                        <TextBlock Name="CoreTextOptionsSectionTitle" Text="中心文字与选中显示定制" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                         <CheckBox Name="ShowSelectedActionTextCheckBox" Content="选中扇区时在中心显示动作名称" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowSelectedActionTextCheckBox_Changed" Unchecked="ShowSelectedActionTextCheckBox_Changed" />
                         <StackPanel Name="CoreTextOptionsPanel" Visibility="Visible">
                           <StackPanel Name="Tab1_CoreFontFamilyPanel">
-                            <TextBlock Name="CoreFontFamilyTitleText" Text="中心文字字体 (Core Font Family):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBlock Name="CoreFontFamilyTitleText" Text="中心文字字体:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                             <ComboBox Name="CoreFontFamilyComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="32" Margin="0,0,0,8" SelectionChanged="CoreFontFamilyComboBox_SelectionChanged">
-                              <ComboBoxItem Content="🖥️ 系统默认 (Microsoft YaHei UI / Segoe UI)" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
-                              <ComboBoxItem Content="🔤 微软雅黑 (Microsoft YaHei UI)" Tag="Microsoft YaHei UI" />
-                              <ComboBoxItem Content="🔤 Segoe UI (Windows Fluent)" Tag="Segoe UI" />
-                              <ComboBoxItem Content="🔤 鸿蒙字体 (HarmonyOS Sans SC)" Tag="HarmonyOS Sans SC" />
-                              <ComboBoxItem Content="🔤 苹方字体 (PingFang SC)" Tag="PingFang SC" />
-                              <ComboBoxItem Content="🔤 小米兰亭 (MiSans)" Tag="MiSans" />
-                              <ComboBoxItem Content="🔤 Inter (Modern Sans)" Tag="Inter" />
+                              <ComboBoxItem Content="🖥️ 系统默认" Tag="Microsoft YaHei UI, Segoe UI" IsSelected="True" />
+                              <ComboBoxItem Content="🔤 微软雅黑" Tag="Microsoft YaHei UI" />
+                              <ComboBoxItem Content="🔤 Segoe UI" Tag="Segoe UI" />
+                              <ComboBoxItem Content="🔤 鸿蒙字体" Tag="HarmonyOS Sans SC" />
+                              <ComboBoxItem Content="🔤 苹方字体" Tag="PingFang SC" />
+                              <ComboBoxItem Content="🔤 小米兰亭" Tag="MiSans" />
+                              <ComboBoxItem Content="🔤 Inter" Tag="Inter" />
                               <ComboBoxItem Content="🔤 Arial" Tag="Arial" />
-                              <ComboBoxItem Content="🔤 黑体 (SimHei)" Tag="SimHei" />
-                              <ComboBoxItem Content="🔤 楷体 (KaiTi)" Tag="KaiTi" />
-                              <ComboBoxItem Content="🔤 等宽代码体 (Consolas / Cascadia)" Tag="Consolas, Cascadia Code" />
+                              <ComboBoxItem Content="🔤 黑体" Tag="SimHei" />
+                              <ComboBoxItem Content="🔤 楷体" Tag="KaiTi" />
+                              <ComboBoxItem Content="🔤 等宽代码体" Tag="Consolas, Cascadia Code" />
                             </ComboBox>
                           </StackPanel>
-                          <TextBlock Name="CoreFontSizeTitleText" Text="中心文字字号大小 (Core Font Size):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                          <TextBlock Name="CoreFontSizeTitleText" Text="中心文字字号大小:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                           <Grid Margin="0,2,0,8">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="*" />
@@ -2356,8 +2336,8 @@
                             <Slider Name="CoreFontSizeSlider" Minimum="8" Maximum="24" Value="13.0" SmallChange="0.5" LargeChange="1.0" TickFrequency="0.5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="CoreFontSizeSlider_ValueChanged" />
                             <TextBlock Name="CoreFontSizeLabel" Grid.Column="1" Text="13.0 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                           </Grid>
-                          <CheckBox Name="CoreTextColorAutoCheckBox" Content="自动适应配色主题 (Auto Contrast)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="CoreTextColorAutoCheckBox_Changed" Unchecked="CoreTextColorAutoCheckBox_Changed" />
-                          <TextBlock Name="CoreTextColorTitleText" Text="中心文字颜色 (Core Text Color):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                          <CheckBox Name="CoreTextColorAutoCheckBox" Content="自动适应配色主题" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,6" Checked="CoreTextColorAutoCheckBox_Changed" Unchecked="CoreTextColorAutoCheckBox_Changed" />
+                          <TextBlock Name="CoreTextColorTitleText" Text="中心文字颜色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                           <Grid Name="CoreTextColorRowGrid" Margin="0,0,0,6">
                             <Grid.ColumnDefinitions>
                               <ColumnDefinition Width="28" />
@@ -2392,40 +2372,40 @@
                     <StaticResource ResourceKey="CardShadowEffect" />
                   </UIElement.Effect>
                   <StackPanel>
-                    <TextBlock Name="LayerIndicatorSectionTitle" Text="轮盘层数切换提示微标 (Layer Switch Indicator)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                    <TextBlock Name="LayerIndicatorSectionTitle" Text="轮盘层数切换提示徽标" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                     <TextBlock Name="LayerIndicatorSectionDesc" Text="在高级全量模式下呼出轮盘后，滑动滚轮或按快捷键切换多层轮盘时的浮动提示徽标外观与停留时长。" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" />
 
                     <!-- 提示显示总开关 -->
-                    <CheckBox Name="ShowLayerIndicatorCheckBox" Content="启用层数切换浮动提示徽标 (Show Layer Indicator)" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowLayerIndicatorCheckBox_Changed" Unchecked="ShowLayerIndicatorCheckBox_Changed" />
+                    <CheckBox Name="ShowLayerIndicatorCheckBox" Content="启用层数切换浮动提示徽标" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,10" Checked="ShowLayerIndicatorCheckBox_Changed" Unchecked="ShowLayerIndicatorCheckBox_Changed" />
 
                     <StackPanel Name="LayerIndicatorConfigPanel" Visibility="Visible">
                       <!-- 预设外观风格 -->
-                      <TextBlock Name="LayerIndicatorStyleTitleText" Text="徽标预设风格 (Preset Style):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Name="LayerIndicatorStyleTitleText" Text="徽标预设风格:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="LayerIndicatorStyleComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="LayerIndicatorStyleComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🌌 沉浸深邃暗黑 (Dark Slate - 推荐)" Tag="Dark" IsSelected="True" />
-                        <ComboBoxItem Content="🧊 晶莹极光蓝透 (Aurora Cyan)" Tag="Aurora" />
-                        <ComboBoxItem Content="🔮 钛金晶透曜紫 (Titanium Purple)" Tag="Purple" />
-                        <ComboBoxItem Content="⚪ 极简透白浅色 (Minimalist Light)" Tag="Light" />
-                        <ComboBoxItem Content="🔘 跟随当前轮盘主题 (Follow Wheel Theme)" Tag="FollowTheme" />
-                        <ComboBoxItem Content="🎨 完全自定义色彩 (Custom Hex)" Tag="Custom" />
+                        <ComboBoxItem Content="🌌 沉浸深邃暗黑 (推荐)" Tag="Dark" IsSelected="True" />
+                        <ComboBoxItem Content="🧊 晶莹极光蓝透" Tag="Aurora" />
+                        <ComboBoxItem Content="🔮 钛金晶透曜紫" Tag="Purple" />
+                        <ComboBoxItem Content="⚪ 极简透白浅色" Tag="Light" />
+                        <ComboBoxItem Content="🔘 跟随当前轮盘主题" Tag="FollowTheme" />
+                        <ComboBoxItem Content="🎨 完全自定义色彩" Tag="Custom" />
                       </ComboBox>
 
                       <!-- 前置图标选择 -->
-                      <TextBlock Name="LayerIndicatorIconTitleText" Text="提示前置图标 (Indicator Icon):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                      <TextBlock Name="LayerIndicatorIconTitleText" Text="提示前置图标:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                       <ComboBox Name="LayerIndicatorIconComboBox" Style="{StaticResource FlatComboBoxStyle}" Height="34" Margin="0,0,0,10" SelectionChanged="LayerIndicatorIconComboBox_SelectionChanged">
-                        <ComboBoxItem Content="🌟 璀璨星芒 (Star - 默认)" Tag="🌟" IsSelected="True" />
-                        <ComboBoxItem Content="❄️ 冰晶雪花 (Snowflake)" Tag="❄️" />
-                        <ComboBoxItem Content="🌀 宇宙星盘 (Galaxy Orbit)" Tag="🌀" />
-                        <ComboBoxItem Content="⚡ 极速闪电 (Lightning)" Tag="⚡" />
-                        <ComboBoxItem Content="🎯 准星靶心 (Target)" Tag="🎯" />
-                        <ComboBoxItem Content="💎 纯净宝石 (Diamond)" Tag="💎" />
-                        <ComboBoxItem Content="🚫 无前置图标 (仅文字)" Tag="None" />
+                        <ComboBoxItem Content="🌟 璀璨星芒 (默认)" Tag="🌟" IsSelected="True" />
+                        <ComboBoxItem Content="❄️ 冰晶雪花" Tag="❄️" />
+                        <ComboBoxItem Content="🌀 宇宙星盘" Tag="🌀" />
+                        <ComboBoxItem Content="⚡ 极速闪电" Tag="⚡" />
+                        <ComboBoxItem Content="🎯 准星靶心" Tag="🎯" />
+                        <ComboBoxItem Content="💎 纯净宝石" Tag="💎" />
+                        <ComboBoxItem Content="🚫 无前置图标" Tag="None" />
                       </ComboBox>
 
                       <!-- 自定义颜色设置区 -->
                       <Border Name="LayerIndicatorCustomColorBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
                         <StackPanel>
-                          <TextBlock Text="🎨 徽标色彩微调 (十六进制色值 / 调色盘 / 屏幕吸色):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                          <TextBlock Text="🎨 徽标色彩微调:" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
 
                           <!-- 徽标底色 -->
                           <Grid Margin="0,0,0,6">
@@ -2478,7 +2458,7 @@
                       </Border>
 
                       <!-- 尺寸与形态滑块 -->
-                      <TextBlock Name="LayerIndicatorCornerRadiusTitleText" Text="徽标平滑圆角 (Corner Radius):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="LayerIndicatorCornerRadiusTitleText" Text="徽标平滑圆角:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -2488,7 +2468,7 @@
                         <TextBlock Name="LayerIndicatorCornerRadiusLabel" Grid.Column="1" Text="12 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
 
-                      <TextBlock Name="LayerIndicatorFontSizeTitleText" Text="文字字号大小 (Font Size):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="LayerIndicatorFontSizeTitleText" Text="文字字号大小:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -2498,7 +2478,7 @@
                         <TextBlock Name="LayerIndicatorFontSizeLabel" Grid.Column="1" Text="11.5 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
 
-                      <TextBlock Name="LayerIndicatorOffsetYTitleText" Text="垂直显示位置偏移 (Offset Y):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="LayerIndicatorOffsetYTitleText" Text="垂直显示位置偏移:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,8">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -2508,7 +2488,7 @@
                         <TextBlock Name="LayerIndicatorOffsetYLabel" Grid.Column="1" Text="10 px" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
                       </Grid>
 
-                      <TextBlock Name="LayerIndicatorDurationTitleText" Text="提示淡出停留时间 (Duration):" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                      <TextBlock Name="LayerIndicatorDurationTitleText" Text="提示淡出停留时间:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
                       <Grid Margin="0,2,0,10">
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -2540,7 +2520,7 @@
                       <ColumnDefinition Width="*" />
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="实时交互画布 (Live Preview)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="实时交互画布" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     <Border Grid.Column="1" Background="#ECFDF5" CornerRadius="4" Padding="6,2">
                       <TextBlock Text="60FPS 同步渲染" FontSize="10" FontWeight="Bold" Foreground="#059669" />
                     </Border>
@@ -2767,7 +2747,7 @@
                       <!-- 槽位标题与提示 -->
                       <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                          <TextBlock Name="FocusSlotTitleText" Text="扇区 1 [向上] (North)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                          <TextBlock Name="FocusSlotTitleText" Text="扇区 1 [向上]" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
                           <Border Name="FocusSlotTagBorder" CornerRadius="4" Background="{DynamicResource NavTabActiveBgBrush}" Padding="6,2" VerticalAlignment="Center">
                             <TextBlock Name="FocusSlotTagText" Text="一级主扇区" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
                           </Border>
@@ -2864,7 +2844,7 @@
 
                         <!-- 动作显示名称输入框 -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                          <TextBlock Name="FocusActionNameLabel" Text="轮盘显示文本 (Action Name):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                          <TextBlock Name="FocusActionNameLabel" Text="轮盘显示文本:" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4" />
                           <TextBox Name="FocusActionNameTextBox" Height="30" FontSize="12" TextChanged="FocusActionNameTextBox_TextChanged" />
                         </StackPanel>
                       </Grid>
@@ -3171,7 +3151,7 @@
                               </Grid.ColumnDefinitions>
                               <WrapPanel VerticalAlignment="Center">
                                 <Image Name="FocusInheritIconPreviewImage" Width="16" Height="16" Stretch="Uniform" Margin="0,0,6,0" Visibility="Collapsed" />
-                                <TextBlock Text="🏷️ 关联外部程序图标 (解耦执行与外观):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                                <TextBlock Text="🏷️ 关联外部程序图标:" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
                                 <TextBlock Name="FocusInheritIconStatusLabel" Text="未关联 (显示默认动作图标)" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                               </WrapPanel>
                               <Button Name="FocusClearInheritedIconBtn" Grid.Column="1" Content="✕ 清除关联" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="6,0" FontSize="10.5" Click="FocusClearInheritedIcon_Click" ToolTip="清除关联的外部程序图标，恢复默认矢量图标" Visibility="Collapsed" />
@@ -3202,7 +3182,7 @@
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
                           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="二级级联子动作 (Sub-Actions):" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" />
+                            <TextBlock Text="二级级联子动作:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" />
                             <TextBlock Name="FocusSubActionsCountLabel" Text="(0 项)" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
                           </StackPanel>
                           <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -3234,7 +3214,7 @@
                       </Border>
                       <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                          <TextBlock Name="FocusBatchTitleText" Text="批量修改模式 (Batch Mode)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
+                          <TextBlock Name="FocusBatchTitleText" Text="批量修改模式" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" />
                           <Border CornerRadius="4" Background="#183B82F6" BorderBrush="#803B82F6" BorderThickness="1" Padding="6,2" VerticalAlignment="Center">
                             <TextBlock Name="FocusBatchTagText" Text="已多选 0 个扇区" FontSize="10.5" FontWeight="SemiBold" Foreground="#3B82F6" />
                           </Border>
@@ -3248,7 +3228,7 @@
                     <Border Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                       <StackPanel>
                         <!-- 1. 批量排版模式 -->
-                        <TextBlock Text="批量切换排版模式 (Layout Mode):" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                        <TextBlock Text="批量切换排版模式:" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
                         <Grid Margin="0,0,0,10">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -3288,7 +3268,7 @@
                         </Grid>
 
                         <!-- 3. 批量文字颜色 -->
-                        <TextBlock Text="批量文字颜色 (Sector Text Color):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,4" />
+                        <TextBlock Text="批量文字颜色:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,4" />
                         <Grid Margin="0,0,0,8">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="28" />
@@ -3311,14 +3291,14 @@
                           </Grid.ColumnDefinitions>
                           <StackPanel Grid.Column="0">
                             <Grid>
-                              <TextBlock Text="水平边距 (X 偏移):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Text="水平 X 偏移:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                               <TextBlock Name="BatchTextOffsetXLabel" Text="0 px" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                             </Grid>
                             <Slider Name="BatchTextOffsetXSlider" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchTextOffsetSlider_ValueChanged" />
                           </StackPanel>
                           <StackPanel Grid.Column="2">
                             <Grid>
-                              <TextBlock Text="垂直边距 (Y 偏移):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                              <TextBlock Text="垂直 Y 偏移:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
                               <TextBlock Name="BatchTextOffsetYLabel" Text="0 px" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" HorizontalAlignment="Right" />
                             </Grid>
                             <Slider Name="BatchTextOffsetYSlider" Minimum="-40" Maximum="40" Value="0" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="0,4,0,0" ValueChanged="BatchTextOffsetSlider_ValueChanged" />
@@ -3375,7 +3355,7 @@
                       <ColumnDefinition Width="Auto" />
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="实时交互画布 (Live Wheel)" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="实时交互画布" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     <Button Name="MappingsLinkSubActionsBtn" Grid.Column="1" Style="{StaticResource ModernButtonStyle}" Height="24" Padding="8,0" Margin="0,0,8,0" ToolTip="开启时：拖拽一级扇区将连同绑定的二级子轮盘一起对调换位&#x0a;关闭时：仅对调一级扇区主动作，保留各方位现存的二级子菜单" Click="MappingsLinkSubActionsBtn_Click">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Name="MappingsLinkSubActionsIcon" Text="🔗" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center" />
@@ -3456,7 +3436,7 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock Text="当前配置方案 (Profile)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock Text="当前配置方案" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <TextBlock Text="选择或新建针对特定程序（如 Chrome、VS Code）或特定工作流的轮盘配置方案（支持双击重命名）。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" />
                       <ListBox Name="ProfilesListBox" Height="100" DisplayMemberPath="DisplayTitle" SelectionChanged="ProfilesListBox_SelectionChanged" MouseDoubleClick="ProfilesListBox_MouseDoubleClick" />
                     </StackPanel>
@@ -3470,7 +3450,7 @@
                 </Border>
                 <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,14">
                   <StackPanel>
-                    <TextBlock Text="扇区方位数量 (Sector Count)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="扇区方位数量" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                     <TextBlock Text="切换手势轮盘的切分数量。4 键最快最不易误触，8 键为标准全能方位，12 键适合功能密集场景。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,10" />
                     <StackPanel Orientation="Horizontal">
                       <RadioButton Name="SectorCount4Radio" GroupName="SectorCountGroup" Content="4 键十字方位" Margin="0,0,24,0" Checked="SectorCountRadio_Checked" />
@@ -3720,8 +3700,7 @@
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-              <TextBlock Name="AdvancedPageHeader" Text="高级系统与运维备份" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-              <TextBlock Name="AdvancedPageSubheader" Text="管理界面语言、Windows 开机自启、管理员提权与配置文件的导入/导出备份。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+              <TextBlock Name="AdvancedPageHeader" Text="系统设置" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
             </StackPanel>
 
             <!-- 🤝 贡献者致谢可折叠卡片 (与 GitHub 仓库实时同步) -->
@@ -3785,12 +3764,12 @@
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🚀" FontSize="15" FontFamily="Segoe UI Emoji, Segoe UI Symbol, Segoe UI" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <TextBlock Name="UpdateSectionTitleText" Text="软件更新与版本管理 (Software Updates)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Name="UpdateSectionTitleText" Text="软件更新" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                         <Border Name="UpdateStatusBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.4-beta.2 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.4-beta.3 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -3831,7 +3810,7 @@
                       </Border>
 
                       <!-- 更新日志预览 -->
-                      <TextBlock Text="📋 详细更新日志 (Changelog):" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,4" />
+                      <TextBlock Text="📋 详细更新日志:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,4" />
                       <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
                         <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                           <TextBlock Name="UpdateChangelogTextBlock" Text="" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" LineHeight="18" />
@@ -3893,7 +3872,7 @@
                       <HeaderedContentControl.Header>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,3,0,3">
                           <TextBlock Text="⚙️" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                          <TextBlock Name="UpdateAdvancedSettingsExpanderTitle" Text="更新偏好、下载加速与历史版本回退 (展开/折叠)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                          <TextBlock Name="UpdateAdvancedSettingsExpanderTitle" Text="更新偏好、下载加速与历史版本回退" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                           <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="3" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="高级选项" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" />
                           </Border>
@@ -3961,7 +3940,7 @@
                                 <ComboBoxItem Tag="ghfast" Content="⚡ 镜像源 1 (ghfast.top 推荐)" />
                                 <ComboBoxItem Tag="gh-proxy" Content="⚡ 镜像源 2 (gh-proxy.com 备用)" />
                                 <ComboBoxItem Tag="mirror" Content="⚡ 镜像源 3 (mirror.ghproxy.com)" />
-                                <ComboBoxItem Tag="direct" Content="🌐 官方直连 (GitHub Official)" />
+                                <ComboBoxItem Tag="direct" Content="🌐 官方直连" />
                               </ComboBox>
                             </Grid>
                           </Grid>
@@ -3978,7 +3957,7 @@
                               <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                   <TextBlock Text="⏮️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                  <TextBlock Name="RollbackSectionTitleText" Text="历史版本回退 (Version Rollback)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                  <TextBlock Name="RollbackSectionTitleText" Text="历史版本回退" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                   <Border Name="RollbackCountBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                                     <TextBlock Name="RollbackCountBadgeText" Text="🚀 测试版最多回退5个版本" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
                                   </Border>
@@ -4041,16 +4020,16 @@
                   <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="🌐" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                      <TextBlock Name="LanguageTitleText" Text="界面语言 (Display Language)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Name="LanguageTitleText" Text="界面语言" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="LanguageDescText" Text="选择软件控制台与轮盘界面的显示语言，即时生效并持久保存。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                   </StackPanel>
                   <ComboBox Name="LanguageComboBox" Grid.Column="1" Style="{StaticResource FlatComboBoxStyle}" MinWidth="260" Height="34" VerticalAlignment="Center" SelectionChanged="LanguageComboBox_SelectionChanged">
-                    <ComboBoxItem Tag="zh-CN" Content="🌐 [ZH] 简体中文 (Simplified Chinese)" />
-                    <ComboBoxItem Tag="zh-TW" Content="🌐 [TW] 繁體中文 (Traditional Chinese)" />
-                    <ComboBoxItem Tag="en" Content="🌐 [EN] English (US / UK)" />
-                    <ComboBoxItem Tag="ja" Content="🌐 [JA] 日本語 (Japanese)" />
-                    <ComboBoxItem Tag="Auto" Content="🖥️ [SYS] 跟随系统 (System Default)" />
+                    <ComboBoxItem Tag="zh-CN" Content="🌐 [ZH] 简体中文" />
+                    <ComboBoxItem Tag="zh-TW" Content="🌐 [TW] 繁體中文" />
+                    <ComboBoxItem Tag="en" Content="🌐 [EN] English" />
+                    <ComboBoxItem Tag="ja" Content="🌐 [JA] 日本語" />
+                    <ComboBoxItem Tag="Auto" Content="🖥️ [SYS] 跟随系统" />
                   </ComboBox>
                 </Grid>
               </Border>
@@ -4127,7 +4106,7 @@
                   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="🛡️" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                      <TextBlock Name="ElevateTitleText" Text="以管理员权限运行 (UAC Elevation)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Name="ElevateTitleText" Text="以管理员权限运行" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="ElevateDescText" Text="当前以普通用户权限运行。若需在任务管理器、注册表或管理员权限程序中响应轮盘手势，建议提升为管理员权限。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                   </StackPanel>
@@ -4146,7 +4125,7 @@
                   <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="🚀" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                      <TextBlock Name="MemoryOptTitleText" Text="极致轻量内存管理 (Memory Optimization)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Name="MemoryOptTitleText" Text="内存管理" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Name="MemoryOptDescText" Text="已开启工作集压缩与动态内存优化，StarPie 常驻后台内存维持在 15~25MB。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
                   </StackPanel>
@@ -4167,7 +4146,7 @@
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="📁" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Name="BackupTitleText" Text="多配置文件方案与备份管理 (Profiles &amp; Backup)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Name="BackupTitleText" Text="多配置文件方案与备份" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                         <Border Name="ActiveProfileBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
                           <TextBlock Name="ActiveProfileBadgeText" Text="当前方案: 默认配置" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
@@ -4220,7 +4199,7 @@
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                       <StackPanel Orientation="Horizontal">
                         <TextBlock Text="📋" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Name="LogsTitleText" Text="系统运行日志与诊断 (Runtime Logs &amp; Diagnostics)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Name="LogsTitleText" Text="系统运行日志与诊断" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                       </StackPanel>
                       <TextBlock Name="LogsDescText" Text="自动记录系统事件、手势调度、按键模拟与异常排查信息（自动保留最近 7 天），便于快速定位与修复问题。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
                     </StackPanel>
@@ -4240,7 +4219,7 @@
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="关于与更新日志" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBlock Text="关于软件" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
             <TextBlock Text="StarPie 现代鼠标轮盘笔势工具版本信息与完整演进历程。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
           </StackPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -4265,7 +4244,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.4-beta.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.4-beta.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -4275,6 +4254,17 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <StaticResource ResourceKey="CardShadowEffect" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.4-beta.3 控制台 UI 与文本规范化精简 &amp; 模式切换整合" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🎨 【消除重复繁琐文本】：全面精简导航栏与卡片标题中重复的“XX与XX”平行并列句式，去除界面控件中硬编码的英文后缀；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🧭 【导航图标与模式整合】：移除侧边栏多余双图标堆砌，整合重复的模式切换开关为右上角统一单选；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🌐 【占位符修复】：彻底解决高级系统设置未国际化占位符显示 raw key 文本的问题，多语言字典规范化对齐。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>
@@ -4377,7 +4367,7 @@
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
                 <StackPanel>
-                  <TextBlock Text="版本演进里程碑 (Milestones)" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                  <TextBlock Text="版本演进里程碑" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
                   <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                     <Grid>
                       <Grid.ColumnDefinitions>
@@ -4650,7 +4640,7 @@
                       <TextBlock Grid.Column="2" Text="2026-08-23" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" />
                     </Grid>
                   </Border>
-                  <Expander Name="OlderMilestonesExpander" Header="📜 展开查看更早的历史版本演进 (Older Milestones)" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" Background="#00FFFFFF" BorderThickness="0" Margin="0,4,0,0">
+                  <Expander Name="OlderMilestonesExpander" Header="📜 展开查看更早的历史版本演进" IsExpanded="False" Foreground="{DynamicResource TextPrimaryBrush}" Background="#00FFFFFF" BorderThickness="0" Margin="0,4,0,0">
                     <StackPanel Margin="0,8,0,0">
                       <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10" Margin="0,0,0,10">
                         <Grid>

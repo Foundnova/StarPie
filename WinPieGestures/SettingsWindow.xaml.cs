@@ -761,23 +761,9 @@ public partial class SettingsWindow : Window
 
 		// 底部版本与版权信息：折叠时持续展示，自适应居中对齐
 		SidebarFooterPanel.Visibility = Visibility.Visible;
-		bool isSimpleMode = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
 		if (isCollapsed)
 		{
 			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Center;
-			if (SidebarModeBadge != null)
-			{
-				SidebarModeBadge.HorizontalAlignment = HorizontalAlignment.Center;
-				SidebarModeBadge.Padding = new Thickness(6, 4, 6, 4);
-				SidebarModeBadge.CornerRadius = new CornerRadius(12);
-				SidebarModeBadge.ToolTip = isSimpleMode ? "当前: 简单模式 (点击快速切换至高级全星模式)" : "当前: 高级全星模式 (点击快速切换至简单模式)";
-			}
-			if (SidebarModeText != null)
-			{
-				SidebarModeText.Text = isSimpleMode ? "💡" : "⚙️";
-				SidebarModeText.FontSize = 13;
-				SidebarModeText.Foreground = Brushes.White;
-			}
 			if (SidebarVersionBadge != null)
 			{
 				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Center;
@@ -797,19 +783,6 @@ public partial class SettingsWindow : Window
 		else
 		{
 			SidebarFooterPanel.HorizontalAlignment = HorizontalAlignment.Left;
-			if (SidebarModeBadge != null)
-			{
-				SidebarModeBadge.HorizontalAlignment = HorizontalAlignment.Left;
-				SidebarModeBadge.Padding = new Thickness(7, 3, 7, 3);
-				SidebarModeBadge.CornerRadius = new CornerRadius(6);
-				SidebarModeBadge.ToolTip = isSimpleMode ? "点击快速切换至高级全星模式" : "点击快速切换至简单模式";
-			}
-			if (SidebarModeText != null)
-			{
-				SidebarModeText.Text = I18n.T(isSimpleMode ? "SidebarModeSimple" : "SidebarModePro");
-				SidebarModeText.FontSize = 10.5;
-				SidebarModeText.Foreground = Brushes.White;
-			}
 			if (SidebarVersionBadge != null)
 			{
 				SidebarVersionBadge.HorizontalAlignment = HorizontalAlignment.Left;
@@ -1164,22 +1137,22 @@ public partial class SettingsWindow : Window
 		// Sub-Wheel Dimensions
 		if (SubWheelOuterRadiusSlider != null)
 		{
-			SubWheelOuterRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : 210.0);
+			SubWheelOuterRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelOuterRadius > 0.0) ? ConfigManager.CurrentConfig.SubWheelOuterRadius : 196.0);
 			SubWheelOuterRadiusLabel.Text = $"{SubWheelOuterRadiusSlider.Value:0} px";
 		}
 		if (SubWheelInnerGapSlider != null)
 		{
-			SubWheelInnerGapSlider.Value = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0);
+			SubWheelInnerGapSlider.Value = ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 7.0);
 			SubWheelInnerGapLabel.Text = $"{SubWheelInnerGapSlider.Value:0} px";
 		}
 		if (SubWheelCornerRadiusSlider != null)
 		{
-			SubWheelCornerRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
+			SubWheelCornerRadiusSlider.Value = ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 14.0);
 			SubWheelCornerRadiusLabel.Text = $"{SubWheelCornerRadiusSlider.Value:0} px";
 		}
 		if (SubWheelIconSizeSlider != null)
 		{
-			SubWheelIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 18.0);
+			SubWheelIconSizeSlider.Value = ((ConfigManager.CurrentConfig.SubWheelIconSize > 0.0) ? ConfigManager.CurrentConfig.SubWheelIconSize : 16.0);
 			SubWheelIconSizeLabel.Text = $"{SubWheelIconSizeSlider.Value:0} px";
 		}
 		if (SubWheelFontSizeSlider != null)
@@ -1189,7 +1162,7 @@ public partial class SettingsWindow : Window
 		}
 		if (SubWheelTriggerDistanceSlider != null)
 		{
-			SubWheelTriggerDistanceSlider.Value = ((ConfigManager.CurrentConfig.SubWheelTriggerDistance > 0.0) ? ConfigManager.CurrentConfig.SubWheelTriggerDistance : 95.0);
+			SubWheelTriggerDistanceSlider.Value = ((ConfigManager.CurrentConfig.SubWheelTriggerDistance > 0.0) ? ConfigManager.CurrentConfig.SubWheelTriggerDistance : 141.0);
 			if (SubWheelTriggerDistanceValueText != null)
 			{
 				SubWheelTriggerDistanceValueText.Text = $"{SubWheelTriggerDistanceSlider.Value:0} px";
@@ -1738,32 +1711,9 @@ public partial class SettingsWindow : Window
 
 		UpdateFocusActionTypeItemsSource();
 
-		// 5. 顶部状态微标与提示文本
-		if (ConfigModeStatusIcon != null)
-		{
-			ConfigModeStatusIcon.Text = isSimple ? "💡" : "⚙️";
-		}
-		if (ConfigModeStatusText != null)
-		{
-			ConfigModeStatusText.Text = I18n.T(isSimple ? "ConfigModeSimpleTitle" : "ConfigModeProTitle");
-		}
-		if (ConfigModeHintText != null)
-		{
-			ConfigModeHintText.Text = I18n.T(isSimple ? "ConfigModeSimpleHint" : "ConfigModeProHint");
-		}
-
-		// 6. 侧边栏微标与提示文本
-		if (SidebarModeBadge != null)
-		{
-			SidebarModeBadge.Background = isSimple ? (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush") : new SolidColorBrush(System.Windows.Media.Color.FromRgb(124, 58, 237));
-		}
-		if (SidebarModeText != null)
-		{
-			SidebarModeText.Foreground = Brushes.White;
-		}
 		ApplySidebarLayout();
 
-		// 7. 单选按钮状态同步
+		// 5. 单选按钮状态同步
 		bool oldUpdating = _isUpdatingUi;
 		try
 		{
@@ -1793,12 +1743,6 @@ public partial class SettingsWindow : Window
 		{
 			ApplyConfigMode("Pro", true);
 		}
-	}
-
-	private void SidebarModeBadge_Click(object sender, MouseButtonEventArgs e)
-	{
-		bool isSimple = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
-		ApplyConfigMode(isSimple ? "Pro" : "Simple", true);
 	}
 
 	public void ApplyLocalization()
@@ -2545,10 +2489,7 @@ public partial class SettingsWindow : Window
 		{
 			PreviewPanHintText.Text = I18n.T("PreviewPanHint");
 		}
-		if (AdvancedPageSubheader != null)
-		{
-			AdvancedPageSubheader.Text = I18n.T("AdvancedPageSubheader");
-		}
+
 		UpdateFocusActionTypeItemsSource();
 		App.RefreshTrayMenu();
 	}
@@ -7498,7 +7439,7 @@ public partial class SettingsWindow : Window
 					catch { }
 				}
 
-				bool showText = ConfigManager.CurrentConfig?.MappingsCanvasShowText ?? true;
+				bool showText = ConfigManager.CurrentConfig?.MappingsCanvasShowText ?? false;
 
 				if (showText)
 				{
@@ -12421,27 +12362,27 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		try
 		{
-			WheelRadiusSlider.Value = 138.0;
-			WheelRadiusLabel.Text = "138";
-			InnerRadiusSlider.Value = 52.0;
-			InnerRadiusLabel.Text = "52";
-			CoreRadiusSlider.Value = 50.0;
-			CoreRadiusLabel.Text = "50";
-			SectorGapSlider.Value = 2.0;
-			SectorGapLabel.Text = "2 px";
-			SectorCornerRadiusSlider.Value = 4.0;
-			SectorCornerRadiusLabel.Text = "4 px";
+			WheelRadiusSlider.Value = 133.0;
+			WheelRadiusLabel.Text = "133";
+			InnerRadiusSlider.Value = 70.0;
+			InnerRadiusLabel.Text = "70";
+			CoreRadiusSlider.Value = 36.0;
+			CoreRadiusLabel.Text = "36";
+			SectorGapSlider.Value = 4.0;
+			SectorGapLabel.Text = "4 px";
+			SectorCornerRadiusSlider.Value = 13.0;
+			SectorCornerRadiusLabel.Text = "13 px";
 			SectorIconSizeSlider.Value = 20.0;
 			SectorIconSizeLabel.Text = "20 px";
-			SectorFontSizeSlider.Value = 10.5;
-			SectorFontSizeLabel.Text = "10.5 px";
-			ConfigManager.CurrentConfig.WheelRadius = 138.0;
-			ConfigManager.CurrentConfig.InnerRadius = 52.0;
-			ConfigManager.CurrentConfig.CoreRadius = 50.0;
-			ConfigManager.CurrentConfig.SectorGap = 2.0;
-			ConfigManager.CurrentConfig.SectorCornerRadius = 4.0;
+			SectorFontSizeSlider.Value = 13.0;
+			SectorFontSizeLabel.Text = "13 px";
+			ConfigManager.CurrentConfig.WheelRadius = 133.0;
+			ConfigManager.CurrentConfig.InnerRadius = 70.0;
+			ConfigManager.CurrentConfig.CoreRadius = 36.0;
+			ConfigManager.CurrentConfig.SectorGap = 4.0;
+			ConfigManager.CurrentConfig.SectorCornerRadius = 13.0;
 			ConfigManager.CurrentConfig.SectorIconSize = 20.0;
-			ConfigManager.CurrentConfig.SectorFontSize = 10.5;
+			ConfigManager.CurrentConfig.SectorFontSize = 13.0;
 			ConfigManager.CurrentConfig.SectorTextPlacement = "Below";
 			ConfigManager.CurrentConfig.SectorTextOffsetX = 0.0;
 			ConfigManager.CurrentConfig.SectorTextOffsetY = 0.0;
@@ -12673,33 +12614,33 @@ public partial class SettingsWindow : Window
 		{
 			if (SubWheelOuterRadiusSlider != null)
 			{
-				SubWheelOuterRadiusSlider.Value = 210.0;
-				SubWheelOuterRadiusLabel.Text = "210 px";
+				SubWheelOuterRadiusSlider.Value = 196.0;
+				SubWheelOuterRadiusLabel.Text = "196 px";
 			}
 			if (SubWheelInnerGapSlider != null)
 			{
-				SubWheelInnerGapSlider.Value = 4.0;
-				SubWheelInnerGapLabel.Text = "4 px";
+				SubWheelInnerGapSlider.Value = 7.0;
+				SubWheelInnerGapLabel.Text = "7 px";
 			}
 			if (SubWheelCornerRadiusSlider != null)
 			{
-				SubWheelCornerRadiusSlider.Value = 4.0;
-				SubWheelCornerRadiusLabel.Text = "4 px";
+				SubWheelCornerRadiusSlider.Value = 14.0;
+				SubWheelCornerRadiusLabel.Text = "14 px";
 			}
 			if (SubWheelIconSizeSlider != null)
 			{
-				SubWheelIconSizeSlider.Value = 18.0;
-				SubWheelIconSizeLabel.Text = "18 px";
+				SubWheelIconSizeSlider.Value = 16.0;
+				SubWheelIconSizeLabel.Text = "16 px";
 			}
 			if (SubWheelFontSizeSlider != null)
 			{
 				SubWheelFontSizeSlider.Value = 9.5;
 				SubWheelFontSizeLabel.Text = "9.5 px";
 			}
-			ConfigManager.CurrentConfig.SubWheelOuterRadius = 210.0;
-			ConfigManager.CurrentConfig.SubWheelInnerGap = 4.0;
-			ConfigManager.CurrentConfig.SubWheelCornerRadius = 4.0;
-			ConfigManager.CurrentConfig.SubWheelIconSize = 18.0;
+			ConfigManager.CurrentConfig.SubWheelOuterRadius = 196.0;
+			ConfigManager.CurrentConfig.SubWheelInnerGap = 7.0;
+			ConfigManager.CurrentConfig.SubWheelCornerRadius = 14.0;
+			ConfigManager.CurrentConfig.SubWheelIconSize = 16.0;
 			ConfigManager.CurrentConfig.SubWheelFontSize = 9.5;
 		}
 		finally
@@ -15425,10 +15366,10 @@ public partial class SettingsWindow : Window
 			double num10 = Math.Max(10.0, ConfigManager.CurrentConfig.CoreRadius * num7);
 			double gap = Math.Max(0.0, ConfigManager.CurrentConfig.SectorGap * num7);
 			double cornerRadius = Math.Max(0.0, ConfigManager.CurrentConfig.SectorCornerRadius * num7);
-			double num11 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0) * num7);
+			double num11 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 7.0) * num7);
 			double num12 = num8 + num11 + 2.0;
 			double num13 = Math.Max(num12 + 10.0, num6 * num7);
-			double cornerRadius2 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0) * num7);
+			double cornerRadius2 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 14.0) * num7);
 			if (num9 >= num8)
 			{
 				num9 = num8 * 0.5;
@@ -16939,7 +16880,7 @@ public partial class SettingsWindow : Window
 			double num9 = ConfigManager.CurrentConfig.WheelRadius * num8;
 			double num10 = ConfigManager.CurrentConfig.InnerRadius * num8;
 			double num11 = ConfigManager.CurrentConfig.CoreRadius * num8;
-			double num12 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 4.0) * num8);
+			double num12 = Math.Max(0.0, ((ConfigManager.CurrentConfig.SubWheelInnerGap >= 0.0) ? ConfigManager.CurrentConfig.SubWheelInnerGap : 7.0) * num8);
 			double num13 = num9 + num12 + 2.0;
 			double num14 = Math.Max(num13 + 10.0, num7 * num8);
 			int num15 = -2;

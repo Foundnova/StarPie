@@ -508,7 +508,7 @@ public partial class RadialWindow : Window
 		// 计算轮盘的真实有效可见半径（基于主轮盘外径及多级展开子轮盘外径，而非整个巨幅透明阴影画布）
 		double wheelRadius = (ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig.WheelRadius > 0.0)
 			? ConfigManager.CurrentConfig.WheelRadius
-			: 138.0;
+			: 133.0;
 		bool enableMultiTier = ConfigManager.CurrentConfig?.EnableMultiTier == true;
 		double ratio = (ConfigManager.CurrentConfig?.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
 		double subMaxR = (ConfigManager.CurrentConfig?.SubWheelOuterRadius > 0.0)
@@ -599,8 +599,8 @@ public partial class RadialWindow : Window
 		_subSectorTransforms = new List<TranslateTransform>();
 		_subContainerTransforms = new List<TranslateTransform>();
 		_subSectorAngles = new List<double>();
-		_innerRadius = 52.0;
-		_outerRadius = 138.0;
+		_innerRadius = 70.0;
+		_outerRadius = 133.0;
 		_borderThickness = 1.0;
 		_highlightBorderThickness = 1.5;
 		InitializeComponent();
@@ -3177,7 +3177,7 @@ public partial class RadialWindow : Window
 			double maxFillet = (Math.Sqrt(3.0) / 2.0) * radius * 0.95;
 			double rawCr = (cornerRadius >= 0.0)
 				? cornerRadius
-				: ((ConfigManager.CurrentConfig?.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
+				: ((ConfigManager.CurrentConfig?.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 14.0);
 			double effectiveCr = Math.Max(0.0, Math.Min(rawCr, maxFillet));
 
 			Point[] vertices = new Point[6];

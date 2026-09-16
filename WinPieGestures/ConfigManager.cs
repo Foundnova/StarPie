@@ -510,45 +510,45 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "复制 (Copy)",
+					Name = "复制",
 					Parameter = "Ctrl+C",
 					IconKey = "Copy",
 					SubActions = new List<ActionItem>
 					{
-						new ActionItem { Type = "Hotkey", Name = "粘贴 (Paste)", Parameter = "Ctrl+V", IconKey = "Paste" },
-						new ActionItem { Type = "Hotkey", Name = "剪切 (Cut)", Parameter = "Ctrl+X", IconKey = "Cut" },
-						new ActionItem { Type = "Hotkey", Name = "全选 (Select All)", Parameter = "Ctrl+A", IconKey = "Folder" }
+						new ActionItem { Type = "Hotkey", Name = "粘贴", Parameter = "Ctrl+V", IconKey = "Paste" },
+						new ActionItem { Type = "Hotkey", Name = "剪切", Parameter = "Ctrl+X", IconKey = "Cut" },
+						new ActionItem { Type = "Hotkey", Name = "全选", Parameter = "Ctrl+A", IconKey = "Folder" }
 					}
 				},
 				new ActionItem
 				{
 					Type = "System",
-					Name = "屏幕截图 (Capture)",
+					Name = "屏幕截图",
 					Parameter = "Screenshot",
 					IconKey = "Screenshot"
 				},
 				new ActionItem
 				{
 					Type = "System",
-					Name = "显示桌面 (Desktop)",
+					Name = "显示桌面",
 					Parameter = "ShowDesktop",
 					IconKey = "ShowDesktop",
 					SubActions = new List<ActionItem>
 					{
-						new ActionItem { Type = "System", Name = "锁定电脑 (Lock)", Parameter = "Lock", IconKey = "Lock" }
+						new ActionItem { Type = "System", Name = "锁定电脑", Parameter = "Lock", IconKey = "Lock" }
 					}
 				},
 				new ActionItem
 				{
 					Type = "System",
-					Name = "多任务视图 (Task View)",
+					Name = "多任务视图",
 					Parameter = "TaskView",
 					IconKey = "Camera"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "常用工具 (Utilities)",
+					Name = "常用工具",
 					Parameter = "Ctrl+V",
 					IconKey = "Paste",
 					SubActions = new List<ActionItem>
@@ -562,14 +562,14 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "System",
-					Name = "音量减 (Vol Down)",
+					Name = "音量减",
 					Parameter = "VolumeDown",
 					IconKey = "VolumeDown"
 				},
 				new ActionItem
 				{
 					Type = "Launch",
-					Name = "浏览器 (Web Browser)",
+					Name = "浏览器",
 					Parameter = "https://www.google.com",
 					IconKey = "Browser",
 					SubActions = new List<ActionItem>
@@ -582,7 +582,7 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "System",
-					Name = "音量增 (Vol Up)",
+					Name = "音量增",
 					Parameter = "VolumeUp",
 					IconKey = "VolumeUp"
 				}
@@ -597,28 +597,28 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "关闭标签 (Close Tab)",
+					Name = "关闭标签",
 					Parameter = "Ctrl+W",
 					IconKey = "CloseTab"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "后退 (Back)",
+					Name = "后退",
 					Parameter = "Alt+Left",
 					IconKey = "Back"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "新建标签 (New Tab)",
+					Name = "新建标签",
 					Parameter = "Ctrl+T",
 					IconKey = "NewTab"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "刷新 (Refresh)",
+					Name = "刷新",
 					Parameter = "F5",
 					IconKey = "Refresh"
 				}
@@ -633,56 +633,56 @@ public static class ConfigManager
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "定义跳转 (F12)",
+					Name = "定义跳转",
 					Parameter = "F12",
 					IconKey = "Code"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "格式化 (Format)",
+					Name = "代码格式化",
 					Parameter = "Shift+Alt+F",
 					IconKey = "Edit"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "控制台 (Terminal)",
+					Name = "控制台",
 					Parameter = "Ctrl+`",
 					IconKey = "Terminal"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "查找文件 (Quick Open)",
+					Name = "快速查找文件",
 					Parameter = "Ctrl+P",
 					IconKey = "Search"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "保存全部 (Save All)",
+					Name = "保存全部",
 					Parameter = "Ctrl+K,S",
 					IconKey = "Save"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "全局搜索 (Find in Files)",
+					Name = "全局搜索",
 					Parameter = "Ctrl+Shift+F",
 					IconKey = "Search"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "撤销 (Undo)",
+					Name = "撤销",
 					Parameter = "Ctrl+Z",
 					IconKey = "Undo"
 				},
 				new ActionItem
 				{
 					Type = "Hotkey",
-					Name = "重做 (Redo)",
+					Name = "重做",
 					Parameter = "Ctrl+Y",
 					IconKey = "Redo"
 				}

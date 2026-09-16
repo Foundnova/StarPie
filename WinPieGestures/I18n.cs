@@ -262,16 +262,16 @@ public static class I18n
 		};
 		dictionary["WheelFontFamily"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘文字字体 (Font Family):",
-			[LanguageCode.ZhTw] = "輪盤文字字體 (Font Family):",
+			[LanguageCode.ZhCn] = "轮盘文字字体:",
+			[LanguageCode.ZhTw] = "輪盤文字字體:",
 			[LanguageCode.En] = "Wheel Font Family:",
 			[LanguageCode.Ja] = "ホイールのフォント:"
 		};
 		
 		dictionary["SubmenuStyleTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "二级菜单样式 (Submenu Style)",
-			[LanguageCode.ZhTw] = "二級選單樣式 (Submenu Style)",
+			[LanguageCode.ZhCn] = "二级菜单样式",
+			[LanguageCode.ZhTw] = "二級選單樣式",
 			[LanguageCode.En] = "Submenu Style",
 			[LanguageCode.Ja] = "サブメニューのスタイル"
 		};
@@ -284,25 +284,25 @@ public static class I18n
 		};
 		dictionary["SubmenuStyleWheel"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "🌐 外圈子环 (Sub-Ring)",
-			[LanguageCode.ZhTw] = "🌐 外圈子環 (Sub-Ring)",
+			[LanguageCode.ZhCn] = "🌐 外圈子环",
+			[LanguageCode.ZhTw] = "🌐 外圈子環",
 			[LanguageCode.En] = "🌐 Outer Sub-Ring",
 			[LanguageCode.Ja] = "🌐 外周同心リング"
 		};
 		dictionary["SubmenuStyleFan"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "🍯 蜂窝扇 (Honeycomb Fan)",
-			[LanguageCode.ZhTw] = "🍯 蜂窩扇 (Honeycomb Fan)",
+			[LanguageCode.ZhCn] = "🍯 蜂窝扇",
+			[LanguageCode.ZhTw] = "🍯 蜂窩扇",
 			[LanguageCode.En] = "🍯 Honeycomb Fan",
 			[LanguageCode.Ja] = "🍯 ハニカムファン"
 		};
 
 		dictionary["OuterEscapeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "顺势外甩脱离取消 (Outer Escape Cancel)",
-			[LanguageCode.ZhTw] = "順勢外甩脫離取消 (Outer Escape Cancel)",
+			[LanguageCode.ZhCn] = "外甩脱离取消",
+			[LanguageCode.ZhTw] = "外甩脫離取消",
 			[LanguageCode.En] = "Outer Escape Cancel",
-			[LanguageCode.Ja] = "外側スワイプでキャンセル (Outer Escape)"
+			[LanguageCode.Ja] = "外側スワイプでキャンセル"
 		};
 		dictionary["OuterEscapeDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -313,10 +313,10 @@ public static class I18n
 		};
 		dictionary["OuterEscapeDistanceTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "外甩取消距离灵敏度 (Escape Distance):",
-			[LanguageCode.ZhTw] = "外甩取消距離靈敏度 (Escape Distance):",
-			[LanguageCode.En] = "Escape Distance Threshold (Sensitivity):",
-			[LanguageCode.Ja] = "キャンセルスワイプ距離 (感度設定):"
+			[LanguageCode.ZhCn] = "外甩取消距离:",
+			[LanguageCode.ZhTw] = "外甩取消距離:",
+			[LanguageCode.En] = "Escape Distance:",
+			[LanguageCode.Ja] = "キャンセルスワイプ距離:"
 		};
 		dictionary["OuterEscapeDistanceDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -334,10 +334,10 @@ public static class I18n
 		};
 		dictionary["VolumeDragTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "音量拖距调音 (Volume Drag-Adjust)",
-			[LanguageCode.ZhTw] = "音量拖距調音 (Volume Drag-Adjust)",
+			[LanguageCode.ZhCn] = "音量拖距调音",
+			[LanguageCode.ZhTw] = "音量拖距調音",
 			[LanguageCode.En] = "Volume Drag-Adjust",
-			[LanguageCode.Ja] = "音量ドラッグ調整 (Volume Drag-Adjust)"
+			[LanguageCode.Ja] = "音量ドラッグ調整"
 		};
 		dictionary["VolumeDragDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -348,10 +348,10 @@ public static class I18n
 		};
 		dictionary["VolumeCancelRatioTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "缩回取消系数 (Cancel Hysteresis):",
-			[LanguageCode.ZhTw] = "縮回取消係數 (Cancel Hysteresis):",
-			[LanguageCode.En] = "Return-to-center cancel ratio (Hysteresis):",
-			[LanguageCode.Ja] = "中心復帰キャンセル係数 (Hysteresis):"
+			[LanguageCode.ZhCn] = "缩回取消滞后:",
+			[LanguageCode.ZhTw] = "縮回取消滯後:",
+			[LanguageCode.En] = "Return Cancel Ratio:",
+			[LanguageCode.Ja] = "中心復帰キャンセル係数:"
 		};
 		dictionary["VolumeCancelRatioDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -362,10 +362,10 @@ public static class I18n
 		};
 		dictionary["VolumeFlickFarTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "甩出取消距离下限 (Flick Far):",
-			[LanguageCode.ZhTw] = "甩出取消距離下限 (Flick Far):",
-			[LanguageCode.En] = "Flick-out cancel distance floor (Flick Far):",
-			[LanguageCode.Ja] = "スワイプキャンセル距離下限 (Flick Far):"
+			[LanguageCode.ZhCn] = "外甩取消距离下限:",
+			[LanguageCode.ZhTw] = "外甩取消距離下限:",
+			[LanguageCode.En] = "Flick Cancel Distance Floor:",
+			[LanguageCode.Ja] = "スワイプキャンセル距離下限:"
 		};
 		dictionary["VolumeFlickFarDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -376,10 +376,10 @@ public static class I18n
 		};
 		dictionary["VolumeFlickJumpTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "甩动跳变阈值 (Flick Jump):",
-			[LanguageCode.ZhTw] = "甩動跳變閾值 (Flick Jump):",
-			[LanguageCode.En] = "Per-frame flick jump threshold (Flick Jump):",
-			[LanguageCode.Ja] = "フレームあたりスワイプ跳変閾値 (Flick Jump):"
+			[LanguageCode.ZhCn] = "外甩速度跳变阈值:",
+			[LanguageCode.ZhTw] = "外甩速度跳變閾值:",
+			[LanguageCode.En] = "Flick Jump Threshold:",
+			[LanguageCode.Ja] = "スワイプ跳変閾値:"
 		};
 		dictionary["VolumeFlickJumpDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -439,38 +439,38 @@ public static class I18n
 		};
 		dictionary["CoreTransformSectionTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "图案与贴图尺寸及显示位置微调",
-			[LanguageCode.ZhTw] = "圖案與貼圖尺寸及顯示位置微調",
+			[LanguageCode.ZhCn] = "图案尺寸与位置",
+			[LanguageCode.ZhTw] = "圖案尺寸與位置",
 			[LanguageCode.En] = "Core Pattern & Image Size and Position Tuning",
 			[LanguageCode.Ja] = "コアパターン・画像のサイズと位置の微調整"
 		};
 		dictionary["CoreIconScaleTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心图案大小缩放 (Scale / Zoom):",
-			[LanguageCode.ZhTw] = "中心圖案大小縮放 (Scale / Zoom):",
-			[LanguageCode.En] = "Core Pattern / Image Scale (Zoom):",
-			[LanguageCode.Ja] = "中央パターン／画像のスケーリング (ズーム):"
+			[LanguageCode.ZhCn] = "图案大小缩放:",
+			[LanguageCode.ZhTw] = "圖案大小縮放:",
+			[LanguageCode.En] = "Core Pattern / Image Scale:",
+			[LanguageCode.Ja] = "中央パターン／画像のスケーリング:"
 		};
 		dictionary["CoreImageOffsetXTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "水平显示位置偏移 (Offset X):",
-			[LanguageCode.ZhTw] = "水平顯示位置偏移 (Offset X):",
-			[LanguageCode.En] = "Horizontal Position Offset (X):",
+			[LanguageCode.ZhCn] = "水平偏移:",
+			[LanguageCode.ZhTw] = "水平偏移:",
+			[LanguageCode.En] = "Horizontal Offset (X):",
 			[LanguageCode.Ja] = "水平表示位置オフセット (X):"
 		};
 		dictionary["CoreImageOffsetYTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "垂直显示位置偏移 (Offset Y):",
-			[LanguageCode.ZhTw] = "垂直顯示位置偏移 (Offset Y):",
-			[LanguageCode.En] = "Vertical Position Offset (Y):",
+			[LanguageCode.ZhCn] = "垂直偏移:",
+			[LanguageCode.ZhTw] = "垂直偏移:",
+			[LanguageCode.En] = "Vertical Offset (Y):",
 			[LanguageCode.Ja] = "垂直表示位置オフセット (Y):"
 		};
 		dictionary["BtnResetCoreTransform"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udd04 重置图案大小与居中位置",
-			[LanguageCode.ZhTw] = "\ud83d\udd04 重設圖案大小與置中位置",
-			[LanguageCode.En] = "\ud83d\udd04 Reset Size & Center Position",
-			[LanguageCode.Ja] = "\ud83d\udd04 サイズと中央位置をリセット"
+			[LanguageCode.ZhCn] = "🔄 重置尺寸与居中",
+			[LanguageCode.ZhTw] = "🔄 重設尺寸與置中",
+			[LanguageCode.En] = "🔄 Reset Size & Center Position",
+			[LanguageCode.Ja] = "🔄 サイズと中央位置をリセット"
 		};
 		dictionary["CoreImagePerformanceTip"] = new Dictionary<LanguageCode, string>
 		{
@@ -509,8 +509,8 @@ public static class I18n
 		};
 		dictionary["IsolationModeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "进程隔离与生效模式 (Process Isolation Mode)",
-			[LanguageCode.ZhTw] = "處理程序隔離與生效模式 (Process Isolation Mode)",
+			[LanguageCode.ZhCn] = "进程隔离与生效模式",
+			[LanguageCode.ZhTw] = "處理程序隔離與生效模式",
 			[LanguageCode.En] = "Process Isolation & Activation Mode",
 			[LanguageCode.Ja] = "プロセス分離と有効化モード"
 		};
@@ -572,10 +572,10 @@ public static class I18n
 		};
 		dictionary["MilestonesOlderExpander"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udcdc 展开查看更早的历史版本演进 (Older Milestones)",
-			[LanguageCode.ZhTw] = "\ud83d\udcdc 展開查看更早的歷史版本演進 (Older Milestones)",
-			[LanguageCode.En] = "\ud83d\udcdc View Older Milestones",
-			[LanguageCode.Ja] = "\ud83d\udcdc 過去の更新履歴を表示"
+			[LanguageCode.ZhCn] = "📜 展开查看更早的历史版本演进",
+			[LanguageCode.ZhTw] = "📜 展開查看更早的歷史版本演進",
+			[LanguageCode.En] = "📜 View Older Milestones",
+			[LanguageCode.Ja] = "📜 過去の更新履歴を表示"
 		};
 		dictionary["BrowseAppTooltip"] = new Dictionary<LanguageCode, string>
 		{
@@ -747,8 +747,8 @@ public static class I18n
 		};
 		dictionary["ProfileCardTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "当前配置方案 (Profile)",
-			[LanguageCode.ZhTw] = "當前配置方案 (Profile)",
+			[LanguageCode.ZhCn] = "当前配置方案",
+			[LanguageCode.ZhTw] = "當前配置方案",
 			[LanguageCode.En] = "Active Profiles",
 			[LanguageCode.Ja] = "プロファイル設定"
 		};
@@ -796,8 +796,8 @@ public static class I18n
 		};
 		dictionary["SectorCountOptionTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "扇区方位数量 (Sector Count)",
-			[LanguageCode.ZhTw] = "扇區方位數量 (Sector Count)",
+			[LanguageCode.ZhCn] = "扇区按键数",
+			[LanguageCode.ZhTw] = "扇區按鍵數",
 			[LanguageCode.En] = "Sector Count",
 			[LanguageCode.Ja] = "セクター数（キー数）"
 		};
@@ -901,8 +901,8 @@ public static class I18n
 		};
 		dictionary["ColorPickerTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "色彩选择器与屏幕吸管 (Color Picker)",
-			[LanguageCode.ZhTw] = "色彩選擇器與螢幕吸管 (Color Picker)",
+			[LanguageCode.ZhCn] = "颜色选择器",
+			[LanguageCode.ZhTw] = "色彩選擇器",
 			[LanguageCode.En] = "Color Picker & Eyedropper",
 			[LanguageCode.Ja] = "カラーピッカー＆スポイト"
 		};
@@ -999,45 +999,45 @@ public static class I18n
 		};
 		dictionary["WindowTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "StarPie 设置控制台 (Preferences)",
-			[LanguageCode.ZhTw] = "StarPie 設定控制台 (Preferences)",
+			[LanguageCode.ZhCn] = "StarPie 设置控制台",
+			[LanguageCode.ZhTw] = "StarPie 設定控制台",
 			[LanguageCode.En] = "StarPie Preferences Console",
 			[LanguageCode.Ja] = "StarPie 環境設定コンソール"
 		};
 		dictionary["TabTrigger"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udfaf 触发与场景",
-			[LanguageCode.ZhTw] = "\ud83c\udfaf 觸發與場景",
-			[LanguageCode.En] = "\ud83c\udfaf Trigger & Scenes",
-			[LanguageCode.Ja] = "\ud83c\udfaf トリガーとシーン"
+			[LanguageCode.ZhCn] = "触发设置",
+			[LanguageCode.ZhTw] = "觸發設定",
+			[LanguageCode.En] = "Triggers",
+			[LanguageCode.Ja] = "トリガー設定"
 		};
 		dictionary["TabAppearance"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udfa8 外观与形态",
-			[LanguageCode.ZhTw] = "\ud83c\udfa8 外觀與形態",
-			[LanguageCode.En] = "\ud83c\udfa8 Appearance & Shapes",
-			[LanguageCode.Ja] = "\ud83c\udfa8 外観と形状"
+			[LanguageCode.ZhCn] = "外观样式",
+			[LanguageCode.ZhTw] = "外觀樣式",
+			[LanguageCode.En] = "Appearance",
+			[LanguageCode.Ja] = "外観スタイル"
 		};
 		dictionary["TabGestures"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚡ 手势与动作",
-			[LanguageCode.ZhTw] = "⚡ 手勢與動作",
-			[LanguageCode.En] = "⚡ Gestures & Actions",
-			[LanguageCode.Ja] = "⚡ ジェスチャーと動作"
+			[LanguageCode.ZhCn] = "手势动作",
+			[LanguageCode.ZhTw] = "手勢動作",
+			[LanguageCode.En] = "Gestures & Actions",
+			[LanguageCode.Ja] = "ジェスチャー"
 		};
 		dictionary["TabAdvanced"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚙\ufe0f 高级与系统",
-			[LanguageCode.ZhTw] = "⚙\ufe0f 進階與系統",
-			[LanguageCode.En] = "⚙\ufe0f Advanced & System",
-			[LanguageCode.Ja] = "⚙\ufe0f 高度な設定とシステム"
+			[LanguageCode.ZhCn] = "系统设置",
+			[LanguageCode.ZhTw] = "系統設定",
+			[LanguageCode.En] = "System Settings",
+			[LanguageCode.Ja] = "システム設定"
 		};
 		dictionary["TabAbout"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udccb 关于与更新",
-			[LanguageCode.ZhTw] = "\ud83d\udccb 關於與更新",
-			[LanguageCode.En] = "\ud83d\udccb About & Updates",
-			[LanguageCode.Ja] = "\ud83d\udccb 情報と更新"
+			[LanguageCode.ZhCn] = "关于软件",
+			[LanguageCode.ZhTw] = "關於軟體",
+			[LanguageCode.En] = "About StarPie",
+			[LanguageCode.Ja] = "バージョン情報"
 		};
 		dictionary["SidebarCollapse"] = new Dictionary<LanguageCode, string>
 		{
@@ -1125,8 +1125,8 @@ public static class I18n
 		};
 		dictionary["GestureTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "鼠标手势 (Mouse Gestures)",
-			[LanguageCode.ZhTw] = "滑鼠手勢 (Mouse Gestures)",
+			[LanguageCode.ZhCn] = "鼠标手势",
+			[LanguageCode.ZhTw] = "滑鼠手勢",
 			[LanguageCode.En] = "Mouse Gestures",
 			[LanguageCode.Ja] = "マウスジェスチャー"
 		};
@@ -1489,31 +1489,31 @@ public static class I18n
 		};
 		dictionary["TriggerBtnRight"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\uddb1\ufe0f 鼠标右键 (Right Button) [推荐 / 默认]",
-			[LanguageCode.ZhTw] = "\ud83d\uddb1\ufe0f 滑鼠右鍵 (Right Button) [推薦 / 默認]",
-			[LanguageCode.En] = "\ud83d\uddb1\ufe0f Right Mouse Button [Default / Recommended]",
-			[LanguageCode.Ja] = "\ud83d\uddb1\ufe0f マウス右ボタン [推奨 / デフォルト]"
+			[LanguageCode.ZhCn] = "🖱️ 鼠标右键 [推荐 / 默认]",
+			[LanguageCode.ZhTw] = "🖱️ 滑鼠右鍵 [推薦 / 默認]",
+			[LanguageCode.En] = "🖱️ Right Mouse Button [Default / Recommended]",
+			[LanguageCode.Ja] = "🖱️ マウス右ボタン [推奨 / デフォルト]"
 		};
 		dictionary["TriggerBtnMiddle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\uddb1\ufe0f 鼠标中键 / 滚轮按压 (Middle Button)",
-			[LanguageCode.ZhTw] = "\ud83d\uddb1\ufe0f 滑鼠中鍵 / 滾輪按壓 (Middle Button)",
-			[LanguageCode.En] = "\ud83d\uddb1\ufe0f Middle Mouse Button / Wheel Click",
-			[LanguageCode.Ja] = "\ud83d\uddb1\ufe0f マウス中央ボタン / ホイールクリック"
+			[LanguageCode.ZhCn] = "🖱️ 鼠标中键 / 滚轮按压",
+			[LanguageCode.ZhTw] = "🖱️ 滑鼠中鍵 / 滾輪按壓",
+			[LanguageCode.En] = "🖱️ Middle Mouse Button / Wheel Click",
+			[LanguageCode.Ja] = "🖱️ マウス中央ボタン / ホイールクリック"
 		};
 		dictionary["TriggerBtnX1"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\uddb1\ufe0f 鼠标侧键 1 / 后退键 (XButton 1 / Back)",
-			[LanguageCode.ZhTw] = "\ud83d\uddb1\ufe0f 滑鼠側鍵 1 / 後退鍵 (XButton 1 / Back)",
-			[LanguageCode.En] = "\ud83d\uddb1\ufe0f Mouse Side Button 1 / Back (XButton 1)",
-			[LanguageCode.Ja] = "\ud83d\uddb1\ufe0f マウスサイドボタン 1 / 戻る (XButton 1)"
+			[LanguageCode.ZhCn] = "🖱️ 鼠标侧键 1 / 后退键",
+			[LanguageCode.ZhTw] = "🖱️ 滑鼠側鍵 1 / 後退鍵",
+			[LanguageCode.En] = "🖱️ Mouse Side Button 1 / Back",
+			[LanguageCode.Ja] = "🖱️ マウスサイドボタン 1 / 戻る"
 		};
 		dictionary["TriggerBtnX2"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\uddb1\ufe0f 鼠标侧键 2 / 前进键 (XButton 2 / Forward)",
-			[LanguageCode.ZhTw] = "\ud83d\uddb1\ufe0f 滑鼠側鍵 2 / 前進鍵 (XButton 2 / Forward)",
-			[LanguageCode.En] = "\ud83d\uddb1\ufe0f Mouse Side Button 2 / Forward (XButton 2)",
-			[LanguageCode.Ja] = "\ud83d\uddb1\ufe0f マウスサイドボタン 2 / 進む (XButton 2)"
+			[LanguageCode.ZhCn] = "🖱️ 鼠标侧键 2 / 前进键",
+			[LanguageCode.ZhTw] = "🖱️ 滑鼠側鍵 2 / 前進鍵",
+			[LanguageCode.En] = "🖱️ Mouse Side Button 2 / Forward",
+			[LanguageCode.Ja] = "🖱️ マウスサイドボタン 2 / 進む"
 		};
 		dictionary["SensitivityTitle"] = new Dictionary<LanguageCode, string>
 		{
@@ -1643,155 +1643,155 @@ public static class I18n
 		};
 		dictionary["StyleTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘渲染风格 (Visual Renderer)",
-			[LanguageCode.ZhTw] = "輪盤渲染風格 (Visual Renderer)",
+			[LanguageCode.ZhCn] = "轮盘视觉风格",
+			[LanguageCode.ZhTw] = "輪盤視覺風格",
 			[LanguageCode.En] = "Visual Renderer Style",
 			[LanguageCode.Ja] = "ビジュアルレンダラー"
 		};
 		dictionary["StyleGlass"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "液态毛玻璃 (Glassmorphism)",
-			[LanguageCode.ZhTw] = "液態毛玻璃 (Glassmorphism)",
+			[LanguageCode.ZhCn] = "液态毛玻璃",
+			[LanguageCode.ZhTw] = "液態毛玻璃",
 			[LanguageCode.En] = "Liquid Glassmorphism",
 			[LanguageCode.Ja] = "リキッドグラスモーフィズム"
 		};
 		dictionary["StyleClassic"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "经典圆环 (Classic Ring)",
-			[LanguageCode.ZhTw] = "經典圓環 (Classic Ring)",
+			[LanguageCode.ZhCn] = "经典圆环",
+			[LanguageCode.ZhTw] = "經典圓環",
 			[LanguageCode.En] = "Classic Ring",
 			[LanguageCode.Ja] = "クラシックリング"
 		};
 		dictionary["StyleClean"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "极简扇区 (Clean Sectors)",
-			[LanguageCode.ZhTw] = "極簡扇區 (Clean Sectors)",
+			[LanguageCode.ZhCn] = "悬浮扇区",
+			[LanguageCode.ZhTw] = "懸浮扇區",
 			[LanguageCode.En] = "Clean Sectors",
 			[LanguageCode.Ja] = "クリーンセクター"
 		};
 		dictionary["StyleCatPaw"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "萌宠猫爪 (Cute Cat Paw)",
-			[LanguageCode.ZhTw] = "萌寵貓爪 (Cute Cat Paw)",
+			[LanguageCode.ZhCn] = "萌宠猫爪",
+			[LanguageCode.ZhTw] = "萌寵貓爪",
 			[LanguageCode.En] = "Cute Cat Paw",
 			[LanguageCode.Ja] = "キュートキャットポー (肉球)"
 		};
 		dictionary["ThemeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘配色方案 (Color Palette)",
-			[LanguageCode.ZhTw] = "輪盤配色方案 (Color Palette)",
+			[LanguageCode.ZhCn] = "轮盘配色方案",
+			[LanguageCode.ZhTw] = "輪盤配色方案",
 			[LanguageCode.En] = "Wheel Color Palette",
 			[LanguageCode.Ja] = "ホイール配色パレット"
 		};
 		dictionary["BtnDeletePreset"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\uddd1\ufe0f 删除预设",
-			[LanguageCode.ZhTw] = "\ud83d\uddd1\ufe0f 刪除預設",
-			[LanguageCode.En] = "\ud83d\uddd1\ufe0f Delete Preset",
-			[LanguageCode.Ja] = "\ud83d\uddd1\ufe0f プリセット削除"
+			[LanguageCode.ZhCn] = "🗑️ 删除预设",
+			[LanguageCode.ZhTw] = "🗑️ 刪除預設",
+			[LanguageCode.En] = "🗑️ Delete Preset",
+			[LanguageCode.Ja] = "🗑️ プリセット削除"
 		};
 		dictionary["GlowTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "高亮边缘光晕 (Highlight Edge Glow)",
-			[LanguageCode.ZhTw] = "高亮邊緣光暈 (Highlight Edge Glow)",
+			[LanguageCode.ZhCn] = "高亮边缘光晕",
+			[LanguageCode.ZhTw] = "高亮邊緣光暈",
 			[LanguageCode.En] = "Highlight Edge Glow",
 			[LanguageCode.Ja] = "ハイライトエッジグロー発光"
 		};
 		dictionary["GlowFollowTheme"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "跟随主题高亮色 (Auto)",
-			[LanguageCode.ZhTw] = "跟隨主題高亮色 (Auto)",
-			[LanguageCode.En] = "Follow Theme (Auto)",
-			[LanguageCode.Ja] = "テーマ連動 (自動)"
+			[LanguageCode.ZhCn] = "跟随主题高亮色",
+			[LanguageCode.ZhTw] = "跟隨主題高亮色",
+			[LanguageCode.En] = "Follow Theme",
+			[LanguageCode.Ja] = "テーマ連動"
 		};
 		dictionary["GlowRadius"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "光晕弥散半径 (Glow Radius)",
-			[LanguageCode.ZhTw] = "光暈彌散半徑 (Glow Radius)",
+			[LanguageCode.ZhCn] = "光晕半径",
+			[LanguageCode.ZhTw] = "光暈半徑",
 			[LanguageCode.En] = "Glow Radius",
 			[LanguageCode.Ja] = "グロー拡散半径"
 		};
 		dictionary["GlowOpacity"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "光晕不透明度 (Glow Opacity)",
-			[LanguageCode.ZhTw] = "光暈不透明度 (Glow Opacity)",
+			[LanguageCode.ZhCn] = "光晕不透明度",
+			[LanguageCode.ZhTw] = "光暈不透明度",
 			[LanguageCode.En] = "Glow Opacity",
 			[LanguageCode.Ja] = "グロー不透明度"
 		};
 		dictionary["GeometryTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "几何形态与尺寸 (Geometry & Dimensions)",
-			[LanguageCode.ZhTw] = "幾何形態與尺寸 (Geometry & Dimensions)",
+			[LanguageCode.ZhCn] = "形态与尺寸",
+			[LanguageCode.ZhTw] = "形態與尺寸",
 			[LanguageCode.En] = "Geometry & Dimensions",
 			[LanguageCode.Ja] = "幾何学形状とサイズ"
 		};
 		dictionary["ShapeOriginal"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "原生扇区 (Original Sector)",
-			[LanguageCode.ZhTw] = "原生扇區 (Original Sector)",
+			[LanguageCode.ZhCn] = "原生扇区",
+			[LanguageCode.ZhTw] = "原生扇區",
 			[LanguageCode.En] = "Original Sector",
 			[LanguageCode.Ja] = "オリジナルセクター"
 		};
 		dictionary["ShapeCircle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "极简圆形 (Floating Circle)",
-			[LanguageCode.ZhTw] = "極簡圓形 (Floating Circle)",
+			[LanguageCode.ZhCn] = "极简圆形",
+			[LanguageCode.ZhTw] = "極簡圓形",
 			[LanguageCode.En] = "Floating Circle",
 			[LanguageCode.Ja] = "フローティングサークル"
 		};
 		dictionary["ShapeRounded"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "平滑圆角 (Rounded Fillet)",
-			[LanguageCode.ZhTw] = "平滑圓角 (Rounded Fillet)",
+			[LanguageCode.ZhCn] = "平滑圆角",
+			[LanguageCode.ZhTw] = "平滑圓角",
 			[LanguageCode.En] = "Rounded Fillet",
 			[LanguageCode.Ja] = "角丸フィレット"
 		};
 		dictionary["ShapeCapsule"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "圆润胶囊 (Pill Capsules)",
-			[LanguageCode.ZhTw] = "圓潤膠囊 (Pill Capsules)",
+			[LanguageCode.ZhCn] = "圆润胶囊",
+			[LanguageCode.ZhTw] = "圓潤膠囊",
 			[LanguageCode.En] = "Pill Capsules",
 			[LanguageCode.Ja] = "ピルカプセル"
 		};
 		dictionary["ShapeHexagon"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "未来蜂巢 (Hexagon Hive)",
-			[LanguageCode.ZhTw] = "未來蜂巢 (Hexagon Hive)",
+			[LanguageCode.ZhCn] = "蜂巢六边形",
+			[LanguageCode.ZhTw] = "蜂巢六邊形",
 			[LanguageCode.En] = "Hexagon Hive",
 			[LanguageCode.Ja] = "ヘキサゴンハニカム"
 		};
 		dictionary["RadiusOuter"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘外半径 (Outer Radius)",
-			[LanguageCode.ZhTw] = "輪盤外半徑 (Outer Radius)",
+			[LanguageCode.ZhCn] = "轮盘外径",
+			[LanguageCode.ZhTw] = "輪盤外徑",
 			[LanguageCode.En] = "Outer Radius",
 			[LanguageCode.Ja] = "外側半径"
 		};
 		dictionary["RadiusInner"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "内环半径 (Inner Radius)",
-			[LanguageCode.ZhTw] = "內環半徑 (Inner Radius)",
+			[LanguageCode.ZhCn] = "轮盘内径",
+			[LanguageCode.ZhTw] = "輪盤內徑",
 			[LanguageCode.En] = "Inner Radius",
 			[LanguageCode.Ja] = "内側半径"
 		};
 		dictionary["RadiusCore"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "核圆半径 (Core Radius)",
-			[LanguageCode.ZhTw] = "核圓半徑 (Core Radius)",
+			[LanguageCode.ZhCn] = "中心圆半径",
+			[LanguageCode.ZhTw] = "中心圓半徑",
 			[LanguageCode.En] = "Core Radius",
 			[LanguageCode.Ja] = "コア半径"
 		};
 		dictionary["SectorGap"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "扇区间隙 (Sector Gap)",
-			[LanguageCode.ZhTw] = "扇區間隙 (Sector Gap)",
+			[LanguageCode.ZhCn] = "扇区缝隙",
+			[LanguageCode.ZhTw] = "扇區縫隙",
 			[LanguageCode.En] = "Sector Gap",
 			[LanguageCode.Ja] = "セクター間隔"
 		};
 		dictionary["SectorCornerRadius"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "扇区倒角 (Corner Radius)",
-			[LanguageCode.ZhTw] = "扇區倒角 (Corner Radius)",
+			[LanguageCode.ZhCn] = "扇区圆角",
+			[LanguageCode.ZhTw] = "扇區圓角",
 			[LanguageCode.En] = "Corner Radius",
 			[LanguageCode.Ja] = "角丸半径"
 		};
@@ -1804,29 +1804,29 @@ public static class I18n
 		};
 		dictionary["IconLayoutTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "图标与文字排版 (Layout & Typography)",
-			[LanguageCode.ZhTw] = "圖示與文字排版 (Layout & Typography)",
+			[LanguageCode.ZhCn] = "图标与文字排版",
+			[LanguageCode.ZhTw] = "圖示與文字排版",
 			[LanguageCode.En] = "Layout & Typography",
 			[LanguageCode.Ja] = "レイアウトと文字"
 		};
 		dictionary["LayoutIconText"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "图文并茂 (Icon + Text)",
-			[LanguageCode.ZhTw] = "圖文並茂 (Icon + Text)",
+			[LanguageCode.ZhCn] = "图文并茂",
+			[LanguageCode.ZhTw] = "圖文並茂",
 			[LanguageCode.En] = "Icon & Text",
 			[LanguageCode.Ja] = "アイコン＋文字"
 		};
 		dictionary["LayoutIconOnly"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "仅显示图标 (Icon Only)",
-			[LanguageCode.ZhTw] = "僅顯示圖示 (Icon Only)",
+			[LanguageCode.ZhCn] = "仅显示图标",
+			[LanguageCode.ZhTw] = "僅顯示圖示",
 			[LanguageCode.En] = "Icon Only",
 			[LanguageCode.Ja] = "アイコンのみ"
 		};
 		dictionary["LayoutTextOnly"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "仅显示文字 (Text Only)",
-			[LanguageCode.ZhTw] = "僅顯示文字 (Text Only)",
+			[LanguageCode.ZhCn] = "仅显示文字",
+			[LanguageCode.ZhTw] = "僅顯示文字",
 			[LanguageCode.En] = "Text Only",
 			[LanguageCode.Ja] = "文字のみ"
 		};
@@ -1846,15 +1846,15 @@ public static class I18n
 		};
 		dictionary["SectorIconSize"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "图标大小 (Icon Size)",
-			[LanguageCode.ZhTw] = "圖示大小 (Icon Size)",
+			[LanguageCode.ZhCn] = "图标大小",
+			[LanguageCode.ZhTw] = "圖示大小",
 			[LanguageCode.En] = "Icon Size",
 			[LanguageCode.Ja] = "アイコンサイズ"
 		};
 		dictionary["SectorFontSize"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "文字字号 (Font Size)",
-			[LanguageCode.ZhTw] = "文字字級 (Font Size)",
+			[LanguageCode.ZhCn] = "文字字号",
+			[LanguageCode.ZhTw] = "文字字級",
 			[LanguageCode.En] = "Font Size",
 			[LanguageCode.Ja] = "文字サイズ"
 		};
@@ -1888,22 +1888,22 @@ public static class I18n
 		};
 		dictionary["SectorTextColor"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘文字颜色 (Sector Text Color):",
-			[LanguageCode.ZhTw] = "輪盤文字顏色 (Sector Text Color):",
+			[LanguageCode.ZhCn] = "轮盘文字颜色:",
+			[LanguageCode.ZhTw] = "輪盤文字顏色:",
 			[LanguageCode.En] = "Sector Text Color:",
 			[LanguageCode.Ja] = "ホイール文字色:"
 		};
 		dictionary["CoreTextOptions"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心文字与选中显示选项",
-			[LanguageCode.ZhTw] = "中心文字與選取顯示選項",
+			[LanguageCode.ZhCn] = "中心文字",
+			[LanguageCode.ZhTw] = "中心文字",
 			[LanguageCode.En] = "Center Text & Selection Options",
 			[LanguageCode.Ja] = "中央テキストと選択時表示"
 		};
 		dictionary["CoreFontFamily"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心文字字体 (Core Font Family):",
-			[LanguageCode.ZhTw] = "中心文字字型 (Core Font Family):",
+			[LanguageCode.ZhCn] = "中心文字字体:",
+			[LanguageCode.ZhTw] = "中心文字字型:",
 			[LanguageCode.En] = "Center Font Family:",
 			[LanguageCode.Ja] = "中央フォント:"
 		};
@@ -1923,22 +1923,22 @@ public static class I18n
 		};
 		dictionary["CoreFontSize"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心文字大小 (Core Font Size):",
-			[LanguageCode.ZhTw] = "中心文字大小 (Core Font Size):",
+			[LanguageCode.ZhCn] = "中心文字大小:",
+			[LanguageCode.ZhTw] = "中心文字大小:",
 			[LanguageCode.En] = "Center Font Size:",
 			[LanguageCode.Ja] = "中央フォントサイズ:"
 		};
 		dictionary["CoreTextColorAuto"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "自动适应配色主题 (Auto Contrast)",
-			[LanguageCode.ZhTw] = "自動適應配色主題 (Auto Contrast)",
+			[LanguageCode.ZhCn] = "自动适应配色主题",
+			[LanguageCode.ZhTw] = "自動適應配色主題",
 			[LanguageCode.En] = "Auto Contrast",
-			[LanguageCode.Ja] = "配色テーマに自動追従 (Auto Contrast)"
+			[LanguageCode.Ja] = "配色テーマに自動追従"
 		};
 		dictionary["CoreTextColor"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心文字颜色 (Core Text Color):",
-			[LanguageCode.ZhTw] = "中心文字顏色 (Core Text Color):",
+			[LanguageCode.ZhCn] = "中心文字颜色:",
+			[LanguageCode.ZhTw] = "中心文字顏色:",
 			[LanguageCode.En] = "Center Text Color:",
 			[LanguageCode.Ja] = "中央文字色:"
 		};
@@ -1951,15 +1951,15 @@ public static class I18n
 		};
 		dictionary["InheritGlobal"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "跟随全局默认 (Inherit Global)",
-			[LanguageCode.ZhTw] = "跟隨全域預設 (Inherit Global)",
+			[LanguageCode.ZhCn] = "跟随全局默认",
+			[LanguageCode.ZhTw] = "跟隨全域預設",
 			[LanguageCode.En] = "Inherit Global Default",
 			[LanguageCode.Ja] = "グローバルデフォルトを継承"
 		};
 		dictionary["CoreTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "中心核圆图案定制 (Center Core Customization)",
-			[LanguageCode.ZhTw] = "中心核圓圖案自訂 (Center Core Customization)",
+			[LanguageCode.ZhCn] = "中心图标设置",
+			[LanguageCode.ZhTw] = "中心圖示設定",
 			[LanguageCode.En] = "Center Core Customization",
 			[LanguageCode.Ja] = "中央コアのカスタマイズ"
 		};
@@ -1979,15 +1979,15 @@ public static class I18n
 		};
 		dictionary["CorePatternExit"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "取消叉号 (Cancel Cross)",
-			[LanguageCode.ZhTw] = "取消叉號 (Cancel Cross)",
+			[LanguageCode.ZhCn] = "取消手势图标",
+			[LanguageCode.ZhTw] = "取消手勢圖示",
 			[LanguageCode.En] = "Cancel Cross",
 			[LanguageCode.Ja] = "キャンセルバツ"
 		};
 		dictionary["CorePatternCrosshair"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "精准准心 (Crosshair)",
-			[LanguageCode.ZhTw] = "精準準心 (Crosshair)",
+			[LanguageCode.ZhCn] = "精准准心",
+			[LanguageCode.ZhTw] = "精準準心",
 			[LanguageCode.En] = "Crosshair",
 			[LanguageCode.Ja] = "照準レティクル"
 		};
@@ -2000,36 +2000,36 @@ public static class I18n
 		};
 		dictionary["CorePatternDot"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "极简圆点 (Minimal Dot)",
-			[LanguageCode.ZhTw] = "極簡圓點 (Minimal Dot)",
+			[LanguageCode.ZhCn] = "极简圆点",
+			[LanguageCode.ZhTw] = "極簡圓點",
 			[LanguageCode.En] = "Minimal Dot",
 			[LanguageCode.Ja] = "ミニマルドット"
 		};
 		dictionary["CorePatternHome"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "主页图标 (Home)",
-			[LanguageCode.ZhTw] = "首頁圖示 (Home)",
+			[LanguageCode.ZhCn] = "主页图标",
+			[LanguageCode.ZhTw] = "首頁圖示",
 			[LanguageCode.En] = "Home",
 			[LanguageCode.Ja] = "ホーム"
 		};
 		dictionary["CorePatternPower"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "电源图标 (Power)",
-			[LanguageCode.ZhTw] = "電源圖示 (Power)",
+			[LanguageCode.ZhCn] = "电源图标",
+			[LanguageCode.ZhTw] = "電源圖示",
 			[LanguageCode.En] = "Power",
 			[LanguageCode.Ja] = "電源"
 		};
 		dictionary["CorePatternCompass"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "星空罗盘 (Compass)",
-			[LanguageCode.ZhTw] = "星空羅盤 (Compass)",
+			[LanguageCode.ZhCn] = "星空罗盘",
+			[LanguageCode.ZhTw] = "星空羅盤",
 			[LanguageCode.En] = "Compass",
 			[LanguageCode.Ja] = "コンパス"
 		};
 		dictionary["CorePatternCatPaw"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "萌宠猫爪 (Cat Paw)",
-			[LanguageCode.ZhTw] = "萌寵貓爪 (Cat Paw)",
+			[LanguageCode.ZhCn] = "萌宠猫爪",
+			[LanguageCode.ZhTw] = "萌寵貓爪",
 			[LanguageCode.En] = "Cat Paw",
 			[LanguageCode.Ja] = "肉球"
 		};
@@ -2049,92 +2049,92 @@ public static class I18n
 		};
 		dictionary["ConsoleThemeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "软件控制台主题 (Console Theme)",
-			[LanguageCode.ZhTw] = "軟體控制台主題 (Console Theme)",
+			[LanguageCode.ZhCn] = "软件主题",
+			[LanguageCode.ZhTw] = "軟體主題",
 			[LanguageCode.En] = "Console Theme",
 			[LanguageCode.Ja] = "コントロールパネルテーマ"
 		};
 		dictionary["ThemeCustom"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udfa8 自定义配色 (Custom Colors)",
-			[LanguageCode.ZhTw] = "\ud83c\udfa8 自定義配色 (Custom Colors)",
+			[LanguageCode.ZhCn] = "\ud83c\udfa8 自定义配色",
+			[LanguageCode.ZhTw] = "\ud83c\udfa8 自定義配色",
 			[LanguageCode.En] = "\ud83c\udfa8 Custom Colors",
 			[LanguageCode.Ja] = "\ud83c\udfa8 カスタム配色"
 		};
 		dictionary["ThemeSystem"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udda5\ufe0f 跟随 Windows 系统 (Auto)",
-			[LanguageCode.ZhTw] = "\ud83d\udda5\ufe0f 跟隨 Windows 系統 (Auto)",
+			[LanguageCode.ZhCn] = "\ud83d\udda5\ufe0f 跟随 Windows 系统",
+			[LanguageCode.ZhTw] = "\ud83d\udda5\ufe0f 跟隨 Windows 系統",
 			[LanguageCode.En] = "\ud83d\udda5\ufe0f Follow Windows System",
 			[LanguageCode.Ja] = "\ud83d\udda5\ufe0f Windows システムに従う"
 		};
 		dictionary["ThemeLight"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "☀\ufe0f 极简纯白 (Pure Light)",
-			[LanguageCode.ZhTw] = "☀\ufe0f 極簡純白 (Pure Light)",
+			[LanguageCode.ZhCn] = "☀\ufe0f 极简纯白",
+			[LanguageCode.ZhTw] = "☀\ufe0f 極簡純白",
 			[LanguageCode.En] = "☀\ufe0f Pure Light",
 			[LanguageCode.Ja] = "☀\ufe0f ピュアライト"
 		};
 		dictionary["ThemeDark"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udf19 极夜曜黑 (Oled Dark)",
-			[LanguageCode.ZhTw] = "\ud83c\udf19 極夜曜黑 (Oled Dark)",
+			[LanguageCode.ZhCn] = "\ud83c\udf19 极夜曜黑",
+			[LanguageCode.ZhTw] = "\ud83c\udf19 極夜曜黑",
 			[LanguageCode.En] = "\ud83c\udf19 OLED Dark",
 			[LanguageCode.Ja] = "\ud83c\udf19 OLEDダーク"
 		};
 		dictionary["ThemeNavy"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udf0c 午夜深蓝 (Midnight Navy)",
-			[LanguageCode.ZhTw] = "\ud83c\udf0c 午夜深藍 (Midnight Navy)",
+			[LanguageCode.ZhCn] = "\ud83c\udf0c 午夜深蓝",
+			[LanguageCode.ZhTw] = "\ud83c\udf0c 午夜深藍",
 			[LanguageCode.En] = "\ud83c\udf0c Midnight Navy",
 			[LanguageCode.Ja] = "\ud83c\udf0c ミッドナイトネイビー"
 		};
 		dictionary["ThemeViolet"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udd2e 暗夜紫罗兰 (Royal Violet)",
-			[LanguageCode.ZhTw] = "\ud83d\udd2e 暗夜紫羅蘭 (Royal Violet)",
+			[LanguageCode.ZhCn] = "\ud83d\udd2e 暗夜紫罗兰",
+			[LanguageCode.ZhTw] = "\ud83d\udd2e 暗夜紫羅蘭",
 			[LanguageCode.En] = "\ud83d\udd2e Royal Violet",
 			[LanguageCode.Ja] = "\ud83d\udd2e ロイヤルバイオレット"
 		};
 		dictionary["ThemeGray"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚙\ufe0f 钛金深灰 (Titanium Gray)",
-			[LanguageCode.ZhTw] = "⚙\ufe0f 鈦金深灰 (Titanium Gray)",
+			[LanguageCode.ZhCn] = "⚙\ufe0f 钛金深灰",
+			[LanguageCode.ZhTw] = "⚙\ufe0f 鈦金深灰",
 			[LanguageCode.En] = "⚙\ufe0f Titanium Gray",
 			[LanguageCode.Ja] = "⚙\ufe0f チタングレー"
 		};
 		dictionary["GesturesHeader"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "手势轮盘分位与动作配置",
-			[LanguageCode.ZhTw] = "手勢輪盤分位與動作配置",
+			[LanguageCode.ZhCn] = "手势动作设置",
+			[LanguageCode.ZhTw] = "手勢動作設定",
 			[LanguageCode.En] = "Gesture Sectors & Action Mappings",
 			[LanguageCode.Ja] = "セクター配置とアクション設定"
 		};
 		dictionary["SectorCountTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘方位按键数 (Sector Count)",
-			[LanguageCode.ZhTw] = "輪盤方位按鍵數 (Sector Count)",
+			[LanguageCode.ZhCn] = "扇区按键数",
+			[LanguageCode.ZhTw] = "扇區按鍵數",
 			[LanguageCode.En] = "Sector Count",
 			[LanguageCode.Ja] = "セクター数（キー数）"
 		};
 		dictionary["SectorCount4"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "4 键 (十字方位 / Cross 4-Way)",
-			[LanguageCode.ZhTw] = "4 鍵 (十字方位 / Cross 4-Way)",
+			[LanguageCode.ZhCn] = "4 键 (十字方位)",
+			[LanguageCode.ZhTw] = "4 鍵 (十字方位)",
 			[LanguageCode.En] = "4 Sectors (Cross 4-Way)",
 			[LanguageCode.Ja] = "4キー (十字方向)"
 		};
 		dictionary["SectorCount8"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "8 键 (八卦全向 / Standard 8-Way)",
-			[LanguageCode.ZhTw] = "8 鍵 (八卦全向 / Standard 8-Way)",
+			[LanguageCode.ZhCn] = "8 键 (标准八向)",
+			[LanguageCode.ZhTw] = "8 鍵 (標準八向)",
 			[LanguageCode.En] = "8 Sectors (Standard 8-Way)",
 			[LanguageCode.Ja] = "8キー (全方向8方位)"
 		};
 		dictionary["SectorCount12"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "12 键 (钟表表盘 / Clock Dial 12-Way)",
-			[LanguageCode.ZhTw] = "12 鍵 (鐘錶錶盤 / Clock Dial 12-Way)",
+			[LanguageCode.ZhCn] = "12 键 (时钟十二向)",
+			[LanguageCode.ZhTw] = "12 鍵 (時鐘十二向)",
 			[LanguageCode.En] = "12 Sectors (Clock Dial 12-Way)",
 			[LanguageCode.Ja] = "12キー (時計盤12方位)"
 		};
@@ -2315,9 +2315,9 @@ public static class I18n
 		};
 		dictionary["SubWheelThemeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "二级轮盘视觉风格与色彩配置",
-			[LanguageCode.ZhTw] = "二級輪盤視覺風格與色彩配置",
-			[LanguageCode.En] = "Tier 2 Visual Style & Color Scheme",
+			[LanguageCode.ZhCn] = "二级轮盘视觉风格",
+			[LanguageCode.ZhTw] = "二級輪盤視覺風格",
+			[LanguageCode.En] = "Tier 2 Visual Style & Colors",
 			[LanguageCode.Ja] = "第2層ホイールのスタイルと配色"
 		};
 		dictionary["SubWheelThemeDesc"] = new Dictionary<LanguageCode, string>
@@ -2329,10 +2329,10 @@ public static class I18n
 		};
 		dictionary["MemoryTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "极简内存优化 (Working Set Trim)",
-			[LanguageCode.ZhTw] = "極簡記憶體最佳化 (Working Set Trim)",
+			[LanguageCode.ZhCn] = "内存深度整理",
+			[LanguageCode.ZhTw] = "記憶體深度整理",
 			[LanguageCode.En] = "Memory Optimization",
-			[LanguageCode.Ja] = "メモリ最適化 (ワーキングセット圧縮)"
+			[LanguageCode.Ja] = "メモリ最適化"
 		};
 		dictionary["MemoryDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -2350,8 +2350,8 @@ public static class I18n
 		};
 		dictionary["ElevateTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "管理员权限提升 (Run as Admin)",
-			[LanguageCode.ZhTw] = "系統管理員權限提升 (Run as Admin)",
+			[LanguageCode.ZhCn] = "管理员权限提升",
+			[LanguageCode.ZhTw] = "系統管理員權限提升",
 			[LanguageCode.En] = "Run as Administrator",
 			[LanguageCode.Ja] = "管理者権限で実行"
 		};
@@ -2371,10 +2371,10 @@ public static class I18n
 		};
 		dictionary["BackupTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "多配置文件方案与备份管理 (Profiles & Backup)",
-			[LanguageCode.ZhTw] = "多設定檔方案與備份管理 (Profiles & Backup)",
-			[LanguageCode.En] = "Configuration Profiles & Backup Management",
-			[LanguageCode.Ja] = "設定プロファイルとバックアップ管理"
+			[LanguageCode.ZhCn] = "配置方案与备份",
+			[LanguageCode.ZhTw] = "配置方案與備份",
+			[LanguageCode.En] = "Configuration Profiles & Backup",
+			[LanguageCode.Ja] = "設定プロファイルとバックアップ"
 		};
 		dictionary["BackupDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -2441,10 +2441,10 @@ public static class I18n
 		};
 		dictionary["LogsTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "系统运行日志与诊断 (Runtime Logs)",
-			[LanguageCode.ZhTw] = "系統運行日誌與診斷 (Runtime Logs)",
-			[LanguageCode.En] = "System Runtime Logs & Diagnostics",
-			[LanguageCode.Ja] = "システム動作ログと診断 (Runtime Logs)"
+			[LanguageCode.ZhCn] = "系统运行日志",
+			[LanguageCode.ZhTw] = "系統運行日誌",
+			[LanguageCode.En] = "System Runtime Logs",
+			[LanguageCode.Ja] = "システム動作ログ"
 		};
 		dictionary["LogsDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -2469,10 +2469,10 @@ public static class I18n
 		};
 		dictionary["AboutHeader"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "关于 StarPie & 版本记录",
-			[LanguageCode.ZhTw] = "關於 StarPie & 版本記錄",
-			[LanguageCode.En] = "About StarPie & Changelog",
-			[LanguageCode.Ja] = "StarPie について & 更新履歴"
+			[LanguageCode.ZhCn] = "关于 StarPie",
+			[LanguageCode.ZhTw] = "關於 StarPie",
+			[LanguageCode.En] = "About StarPie",
+			[LanguageCode.Ja] = "StarPie について"
 		};
 		dictionary["AboutDesc"] = new Dictionary<LanguageCode, string>
 		{
@@ -2490,8 +2490,8 @@ public static class I18n
 		};
 		dictionary["MilestonesTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "版本演进里程碑 (Milestones)",
-			[LanguageCode.ZhTw] = "版本演進里程碑 (Milestones)",
+			[LanguageCode.ZhCn] = "版本演进历程",
+			[LanguageCode.ZhTw] = "版本演進歷程",
 			[LanguageCode.En] = "Version Milestones",
 			[LanguageCode.Ja] = "バージョン履歴"
 		};
@@ -2532,31 +2532,31 @@ public static class I18n
 		};
 		dictionary["TrayPreferences"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚙\ufe0f 偏好设置 (Settings)",
-			[LanguageCode.ZhTw] = "⚙\ufe0f 偏好設定 (Settings)",
-			[LanguageCode.En] = "⚙\ufe0f Preferences (Settings)",
-			[LanguageCode.Ja] = "⚙\ufe0f 環境設定 (Settings)"
+			[LanguageCode.ZhCn] = "⚙\ufe0f 偏好设置",
+			[LanguageCode.ZhTw] = "⚙\ufe0f 偏好設定",
+			[LanguageCode.En] = "⚙\ufe0f Preferences",
+			[LanguageCode.Ja] = "⚙\ufe0f 設定"
 		};
 		dictionary["TrayAppearance"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83c\udfa8 外观与形态 (Appearance)",
-			[LanguageCode.ZhTw] = "\ud83c\udfa8 外觀與形態 (Appearance)",
-			[LanguageCode.En] = "\ud83c\udfa8 Appearance & Shapes",
-			[LanguageCode.Ja] = "\ud83c\udfa8 外観と形状"
+			[LanguageCode.ZhCn] = "\ud83c\udfa8 外观样式",
+			[LanguageCode.ZhTw] = "\ud83c\udfa8 外觀樣式",
+			[LanguageCode.En] = "\ud83c\udfa8 Appearance",
+			[LanguageCode.Ja] = "\ud83c\udfa8 外観"
 		};
 		dictionary["TrayGestures"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚡ 手势与动作 (Mappings)",
-			[LanguageCode.ZhTw] = "⚡ 手勢與動作 (Mappings)",
-			[LanguageCode.En] = "⚡ Gestures & Actions",
-			[LanguageCode.Ja] = "⚡ ジェスチャーと動作"
+			[LanguageCode.ZhCn] = "⚡ 手势动作",
+			[LanguageCode.ZhTw] = "⚡ 手勢動作",
+			[LanguageCode.En] = "⚡ Gestures",
+			[LanguageCode.Ja] = "⚡ ジェスチャー"
 		};
 		dictionary["TrayAbout"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "\ud83d\udccb 更新日志与关于 (About)",
-			[LanguageCode.ZhTw] = "\ud83d\udccb 更新日誌與關於 (About)",
-			[LanguageCode.En] = "\ud83d\udccb About & Changelog",
-			[LanguageCode.Ja] = "\ud83d\udccb 情報と更新履歴"
+			[LanguageCode.ZhCn] = "\ud83d\udccb 关于软件",
+			[LanguageCode.ZhTw] = "\ud83d\udccb 關於軟體",
+			[LanguageCode.En] = "\ud83d\udccb About",
+			[LanguageCode.Ja] = "\ud83d\udccb 情報"
 		};
 		dictionary["TrayElevate"] = new Dictionary<LanguageCode, string>
 		{
@@ -2581,10 +2581,10 @@ public static class I18n
 		};
 		dictionary["UpdateSectionTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "软件更新与版本管理 (Software Updates)",
-			[LanguageCode.ZhTw] = "軟體更新與版本管理 (Software Updates)",
-			[LanguageCode.En] = "Software Updates & Version Control",
-			[LanguageCode.Ja] = "ソフトウェア更新とバージョン管理"
+			[LanguageCode.ZhCn] = "软件更新",
+			[LanguageCode.ZhTw] = "軟體更新",
+			[LanguageCode.En] = "Software Updates",
+			[LanguageCode.Ja] = "ソフトウェア更新"
 		};
 		dictionary["UpdateStatusLatest"] = new Dictionary<LanguageCode, string>
 		{
@@ -2672,10 +2672,10 @@ public static class I18n
 		};
 		dictionary["UpdateProxyDirect"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "🌐 官方直连 (GitHub Official)",
-			[LanguageCode.ZhTw] = "🌐 官方直連 (GitHub Official)",
-			[LanguageCode.En] = "🌐 Official Direct (GitHub)",
-			[LanguageCode.Ja] = "🌐 公式ダイレクト (GitHub)"
+			[LanguageCode.ZhCn] = "🌐 官方直连",
+			[LanguageCode.ZhTw] = "🌐 官方直連",
+			[LanguageCode.En] = "🌐 Official Direct",
+			[LanguageCode.Ja] = "🌐 公式ダイレクト"
 		};
 		dictionary["UpdateProxyGhproxy"] = new Dictionary<LanguageCode, string>
 		{
@@ -2700,8 +2700,8 @@ public static class I18n
 		};
 		dictionary["RollbackSectionTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "历史版本回退 (Version Rollback)",
-			[LanguageCode.ZhTw] = "歷史版本回退 (Version Rollback)",
+			[LanguageCode.ZhCn] = "历史版本回退",
+			[LanguageCode.ZhTw] = "歷史版本回退",
 			[LanguageCode.En] = "Version Rollback",
 			[LanguageCode.Ja] = "過去バージョンへのロールバック"
 		};
@@ -2854,15 +2854,15 @@ public static class I18n
 		};
 		dictionary["DimensionsCardTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘几何尺寸与间距",
-			[LanguageCode.ZhTw] = "輪盤幾何尺寸與間距",
+			[LanguageCode.ZhCn] = "轮盘尺寸与间距",
+			[LanguageCode.ZhTw] = "輪盤尺寸與間距",
 			[LanguageCode.En] = "Radial Geometry & Spacing",
 			[LanguageCode.Ja] = "ラジアルの幾何学的寸法と間隔"
 		};
 		dictionary["VisualThemeCardTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "切削形态与主题配色",
-			[LanguageCode.ZhTw] = "切削形態與主題配色",
+			[LanguageCode.ZhCn] = "切削形态与配色",
+			[LanguageCode.ZhTw] = "切削形態與配色",
 			[LanguageCode.En] = "Cutout Shapes & Color Themes",
 			[LanguageCode.Ja] = "カット形状とカラーテーマ"
 		};
@@ -2889,17 +2889,17 @@ public static class I18n
 		};
 		dictionary["ConfigModeProRadio"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "⚙️ 高级全量模式",
-			[LanguageCode.ZhTw] = "⚙️ 高級全量模式",
-			[LanguageCode.En] = "⚙️ Pro Full Mode",
-			[LanguageCode.Ja] = "⚙️ プロ全機能モード"
+			[LanguageCode.ZhCn] = "⚙️ 高级模式",
+			[LanguageCode.ZhTw] = "⚙️ 高級模式",
+			[LanguageCode.En] = "⚙️ Pro Mode",
+			[LanguageCode.Ja] = "⚙️ プロモード"
 		};
 		dictionary["ConfigModeSimpleTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "简单模式 (精简聚焦)",
-			[LanguageCode.ZhTw] = "簡單模式 (精簡聚焦)",
-			[LanguageCode.En] = "Simple Mode (Focused)",
-			[LanguageCode.Ja] = "シンプルモード (集中)"
+			[LanguageCode.ZhCn] = "简单模式",
+			[LanguageCode.ZhTw] = "簡單模式",
+			[LanguageCode.En] = "Simple Mode",
+			[LanguageCode.Ja] = "シンプルモード"
 		};
 		dictionary["ConfigModeSimpleHint"] = new Dictionary<LanguageCode, string>
 		{
@@ -2910,10 +2910,10 @@ public static class I18n
 		};
 		dictionary["ConfigModeProTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "高级全量模式 (全开)",
-			[LanguageCode.ZhTw] = "高級全量模式 (全開)",
-			[LanguageCode.En] = "Pro Full Mode (Unrestricted)",
-			[LanguageCode.Ja] = "プロ全機能モード (全開)"
+			[LanguageCode.ZhCn] = "高级模式",
+			[LanguageCode.ZhTw] = "高級模式",
+			[LanguageCode.En] = "Pro Mode",
+			[LanguageCode.Ja] = "プロモード"
 		};
 		dictionary["ConfigModeProHint"] = new Dictionary<LanguageCode, string>
 		{
@@ -2938,78 +2938,78 @@ public static class I18n
 		};
 		dictionary["LayerIndicatorSectionTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘层数切换提示微标",
-			[LanguageCode.ZhTw] = "輪盤層數切換提示微標",
+			[LanguageCode.ZhCn] = "轮盘层数切换提示徽标",
+			[LanguageCode.ZhTw] = "輪盤層數切換提示徽標",
 			[LanguageCode.En] = "Layer Switch Indicator Badge",
 			[LanguageCode.Ja] = "レイヤ切替インジケーター"
 		};
 		dictionary["LayerIndicatorSectionDesc"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "在高级全量模式下呼出轮盘后，滑动滚轮或按快捷键切换多层轮盘时的浮动提示徽标外观与停留时长。",
-			[LanguageCode.ZhTw] = "在高級全量模式下呼出輪盤後，滑動滾輪或按快捷鍵切換多層輪盤時的浮動提示微標外觀與停留時長。",
+			[LanguageCode.ZhCn] = "呼出轮盘后，滑动滚轮或按快捷键切换多层轮盘时的浮动提示徽标外观与停留时长。",
+			[LanguageCode.ZhTw] = "呼出輪盤後，滑動滾輪或按快捷鍵切換多層輪盤時的浮動提示徽標外觀與停留時長。",
 			[LanguageCode.En] = "Appearance and fadeout duration of the floating layer badge when switching layers in Advanced Mode.",
 			[LanguageCode.Ja] = "アドバンスモードでレイヤを切り替える際のフロートバッジの外観と表示時間。"
 		};
 		dictionary["ShowLayerIndicator"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "启用层数切换浮动提示徽标 (Show Layer Indicator)",
-			[LanguageCode.ZhTw] = "啟用層數切換浮動提示微標 (Show Layer Indicator)",
+			[LanguageCode.ZhCn] = "启用层数切换浮动提示徽标",
+			[LanguageCode.ZhTw] = "啟用層數切換浮動提示徽標",
 			[LanguageCode.En] = "Show Layer Switch Floating Badge",
 			[LanguageCode.Ja] = "レイヤ切替フロートバッジを表示"
 		};
 		dictionary["LayerIndicatorStyleTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "徽标预设风格 (Preset Style):",
-			[LanguageCode.ZhTw] = "微標預設風格 (Preset Style):",
+			[LanguageCode.ZhCn] = "徽标预设风格:",
+			[LanguageCode.ZhTw] = "徽標預設風格:",
 			[LanguageCode.En] = "Preset Style:",
 			[LanguageCode.Ja] = "プリセットスタイル:"
 		};
 		dictionary["LayerIndicatorIconTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "提示前置图标 (Indicator Icon):",
-			[LanguageCode.ZhTw] = "提示前置圖示 (Indicator Icon):",
+			[LanguageCode.ZhCn] = "提示前置图标:",
+			[LanguageCode.ZhTw] = "提示前置圖示:",
 			[LanguageCode.En] = "Indicator Icon:",
 			[LanguageCode.Ja] = "インジケーターアイコン:"
 		};
 		dictionary["LayerIndicatorCornerRadiusTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "徽标平滑圆角 (Corner Radius):",
-			[LanguageCode.ZhTw] = "微標平滑圓角 (Corner Radius):",
+			[LanguageCode.ZhCn] = "徽标圆角:",
+			[LanguageCode.ZhTw] = "徽標圓角:",
 			[LanguageCode.En] = "Badge Corner Radius:",
 			[LanguageCode.Ja] = "バッジ角の丸み:"
 		};
 		dictionary["LayerIndicatorFontSizeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "文字字号大小 (Font Size):",
-			[LanguageCode.ZhTw] = "文字字型大小 (Font Size):",
+			[LanguageCode.ZhCn] = "文字字号:",
+			[LanguageCode.ZhTw] = "文字字型大小:",
 			[LanguageCode.En] = "Font Size:",
 			[LanguageCode.Ja] = "フォントサイズ:"
 		};
 		dictionary["LayerIndicatorOffsetYTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "垂直显示位置偏移 (Offset Y):",
-			[LanguageCode.ZhTw] = "垂直顯示位置偏移 (Offset Y):",
+			[LanguageCode.ZhCn] = "垂直偏移:",
+			[LanguageCode.ZhTw] = "垂直偏移:",
 			[LanguageCode.En] = "Vertical Offset Y:",
 			[LanguageCode.Ja] = "垂直オフセット Y:"
 		};
 		dictionary["LayerIndicatorDurationTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "提示淡出停留时间 (Duration):",
-			[LanguageCode.ZhTw] = "提示淡出停留時間 (Duration):",
+			[LanguageCode.ZhCn] = "淡出停留时间:",
+			[LanguageCode.ZhTw] = "淡出停留時間:",
 			[LanguageCode.En] = "Fadeout Duration:",
 			[LanguageCode.Ja] = "表示時間:"
 		};
 		dictionary["BtnResetLayerIndicator"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "🔄 恢复默认提示徽标样式",
-			[LanguageCode.ZhTw] = "🔄 恢復預設提示微標樣式",
+			[LanguageCode.ZhTw] = "🔄 恢復預設提示徽標樣式",
 			[LanguageCode.En] = "🔄 Reset Indicator Style",
 			[LanguageCode.Ja] = "🔄 インジケータースタイルを初期化"
 		};
 		dictionary["SoundEffectsTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "轮盘触发交互音效 (Sound & Haptic Feedback)",
-			[LanguageCode.ZhTw] = "輪盤觸發互動音效 (Sound & Haptic Feedback)",
+			[LanguageCode.ZhCn] = "轮盘交互音效",
+			[LanguageCode.ZhTw] = "輪盤互動音效",
 			[LanguageCode.En] = "Radial Interaction Sound Effects",
 			[LanguageCode.Ja] = "ホイール起動・操作サウンド効果"
 		};
@@ -3036,8 +3036,8 @@ public static class I18n
 		};
 		dictionary["SoundThemeLabel"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "音效风格主题 (Sound Theme)",
-			[LanguageCode.ZhTw] = "音效風格主題 (Sound Theme)",
+			[LanguageCode.ZhCn] = "音效主题",
+			[LanguageCode.ZhTw] = "音效主題",
 			[LanguageCode.En] = "Sound Theme",
 			[LanguageCode.Ja] = "サウンドテーマ"
 		};
@@ -3050,8 +3050,8 @@ public static class I18n
 		};
 		dictionary["SoundVolumeTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "交互音量 (Volume):",
-			[LanguageCode.ZhTw] = "互動音量 (Volume):",
+			[LanguageCode.ZhCn] = "交互音量:",
+			[LanguageCode.ZhTw] = "互動音量:",
 			[LanguageCode.En] = "Feedback Volume:",
 			[LanguageCode.Ja] = "効果音音量:"
 		};
@@ -3071,8 +3071,8 @@ public static class I18n
 		};
 		dictionary["SoundSubEventsTitle"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "细项事件声音独立开关 (Event Toggles)",
-			[LanguageCode.ZhTw] = "細項事件聲音獨立開關 (Event Toggles)",
+			[LanguageCode.ZhCn] = "细项事件独立开关",
+			[LanguageCode.ZhTw] = "細項事件獨立開關",
 			[LanguageCode.En] = "Independent Event Toggles",
 			[LanguageCode.Ja] = "個別イベントのサウンド設定"
 		};
@@ -3113,10 +3113,10 @@ public static class I18n
 		};
 		dictionary["CustomSoundConfigBtn"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "🎛️ 方案配置 (Demo)",
-			[LanguageCode.ZhTw] = "🎛️ 方案配置 (Demo)",
-			[LanguageCode.En] = "🎛️ Custom Studio (Demo)",
-			[LanguageCode.Ja] = "🎛️ カスタム設定 (Demo)"
+			[LanguageCode.ZhCn] = "🎛️ 方案配置",
+			[LanguageCode.ZhTw] = "🎛️ 方案配置",
+			[LanguageCode.En] = "🎛️ Configure Sound",
+			[LanguageCode.Ja] = "🎛️ サウンド設定"
 		};
 		dictionary["CustomSoundStudioTitle"] = new Dictionary<LanguageCode, string>
 		{
