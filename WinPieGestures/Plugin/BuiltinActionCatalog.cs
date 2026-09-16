@@ -157,12 +157,17 @@ internal static class BuiltinActionCatalog
 			BuiltinActionSystem.Create(),
 			BuiltinActionShellTool.Create(),
 
-			// 尚未收敛的是窗口类动作（Tile / TileCycle / TileRestore / SwitchWindow /
-			// MoveMonitor / ToggleTopmost / WindowOpacity）与 Text。
-			// 它们的 Parameter 里编码的是「子模式 + 该子模式的取值」这种复合含义
-			// （例如 Tile 的 "2L" 表示左半屏、CycleParam 表示轮换），
-			// 拆成声明式 schema 之前得先想清楚这套编码要不要一并改掉 ——
-			// 那是另一件事，不塞进这批里做。
+			// 窗口类。注意 Tile 一个 Type 承载四种语义（具体布局 / 循环 / 反向循环 / 还原），
+			// 靠 Parameter 的特殊标记区分，动作侧把它们合并成一枚 20 项的下拉 —— 见该文件的说明。
+			BuiltinActionTile.Create(),
+			BuiltinActionToggleTopmost.Create(),
+			BuiltinActionMoveMonitor.Create(),
+			BuiltinActionWindowOpacity.Create(),
+			BuiltinActionSwitchWindow.Create(),
+
+			// 至此九个顶层动作类型全部收敛。剩下的 Text/String 不在「动作类型」下拉里
+			// （九个顶层类型不含它），它是给二级子动作与程序化场景用的，
+			// 是否要在界面上暴露成可选动作是另一个决定，不混进这批做。
 		};
 
 		var map = new Dictionary<string, BuiltinActionRegistration>(StringComparer.OrdinalIgnoreCase);

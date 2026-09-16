@@ -275,65 +275,37 @@ public static class ActionExecutor
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
 
 			// 【内建动作 · 统一接缝】
-			// 已向插件模型收敛的内建动作在这里被接走，不再落进下面的 switch。
-			// 尚未收敛的动作 TryGet 会失败、照旧走 switch —— 所以迁移可以一个动作一个动作地做，
-			// 中途任何一个动作出问题都能单独回退，不必整体回滚。
+			// 内建动作在这里被统一接走：查目录 → 投影参数 → 校验 → ExecuteAsync。
+			// 目录是编译期静态注册的，不经过扫描、安装与 AssemblyLoadContext ——
+			// 这正是「不装插件时零开销」那条红线的前提。
 			if (Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtinAction))
 			{
 				ExecuteBuiltinActionItem(action, builtinAction);
 				return;
 			}
 
+			// 走到这里，说明这个 Type 不在内建动作表里。只剩三类：
+			//
+			//   一、尚未收敛的动作。目前只有 Text / String —— 它不在「动作类型」下拉的
+			//       九个顶层类型里，是给二级子动作与程序化场景用的。
+			//   二、历史遗留类型。TileRestore 是更早版本里「还原平铺」的独立 Type；
+			//       现在的界面统一产生 Type="Tile" + Parameter="Restore"，
+			//       但老配置里可能还留着旧写法，所以这一行专门为它们保留。
+			//   三、插件动作（Type="Plugin"）。靠 action.PluginActionRef 分发，
+			//       形状与内建动作截然不同，不并入上面的表。
+			//
+			// 已收敛动作的原 switch 分支已随之删除：它们现在不可达，留着只会让下一个读代码
+			// 的人以为这里还有两条路可走 —— 而这正是本次改动要消除的「双轨制」本身。
+			// 需要对照旧实现时从 git 历史取。
 			switch (action.Type.Trim())
 			{
-			case "Launch":
-				ExecuteLaunch(action.Parameter, action.Arguments, action.RunAsStandardUser);
-				break;
-			case "Folder":
-			case "OpenFolder":
-				ExecuteFolder(action.Parameter);
-				break;
-			case "Ocr":
-			case "ScreenOcr":
-				OcrManager.StartCaptureAndRecognize();
-				break;
-			case "Hotkey":
-				ExecuteHotkey(action.Parameter);
-				break;
-			case "Command":
-				ExecuteCommand(action.Parameter, action.CommandTerminal);
-				break;
-			case "SwitchWindow":
-				ExecuteSwitchWindow(action.Parameter);
-				break;
-			case "Tile":
-				WindowTiler.ExecuteTile(action.Parameter);
-				break;
 			case "TileRestore":
+				// 历史遗留：老配置里「还原平铺」的独立 Type，等价于 Tile + Parameter="Restore"。
 				WindowTiler.RestoreLastLayout();
-				break;
-			case "MoveMonitor":
-				WindowTiler.MoveWindowToNextMonitor();
-				break;
-			case "ToggleTopmost":
-				WindowTiler.ToggleWindowTopmost(action.Parameter);
-				break;
-			case "WindowOpacity":
-				WindowTiler.SetWindowOpacity(action.Parameter);
 				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
-				break;
-			case "WebUrl":
-			case "Url":
-				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
-				break;
-			case "System":
-				ExecuteSystem(action.Parameter);
-				break;
-			case "ShellTool":
-				ExecuteShellTool(action.Parameter);
 				break;
 			case "Plugin":
 				// 【插件系统 · 唯一的执行接缝】
@@ -1511,8 +1483,15 @@ public static class ActionExecutor
 		}
 	}
 
-/// <summary>切换到任务栏第 N 个窗口；参数缺失/非法默认第 1 个。全程后台线程执行（UIA 遍历/前台激活不得阻塞 UI 与钩子线程）。</summary>
-	private static void ExecuteSwitchWindow(string? parameter)
+	/// <summary>
+	/// 切换到任务栏第 N 个窗口；参数缺失/非法时默认第 1 个。
+	/// 全程在后台线程执行 —— UIA 遍历与前台激活都不得阻塞 UI 与钩子线程。
+	/// <para>
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「切换应用」的实现
+	/// （<c>Plugins.BuiltinActions.BuiltinActionSwitchWindow</c>）现在也走这条路。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteSwitchWindow(string? parameter)
 	{
 		int n = 1;
 		if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)

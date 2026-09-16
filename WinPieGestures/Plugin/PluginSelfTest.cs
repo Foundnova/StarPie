@@ -526,6 +526,26 @@ internal static class PluginSelfTest
                 ("Ocr", "ScreenOcr",
                     new ActionItem { Type = "Ocr" },
                     0, null, "", ""),
+
+                ("Tile", null,
+                    new ActionItem { Type = "Tile", Parameter = "2L" },
+                    1, "layout", "2L", "平铺方式"),
+
+                ("ToggleTopmost", null,
+                    new ActionItem { Type = "ToggleTopmost", Parameter = "" },
+                    0, null, "", ""),
+
+                ("MoveMonitor", null,
+                    new ActionItem { Type = "MoveMonitor", Parameter = "" },
+                    0, null, "", ""),
+
+                ("WindowOpacity", null,
+                    new ActionItem { Type = "WindowOpacity", Parameter = "80" },
+                    1, "opacity", "80", "透明度"),
+
+                ("SwitchWindow", null,
+                    new ActionItem { Type = "SwitchWindow", Parameter = "1" },
+                    1, "index", "1", "任务栏位置"),
             };
 
             int builtinVerified = 0;
@@ -583,6 +603,20 @@ internal static class PluginSelfTest
                     }
                 }
 
+                // Tile 的选项 = 全部布局码 + 循环 / 反向循环 / 还原三个特殊标记。
+                // 少一个标记的后果是那种用法在界面上彻底选不到，而且不会有任何报错。
+                if (caseType == "Tile")
+                {
+                    int optionCount = caseReg.Contribution.Parameters[0].Options?.Count ?? 0;
+                    int expectedOptions = WindowTiler.LayoutKeys.Count + 3;
+
+                    if (optionCount != expectedOptions)
+                    {
+                        Fail("内建动作参数",
+                            $"Tile 的选项数（{optionCount}）应为布局表 {WindowTiler.LayoutKeys.Count} + 3 个特殊标记 = {expectedOptions}");
+                    }
+                }
+
                 // 必填项漏标，统一表单就会放行空值，等于把静默失效的门重新打开。
                 if (!caseReg.Contribution.Parameters.Any(f => f.Key == caseKey && f.Required))
                 {
@@ -625,6 +659,47 @@ internal static class PluginSelfTest
             if (builtinVerified == builtinCases.Length)
             {
                 Line($"  全部 {builtinVerified} 个动作：注册 ✓｜别名 ✓｜投影 ✓｜必填 ✓｜空值拦截 ✓");
+            }
+
+            // ---- 3g 端到端派发 ----
+            //
+            // 上面两段验的是「接缝本身好不好使」，但都直接调了接缝方法，绕过了
+            // Execute() 开头那段 TryGet —— 而用户按下扇区走的恰恰是 Execute()。
+            // 万一那段派发写错了位置（比如挪到 switch 之后），上面照样全绿，
+            // 真机上却依然在走老路径 —— 典型的「测试说没问题、用户说没反应」。
+            Line("");
+            Line("[3g] 端到端派发（Execute → TryGet → 执行体）");
+
+            string dispatchOutput = Path.Combine(sandboxRoot, "builtin-dispatch-result.txt");
+            var dispatchProbe = new ActionItem
+            {
+                Type = "Command",
+                Name = "自检用",
+                Parameter = $"echo dispatch-ok>\"{dispatchOutput}\"",
+                CommandTerminal = "cmd_hidden",
+            };
+
+            try
+            {
+                ActionExecutor.Execute(dispatchProbe);
+
+                for (int wait = 0; wait < 30 && !File.Exists(dispatchOutput); wait++)
+                {
+                    System.Threading.Thread.Sleep(100);
+                }
+
+                if (!File.Exists(dispatchOutput))
+                {
+                    Fail("端到端派发", $"经 Execute() 的探针没有产生产物（{dispatchOutput}）—— 内建动作没有被接走");
+                }
+                else
+                {
+                    Line("  Execute → TryGet → 执行体：产物已生成 ✓");
+                }
+            }
+            catch (Exception dispatchError)
+            {
+                Fail("端到端派发", $"Execute 抛出异常：{dispatchError.Message}");
             }
 
             // ---- 7 环境还原性检查 ----
