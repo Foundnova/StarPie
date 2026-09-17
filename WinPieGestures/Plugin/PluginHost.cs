@@ -33,6 +33,9 @@ internal sealed class PluginInstallOptions
     /// <para>用途只有一个：日后排查「这个插件是怎么进来的」。不做任何逻辑分支。</para>
     /// </summary>
     public string SourceKind { get; set; } = "UserSelectedFile";
+
+    /// <summary>是否为随主程序分发的官方插件。</summary>
+    public bool Bundled { get; set; }
 }
 
 internal sealed class PluginInstallResult
@@ -138,11 +141,12 @@ internal static class PluginHost
 
             CheckSafeMode();
 
+            int bundledChanged = BundledPluginLifecycle.Synchronize(ScanCandidateFile, CommitInstall);
             int discovered = SyncFromDisk();
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
-                $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
+                $"（本次扫描新发现 {discovered} 个，随包同步 {bundledChanged} 项），安全模式={_safeModeActive}");
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -322,6 +326,10 @@ internal static class PluginHost
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
+                    Bundled = options.Bundled,
+                    ClaimedTypes = options.Bundled
+                        ? BundledPluginLifecycle.BuildClaimWire(manifest)
+                        : new List<string>(),
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -564,6 +572,14 @@ internal static class PluginHost
             return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
         }
 
+        if (instance.Entry.Bundled)
+        {
+            return new PluginUninstallResult
+            {
+                Success = false,
+                Error = $"「{instance.Entry.Name}」随 StarPie 一起分发，不能卸载；如不需要请停用。",
+            };
+        }
         PluginStopResult stop = await DisableAsync(
             pluginId,
             PluginStopReason.Uninstall,
@@ -1052,7 +1068,7 @@ internal static class PluginHost
     }
 
     /// <summary>识别扫描目录里的一枚 dll。异常一律转成「识别未通过」而不是上抛 —— 一枚坏文件不该让整页空掉。</summary>
-    private static PluginScanResult ScanCandidateFile(string file)
+    internal static PluginScanResult ScanCandidateFile(string file)
     {
         try
         {
@@ -1448,7 +1464,7 @@ internal static class PluginHost
     /// </para></item>
     /// </list>
     /// </summary>
-    private static bool CopyPayload(PluginScanResult scan, string targetDirectory, bool overwrite, out string error)
+    internal static bool CopyPayload(PluginScanResult scan, string targetDirectory, bool overwrite, out string error)
     {
         if (string.Equals(scan.ManifestSource, "Manifest", StringComparison.Ordinal))
         {

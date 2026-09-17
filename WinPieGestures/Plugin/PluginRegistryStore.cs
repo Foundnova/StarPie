@@ -48,6 +48,26 @@ internal sealed class PluginRegistryEntry
     /// <summary>安装来源：<c>UserSelectedFile</c> / <c>UserSelectedFolder</c> / <c>DeveloperPath</c> / <c>Discovered</c>。</summary>
     public string Source { get; set; } = "UserSelectedFile";
 
+    /// <summary>
+    /// 随主程序分发的插件（来源是程序目录下的只读扫描目录）。
+    /// <para>
+    /// 带这个标记的条目：首启自动安装并启用、不可卸载（只可停用）、
+    /// 被从宿主区删掉后下次启动会补回来。用户自己装的插件一律为 false。
+    /// </para>
+    /// </summary>
+    public bool Bundled { get; set; }
+
+    /// <summary>
+    /// 本插件认领的顶层动作类型，形如 <c>"Command=command"</c>（见 <see cref="PluginTypeClaim.ToWire"/>）。
+    /// <para>
+    /// <b>为什么不现读程序集元数据</b>：这张表要在<b>启动最早期、且一个插件都没加载时</b>就可用 ——
+    /// 宿主靠它决定「配置里引用到的类型该预加载谁」，这是轮盘首次触发不产生几百毫秒停顿的前提。
+    /// 落在登记表里，读取就是一次 JSON 反序列化，与程序集完全解耦：
+    /// 宿主区的 DLL 被误删、正在被替换、或读取失败，都不影响「谁认领了什么」这个事实。
+    /// </para>
+    /// </summary>
+    public List<string> ClaimedTypes { get; set; } = new();
+
     public string? InstalledAt { get; set; }
 
     public PluginRegistryEntry Clone() => new()
@@ -69,6 +89,8 @@ internal sealed class PluginRegistryEntry
         AckedAt = AckedAt,
         AckedHostVersion = AckedHostVersion,
         Source = Source,
+        Bundled = Bundled,
+        ClaimedTypes = new List<string>(ClaimedTypes),
         InstalledAt = InstalledAt,
     };
 }
