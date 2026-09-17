@@ -3947,8 +3947,8 @@
             <!-- 空状态 -->
             <StackPanel Name="PluginsEmptyStatePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
               <TextBlock Text="🧩" FontSize="42" HorizontalAlignment="Center" Opacity="0.35" />
-              <TextBlock Text="还没有安装任何插件" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" HorizontalAlignment="Center" />
-              <TextBlock Text="把插件 .dll 放进程序目录的 plugin 文件夹并点上方「重新扫描」，或直接点右上角「安装插件 (.dll)」选择文件" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Opacity="0.8" />
+              <TextBlock Name="PluginsEmptyTitleText" Text="还没有安装任何插件" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" HorizontalAlignment="Center" />
+              <TextBlock Name="PluginsEmptyHintText" Text="把插件 .dll 放进程序目录的 plugin 文件夹并点上方「重新扫描」，或直接点右上角「安装插件 (.dll)」选择文件" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Opacity="0.8" />
             </StackPanel>
           </Grid>
         </Grid>

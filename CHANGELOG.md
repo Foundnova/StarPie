@@ -4,6 +4,38 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（插件页多语言补齐：S4 拆包漏接的 51 个词条）
+
+合并审计的收尾发现：**插件页（S4 拆包的产物）从来没有接进多语言系统** —— 切到英文 / 日文时整页仍是中文。
+
+### 🐛 问题修复
+
+**根因**：这套控制台一直靠「XAML 写中文默认值 + `ApplyLocalization()` 里逐项按当前语言重设」。插件页是 S4 拆包时新加的：页面与按钮进了 XAML、`NavTab5` 也加进了侧边栏，但**没有同步加进 `ApplyLocalization()`**。还有一处更隐蔽 —— 侧边栏折叠逻辑里的 `navigationButtons` / `navigationTexts` 两个数组仍是 5 项（`NavTab0`~`NavTab4`），于是折叠侧边栏时插件页签的文字不会跟着隐藏。
+
+**范围**（逐处核对得出，非估算）：
+
+| 位置 | 处数 | 内容 |
+| :--- | :--- | :--- |
+| `SettingsWindow.xaml` | 8 | 页签、页头、副标题、四个按钮、启用复选框 |
+| `SettingsWindow.xaml` 空状态 | 2 | 「还没有安装任何插件」两行 —— 此前没有 `Name`，代码无法重设，本次补 `Name` |
+| `SettingsWindow.xaml.cs` 动态文案 | 7 | 列表状态摘要、安全模式横幅、候选区标题与路径提示、四个弹窗（重载失败 / 重载成功 / 候选消失 / 安装失败与成功 / 扫描目录缺失） |
+| `Plugin/PluginCandidate.cs` | 3 个属性 | 候选卡片状态徽标（9 种）、摘要行（作者 / 声明能力）、安装按钮（4 种） |
+
+**修法**：
+
+- 新增 **51 个词条 × 4 语言**（简中 / 繁中 / 英文 / 日文），集中在 `I18n.cs` 的 `TabPlugins` 与 `Plugins*` / `PluginCandidate*` 两段，键名沿用既有风格。
+- 新增 `I18n.TF(key, args)`：查表 + 填充 `{0}` 占位符。单独开这个方法而不是让每个调用点各写 `string.Format` —— 键缺失时 `T()` 会原样返回键名，此时 `string.Format` 作用在不含占位符的字符串上是安全的，失败路径不会把界面搞崩。
+- 新增 `ApplyPluginsPageLocalization()`，在 `ApplyLocalization()` 的 `NavTab4Text` 之后调用；末尾重新绑定一次插件列表数据源 —— 候选卡片的徽标与按钮文案是 **getter**（每次读取时才查表），不重绑就不会跟着换语言。
+- `navigationButtons` / `navigationTexts` 补上第 6 项（`NavTab5` / `NavTab5Text`）。
+
+### 🧪 自检
+
+- `dotnet build`（Release）→ **0 警告 0 错误**。
+- **键完整性交叉核对**：代码里 `I18n.T` / `I18n.TF` 引用的 353 个键与字典定义的键求差，**「引用但未定义」为 0** —— 不存在会裸显键名的界面文本。
+- 每个新增键都核对过 4 条语言分支齐全。
+- `--plugin-selftest`（System 包，`--skip-invoke`）→ PASS 全链路可用，`%TEMP%` 沙箱零残留。
+- 插件页是纯 UI 行为，`--plugin-selftest` 沙箱不覆盖；**界面验证需在运行中切到英文 / 日文确认整页翻译**（建议纳入 UI 回归套件）。
+
 ## [未发布] - 2026-09-17（版本记录回补与版本号同步：CHANGELOG 缺 beta.3 / beta.4 两个已发布小节）
 
 `devplugin` 合并遗留的第三类 —— **文档层面**：合并结果里的 `CHANGELOG.md` 少了 `v1.7.4-beta.3` 与 `v1.7.4-beta.4` 两个**已发布**版本的小节。

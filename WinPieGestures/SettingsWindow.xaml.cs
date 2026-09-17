@@ -807,8 +807,8 @@ public partial class SettingsWindow : Window
 			}
 		}
 
-		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
-		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
+		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[6] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4, NavTab5 };
+		TextBlock[] navigationTexts = new TextBlock[6] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text, NavTab5Text };
 		for (int i = 0; i < navigationButtons.Length; i++)
 		{
 			if (navigationButtons[i] == null) continue;
@@ -1788,6 +1788,11 @@ public partial class SettingsWindow : Window
 		{
 			NavTab4Text.Text = I18n.T("TabAbout");
 		}
+		if (NavTab5Text != null)
+		{
+			NavTab5Text.Text = I18n.T("TabPlugins");
+		}
+		ApplyPluginsPageLocalization();
 		if (SidebarToggleButton != null)
 		{
 			string toggleText = I18n.T(_isSidebarCollapsed ? "SidebarExpand" : "SidebarCollapse");
@@ -6038,28 +6043,30 @@ public partial class SettingsWindow : Window
 
 		// 进程内插件无法原地热替换 —— 已加载的程序集不会被重新读取。
 		// 必须走「停用 → 启用」才会真正把磁盘上的新二进制加载进来。
+		string msgTitle = I18n.T("PluginsMsgTitle");
+
 		if (!PluginHost.Disable(reference.PluginId, out string disableError))
 		{
-			System.Windows.MessageBox.Show(this, $"停用失败：{disableError}", "StarPie 插件",
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsDisableFailed", disableError), msgTitle,
 				MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
 		if (!PluginHost.Enable(reference.PluginId, out string enableError))
 		{
-			System.Windows.MessageBox.Show(this, $"重新加载失败：{enableError}", "StarPie 插件",
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsReloadFailed", enableError), msgTitle,
 				MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
 		PluginInstance? reloaded = PluginHost.Find(reference.PluginId);
-		PluginHost.NotifyUser("StarPie 插件", $"{reference.PluginId} 已重新加载。");
+		PluginHost.NotifyUser(msgTitle, I18n.TF("PluginsReloaded", reference.PluginId));
 
 		if (reloaded?.RequiresRestart == true)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"{reference.PluginId} 已重新加载，但旧程序集未能立即从内存释放，需要重启 StarPie 才能完全生效。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsReloadedRestartNeeded", reference.PluginId),
+				msgTitle, MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
 		UpdateFocusEditorUi();
@@ -6133,10 +6140,10 @@ public partial class SettingsWindow : Window
 		if (PluginsStatusSummaryText != null)
 		{
 			int enabledCount = items.Count(i => i.IsEnabled);
-			string directoryHint = $"数据目录：{PluginPaths.Root}";
+			string directoryHint = I18n.TF("PluginsDataDirectoryHint", PluginPaths.Root);
 			PluginsStatusSummaryText.Text = items.Count == 0
-				? $"尚未安装任何插件。{directoryHint}"
-				: $"共 {items.Count} 个插件，{enabledCount} 个已启用。{directoryHint}";
+				? I18n.TF("PluginsStatusEmpty", directoryHint)
+				: I18n.TF("PluginsStatusSummary", items.Count, enabledCount, directoryHint);
 		}
 
 		if (PluginsSafeModeText != null)
@@ -6144,7 +6151,7 @@ public partial class SettingsWindow : Window
 			PluginsSafeModeText.Visibility = PluginHost.IsSafeModeActive ? Visibility.Visible : Visibility.Collapsed;
 			if (PluginHost.IsSafeModeActive)
 			{
-				PluginsSafeModeText.Text = "⚠️ 安全模式：上次启动时插件引发异常，已自动禁用问题插件，避免反复崩溃。";
+				PluginsSafeModeText.Text = I18n.T("PluginsSafeModeWarning");
 			}
 		}
 
@@ -6159,6 +6166,58 @@ public partial class SettingsWindow : Window
 	/// 所以这里始终把<b>实际路径</b>写出来，并明确说明宿主不会替用户创建它。
 	/// </para>
 	/// </summary>
+	/// <summary>
+	/// 插件页的静态文案：页头、副标题、各按钮与复选框。
+	/// <para>
+	/// 覆盖的是 <c>SettingsWindow.xaml</c> 里那几个硬编码中文默认值。插件页是 S4 拆包时新加的，
+	/// 当时没有同步接进 <see cref="ApplyLocalization"/>，于是切到英文 / 日文时整页仍是中文。
+	/// 列表状态、候选区那几段带数字的文案各自在刷新方法里取（见 <see cref="TF"/>）。
+	/// </para>
+	/// </summary>
+	private void ApplyPluginsPageLocalization()
+	{
+		if (PluginsPageHeader != null)
+		{
+			PluginsPageHeader.Text = I18n.T("TabPlugins");
+		}
+		if (PluginsPageSubheader != null)
+		{
+			PluginsPageSubheader.Text = I18n.T("PluginsPageSubheader");
+		}
+		if (InstallPluginButton != null)
+		{
+			InstallPluginButton.Content = I18n.T("PluginsInstallButton");
+		}
+		if (RescanPluginsButton != null)
+		{
+			RescanPluginsButton.Content = I18n.T("PluginsRescanButton");
+		}
+		if (OpenPluginsFolderButton != null)
+		{
+			OpenPluginsFolderButton.Content = I18n.T("PluginsOpenDataFolderButton");
+		}
+		if (OpenPluginScanFolderButton != null)
+		{
+			OpenPluginScanFolderButton.Content = I18n.T("PluginsOpenScanFolderButton");
+		}
+		if (PluginSystemEnabledCheckBox != null)
+		{
+			PluginSystemEnabledCheckBox.Content = I18n.T("PluginsEnableCheckBox");
+		}
+		if (PluginsEmptyTitleText != null)
+		{
+			PluginsEmptyTitleText.Text = I18n.T("PluginsEmptyTitle");
+		}
+		if (PluginsEmptyHintText != null)
+		{
+			PluginsEmptyHintText.Text = I18n.T("PluginsEmptyHint");
+		}
+
+		// 候选卡片的状态徽标与安装按钮文案是 getter（每次读取时才查表），
+		// 光设静态文本不会让它们换语言 —— 得重新绑定一次数据源。
+		RefreshPluginManagerUi();
+	}
+
 	private void RefreshPluginCandidatesUi()
 	{
 		if (PluginCandidatesPanel == null) return;
@@ -6180,17 +6239,16 @@ public partial class SettingsWindow : Window
 		{
 			PluginCandidatesHeaderText.Text = PluginPaths.ScanRootExists
 				? (installable > 0
-					? $"扫描目录里发现 {candidates.Count} 个 .dll，其中 {installable} 个可以安装"
-					: "扫描目录里没有可安装的插件")
-				: "扫描目录不存在（宿主不会创建它）";
+					? I18n.TF("PluginsScanHeaderFound", candidates.Count, installable)
+					: I18n.T("PluginsScanHeaderNone"))
+				: I18n.T("PluginsScanHeaderMissing");
 		}
 
 		if (PluginCandidatesPathText != null)
 		{
 			PluginCandidatesPathText.Text = PluginPaths.ScanRootExists
 				? PluginPaths.ScanRoot
-				: $"{PluginPaths.ScanRoot}　—　把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。" +
-				  "该目录由你自己创建：StarPie 装在只读位置时无权创建它。";
+				: PluginPaths.ScanRoot + "　—　" + I18n.T("PluginsScanPathHint");
 		}
 
 		if (PluginCandidateItemsControl != null)
@@ -6214,8 +6272,8 @@ public partial class SettingsWindow : Window
 		if (candidate == null)
 		{
 			System.Windows.MessageBox.Show(this,
-				"这枚候选已经不在扫描目录里了（可能刚被移走或改名）。已重新扫描，请再试一次。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.T("PluginsCandidateGone"),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 			RefreshPluginManagerUi();
 			return;
 		}
@@ -6227,14 +6285,13 @@ public partial class SettingsWindow : Window
 		if (!ok)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"安装失败：{error}", "StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				I18n.TF("PluginsInstallFailed", error), I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 		else if (candidate.State == PluginCandidateState.Update)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"{candidate.DisplayName} 已更新到 {candidate.VersionText} 并已启用。\n\n" +
-				"如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsUpdatedAndEnabled", candidate.DisplayName, candidate.VersionText),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
 		RefreshPluginManagerUi();
@@ -6244,39 +6301,35 @@ public partial class SettingsWindow : Window
 	private bool ConfirmCandidateInstall(PluginCandidate candidate)
 	{
 		var text = new System.Text.StringBuilder();
-		text.AppendLine($"即将安装：{candidate.DisplayName} {candidate.VersionText}");
-		text.AppendLine($"文件：{candidate.DllPath}");
+		text.AppendLine(I18n.TF("PluginsConfirmAboutToInstall", candidate.DisplayName, candidate.VersionText));
+		text.AppendLine(I18n.TF("PluginsConfirmFile", candidate.DllPath));
 		text.AppendLine();
 
 		if (candidate.Scan.Manifest?.Capabilities is { Count: > 0 } capabilities)
 		{
-			text.AppendLine("该插件声明了以下能力：");
+			text.AppendLine(I18n.T("PluginsConfirmCapabilities"));
 			text.AppendLine(DescribeCapabilities(candidate.Scan.Manifest.ResolveCapabilities()));
 			text.AppendLine();
 		}
 
 		if (candidate.HasNote)
 		{
-			text.AppendLine($"扫描结果：{candidate.Note}");
+			text.AppendLine(I18n.TF("PluginsConfirmScanResult", candidate.Note));
 			text.AppendLine();
 		}
 
 		text.AppendLine(candidate.State switch
 		{
-			PluginCandidateState.Update =>
-				"点击「确定」后将用扫描目录里的新版覆盖现有安装并立即启用。" +
-				"如果插件正在运行，宿主会先自动停用它再替换文件。",
-			PluginCandidateState.Downgrade =>
-				"点击「确定」后将用更旧的版本覆盖现有安装。除非你明确需要退回旧版，否则不建议这样做。",
-			PluginCandidateState.Replaced =>
-				"点击「确定」后将用扫描目录里的文件覆盖现有安装（版本号相同但内容不同）。",
-			_ => "点击「确定」后插件将被复制到 StarPie 的数据目录并立即启用。",
+			PluginCandidateState.Update => I18n.T("PluginsConfirmUpdate"),
+			PluginCandidateState.Downgrade => I18n.T("PluginsConfirmDowngrade"),
+			PluginCandidateState.Replaced => I18n.T("PluginsConfirmReplaced"),
+			_ => I18n.T("PluginsConfirmFresh"),
 		});
 		text.AppendLine();
-		text.Append("插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。");
+		text.Append(I18n.T("PluginsConfirmPrivileges"));
 
 		return System.Windows.MessageBox.Show(this, text.ToString(),
-			"确认安装插件", MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+			I18n.T("PluginsConfirmTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
 	/// <summary>打开只读扫描目录。目录不存在时只提示路径，绝不代为创建。</summary>
@@ -6287,10 +6340,8 @@ public partial class SettingsWindow : Window
 		if (!PluginPaths.ScanRootExists)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"扫描目录还不存在：\n{scanRoot}\n\n" +
-				"StarPie 不会替你创建它 —— 程序可能装在只读位置，宿主对这里只读不写。\n" +
-				"如需使用随包附带的插件，请手工创建该文件夹，把插件 .dll 放进去，再点「重新扫描」。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsScanFolderMissing", scanRoot),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
 
