@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Threading;
@@ -68,6 +68,9 @@ internal sealed class PluginHostInfo : IHostInfo
 
     public bool IsPortable => PluginPaths.IsPortable;
 
+    public bool HasCapability(PluginCapability capability) =>
+        (_capabilities & capability) == capability;
+
     public string HostExecutablePath
     {
         get
@@ -84,14 +87,6 @@ internal sealed class PluginHostInfo : IHostInfo
             }
         }
     }
-
-    /// <summary>
-    /// 读的是<b>本插件自己的清单</b>，不是宿主的全局开关。所以插件可以在
-    /// <c>Initialize</c> 里问一句「我有没有 Process 能力」，据此决定注册一个能用的动作、
-    /// 还是注册一个点了就告诉用户「本插件需要「进程」能力」的动作 ——
-    /// 后者比让那次动作在运行时抛异常友好得多。
-    /// </summary>
-    public bool HasCapability(PluginCapability capability) => (_capabilities & capability) == capability;
 }
 
 /// <summary>UI 线程调度。UI 不可用时降级为「直接执行」或「静默忽略」，绝不抛异常。</summary>
@@ -280,18 +275,7 @@ internal sealed class PluginHostActionInvoker : IHostActionInvoker
 }
 
 /// <summary>
-/// 带能力门禁的宿主服务骨架：能力校验 + 异常包裹，两条纪律的唯一实现。
-/// <para>
-/// 三个服务（命令 / Shell 动词 / 窗口控制）的这两件事逐字相同，差别只有所需的能力标志。
-/// 抽出来不只是为了少写几行 —— 它们是<b>纪律的载体</b>，各写一份的话，
-/// 某天只修了其中两份就会得到一个行为自相矛盾的 SDK：
-/// <list type="bullet">
-/// <item><b>门禁必须先落日志再抛</b>。异常可能被插件自己的 <c>catch</c> 吞掉，
-/// 而日志是排查的第一现场 —— 否则现象只剩「按下去什么都没发生」。</item>
-/// <item><b>异常必须吞在服务内</b>。冒泡到 <c>ActionExecutor.Execute</c> 会命中它的
-/// MessageBox 分支，在无人值守时卡死唯一的动作线程。</item>
-/// </list>
-/// </para>
+/// 带能力门禁的宿主服务骨架：统一完成能力校验、拒绝日志和异常隔离。
 /// </summary>
 internal abstract class PluginGatedService
 {
@@ -689,11 +673,16 @@ internal sealed class PluginSystemService : PluginGatedService, IHostSystemServi
 /// </summary>
 internal sealed class PluginEventService : IPluginEvents
 {
+    private readonly PluginInstance _instance;
     private readonly string _pluginId;
     private readonly object _gate = new();
     private readonly List<Subscription> _subscriptions = new();
 
-    public PluginEventService(string pluginId) => _pluginId = pluginId;
+    public PluginEventService(PluginInstance instance)
+    {
+        _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+        _pluginId = instance.PluginId;
+    }
 
     private sealed class Subscription : IDisposable
     {
@@ -729,8 +718,19 @@ internal sealed class PluginEventService : IPluginEvents
 
         Action onChanged = () =>
         {
-            try { handler(I18n.CurrentLanguageCode); }
-            catch (Exception ex) { AppLogger.LogError($"[plugin:{_pluginId}] OnLanguageChanged 回调异常", ex); }
+            if (!_instance.TryAcquireInvocation(
+                    PluginCallKind.InteractionEvent,
+                    out PluginInvocationLease? lease,
+                    out _))
+            {
+                return;
+            }
+
+            using (lease)
+            {
+                try { handler(I18n.CurrentLanguageCode); }
+                catch (Exception ex) { AppLogger.LogError($"[plugin:{_pluginId}] OnLanguageChanged 回调异常", ex); }
+            }
         };
 
         I18n.LanguageChanged += onChanged;

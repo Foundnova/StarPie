@@ -9,7 +9,7 @@
 1. [🌟 项目起源、使命与设计哲学](#1-项目起源使命与设计哲学)
 2. [🏗️ 源码架构与核心模块分工](#2-源码架构与核心模块分工)
 3. [⚙️ 核心技术机制与避坑规范](#3-核心技术机制与避坑规范)
-4. [🧩 插件系统运行时重构（未采用）](#4-插件系统运行时重构未采用)
+4. [🧩 插件系统运行时重构](#4-插件系统运行时重构)
 5. [🔄 代码生成、编译与发布流水线](#5-代码生成编译与发布流水线)
 6. [🎨 UI/UX 与视觉设计规范](#6-uiux-与视觉设计规范)
 7. [📜 版本演进与发布记录](CHANGELOG.md)
@@ -79,10 +79,10 @@ g:\Users\2 Better\Desktop\design\
 │   │   ├── ClassicRingRenderer.cs     # 经典圆弧与圆角胶囊渲染器
 │   │   ├── CleanSectorsRenderer.cs    # 悬浮圆角矩形渲染器
 │   │   └── GlassmorphismRenderer.cs   # 液态毛玻璃渲染器
-│   └── Plugin/                    # ★ 插件系统宿主实现（详见 3.7）
+│   └── Plugin/                    # ★ 插件系统宿主实现（详见第 4 节）
 │       ├── PluginHost.cs              # 执行/校验/安装的唯一入口接缝
-│       ├── BuiltinActionCatalog.cs    # 内建动作静态表（编译期注册，不加载任何程序集）
-│       ├── BuiltinActions/             # 内建动作实现，一个动作一个文件（与插件同一个接口）
+│       ├── PluginRuntime.cs           # 路径注册、激活、调用与异步停用公共运行时
+│       ├── PluginPathModules.cs       # 动作/交互事件/轮盘结构三条强类型路径模块
 │       ├── PluginCatalog.cs           # 贡献点注册表 + 注册会话（暂存→提交的原子性）
 │       ├── PluginLoadContext.cs       # 可回收 ALC（停用即卸载，需重启比例是硬指标）
 │       ├── PluginInstance.cs          # 单个插件的运行时状态机与加载计量
@@ -92,6 +92,12 @@ g:\Users\2 Better\Desktop\design\
 │       ├── PluginParameterValidator.cs # 声明式参数约束校验（Required/MaxLength/Min/Max/Regex）
 │       ├── PluginParameterForm.cs     # 参数表单动态渲染（9 种 ParameterFieldType）
 │       ├── PluginActionBinding.cs     # 「Type + PluginActionRef ⇄ 单 Tag」双向投影
+│       ├── ActionParameterProjection.cs # 认领动作的宿主裸字段 → 参数字典投影
+│       ├── PluginActionClaimRegistry.cs # 随包动作的顶层 Type 认领快照与冲突拒绝
+│       ├── BundledPluginLifecycle.cs  # 随包动作包的同步、刷新、补回与安全清理
+│       ├── BuiltinActionCatalog.cs     # 仅保留 Hotkey 的进程内动作目录
+│       ├── BuiltinActions/             # 内建动作的插件模型适配实现
+│       ├── PluginCapabilityLabels.cs   # 能力位 → 安装确认风险文案
 │       ├── PluginI18n.cs              # 插件词条 key 的统一解析（短键 ⇄ 全键）
 │       ├── PluginListItem.cs          # 插件管理页的列表项 DTO
 │       ├── PluginSelfTest.cs          # --plugin-selftest 无界面端到端自检通道
@@ -99,34 +105,17 @@ g:\Users\2 Better\Desktop\design\
 │       ├── PluginPaths.cs             # 插件目录/清单/日志/便携模式判定
 │       ├── PluginRegistryStore.cs     # 启用状态与哈希登记（registry.json）
 │       ├── PluginLogger.cs            # 按插件分文件的日志
-│       ├── PluginContext.cs           # IPluginContext 实现（装配宿主服务与元数据）
-│       └── PluginHostServices.cs      # 动作执行/命令/Shell 动词/窗口/剪贴板/通知等宿主服务实现
+│       ├── PluginContext.cs           # IPluginContext 实现 + 能力门禁 + 词条注册表
+│       └── PluginHostServices.cs      # 动作执行/窗口/剪贴板/通知等宿主服务实现
 ├── StarPie.Plugin.Abstractions/   # ★ 插件 SDK 契约层（插件唯一允许引用的 StarPie 程序集）
 │   ├── IStarPiePlugin.cs          # 插件入口契约（Initialize / Shutdown）
 │   ├── IPluginContext.cs          # 插件可见的宿主能力集合
 │   ├── Actions.cs                 # ActionDescriptor / ParameterField / ActionResult
 │   ├── Registries.cs              # 动作、图标、词条注册表契约
-│   ├── Services.cs                # 宿主服务契约（命令、Shell 动词、窗口、剪贴板、通知、事件）
+│   ├── Services.cs                # 宿主服务契约（窗口、剪贴板、通知、事件）
 │   ├── PluginManifest.cs          # plugin.json 清单模型
 │   ├── PluginMetadata.cs          # 程序集元数据兜底模型
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
-├── plugins/                       # ★ 随包动作包（与主程序同源构建，随发行包分发到 程序目录\plugin\）
-│   ├── StarPie.Plugin.Launch/         # 启动程序（认领 Launch）
-│   ├── StarPie.Plugin.WebUrl/         # 打开网址（认领 WebUrl + 别名 Url）
-│   ├── StarPie.Plugin.Folder/         # 打开文件夹（认领 Folder + 别名 OpenFolder）
-│   ├── StarPie.Plugin.Command/        # 运行命令（认领 Command）
-│   ├── StarPie.Plugin.ShellTool/      # 系统与右键工具（认领 ShellTool）
-│   ├── StarPie.Plugin.Tile/           # 平铺窗口（认领 Tile）
-│   ├── StarPie.Plugin.ToggleTopmost/  # 窗口置顶/取消置顶（认领 ToggleTopmost）
-│   ├── StarPie.Plugin.MoveMonitor/    # 窗口移到下一屏（认领 MoveMonitor）
-│   ├── StarPie.Plugin.WindowOpacity/  # 窗口透明度（认领 WindowOpacity）
-│   ├── StarPie.Plugin.SwitchWindow/   # 切换窗口（认领 SwitchWindow）
-│   ├── StarPie.Plugin.Ocr/            # 截屏识字（认领 Ocr + 别名 ScreenOcr）
-│   └── StarPie.Plugin.System/         # 系统控制（认领 System）
-│       # 十二个动作包一律**一个动作一个包**：拆包粒度就是停用粒度，
-│       # 用户能把「窗口透明度」关掉而继续用「平铺窗口」，也能单独关掉读屏幕的「截屏识字」。
-│       # **别名必须与主类型同包**（Url / OpenFolder / ScreenOcr 三对）——
-│       # 否则同一个动作在两种写法下由不同插件执行，停用其中一个只失效一半配置。
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
 │   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
@@ -233,6 +222,8 @@ g:\Users\2 Better\Desktop\design\
 - **初始化不得产生系统副作用**：WPF 给 `CheckBox.IsChecked` 赋值时也可能触发 `Checked/Unchecked`。加载自启动状态时必须同时使用 `_isUpdatingUi`、`_isUiInitializing` 与 `_isLoadingAutoStartState` 防护，并比较已加载状态；只有用户实际修改开关时才能调用 `ConfigManager.SetAutoStart()`，严禁打开控制台时创建或删除计划任务。
 - **显式退出模式**：`App.xaml` 必须保持 `ShutdownMode="OnExplicitShutdown"`，关闭最后一个设置窗口不能结束后台 Hook 与托盘进程；只有托盘退出、提权重启或明确的应用退出流程可以调用 `Shutdown()`。
 
+---
+
 ### 3.7 插件系统 (`StarPie.Plugin.Abstractions` + `WinPieGestures/Plugin/`)
 - **三层分界，任何一层都不许越界**：
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
@@ -316,13 +307,17 @@ g:\Users\2 Better\Desktop\design\
 
 ---
 
-## 4. 🧩 插件系统运行时重构（未采用）
+## 4. 🧩 插件系统运行时重构
 
-> 本节原内容来自 `devplugin` 分支 2026-09-17 的合并：那一侧把插件系统重构为「统一调用运行时 + 路径模块」（`PluginRuntime` / `PluginPathModules`）、「活动调用租约」（`PluginInvocationLease`）与「异步停用状态机」（`DisableAsync`），设计文档见 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
->
-> **本分支不采用这套实现**：合并时插件系统文件一律取了本分支版本（那一侧不含 §3.7 的顶层类型认领、`plugins\` 下的 12 个单动作包与 SDK 1.3 / 1.4 的能力面，两者在 `PluginHost` 上不可共存），只有它新增的两个模块文件被带了进来 —— 那两个文件零引用（915 行），已删除。
->
-> 将来若要采用这套重构，正确做法是**把认领链路重新融合进它的运行时**，不能直接取那一侧的文件。插件系统的现行规范见 §3.7。
+> 本节是 2026-09-17 与 `devplugin` 侧同步后**已采用**的运行时形态；插件系统的通用规范
+> （两个插件目录、候选安装三条规则、顶层类型认领、宿主能力门禁、派发顺序等）见 **§3.7**。
+
+- **详细架构文档**：宿主分层、插件加载与原子注册、`PluginInstance` 包装、活动调用租约、异步停用和动作执行全链路统一维护在 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
+- **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
+- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。用户停用、更新与卸载必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载；插件系统总开关和应用退出只停止当前运行时，不得清空插件自身的启用偏好。实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
+- **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
+- **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
+- **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
 
 ---
 

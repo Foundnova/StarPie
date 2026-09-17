@@ -417,6 +417,82 @@ sequenceDiagram
 
 ---
 
+## 8.1 随包动作包、类型认领与宿主能力
+
+### 内建动作的最终分工
+
+`Hotkey` 是唯一保留在 `BuiltinActionCatalog` 的内建动作。它也是未配置槽位的占位类型，不能外移；否则用户停用某个动作包后，空槽位也会变成“动作不可用”。
+
+其余 12 个原内建动作以 `plugins/StarPie.Plugin.*` 下的单动作包随发行版构建：
+
+```text
+Launch / WebUrl / Folder / Command / ShellTool
+Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow
+Ocr / System
+```
+
+单动作包的拆分粒度就是用户可以停用的粒度。插件工程只依赖 `StarPie.Plugin.Abstractions`，并以 `Private=false` 引用它；主工程只将产物复制到来源区，不引用插件类型。
+
+### 顶层类型认领（Type Claim）
+
+旧配置以 `ActionItem.Type` 保存动作身份，例如 `Launch`、`Url` 或 `Tile`。为了不迁移用户配置，随包动作包通过程序集静态元数据声明：
+
+```text
+StarPiePluginTypeClaims = "Launch=launch"
+```
+
+`PluginActionClaimRegistry` 只读取登记表中的随包认领快照，将顶层类型解析为 `PluginId + ContributionId`。它不加载 DLL、不执行插件代码，也不承担参数校验或调度。
+
+动作派发顺序是固定契约：
+
+```text
+ActionExecutor
+  1. BuiltinActionCatalog（Hotkey）
+  2. PluginActionClaimRegistry（旧 Type → 随包插件贡献点）
+  3. 历史 switch / Type="Plugin" 兜底
+```
+
+认领规则：
+
+- 只有登记为 `Bundled` 的插件可以认领顶层类型；
+- 不能认领 `Plugin` 或仍在内建目录中的类型；
+- 多个随包插件争抢同一类型时整组拒绝，绝不采用后写覆盖；
+- 已认领贡献点不显示在普通“插件动作”子下拉中，避免同一功能出现两种互不兼容的持久化形态；
+- 认领动作的旧裸字段由 `ActionParameterProjection` 投影为参数字典，再进入 `PluginRuntime.Actions` 的统一激活、校验、租约和调用路径。
+
+### 随包生命周期
+
+`BundledPluginLifecycle` 在启动初始化阶段、`SyncFromDisk` 之前执行，且只做静态扫描与文件同步：
+
+```text
+程序目录 plugin\ 来源区
+  → 首次安装并在登记表标记 Bundled
+  → 已存在时刷新文件元数据，但不改 Enabled / Preload
+  → 宿主区载荷丢失时补回
+  → 来源区完整且可识别时，清理已停止分发的旧随包载荷
+  → SyncFromDisk 建立或就地更新 PluginInstance
+  → PluginActionClaimRegistry 重建路由表
+```
+
+清理遵循保守原则：来源区不存在、为空或存在无法识别 DLL 时，宁可留下旧条目，也不删除用户数据。停止分发时只删载荷和登记，保留插件 `data\` 目录。
+
+随包动作包允许使用 `starpie.*` 保留 ID，但仅在只读来源区、已登记的随包安装副本和自检沙箱中放行；用户手动选择 DLL 的入口仍按社区插件规则拒绝保留 ID。
+
+### SDK 1.4 能力门禁
+
+`IPluginContext` 还提供以下宿主能力面：
+
+| 服务 | 执行所需能力 |
+|---|---|
+| `Commands` / `Shell` | `Process` |
+| `Windows` | `WindowControl` |
+| `ScreenCapture` | `ScreenCapture` |
+| `System` | `InputSimulation` |
+
+能力检查发生在会产生实际后果的宿主服务调用点；用于构建参数表单的终端、布局和预设列表仍可读取。`PluginCapabilityLabels` 是安装确认页能力文案的唯一来源，自检会检查每个能力位均有说明。
+
+---
+
 ## 9. 插件启用和加载过程
 
 ### 为什么要惰性加载
