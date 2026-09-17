@@ -689,9 +689,9 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.4-beta.3&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.4-beta.4&#x0a;© 2026 StarPie">
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.4-beta.3" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.7.4-beta.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -4033,7 +4033,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.4-beta.3 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.4-beta.4 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -4508,7 +4508,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.4-beta.3" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.4-beta.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -4518,6 +4518,18 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <StaticResource ResourceKey="CardShadowEffect" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Text="v1.7.4-beta.4 多层轮盘全局继承解耦 &amp; 同层精准映射与超层优雅回退" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Text="• 🧩 【全局层级状态污染消除】：重构动作继承求值链路，彻底解耦对全局方案当前浏览层指针的依赖，在控制台切换全局方案层数时不再污染其他应用程序方案的未配置槽位；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🎯 【同层对应优先继承】：专属程序方案第 N 层的空白扇区与中心核心圆，优先对应继承全局方案第 N 层的动作与子动作配置；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• 🪜 【多层超额优雅回退】：当程序方案层数多于全局方案时（如程序 3 层、全局 2 层），超额层的未配置槽位自动回退继承全局方案第 1 层动作，杜绝越界与空指针异常；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Text="• ⚡ 【实时运行态切层同步】：桌面划动手势与滚轮切层时，继承动作跟随层级切换毫秒级即时重新评估与渲染。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>
