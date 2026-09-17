@@ -176,20 +176,6 @@ public static class I18n
 	static I18n()
 	{
 		Dictionary<string, Dictionary<LanguageCode, string>> dictionary = new Dictionary<string, Dictionary<LanguageCode, string>>();
-		dictionary["SidebarModeSimple"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "💡 简单模式",
-			[LanguageCode.ZhTw] = "💡 簡易模式",
-			[LanguageCode.En] = "💡 Simple Mode",
-			[LanguageCode.Ja] = "💡 シンプルモード"
-		};
-		dictionary["SidebarModePro"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "⚙️ 高级全星模式",
-			[LanguageCode.ZhTw] = "⚙️ 進階全星模式",
-			[LanguageCode.En] = "⚙️ Pro Full Mode",
-			[LanguageCode.Ja] = "⚙️ プロ全星モード"
-		};
 		dictionary["NewCustomPresetButton"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "➕ 新建配色",
@@ -528,20 +514,6 @@ public static class I18n
 			[LanguageCode.En] = "\ud83d\udee1\ufe0f Whitelist Mode (Only active in whitelisted apps, bypass elsewhere)",
 			[LanguageCode.Ja] = "\ud83d\udee1\ufe0f ホワイトリストモード (登録アプリのみ有効、他は右クリック通過)"
 		};
-		dictionary["BlacklistTitle"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "进程排除黑名单",
-			[LanguageCode.ZhTw] = "處理程序排除黑名單",
-			[LanguageCode.En] = "Process Exclusion Blacklist",
-			[LanguageCode.Ja] = "プロセス除外ブラックリスト"
-		};
-		dictionary["BlacklistDesc"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "在排除黑名单中的应用程序（如远程桌面、画图、3D建模软件）中，完全放行鼠标右键。",
-			[LanguageCode.ZhTw] = "在排除黑名單中的應用程式（如遠端桌面、小畫家、3D建模軟體）中，完全放行滑鼠右鍵。",
-			[LanguageCode.En] = "Bypass mouse gestures in blacklisted applications (e.g. Remote Desktop, Paint, CAD tools).",
-			[LanguageCode.Ja] = "ブラックリストに登録されたアプリ（リモートデスクトップ、ペイントなど）ではジェスチャーを無効化します。"
-		};
 		dictionary["WhitelistTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "进程启用白名单",
@@ -794,14 +766,19 @@ public static class I18n
 			[LanguageCode.En] = "➕ Add Custom Profile",
 			[LanguageCode.Ja] = "➕ カスタム設定を追加"
 		};
-		dictionary["BtnRenameProfile"] = new Dictionary<LanguageCode, string>
+		// 拆键说明（2026-09-17）：下面两键供列表模式的整宽按钮 —— 同一面板统一用长标签
+		// （见上方的「➕ 新建自定义配置」与下方的「📑 复制方案」）。画布模式的紧凑工具条按钮
+		// 另用短标签的 BtnRenameProfile / BtnDeleteProfile。两组原先各共用一个键，而短文案的
+		// 定义写在后面、静默覆盖了长文案，于是列表模式按钮少显示「当前配置」。此处把被顶掉的
+		// 长文案独立成键，恢复它原本的设计。
+		dictionary["BtnRenameCurrentProfile"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "✏\ufe0f 重命名当前配置",
 			[LanguageCode.ZhTw] = "✏\ufe0f 重新命名當前配置",
 			[LanguageCode.En] = "✏\ufe0f Rename Profile",
 			[LanguageCode.Ja] = "✏\ufe0f 名前を変更"
 		};
-		dictionary["BtnDeleteProfile"] = new Dictionary<LanguageCode, string>
+		dictionary["BtnDeleteCurrentProfile"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "\ud83d\uddd1\ufe0f 删除当前配置",
 			[LanguageCode.ZhTw] = "\ud83d\uddd1\ufe0f 刪除當前配置",
@@ -2908,13 +2885,6 @@ public static class I18n
 			[LanguageCode.En] = "Center Text Color:",
 			[LanguageCode.Ja] = "中央文字色:"
 		};
-		dictionary["ClickSectorHint"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "💡 提示：在右侧画布中点击任意扇区可直接选中",
-			[LanguageCode.ZhTw] = "💡 提示：在右側畫布中點選任意扇區可直接選取",
-			[LanguageCode.En] = "Tip: Click any sector on the canvas to select",
-			[LanguageCode.Ja] = "ヒント: キャンバス上の扇形をクリックして直接選択"
-		};
 		dictionary["InheritGlobal"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "跟随全局默认",
@@ -3243,20 +3213,6 @@ public static class I18n
 			[LanguageCode.ZhTw] = "在 Windows 開機登入時靜默自啟動並在後台托盤駐留。",
 			[LanguageCode.En] = "Automatically start StarPie silently minimized to tray on login.",
 			[LanguageCode.Ja] = "Windows起動時に自動でタスクトレイに常駐します。"
-		};
-		dictionary["AutoStartAsAdminTitle"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "以管理员权限自启动 (推荐)",
-			[LanguageCode.ZhTw] = "以系統管理員權限自啟動 (推薦)",
-			[LanguageCode.En] = "Run with Administrator Privileges on Startup",
-			[LanguageCode.Ja] = "管理者権限で自動起動 (推奨)"
-		};
-		dictionary["AutoStartAsAdminDesc"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "通过 Windows 任务计划程序以最高权限静默自启，无需每次弹出 UAC，可在各类高权限窗口中正常响应手势。",
-			[LanguageCode.ZhTw] = "透過 Windows 工作排程器以最高權限靜默自啟，無需每次彈出 UAC，可在各類高權限視窗中正常回應手勢。",
-			[LanguageCode.En] = "Launches via Windows Task Scheduler with highest privileges without UAC prompt, ensuring gestures work in elevated windows.",
-			[LanguageCode.Ja] = "Windowsタスクスケジューラを利用してUACなしで最高権限で自動起動し、管理者権限ウィンドウでも動作します。"
 		};
 		dictionary["ProgramPickerRefresh"] = new Dictionary<LanguageCode, string>
 		{

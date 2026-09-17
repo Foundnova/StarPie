@@ -141,7 +141,7 @@ g:\Users\2 Better\Desktop\design\
 │   ├── StarPie.iss                # 安装脚本（语言文件在 Languages/）
 │   └── build-installer.ps1        # 打包入口 —— 版本号 6 处同步点之一（$Version 兜底值）
 ├── docs/
-│   ├── plugin-system-architecture.md # ⚠ 本分支**不采用**的设计存档（统一调用运行时 + 路径模块方案），仅作设计参考
+│   ├── plugin-system-architecture.md # 插件系统**现行实现**说明（统一调用运行时 + 路径模块 + 活动调用租约 + 异步停用状态机）
 │   ├── prototypes/                # 早期交互原型（v1.6.0 / v1.6.5，纯 HTML，仅供设计参考，不参与构建）
 │   └── issue100.txt               # 用户反馈原始记录（对应修复留档）
 ├── PLUGIN_SYSTEM_DESIGN.md        # 插件系统设计大纲（设计草案，正文路径非现状，勿照抄）

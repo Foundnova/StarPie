@@ -2258,11 +2258,13 @@ public partial class SettingsWindow : Window
 		}
 		if (RenameProfileButton != null)
 		{
-			RenameProfileButton.Content = I18n.T("BtnRenameProfile");
+			// 列表模式的整宽按钮用长标签；画布模式的紧凑工具条按钮
+			// （RenameProfileBtn / RenameProfileBtn2）另用短标签键。见 I18n.cs 的拆键说明。
+			RenameProfileButton.Content = I18n.T("BtnRenameCurrentProfile");
 		}
 		if (DeleteProfileButton != null)
 		{
-			DeleteProfileButton.Content = I18n.T("BtnDeleteProfile");
+			DeleteProfileButton.Content = I18n.T("BtnDeleteCurrentProfile");
 		}
 		if (DuplicateProfileBtn != null)
 		{
