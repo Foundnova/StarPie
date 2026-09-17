@@ -4929,6 +4929,10 @@ public partial class SettingsWindow : Window
 
 			ActionItem displayItem = (isInherited && effectiveInheritedAction != null) ? effectiveInheritedAction : item;
 
+			// 失效警示条跟着「实际生效的那份动作」走 —— 继承来的动作同样可能因
+			// 全局方案里的动作包被停用而失效，只看本地覆写会漏报。
+			UpdateFocusActionUnavailableHint(displayItem);
+
 			if (_selectedSlotIndex == -1)
 			{
 				// Center Core
@@ -6652,6 +6656,31 @@ public partial class SettingsWindow : Window
 		}
 
 		bool desired = box.IsChecked == true;
+
+		// 【停用前必须先说清影响面】「先配好一堆扇区、几个月后停用某个包」是很常见的路径，
+		// 用户按下去之前有权知道有多少配置会暂时失效。统计与确认只对停用做 ——
+		// 启用永远是恢复性的，不需要确认。
+		if (!desired)
+		{
+			int affected = CountAffectedWheelActions(pluginId);
+			if (affected > 0)
+			{
+				string pluginName = PluginHost.Find(pluginId)?.Entry.Name ?? pluginId;
+				MessageBoxResult choice = System.Windows.MessageBox.Show(this,
+					$"确定停用「{pluginName}」吗？\n\n" +
+					$"· 轮盘与手势上共有 {affected} 个动作由它提供，停用期间触发会明确提示「动作不可用」\n" +
+					"· 配置本身不会丢失，重新启用即可全部恢复",
+					"停用插件", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+
+				if (choice != MessageBoxResult.Yes)
+				{
+					// Click 在 IsChecked 变更之后触发，取消 = 把勾选态拨回去，什么都不执行。
+					box.IsChecked = true;
+					return;
+				}
+			}
+		}
+
 		bool ok = desired
 			? PluginHost.Enable(pluginId, out string error)
 			: PluginHost.Disable(pluginId, out error);
@@ -6664,6 +6693,116 @@ public partial class SettingsWindow : Window
 		}
 
 		RefreshPluginManagerUi();
+	}
+
+	/// <summary>
+	/// 统计当前配置里有多少动作由 <paramref name="pluginId"/> 提供。
+	/// <para>
+	/// 覆盖两类：社区插件动作（<c>Type="Plugin"</c> 且引用指向它）与
+	/// <b>被它认领的顶层类型</b>（S4 之后 12 个单动作包各认领一个 Type ——
+	/// 停用「平铺窗口」包，失效的就是所有 <c>Type="Tile"</c> 的扇区）。
+	/// 遍历范围：每个轮盘方案的各层扇区、中心核心圆，以及手势触发动作；
+	/// 并递归进 <see cref="ActionItem.SubActions"/> —— 子动作同样可以绑插件动作。
+	/// </para>
+	/// </summary>
+	private static int CountAffectedWheelActions(string pluginId)
+	{
+		AppConfig? config = ConfigManager.CurrentConfig;
+		if (config == null) return 0;
+
+		HashSet<string> claimedTypes = new(PluginHost.ClaimedTypeNamesOf(pluginId), StringComparer.OrdinalIgnoreCase);
+		int count = 0;
+
+		void CountOne(ActionItem? action)
+		{
+			if (action == null) return;
+			if (string.Equals(action.Type, PluginActionBinding.TypeName, StringComparison.Ordinal))
+			{
+				if (string.Equals(action.PluginActionRef?.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+				{
+					count++;
+				}
+			}
+			else if (action.Type != null && claimedTypes.Contains(action.Type))
+			{
+				count++;
+			}
+
+			if (action.SubActions != null)
+			{
+				foreach (ActionItem sub in action.SubActions)
+				{
+					CountOne(sub);
+				}
+			}
+		}
+
+		foreach (WheelProfile profile in config.Profiles ?? new List<WheelProfile>())
+		{
+			if (profile.Actions != null)
+			{
+				foreach (ActionItem action in profile.Actions)
+				{
+					CountOne(action);
+				}
+			}
+
+			CountOne(profile.CenterAction);
+			if (profile.Layers == null) continue;
+			foreach (WheelLayer layer in profile.Layers)
+			{
+				if (layer.Actions != null)
+				{
+					foreach (ActionItem action in layer.Actions)
+					{
+						CountOne(action);
+					}
+				}
+				CountOne(layer.CenterAction);
+			}
+		}
+
+		if (config.GestureMappings != null)
+		{
+			foreach (GestureMapping mapping in config.GestureMappings)
+			{
+				CountOne(mapping.Action);
+			}
+		}
+
+		return count;
+	}
+
+	/// <summary>
+	/// 刷新槽位编辑器顶部的动作失效警示条。
+	/// <para>
+	/// 目前覆盖<b>认领类型</b>这一类：包被停用 / 被自动隔离 / 登记丢失时，编辑器里
+	/// 类型下拉与参数面板都照常渲染 —— 用户看不出任何异样，而按下扇区只会得到一句
+	/// 托盘提示。红色警示条把后果提前到配置的那一刻。
+	/// 社区插件动作的同类提示已由 <see cref="RefreshFocusPluginPanel"/> 覆盖，不在这里重复。
+	/// </para>
+	/// </summary>
+	private void UpdateFocusActionUnavailableHint(ActionItem displayItem)
+	{
+		if (FocusActionUnavailableText == null || FocusActionUnavailableBanner == null) return;
+
+		string? message = null;
+		if (!string.IsNullOrWhiteSpace(displayItem.Type) &&
+			!string.Equals(displayItem.Type, PluginActionBinding.TypeName, StringComparison.Ordinal) &&
+			PluginHost.TryResolveClaimedType(displayItem.Type, out _) &&
+			!PluginHost.IsClaimedTypeAvailable(displayItem.Type, out string reason))
+		{
+			message = "⚠️ " + reason;
+		}
+
+		if (message == null)
+		{
+			FocusActionUnavailableBanner.Visibility = Visibility.Collapsed;
+			return;
+		}
+
+		FocusActionUnavailableText.Text = message;
+		FocusActionUnavailableBanner.Visibility = Visibility.Visible;
 	}
 
 	private void UninstallPluginButton_Click(object sender, RoutedEventArgs e)

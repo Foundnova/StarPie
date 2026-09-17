@@ -2904,6 +2904,15 @@
                     <!-- 模块 2：触发动作类型选择与参数配置 -->
                     <Border Name="FocusActionTypeAndParamsBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                       <StackPanel>
+                        <!--
+                          动作失效警示条：当前槽位绑定的动作此刻不可用时出现（最常见的是
+                          提供它的随包动作包被停用）。红色、常驻 —— 用户「先配好动作、
+                          再去停用包」是很常见的路径，回到编辑器必须一眼看到后果，
+                          而不是等到按下扇区才知道没反应。
+                        -->
+                        <Border Name="FocusActionUnavailableBanner" Background="#1ADF2626" BorderBrush="#DC2626" BorderThickness="1" CornerRadius="6" Padding="10,7" Margin="0,0,0,10" Visibility="Collapsed">
+                          <TextBlock Name="FocusActionUnavailableText" FontSize="11.5" Foreground="#DC2626" TextWrapping="Wrap" />
+                        </Border>
                         <Grid Margin="0,0,0,10">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
