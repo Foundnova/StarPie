@@ -4870,10 +4870,6 @@ public partial class SettingsWindow : Window
 
 			ActionItem displayItem = (isInherited && effectiveInheritedAction != null) ? effectiveInheritedAction : item;
 
-			// 失效警示条跟着「实际生效的那份动作」走 —— 继承来的动作同样可能因
-			// 全局方案里的动作包被停用而失效，只看本地覆写会漏报。
-			UpdateFocusActionUnavailableHint(displayItem);
-
 			if (_selectedSlotIndex == -1)
 			{
 				// Center Core
@@ -5940,7 +5936,7 @@ public partial class SettingsWindow : Window
 
 		try
 		{
-			PluginHost.PluginActionValidation validation =
+			PluginActionValidation validation =
 				PluginHost.ValidateActionParameters(GetCurrentFocusActionItem());
 
 			// 字段级错误交给表单就地标红，此处只给「字段之外的结论」+ 未通过字段的计数，
@@ -6018,7 +6014,7 @@ public partial class SettingsWindow : Window
 		SwitchToTab(5);
 	}
 
-	private void FocusReloadPluginBtn_Click(object sender, RoutedEventArgs e)
+	private async void FocusReloadPluginBtn_Click(object sender, RoutedEventArgs e)
 	{
 		ActionItem? item = GetCurrentFocusActionItem();
 		StarPie.Plugin.PluginActionRef? reference = item?.PluginActionRef;
@@ -6036,12 +6032,16 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		// 进程内插件无法原地热替换 —— 已加载的程序集不会被重新读取。
-		// 必须走「停用 → 启用」才会真正把磁盘上的新二进制加载进来。
-		if (!PluginHost.Disable(reference.PluginId, out string disableError))
+		PluginStopResult stop = await PluginHost.DisableAsync(
+			reference.PluginId,
+			PluginStopReason.Reload,
+			PluginHost.DefaultStopGracePeriod);
+
+		if (!stop.IsFullyStopped)
 		{
-			System.Windows.MessageBox.Show(this, $"停用失败：{disableError}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			System.Windows.MessageBox.Show(this,
+				$"旧插件尚未完全停止，不能重新加载：\n\n{stop.Message}",
+				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
@@ -6052,17 +6052,8 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		PluginInstance? reloaded = PluginHost.Find(reference.PluginId);
 		PluginHost.NotifyUser("StarPie 插件", $"{reference.PluginId} 已重新加载。");
-
-		if (reloaded?.RequiresRestart == true)
-		{
-			System.Windows.MessageBox.Show(this,
-				$"{reference.PluginId} 已重新加载，但旧程序集未能立即从内存释放，需要重启 StarPie 才能完全生效。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
-		}
-
-		UpdateFocusEditorUi();
+		RefreshPluginManagerUi();
 	}
 
 	// ==================== 🧩 插件与扩展 ====================
@@ -6202,7 +6193,7 @@ public partial class SettingsWindow : Window
 	}
 
 	/// <summary>点候选卡片上的「安装 / 更新 / 降级安装」。</summary>
-	private void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
+	private async void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not System.Windows.Controls.Button button) return;
 		string? dllPath = button.Tag as string;
@@ -6222,9 +6213,10 @@ public partial class SettingsWindow : Window
 
 		if (!ConfirmCandidateInstall(candidate)) return;
 
-		bool ok = PluginHost.InstallCandidate(candidate, out string error);
+		PluginInstallResult installResult = await PluginHost.InstallCandidateAsync(candidate);
+		string error = installResult.Error;
 
-		if (!ok)
+		if (!installResult.Success)
 		{
 			System.Windows.MessageBox.Show(this,
 				$"安装失败：{error}", "StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -6232,8 +6224,7 @@ public partial class SettingsWindow : Window
 		else if (candidate.State == PluginCandidateState.Update)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"{candidate.DisplayName} 已更新到 {candidate.VersionText} 并已启用。\n\n" +
-				"如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。",
+				$"{candidate.DisplayName} 已完成安全停用、更新到 {candidate.VersionText} 并重新启用。",
 				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
@@ -6337,14 +6328,6 @@ public partial class SettingsWindow : Window
 			summaryText += $"\n声明能力：{string.Join("、", entry.CapabilitiesAck)}";
 		}
 
-		// 随包插件必须与用户自己装的插件在界面上看得出区别。否则用户点「卸载」
-		// 只会拿到一句拒绝，却不知道这是设计如此 —— 这里把「不可卸载」连同替代方案
-		// （停用）一次说清，省得他再试一次。
-		if (entry.Bundled)
-		{
-			summaryText += "\n随 StarPie 分发　·　不可卸载，可停用";
-		}
-
 		var detail = new List<string> { $"ID {instance.PluginId}" };
 		if (!string.IsNullOrWhiteSpace(instance.Scan.TargetFramework)) detail.Add(instance.Scan.TargetFramework);
 		if (!string.IsNullOrWhiteSpace(instance.Scan.MachineText)) detail.Add(instance.Scan.MachineText);
@@ -6404,7 +6387,7 @@ public partial class SettingsWindow : Window
 		return false;
 	}
 
-	private void InstallPluginButton_Click(object sender, RoutedEventArgs e)
+	private async void InstallPluginButton_Click(object sender, RoutedEventArgs e)
 	{
 		if (!EnsurePluginSystemReady()) return;
 
@@ -6446,7 +6429,7 @@ public partial class SettingsWindow : Window
 		// 插件是以 StarPie 的权限在进程内跑代码的，这一步是唯一的知情同意关口。
 		if (!ConfirmPluginInstall(scan)) return;
 
-		PluginInstallResult result = PluginHost.CommitInstall(scan, new PluginInstallOptions
+		PluginInstallResult result = await PluginHost.CommitInstallAsync(scan, new PluginInstallOptions
 		{
 			Acknowledged = true,
 			OverwriteExisting = true,
@@ -6512,17 +6495,19 @@ public partial class SettingsWindow : Window
 			MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
-	/// <summary>
-	/// 安装确认页上的风险清单。
-	/// <para>
-	/// 实现在 <see cref="PluginCapabilityLabels"/> 里 —— 搬出去的理由是它原先内联在此处，
-	/// 于是新增能力位时只能靠人记得来补一行，而这件事连着漏了两次
-	/// （<c>WindowControl</c> 与 <c>ScreenCapture</c> 至今没在确认页上出现过）。
-	/// 现在自检会遍历枚举的每个成员要求那里有一行非空文案。
-	/// </para>
-	/// </summary>
-	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities) =>
-		PluginCapabilityLabels.Describe(capabilities);
+	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities)
+	{
+		var parts = new List<string>();
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Process)) parts.Add("· 启动进程 / 操作其他程序");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.FileSystem)) parts.Add("· 读写你的文件");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Network)) parts.Add("· 访问网络");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Clipboard)) parts.Add("· 读取或修改剪贴板");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Registry)) parts.Add("· 读写注册表");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.GlobalHook)) parts.Add("· 安装全局键盘/鼠标钩子");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Ui)) parts.Add("· 显示界面与通知");
+		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Admin)) parts.Add("· 需要管理员权限");
+		return parts.Count == 0 ? "（无）" : string.Join("\n", parts);
+	}
 
 	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
 	{
@@ -6568,27 +6553,34 @@ public partial class SettingsWindow : Window
 	/// Click 只在真实交互时触发，天然规避这类误写。
 	/// </para>
 	/// </summary>
-	private void PluginSystemEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	private async void PluginSystemEnabledCheckBox_Click(object sender, RoutedEventArgs e)
 	{
 		if (PluginSystemEnabledCheckBox == null) return;
 
 		bool desired = PluginSystemEnabledCheckBox.IsChecked == true;
 		int affected = PluginHost.GetRegisteredActions().Count;
-
-		PluginHost.SetEnabled(desired);
-		RefreshPluginManagerUi();
+		PluginSystemEnabledCheckBox.IsEnabled = false;
+		try
+		{
+			await PluginHost.SetEnabledAsync(desired);
+		}
+		finally
+		{
+			PluginSystemEnabledCheckBox.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
 
 		if (!desired && affected > 0)
 		{
 			System.Windows.MessageBox.Show(this,
 				$"插件系统已关闭。\n\n" +
 				$"已经分配到轮盘上的 {affected} 个插件动作会原样保留，但触发时不会执行。\n" +
-				"重新打开开关即可恢复。",
+				"仍在运行的插件任务会收到取消信号并由宿主继续追踪。",
 				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 	}
 
-	private void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	private async void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not System.Windows.Controls.CheckBox { Tag: string pluginId } box ||
 			string.IsNullOrWhiteSpace(pluginId))
@@ -6597,158 +6589,46 @@ public partial class SettingsWindow : Window
 		}
 
 		bool desired = box.IsChecked == true;
-
-		// 【停用前必须先说清影响面】「先配好一堆扇区、几个月后停用某个包」是很常见的路径，
-		// 用户按下去之前有权知道有多少配置会暂时失效。统计与确认只对停用做 ——
-		// 启用永远是恢复性的，不需要确认。
-		if (!desired)
+		box.IsEnabled = false;
+		try
 		{
-			int affected = CountAffectedWheelActions(pluginId);
-			if (affected > 0)
+			if (desired)
 			{
-				string pluginName = PluginHost.Find(pluginId)?.Entry.Name ?? pluginId;
-				MessageBoxResult choice = System.Windows.MessageBox.Show(this,
-					$"确定停用「{pluginName}」吗？\n\n" +
-					$"· 轮盘与手势上共有 {affected} 个动作由它提供，停用期间触发会明确提示「动作不可用」\n" +
-					"· 配置本身不会丢失，重新启用即可全部恢复",
-					"停用插件", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
-
-				if (choice != MessageBoxResult.Yes)
+				if (!PluginHost.Enable(pluginId, out string enableError))
 				{
-					// Click 在 IsChecked 变更之后触发，取消 = 把勾选态拨回去，什么都不执行。
-					box.IsChecked = true;
-					return;
+					System.Windows.MessageBox.Show(this, $"启用插件 {pluginId} 失败：\n\n{enableError}",
+						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+			}
+			else
+			{
+				PluginStopResult stop = await PluginHost.DisableAsync(
+					pluginId,
+					PluginStopReason.UserDisabled,
+					PluginHost.DefaultStopGracePeriod);
+
+				if (stop.Status == PluginStopStatus.Failed)
+				{
+					System.Windows.MessageBox.Show(this, $"停用插件 {pluginId} 失败：\n\n{stop.Message}",
+						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+				else if (!stop.IsFullyStopped)
+				{
+					System.Windows.MessageBox.Show(this, stop.Message,
+						"插件正在后台停止", MessageBoxButton.OK, MessageBoxImage.Information);
 				}
 			}
 		}
-
-		bool ok = desired
-			? PluginHost.Enable(pluginId, out string error)
-			: PluginHost.Disable(pluginId, out error);
-
-		if (!ok)
+		finally
 		{
-			System.Windows.MessageBox.Show(this,
-				$"{(desired ? "启用" : "停用")}插件 {pluginId} 失败：\n\n{error}",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+			box.IsEnabled = true;
+			RefreshPluginManagerUi();
 		}
-
-		RefreshPluginManagerUi();
 	}
 
-	/// <summary>
-	/// 统计当前配置里有多少动作由 <paramref name="pluginId"/> 提供。
-	/// <para>
-	/// 覆盖两类：社区插件动作（<c>Type="Plugin"</c> 且引用指向它）与
-	/// <b>被它认领的顶层类型</b>（S4 之后 12 个单动作包各认领一个 Type ——
-	/// 停用「平铺窗口」包，失效的就是所有 <c>Type="Tile"</c> 的扇区）。
-	/// 遍历范围：每个轮盘方案的各层扇区、中心核心圆，以及手势触发动作；
-	/// 并递归进 <see cref="ActionItem.SubActions"/> —— 子动作同样可以绑插件动作。
-	/// </para>
-	/// </summary>
-	private static int CountAffectedWheelActions(string pluginId)
+	private async void UninstallPluginButton_Click(object sender, RoutedEventArgs e)
 	{
-		AppConfig? config = ConfigManager.CurrentConfig;
-		if (config == null) return 0;
-
-		HashSet<string> claimedTypes = new(PluginHost.ClaimedTypeNamesOf(pluginId), StringComparer.OrdinalIgnoreCase);
-		int count = 0;
-
-		void CountOne(ActionItem? action)
-		{
-			if (action == null) return;
-			if (string.Equals(action.Type, PluginActionBinding.TypeName, StringComparison.Ordinal))
-			{
-				if (string.Equals(action.PluginActionRef?.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
-				{
-					count++;
-				}
-			}
-			else if (action.Type != null && claimedTypes.Contains(action.Type))
-			{
-				count++;
-			}
-
-			if (action.SubActions != null)
-			{
-				foreach (ActionItem sub in action.SubActions)
-				{
-					CountOne(sub);
-				}
-			}
-		}
-
-		foreach (WheelProfile profile in config.Profiles ?? new List<WheelProfile>())
-		{
-			if (profile.Actions != null)
-			{
-				foreach (ActionItem action in profile.Actions)
-				{
-					CountOne(action);
-				}
-			}
-
-			CountOne(profile.CenterAction);
-			if (profile.Layers == null) continue;
-			foreach (WheelLayer layer in profile.Layers)
-			{
-				if (layer.Actions != null)
-				{
-					foreach (ActionItem action in layer.Actions)
-					{
-						CountOne(action);
-					}
-				}
-				CountOne(layer.CenterAction);
-			}
-		}
-
-		if (config.GestureMappings != null)
-		{
-			foreach (GestureMapping mapping in config.GestureMappings)
-			{
-				CountOne(mapping.Action);
-			}
-		}
-
-		return count;
-	}
-
-	/// <summary>
-	/// 刷新槽位编辑器顶部的动作失效警示条。
-	/// <para>
-	/// 目前覆盖<b>认领类型</b>这一类：包被停用 / 被自动隔离 / 登记丢失时，编辑器里
-	/// 类型下拉与参数面板都照常渲染 —— 用户看不出任何异样，而按下扇区只会得到一句
-	/// 托盘提示。红色警示条把后果提前到配置的那一刻。
-	/// 社区插件动作的同类提示已由 <see cref="RefreshFocusPluginPanel"/> 覆盖，不在这里重复。
-	/// </para>
-	/// </summary>
-	private void UpdateFocusActionUnavailableHint(ActionItem displayItem)
-	{
-		if (FocusActionUnavailableText == null || FocusActionUnavailableBanner == null) return;
-
-		string? message = null;
-		if (!string.IsNullOrWhiteSpace(displayItem.Type) &&
-			!string.Equals(displayItem.Type, PluginActionBinding.TypeName, StringComparison.Ordinal) &&
-			PluginHost.TryResolveClaimedType(displayItem.Type, out _) &&
-			!PluginHost.IsClaimedTypeAvailable(displayItem.Type, out string reason))
-		{
-			message = "⚠️ " + reason;
-		}
-
-		if (message == null)
-		{
-			FocusActionUnavailableBanner.Visibility = Visibility.Collapsed;
-			return;
-		}
-
-		FocusActionUnavailableText.Text = message;
-		FocusActionUnavailableBanner.Visibility = Visibility.Visible;
-	}
-
-	private void UninstallPluginButton_Click(object sender, RoutedEventArgs e)
-	{
-		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } ||
+		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } button ||
 			string.IsNullOrWhiteSpace(pluginId))
 		{
 			return;
@@ -6763,13 +6643,21 @@ public partial class SettingsWindow : Window
 
 		if (choice != MessageBoxResult.Yes) return;
 
-		if (!PluginHost.Uninstall(pluginId, removePluginData: true, out string error))
+		button.IsEnabled = false;
+		try
 		{
-			System.Windows.MessageBox.Show(this, $"卸载失败：\n\n{error}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			PluginUninstallResult result = await PluginHost.UninstallAsync(pluginId, removePluginData: true);
+			if (!result.Success)
+			{
+				System.Windows.MessageBox.Show(this, $"卸载失败：\n\n{result.Error}", "StarPie 插件",
+					MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
 		}
-
-		RefreshPluginManagerUi();
+		finally
+		{
+			button.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
 	}
 
 	private void UpdateFocusActionTypeItemsSource(string? currentTag = null)

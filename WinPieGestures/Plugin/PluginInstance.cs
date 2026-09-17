@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using StarPie.Plugin;
 
 namespace WinPieGestures.Plugins;
@@ -20,6 +21,9 @@ internal enum PluginRuntimeState
 
     /// <summary>已启用且贡献点已生效。</summary>
     Active,
+
+    /// <summary>已关闭新调用入口，正在等待活动调用结束。</summary>
+    Stopping,
 
     /// <summary>运行期出错（尚未熔断）。</summary>
     Faulted,
@@ -37,6 +41,40 @@ internal enum PluginRuntimeState
     RequiresRestart,
 }
 
+internal enum PluginCallKind
+{
+    ActionValidation,
+    ActionPreview,
+    ActionExecution,
+    InteractionEvent,
+    WheelStructureQuery,
+}
+
+/// <summary>宿主内部的一次插件调用凭证。Dispose 表示插件代码已经真实结束。</summary>
+internal sealed class PluginInvocationLease : IDisposable
+{
+    private PluginInstance? _owner;
+
+    internal PluginInvocationLease(
+        PluginInstance owner,
+        PluginCallKind kind,
+        CancellationToken cancellationToken)
+    {
+        _owner = owner;
+        Kind = kind;
+        CancellationToken = cancellationToken;
+    }
+
+    public PluginCallKind Kind { get; }
+    public CancellationToken CancellationToken { get; }
+
+    public void Dispose()
+    {
+        PluginInstance? owner = Interlocked.Exchange(ref _owner, null);
+        owner?.ReleaseInvocation();
+    }
+}
+
 /// <summary>
 /// 单个插件的运行时句柄 —— 它把「磁盘上的一个插件目录」变成「一个可调用、可监控、可撤销的活体」。
 /// <para>
@@ -52,6 +90,11 @@ internal enum PluginRuntimeState
 internal sealed class PluginInstance
 {
     private readonly object _gate = new();
+    private readonly object _loadGate = new();
+    private bool _acceptingCalls;
+    private int _activeCallCount;
+    private CancellationTokenSource _stoppingCts = new();
+    private TaskCompletionSource<bool>? _callsDrained;
 
     public PluginInstance(string pluginId, PluginRegistryEntry entry, PluginScanResult scan)
     {
@@ -153,6 +196,11 @@ internal sealed class PluginInstance
 
     public bool IsLoaded => _plugin != null;
 
+    public int ActiveCallCount
+    {
+        get { lock (_gate) return _activeCallCount; }
+    }
+
     public PluginActionRegistration[] OwnedActions { get; private set; } = Array.Empty<PluginActionRegistration>();
 
     private void SetState(PluginRuntimeState state)
@@ -163,13 +211,148 @@ internal sealed class PluginInstance
         }
     }
 
+    internal bool TryAcquireInvocation(
+        PluginCallKind kind,
+        out PluginInvocationLease? lease,
+        out string error)
+    {
+        lock (_gate)
+        {
+            if (!_acceptingCalls || State is PluginRuntimeState.Stopping or PluginRuntimeState.RequiresRestart)
+            {
+                lease = null;
+                error = $"插件「{Entry.Name}」正在停用，已拒绝新的调用。";
+                return false;
+            }
+
+            if (State is not (PluginRuntimeState.Active or PluginRuntimeState.Faulted))
+            {
+                lease = null;
+                error = $"插件「{Entry.Name}」当前状态为 {State}，不能执行调用。";
+                return false;
+            }
+
+            _activeCallCount++;
+            lease = new PluginInvocationLease(this, kind, _stoppingCts.Token);
+            error = "";
+            return true;
+        }
+    }
+
+    internal Task BeginStopping()
+    {
+        CancellationTokenSource cancellation;
+        Task drainTask;
+
+        lock (_gate)
+        {
+            _acceptingCalls = false;
+            if (State != PluginRuntimeState.RequiresRestart)
+            {
+                State = PluginRuntimeState.Stopping;
+            }
+
+            if (_activeCallCount == 0)
+            {
+                drainTask = Task.CompletedTask;
+            }
+            else
+            {
+                _callsDrained ??= new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                drainTask = _callsDrained.Task;
+            }
+
+            cancellation = _stoppingCts;
+        }
+
+        try { cancellation.Cancel(); } catch { }
+        return drainTask;
+    }
+
+    internal void MarkStopPending(string error)
+    {
+        lock (_gate)
+        {
+            _acceptingCalls = false;
+            RequiresRestart = true;
+            LastError = error;
+            State = PluginRuntimeState.RequiresRestart;
+        }
+    }
+
+    internal void ReleaseInvocation()
+    {
+        TaskCompletionSource<bool>? drained = null;
+        lock (_gate)
+        {
+            if (_activeCallCount <= 0) return;
+            _activeCallCount--;
+            if (_activeCallCount == 0)
+            {
+                drained = _callsDrained;
+                _callsDrained = null;
+            }
+        }
+
+        drained?.TrySetResult(true);
+    }
+
+    private void OpenInvocationGate()
+    {
+        CancellationTokenSource previous;
+        lock (_gate)
+        {
+            previous = _stoppingCts;
+            _stoppingCts = new CancellationTokenSource();
+            _callsDrained = null;
+            _activeCallCount = 0;
+            _acceptingCalls = true;
+            RequiresRestart = false;
+            State = PluginRuntimeState.Active;
+        }
+
+        try { previous.Dispose(); } catch { }
+    }
+
     // ------------------------------------------------------------------ 加载
 
     /// <summary>
-    /// 加载并启用插件。全过程在调用线程上同步完成（UI 线程或首次被动作引用时的动作线程）。
+    /// 加载插件运行时。全过程在调用线程上同步完成，但不会修改用户持久化的 Enabled 偏好。
+    /// 同一实例的并发加载在此处合并，确保 Initialize 与贡献提交最多执行一次。
     /// </summary>
-    /// <param name="failureReason">失败原因（用户可读）。</param>
-    public bool Load(out string failureReason)
+    public bool Load(out string failureReason) =>
+        EnsureLoaded(requireEnabled: false, out _, out failureReason);
+
+    /// <summary>
+    /// 在实例级加载锁内再次检查 Enabled，避免停用与首次惰性加载交错后把插件重新拉起。
+    /// </summary>
+    internal bool EnsureLoaded(
+        bool requireEnabled,
+        out bool disabledDuringLoad,
+        out string failureReason)
+    {
+        lock (_loadGate)
+        {
+            disabledDuringLoad = false;
+            if (requireEnabled && !Entry.Enabled)
+            {
+                disabledDuringLoad = true;
+                failureReason = $"插件「{Entry.Name}」当前未启用，请在「插件」页启用后再试。";
+                return false;
+            }
+
+            if (IsLoaded)
+            {
+                failureReason = "";
+                return true;
+            }
+
+            return LoadCore(out failureReason);
+        }
+    }
+
+    private bool LoadCore(out string failureReason)
     {
         failureReason = "";
         SetState(PluginRuntimeState.Loading);
@@ -177,10 +360,7 @@ internal sealed class PluginInstance
         try
         {
             // ① 加载前重新静态识别一次：文件可能在上次识别之后被替换或损坏
-            //    allowReservedIdPrefix: true —— 这枚插件已经登记在册，它的 ID 在进入系统
-            //    那一刻（扫描 / 导入）就查过保留前缀了。装载时复查会让随包插件
-            //    「装得上、永远起不来」，是本项目最忌讳的那种自相矛盾。
-            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(Directory, allowReservedIdPrefix: true);
+            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(Directory);
             if (!scan.Accepted)
             {
                 LastError = scan.DescribeFailure();
@@ -312,7 +492,7 @@ internal sealed class PluginInstance
             };
 
             _session = PluginHost.Catalog.BeginSession(PluginId);
-            _events = new PluginEventService(PluginId);
+            _events = new PluginEventService(this);
             _pluginContext = new PluginContext(
                 metadata, Directory, dataDirectory, _session, Logger, Settings, _events);
 
@@ -365,7 +545,7 @@ internal sealed class PluginInstance
                 h.LastError = null;
             });
 
-            SetState(PluginRuntimeState.Active);
+            OpenInvocationGate();
             return true;
         }
         catch (Exception ex)
@@ -401,6 +581,14 @@ internal sealed class PluginInstance
     /// </para>
     /// </summary>
     public void Unload()
+    {
+        lock (_loadGate)
+        {
+            UnloadCore();
+        }
+    }
+
+    private void UnloadCore()
     {
         // 每一步都刻意放进**独立的、禁止内联的**方法里，而不是写在本方法体里。
         //

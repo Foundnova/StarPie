@@ -264,53 +264,6 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>
-	/// 一个动作在 <see cref="Execute"/> 里的分派归属。
-	/// </summary>
-	internal enum ActionDispatchKind
-	{
-		/// <summary>由宿主程序集内的内建动作表提供（编译期静态注册，不加载任何程序集）。</summary>
-		Builtin,
-
-		/// <summary>由随包插件认领的顶层类型（例如 <c>Type="Launch"</c> 归基础动作包）。</summary>
-		ClaimedType,
-
-		/// <summary>
-		/// <c>switch</c> 里剩下的三类例外：<c>Text</c> / <c>String</c>（未收敛）、
-		/// <c>TileRestore</c>（历史遗留 Type）、<c>Plugin</c>（插件动作）。
-		/// <b>认不出来的 Type 也落在这里</b>，由那个 <c>default</c> 分支出声报错。
-		/// </summary>
-		SpecialCase,
-	}
-
-	/// <summary>
-	/// 判定一个动作该走哪条路。<b>这个判据就是 <see cref="Execute"/> 分派的本体</b>。
-	/// <para>
-	/// <b>为什么单独抽出来</b>：「内建优先 → 认领其次 → switch 兜底」这条顺序本身是契约，
-	/// 而顺序错了的表现是「界面一切正常、按下去却走了另一条路」—— 从现象根本反推不出来。
-	/// 抽成纯函数后，自检可以直接断言每一类 Type 的归属，不必真跑一个动作再猜它走了哪条路
-	/// （原先那种做法还有个副作用：它必须找一个「真跑也无害」的动作，而随着动作陆续外移，
-	/// 这样的动作已经一个不剩了）。
-	/// </para>
-	/// <para>
-	/// 改了 <see cref="Execute"/> 的分派就必须同步改这里，否则自检验证的是空气。
-	/// </para>
-	/// </summary>
-	internal static ActionDispatchKind ClassifyAction(string? type)
-	{
-		if (Plugins.BuiltinActionCatalog.TryGet(type, out _))
-		{
-			return ActionDispatchKind.Builtin;
-		}
-
-		if (Plugins.PluginHost.TryResolveClaimedType(type, out _))
-		{
-			return ActionDispatchKind.ClaimedType;
-		}
-
-		return ActionDispatchKind.SpecialCase;
-	}
-
 	public static void Execute(ActionItem action)
 	{
 		if (action == null)
@@ -320,72 +273,56 @@ public static class ActionExecutor
 		try
 		{
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
-
-			// 【分派：三条路，顺序不可调换】
-			//
-			//   一、内建动作表 —— 宿主程序集内的静态表，编译期注册，不经过扫描 / 安装 / ALC。
-			//       这是「不装插件时零开销」那条红线的前提。
-			//   二、随包插件的顶层类型认领 —— 这些动作在用户配置里仍是 Type="Launch"
-			//       这种老形态，走不到下面 switch 的 "Plugin" 分支，所以必须在 switch 之前。
-			//       认领表在启动期就建好（只读登记表，不加载任何程序集），这里只做一次字典命中：
-			//       轮盘触发路径上不允许出现任何 IO 或程序集加载。
-			//   三、switch 兜底 —— 只剩 Text/String、TileRestore、Plugin 三类。
-			//
-			// 判据抽在 ClassifyAction 里，是为了让<b>顺序本身可被断言</b>：「顺序错了」的表现是
-			// 界面一切正常、按下去却走了另一条路，从现象根本反推不出来；抽成纯函数之后，
-			// 自检可以直接断言每一类 Type 的归属，不必真跑一个动作再猜它走了哪条路。
-			// 改了这里就必须同步改 ClassifyAction，否则自检验证的是空气。
-			switch (ClassifyAction(action.Type))
-			{
-			case ActionDispatchKind.Builtin:
-				Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtinAction);
-				ExecuteBuiltinActionItem(action, builtinAction);
-				return;
-
-			case ActionDispatchKind.ClaimedType:
-				Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginHost.PluginTypeClaimBinding claim);
-				ExecuteClaimedActionItem(action, claim);
-				return;
-			}
-
-			// 走到这里，说明这个 Type 既不在内建动作表里，也没被任何随包插件认领。只剩三类：
-			//
-			//   一、尚未收敛的动作。目前只有 Text / String —— 它不在「动作类型」下拉的
-			//       九个顶层类型里，是给二级子动作与程序化场景用的。
-			//   二、历史遗留类型。TileRestore 是更早版本里「还原平铺」的独立 Type；
-			//       现在的界面统一产生 Type="Tile" + Parameter="Restore"，
-			//       但老配置里可能还留着旧写法，所以这一行专门为它们保留。
-			//   三、插件动作（Type="Plugin"）。靠 action.PluginActionRef 分发，
-			//       形状与内建动作截然不同，不并入上面的表。
-			//
-			// 已收敛动作的原 switch 分支已随之删除：它们现在不可达，留着只会让下一个读代码
-			// 的人以为这里还有两条路可走 —— 而这正是本次改动要消除的「双轨制」本身。
-			// 需要对照旧实现时从 git 历史取。
 			switch (action.Type.Trim())
 			{
+			case "Launch":
+				ExecuteLaunch(action.Parameter, action.Arguments, action.RunAsStandardUser);
+				break;
+			case "Folder":
+			case "OpenFolder":
+				ExecuteFolder(action.Parameter);
+				break;
+			case "Ocr":
+			case "ScreenOcr":
+				OcrManager.StartCaptureAndRecognize();
+				break;
+			case "Hotkey":
+				ExecuteHotkey(action.Parameter);
+				break;
+			case "Command":
+				ExecuteCommand(action.Parameter, action.CommandTerminal);
+				break;
+			case "SwitchWindow":
+				ExecuteSwitchWindow(action.Parameter);
+				break;
+			case "Tile":
+				WindowTiler.ExecuteTile(action.Parameter);
+				break;
 			case "TileRestore":
-				// 历史遗留：老配置里「还原平铺」的独立 Type，等价于 Tile + Parameter="Restore"。
 				WindowTiler.RestoreLastLayout();
+				break;
+			case "MoveMonitor":
+				WindowTiler.MoveWindowToNextMonitor();
+				break;
+			case "ToggleTopmost":
+				WindowTiler.ToggleWindowTopmost(action.Parameter);
+				break;
+			case "WindowOpacity":
+				WindowTiler.SetWindowOpacity(action.Parameter);
 				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
 				break;
-			case "Plugin":
-				// 【插件系统 · 唯一的执行接缝】
-				// 插件动作统一持久化为 Type="Plugin"，靠 action.PluginActionRef 分发。
-				// PluginHost.ExecutePluginAction 内部保证不抛异常：绝不能让插件异常冒泡到本方法末尾的
-				// catch —— 那里会弹 MessageBox，在无人值守时会把整个动作线程卡死在弹窗上。
-				ExecutePluginActionItem(action);
+			case "WebUrl":
+			case "Url":
+				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
 				break;
-			default:
-				// 【必须出声】认领链路上唯一剩下的洞：配置里写着一个谁都不认识的 Type。
-				// 从前这里是一条 break —— 用户按下去什么都不会发生，也没有任何提示，
-				// 正是那种「界面一切正常、行为却悄悄退化」的静默失效。
-				// 需要提醒的是：<b>占位扇区走不到这里</b> —— 未配置的新扇区 Type 是 "Hotkey"，
-				// 而 Hotkey 刻意留在内建动作表里（理由见 BuiltinActionCatalog.Build），
-				// 所以这里报出来的一定是真正的异常配置。
-				ReportUnknownActionType(action);
+			case "System":
+				ExecuteSystem(action.Parameter);
+				break;
+			case "ShellTool":
+				ExecuteShellTool(action.Parameter);
 				break;
 			case "Plugin":
 				// 【插件系统 · 唯一的执行接缝】
@@ -401,74 +338,6 @@ public static class ActionExecutor
 			AppLogger.LogError($"Failed to execute action '{action.Name}' (Type: {action.Type}, Param: {action.Parameter})", ex);
 			MessageBox.Show("Failed to execute action '" + action.Name + "': " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
-	}
-
-	/// <summary>
-	/// 内建动作的统一执行包装。
-	/// <para>
-	/// 与 <see cref="ExecutePluginActionItem"/> 并列，但<b>刻意不复用同一段代码</b> ——
-	/// 两者对失败的诉求正好相反：
-	/// <list type="bullet">
-	/// <item>插件是社区代码：失败必须可诊断、可忽略，走日志 + 托盘气泡，绝不打断用户；</item>
-	/// <item>内建动作是用户亲手配的：失败必须立刻让他知道，异常照常冒泡到外层 <c>catch</c> 弹 MessageBox。</item>
-	/// </list>
-	/// 把两者统一成一种，无论选哪一种都是错的。
-	/// </para>
-	/// </summary>
-	/// <remarks>
-	/// 可见性放宽到 <c>internal</c> 是为了让自检（<c>PluginSelfTest</c>）能调用<b>同一个方法</b> ——
-	/// 它在无界面进程里跑，不能走 <see cref="Execute"/>：那一层的 <c>catch</c> 会弹 MessageBox，
-	/// 一旦探针命令出意外，自检会卡死在无人应答的对话框上。
-	/// </remarks>
-	internal static void ExecuteBuiltinActionItem(ActionItem action, Plugins.BuiltinActionRegistration registration)
-	{
-		string actionName = registration.Contribution.Descriptor.DisplayName;
-		var parameters = registration.ProjectParameters(action);
-
-		// 与插件侧同一个次序：先校验、再执行。用户填了空命令、按下去「什么也没发生」，
-		// 是这套动作最容易出现的静默失效，校验就是专门防它的。
-		string? invalid = registration.Contribution.Validate(parameters);
-		if (invalid != null)
-		{
-			AppLogger.LogWarn($"Builtin action validation failed: {registration.FullId}, Reason='{invalid}'");
-			Plugins.PluginHost.NotifyUser(actionName, invalid);
-			return;
-		}
-
-		var input = new StarPie.Plugin.PluginActionInput
-		{
-			ContributionId = registration.FullId,
-			Parameters = parameters,
-
-			// 内建动作在宿主内部，直接访问宿主 API 即可。ActionContext 是给插件的
-			// 「沙箱视图」（用户在哪个程序里、鼠标在哪），内建动作不需要它 ——
-			// 留空是刻意的，不是漏填。
-			Context = new StarPie.Plugin.ActionContext(),
-		};
-
-		// 同步等待：本方法跑在唯一的动作线程上，而每个内建动作的实现都被约定为「全程同步」
-		// （逐个动作的 ExecuteAsync 里都写着这条线程约束），因此这里不会与别的上下文互相卡死。
-		var result = registration.Contribution
-			.ExecuteAsync(input, CancellationToken.None)
-			.GetAwaiter()
-			.GetResult();
-
-		if (result.Success)
-		{
-			AppLogger.LogInfo($"Builtin action succeeded: {registration.FullId}");
-
-			// 成功且明确要求发声时才提示：绝大多数动作是静默的，
-			// 每按一次扇区弹一次气泡，只会让用户干脆把通知关掉。
-			if (!result.Silent && !string.IsNullOrWhiteSpace(result.Message))
-			{
-				Plugins.PluginHost.NotifyUser(actionName, result.Message);
-			}
-
-			return;
-		}
-
-		AppLogger.LogWarn($"Builtin action failed: {registration.FullId}, Reason='{result.Message}'");
-		Plugins.PluginHost.NotifyUser($"{actionName} 执行失败", result.Message ?? "未提供原因。");
 	}
 
 	/// <summary>
@@ -490,84 +359,20 @@ public static class ActionExecutor
 			return;
 		}
 
-		ReportPluginOutcome(outcome, action, $"Ref='{action.PluginActionRef}'");
-	}
-
-	/// <summary>
-	/// 【随包动作包】认领了顶层类型的动作的执行包装。
-	/// <para>
-	/// 与 <see cref="ExecutePluginActionItem"/> 共用同一个结果上报（<see cref="ReportPluginOutcome"/>）：
-	/// 走到这里时，动作代码已经是一段<b>进程内运行的独立程序集</b>，
-	/// 对失败的诉求与社区插件完全一致 —— 走日志 + 托盘气泡，绝不弹 MessageBox 打断用户。
-	/// 这一条是与「内建动作」的分界线，不是与「插件动作」的。
-	/// </para>
-	/// <para>
-	/// 参数投影由 <see cref="Plugins.ActionParameterProjection"/> 在宿主内完成，
-	/// 所以这个动作包读到的参数与它当年作为内建动作时是同一份值 ——
-	/// 这是「外移」在用户侧完全不可见的前提。
-	/// </para>
-	/// </summary>
-	private static void ExecuteClaimedActionItem(ActionItem action, Plugins.PluginHost.PluginTypeClaimBinding claim)
-	{
-		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecuteClaimedAction(action, claim);
-
-		if (!outcome.Handled)
-		{
-			AppLogger.LogWarn(
-				$"Claimed action not handled: Type='{action.Type}', Claim='{claim.FullId}'");
-			return;
-		}
-
-		ReportPluginOutcome(outcome, action, $"Type='{action.Type}' → {claim.FullId}");
-	}
-
-	/// <summary>
-	/// 插件侧执行结果的统一上报。两条路径（社区插件 / 认领类型）共用，
-	/// 于是「成功写什么、失败提示什么」永远只有一处定义。
-	/// </summary>
-	private static void ReportPluginOutcome(
-		Plugins.PluginExecuteOutcome outcome,
-		ActionItem action,
-		string subject)
-	{
 		if (outcome.QueuedToBackground)
 		{
-			AppLogger.LogInfo($"Plugin action queued to background: {subject}, Name='{action.Name}'");
+			AppLogger.LogInfo($"Plugin action queued to background: {action.PluginActionRef}, Name='{action.Name}'");
 			return;
 		}
 
 		if (outcome.Success)
 		{
-			AppLogger.LogInfo($"Plugin action succeeded: {subject}");
+			AppLogger.LogInfo($"Plugin action succeeded: {action.PluginActionRef}");
 			return;
 		}
 
-		AppLogger.LogWarn($"Plugin action failed: {subject}, Reason='{outcome.Message}'");
-		Plugins.PluginHost.NotifyUser("动作执行失败", outcome.Message);
-	}
-
-	/// <summary>
-	/// 报告一个<b>谁都不认识</b>的动作类型。
-	/// <para>
-	/// 这一类从前是彻底静默的：<c>switch</c> 无匹配分支直接落空，用户按下扇区、
-	/// 什么都不发生、也没有任何提示，日志里也只有一行「Executing Action」。
-	/// 它是最难自查的一类缺陷 —— 所以这里既写 Warn 也发托盘提示。
-	/// </para>
-	/// <para>
-	/// 典型成因有三：配置文件被手工改错；从旧版本导入了本机已不再提供的动作；
-	/// 或者某个随包动作包被<b>卸载</b>后配置仍引用它的动作（正常路径下不会发生 ——
-	/// 随包插件不可卸载、只可停用，而停用会走另一条明确报错的路径）。
-	/// </para>
-	/// </summary>
-	private static void ReportUnknownActionType(ActionItem action)
-	{
-		AppLogger.LogWarn(
-			$"Unknown action type: Type='{action.Type}', Name='{action.Name}', Param='{action.Parameter}'.");
-
-		Plugins.PluginHost.NotifyUser(
-			"无法识别的动作类型",
-			$"动作「{action.Name}」的类型 \"{action.Type}\" 无法识别，本次触发没有执行任何操作。" +
-			"请到「设置 → 手势与动作」重新为该扇区选择一个动作。");
+		AppLogger.LogWarn($"Plugin action failed: {action.PluginActionRef}, Reason='{outcome.Message}'");
+		Plugins.PluginHost.NotifyUser("插件动作执行失败", outcome.Message);
 	}
 
 	public static bool TryToggleProcessWindow(string processOrExePath)
@@ -936,22 +741,7 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>
-	/// 对<b>当前活动的资源管理器窗口及其选中项</b>执行一个上下文动词
-	/// （复制路径、以管理员身份运行、在此处打开终端…）。
-	/// <para>
-	/// 调用方是随包动作包（经 <c>PluginShellService</c>）—— 原先的内建动作
-	/// <c>BuiltinActionShellTool</c> 已外移到那里。可见性随之从 <c>public</c>
-	/// 收窄到 <c>internal</c>：它不再有宿主 UI 侧的调用者。
-	/// </para>
-	/// <para>
-	/// <b>刻意保持 void，不改成 bool</b>：下面 33 个分支里有相当一部分在上下文不适用时
-	/// 静默 <c>return</c>（例如「以管理员身份运行」时前台没有选中可执行文件），
-	/// 方法本身不产生失败信号。改成 bool 就得在这里编一个不可靠的成功判断 ——
-	/// 不如让调用方如实知道「我唯一能确定的是这次调用被接受了」。
-	/// </para>
-	/// </summary>
-	internal static void ExecuteShellTool(string verb)
+	public static void ExecuteShellTool(string verb)
 	{
 		if (string.IsNullOrWhiteSpace(verb)) return;
 		AppLogger.LogInfo($"Executing ShellTool verb: '{verb}'");
@@ -1583,26 +1373,12 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>
-	/// 在指定终端里执行一条命令（cmd / PowerShell / WSL），可带窗口也可无窗口。
-	/// <para>
-	/// 调用方是<b>随包动作包</b>（经 <c>PluginCommandService</c>）—— 原先的内建动作
-	/// <c>BuiltinActionCommand</c> 已外移到那里。所以本方法<b>刻意不弹对话框</b>：
-	/// 插件侧的失败语义必须是「可诊断、可忽略」，而 MessageBox 会在无人值守时
-	/// 把动作线程永久卡死。失败只记日志并返回 false，要不要告知用户由调用方决定。
-	/// </para>
-	/// <para>
-	/// 这相对它作为内建动作时的行为是一处<b>用户可感知的变化</b>：命令启动失败从
-	/// 「弹出的对话框」降级为「日志 + 托盘气泡」。这是动作搬进独立程序集的必然结果 ——
-	/// 判据是「代码是否在独立程序集里」，而不是「是否官方」。
-	/// </para>
-	/// </summary>
-	/// <returns>是否成功<b>发起</b>。只代表进程被拉起，不代表命令本身执行成功。</returns>
-	internal static bool ExecuteCommand(string command, string? terminal)
+	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
+	private static void ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
 		{
-			return false;
+			return;
 		}
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
 		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
@@ -1639,31 +1415,16 @@ public static class ActionExecutor
 				});
 				break;
 			}
-
-			return true;
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
-			return false;
+			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
 	}
 
-	/// <summary>
-	/// 切换到任务栏第 N 个窗口；参数缺失/非法时默认第 1 个。
-	/// 全程在后台线程执行 —— UIA 遍历与前台激活都不得阻塞 UI 与钩子线程。
-	/// <para>
-	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：现在唯一的调用方是
-	/// <c>Plugins.PluginWindowService.ActivateTaskbarSlot</c>（随包动作包「切换窗口」经它过来），
-	/// 宿主界面层不直接调。
-	/// </para>
-	/// <para>
-	/// <b>刻意保持 <c>void</c>、不改成 <c>bool</c></b>：实现体把工作丢给 <c>Task.Run</c> 就返回了，
-	/// 真正的失败（第 N 个槽位不存在）发生在后台线程上，这里根本无从得知。
-	/// 与其编一个不可靠的返回值，不如把语义留空，由调用方如实说明「只表示已受理」。
-	/// </para>
-	/// </summary>
-	internal static void ExecuteSwitchWindow(string? parameter)
+/// <summary>切换到任务栏第 N 个窗口；参数缺失/非法默认第 1 个。全程后台线程执行（UIA 遍历/前台激活不得阻塞 UI 与钩子线程）。</summary>
+	private static void ExecuteSwitchWindow(string? parameter)
 	{
 		int n = 1;
 		if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)
@@ -2005,33 +1766,11 @@ public static class ActionExecutor
 		}
 	}
 
-	/// <summary>
-	/// 执行一个系统预设（最小化 / 关机 / 音量 …）。
-	/// <para>
-	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：系统控制动作的插件实现
-	/// （<c>StarPie.Plugin.System</c>，经宿主的 <c>PluginSystemService</c>）走这条路。
-	/// 与 <see cref="ExecuteCommand"/> 同理，统一的是动作形状，执行体不搬家。
-	/// </para>
-	/// <para>
-	/// <b>返回值是「有没有匹配到一个已实现的预设」，不是「执行成功了没有」</b>：
-	/// 关机要几秒、任务管理器要等它起来，这些在这里同步判定不了。
-	/// 之所以值得返回，是因为原先的 <c>void</c> 让「这个键已经不认识了」这件事
-	/// <b>没有任何出口</b> —— 用户的配置里留着上一代预设键时，按下扇区后什么都没有发生，
-	/// 也没有任何提示，与「按键本身没生效」长得一模一样。现在调用方可以据此出声。
-	/// </para>
-	/// <para>
-	/// <b>刻意不按预设表校验</b>：下面 <c>switch</c> 里的历史别名（<c>snapleft</c> /
-	/// <c>靠左分屏</c> / <c>lock</c> / <c>锁屏</c> / <c>starpie控制台</c> …）
-	/// 早就不在当前预设表里了，按表校验会把那些年代的配置整体判死。
-	/// 所以「认不认识这个键」只能由这个 <c>switch</c> 自己说了算 —— 它认出哪个就是哪个。
-	/// </para>
-	/// </summary>
-	/// <returns>匹配到预设并已发起为 <c>true</c>；空键或无法识别的键为 <c>false</c>。</returns>
-	internal static bool ExecuteSystem(string presetName)
+	private static void ExecuteSystem(string presetName)
 	{
 		if (string.IsNullOrEmpty(presetName))
 		{
-			return false;
+			return;
 		}
 		string text = presetName.Trim().ToLowerInvariant();
 
@@ -2041,44 +1780,44 @@ public static class ActionExecutor
 		case "taskswitcher":
 		case "alttabsticky":
 			ExecuteHotkey("Ctrl+Alt+Tab");
-			return true;
+			break;
 		case "alttab":
 		case "switchwindow":
 			ExecuteHotkey("Alt+Tab");
-			return true;
+			break;
 		case "closewindow":
 			ExecuteHotkey("Alt+F4");
-			return true;
+			break;
 		case "minimize":
 			ExecuteHotkey("Win+Down");
-			return true;
+			break;
 		case "maximize":
 			ExecuteHotkey("Win+Up");
-			return true;
+			break;
 		case "snapleft":
 			ExecuteHotkey("Win+Left");
-			return true;
+			break;
 		case "snapright":
 			ExecuteHotkey("Win+Right");
-			return true;
+			break;
 		case "taskview":
 			ExecuteHotkey("Win+Tab");
-			return true;
+			break;
 		case "prevdesktop":
 			ExecuteHotkey("Win+Ctrl+Left");
-			return true;
+			break;
 		case "nextdesktop":
 			ExecuteHotkey("Win+Ctrl+Right");
-			return true;
+			break;
 		case "showdesktop":
 			ExecuteHotkey("Win+D");
-			return true;
+			break;
 		case "fullscreen":
 			ExecuteHotkey("F11");
-			return true;
+			break;
 		case "screenshot":
 			ExecuteHotkey("Win+Shift+S");
-			return true;
+			break;
 		case "taskmanager":
 			if (!TryToggleProcessWindow("taskmgr"))
 			{
@@ -2095,7 +1834,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Ctrl+Shift+Esc");
 				}
 			}
-			return true;
+			break;
 		case "explorer":
 			try
 			{
@@ -2109,7 +1848,7 @@ public static class ActionExecutor
 			{
 				ExecuteHotkey("Win+E");
 			}
-			return true;
+			break;
 		case "opensettings":
 		case "openstarpie":
 		case "starpie":
@@ -2119,7 +1858,7 @@ public static class ActionExecutor
 			{
 				App.ShowSettingsWindow();
 			});
-			return true;
+			break;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -2136,7 +1875,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+I");
 				}
 			}
-			return true;
+			break;
 		case "calculator":
 			AppLogger.LogInfo("Launching System Calculator");
 			try
@@ -2164,13 +1903,13 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+R");
 				}
 			}
-			return true;
+			break;
 		case "rundialog":
 			ExecuteHotkey("Win+R");
-			return true;
+			break;
 		case "windowssearch":
 			ExecuteHotkey("Win+S");
-			return true;
+			break;
 		case "quicksearch":
 		case "quickfinder":
 		case "nativesearch":
@@ -2181,61 +1920,61 @@ public static class ActionExecutor
 			{
 				QuickSearchWindow.ShowOrActivate();
 			});
-			return true;
+			break;
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
-			return true;
+			break;
 		case "lockworkstation":
 		case "锁定屏幕":
 		case "锁屏":
 		case "lock":
 			LockWorkStation();
-			return true;
+			break;
 		case "volumeup":
 			SimulateSingleKey(175);
-			return true;
+			break;
 		case "volumedown":
 			SimulateSingleKey(174);
-			return true;
+			break;
 		case "volumemute":
 			SimulateSingleKey(173);
-			return true;
+			break;
 		case "playpause":
 			SimulateSingleKey(179);
-			return true;
+			break;
 		case "nexttrack":
 			SimulateSingleKey(176);
-			return true;
+			break;
 		case "prevtrack":
 			SimulateSingleKey(177);
-			return true;
+			break;
 		case "stopmedia":
 			SimulateSingleKey(178);
-			return true;
+			break;
 		case "newtab":
 			ExecuteHotkey("Ctrl+T");
-			return true;
+			break;
 		case "closetab":
 			ExecuteHotkey("Ctrl+W");
-			return true;
+			break;
 		case "reopentab":
 			ExecuteHotkey("Ctrl+Shift+T");
-			return true;
+			break;
 		case "refresh":
 			ExecuteHotkey("F5");
-			return true;
+			break;
 		case "hardrefresh":
 			ExecuteHotkey("Ctrl+F5");
-			return true;
+			break;
 		case "zoomin":
 			ExecuteHotkey("Ctrl+Plus");
-			return true;
+			break;
 		case "zoomout":
 			ExecuteHotkey("Ctrl+Minus");
-			return true;
+			break;
 		case "zoomreset":
 			ExecuteHotkey("Ctrl+0");
-			return true;
+			break;
 		case "sleep":
 		case "睡眠":
 		case "休眠":
@@ -2250,7 +1989,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			return true;
+			break;
 		case "restart":
 		case "重启":
 		case "reboot":
@@ -2264,7 +2003,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			return true;
+			break;
 		case "shutdown":
 		case "关机":
 		case "poweroff":
@@ -2278,9 +2017,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			return true;
-		default:
-			return false;
+			break;
 		}
 	}
 
