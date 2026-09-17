@@ -103,6 +103,45 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish/Standalone
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Inno Setup Installer
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $tagClean = $tag.TrimStart('v', 'V')
+          $outputBaseFilename = "StarPie-$tag-Setup-win-x64"
+
+          $numericVersion = ($tagClean -replace '-.*$', '')
+          $versionParts = @($numericVersion.Split('.'))
+          while ($versionParts.Count -lt 4) {
+            $versionParts += "0"
+          }
+          $quadVersion = ($versionParts[0..3] -join '.')
+
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+
+          & iscc.exe `
+            "/DMyAppVersion=$tagClean" `
+            "/DMyAppNumericVersion=$quadVersion" `
+            "/DSourceDir=$PWD\publish\Standalone" `
+            "/DOutputDir=$PWD\dist" `
+            "/DOutputBaseFilename=$outputBaseFilename" `
+            "installer\StarPie.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
+          }
+
+          if (-not (Test-Path "dist\$outputBaseFilename.exe")) {
+            throw "Expected installer binary dist\$outputBaseFilename.exe was not found!"
+          }
+          Write-Host "Successfully generated Inno Setup installer: dist\$outputBaseFilename.exe"
+
       - name: Package release assets
         shell: pwsh
         run: |
@@ -115,7 +154,7 @@ jobs:
           Compress-Archive -Path "publish/Lightweight/*" -DestinationPath $lightweightArchive -Force
           Compress-Archive -Path "publish/Standalone/*" -DestinationPath $standaloneArchive -Force
 
-          $checksums = Get-ChildItem "dist/*.zip" | Sort-Object Name | ForEach-Object {
+          $checksums = Get-ChildItem "dist/*.zip", "dist/*.exe" | Sort-Object Name | ForEach-Object {
             $hash = Get-FileHash $_.FullName -Algorithm SHA256
             "$($hash.Hash.ToLowerInvariant())  $($_.Name)"
           }
@@ -166,7 +205,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $assets = Get-ChildItem "dist/*.zip", "dist/SHA256SUMS.txt" |
+          $assets = Get-ChildItem "dist/*.zip", "dist/*.exe", "dist/SHA256SUMS.txt" |
             Sort-Object Name |
             Select-Object -ExpandProperty FullName
 

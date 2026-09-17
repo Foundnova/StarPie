@@ -9,10 +9,11 @@
 1. [🌟 项目起源、使命与设计哲学](#1-项目起源使命与设计哲学)
 2. [🏗️ 源码架构与核心模块分工](#2-源码架构与核心模块分工)
 3. [⚙️ 核心技术机制与避坑规范](#3-核心技术机制与避坑规范)
-4. [🔄 代码生成、编译与发布流水线](#4-代码生成编译与发布流水线)
-5. [🎨 UI/UX 与视觉设计规范](#5-uiux-与视觉设计规范)
-6. [📜 版本演进与发布记录](CHANGELOG.md)
-7. [🤝 Agent 接力协作与交付验收闭环](#7-agent-接力协作与交付验收闭环)
+4. [🧩 插件系统架构与开发规范](#4-插件系统架构与开发规范)
+5. [🔄 代码生成、编译与发布流水线](#5-代码生成编译与发布流水线)
+6. [🎨 UI/UX 与视觉设计规范](#6-uiux-与视觉设计规范)
+7. [📜 版本演进与发布记录](CHANGELOG.md)
+8. [🤝 Agent 接力协作与交付验收闭环](#8-agent-接力协作与交付验收闭环)
 
 ---
 
@@ -139,6 +140,8 @@ g:\Users\2 Better\Desktop\design\
 ├── scratch/                       # 代码反编译基线与代码生成流水线工具
 │   ├── Decompiler/                # Program.cs 流水线生成器工程
 │   └── v152_decompiled/           # 反编译基线源码
+├── docs/
+│   └── plugin-system-architecture.md # 插件宿主、公共基础设施与动作路径架构文档
 ├── AGENTS.md                      # 本架构与继承开发规范
 └── CHANGELOG.md                   # 完整版本演进与发布日志
 ```
@@ -296,13 +299,63 @@ g:\Users\2 Better\Desktop\design\
 
 ---
 
-## 4. 🔄 代码生成、编译与发布流水线
+## 4. 🧩 插件系统架构与开发规范
+- **详细架构文档**：宿主分层、插件加载与原子注册、`PluginInstance` 包装、活动调用租约、异步停用和动作执行全链路统一维护在 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
+- **三层分界，任何一层都不许越界**：
+  - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
+  - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
+  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
+- **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
+- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。用户停用、更新与卸载必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载；插件系统总开关和应用退出只停止当前运行时，不得清空插件自身的启用偏好。实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
+- **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
+- **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
+- **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
+- **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
+  1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
+  2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
+  3. 只允许引用 SDK 与 BCL，**严禁引用主程序 `StarPie.dll`**；
+  4. **零 NuGet 依赖**（项目内存红线的一部分，也是「插件不得成为新的依赖黑洞」的保证）。
+- **注册会话的原子性**：插件在 `Initialize` 期间的一切注册（动作、图标、词条）都只是**暂存**，必须等 `Initialize` 成功返回后才由 `PluginCatalog.Commit` 一次性落表。失败则 `Discard`，绝不留下半套贡献点。
+- **⚠️ 词条时序坑（易复发）**：显示名解析发生在 `Actions.Register` 的当时，而词条要等 `Commit` 才写进 `I18n`。若只在注册当时解析，带 `DisplayNameKey` 的动作会**全部落空并静默退回字面文案** —— 而字面文案与译文常常一模一样，所以这个缺陷在中文环境下不露面，等用户切成英文才发现。修法是 `Commit` 落完词条后调用 `ResolveStagedDisplayNames` 补解析一次。**不要**改成「让解析去读暂存表」，那会要求插件遵守「词条必须写在动作之前」这种没人记得的顺序约定。
+- **参数契约 = 声明式，插件不提供 XAML**：
+  - 插件只声明 `ParameterField`（9 种类型：`Text` / `MultilineText` / `Number` / `Bool` / `Folder` / `File` / `Enum` / `Hotkey` / `Color`），控件由 `PluginParameterForm` 用主程序的隐式样式创建 —— 深浅色、字体、圆角因此由宿主统一保证，主程序改版也不会让插件界面错位；
+  - **两层校验，同一入口**：`PluginHost.ValidateActionParameters` 先跑宿主底线 `PluginParameterValidator`（只认 `Required` / `MaxLength` / `Min` / `Max` / `ValidationRegex` 声明，不依赖插件是否记得自查），再跑插件自定义 `IActionContribution.Validate`。**「保存动作」与「执行前」必须都走这一个方法**，否则迟早分叉成「存的时候没事、一触发说参数不合法」。
+  - `Bool` 字段未填视为 `false`，**不算必填失败**，也不要「空值即删除」——取消勾选必须显式落盘 `false`，否则插件读到的会是它自己的兜底值（可能为 `true`），表现为「取消勾选没生效」。
+  - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。
+- **动作调度类别 `ActionKind`**：`Sequential` 占用唯一的动作线程，**任何可能上百毫秒的操作（DDC/CI、网络、目录遍历）都必须声明为 `Background`**，否则用户会明显感到「触发后轮盘卡一下」，直接违背零延迟红线。
+- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。
+- **界面接缝：动作类型下拉「收敛成一个类型 + 一个子下拉」**：插件动作在数据模型上仍是 `ActionItem.Type = "Plugin"` + `PluginActionRef`（`PluginId` + `ContributionId` + `FullId`），但界面上**类型下拉只承载一个选项**「插件动作」，具体是哪个动作由紧随其后的子下拉决定。因此：
+  - 类型下拉的 `Tag` 就是**裸 `Plugin`**，不需要也不应该编码身份（历史上有过 `Plugin:<贡献点全ID>` 的编码与配套的 `TryParseTag`/`ProjectTag` 退化逻辑，收敛后全部成了死代码，已删除）；
+  - 子下拉用 `ListCollectionView` + `PropertyGroupDescription(GroupName)` 按插件名分组，分组头不是 `ComboBoxItem`，**天然不可选中** —— 从结构上排除「选中了插件名却不是一个动作」这种非法状态；
+  - **`PluginActionOptions` 每次求值都新建视图**，所以它只能在**类型切换**时通知重建（`Type` / `AggregatedType` 的 setter），**绝不能**纳入 `NotifyAllPropertiesChanged`：否则任何无关属性变更都会重建视图，而 `ItemsSource` 一变 `ComboBox` 就会把 `SelectedValue` 置空，用户配好的动作会被静默清掉。同理 `SelectedPluginActionFullId` 的 setter 要**忽略空值写入**；
+  - **切换类型时不要清空插件引用**：来回切一次类型就把配置弄丢，是最容易被当成「软件有 bug」的行为。
+  - 分组名必须**按插件去重统计**重名：直接对注册动作逐个取名，一个有 9 个动作的插件会被数成 9 次，「重名」于是永远成立，组标题会莫名其妙拖上一串插件 ID。
+- **图标 key 前缀**：插件图标形如 `plugin:<pluginId>:<shortKey>`，由 `IconHelper.GetSvgPathByKey` 在 `IconMap` 命中之后、裸 path 判定之前解析。插件 SVG 必须用最朴素的 `M/A/L/H/V/Z` 构造 —— 语法一错会让轮盘几何解析抛异常，收益远小于风险。
+- **两个插件目录，职责严格分开（改动路径逻辑前必读）**：
+  - **只读扫描目录** `程序目录\plugin\`（`PluginPaths.ScanRoot`）：随发行包分发的**待安装候选**。只放 `.dll`，不递归子目录。宿主对这里**只读** —— **绝不创建、绝不写入、绝不删除**，`EnsureDirectories()` 也不例外。程序可能装在 Program Files，`ScanRoot` 不存在时唯一正确的动作是「什么都不做」。
+  - **可写宿主区** `%LOCALAPPDATA%\StarPie\plugin-data\`（`PluginPaths.Root`）：安装副本、`registry.json`、`health.json`、插件私有 `data\` 全在这里。宿主拥有整棵目录，卸载时可以安全删。
+  - 便携模式（`portable.flag` / `PortableMode`）**只改可写宿主区的落点**（挪到程序目录下的 `plugin-data\`），`ScanRoot` 永远固定在程序目录。
+  - 历史上可写宿主区叫 `plugins\`。**只改目录常量而不搬迁 `registry.json` 会静默丢数据**：启用状态、已确认能力、入口哈希全在里面。`PluginPaths.Configure` 里保留了 `MigrateLegacyHostRoot`，`Move` 失败（被占用/跨卷）时退化为复制。
+- **候选安装的三条规则**：
+  1. 扫描目录里的 `.dll` **只登记为候选**，不进 `Instances`、不加载、不出现在插件列表 —— 装不装由用户点按钮决定。这与 `SyncFromDisk` 第 ② 段自动登记的「可写宿主区里带 `plugin.json` 的手工投放」是两回事：后者已经是安装产物；
+  2. **复制策略由 `ManifestSource` 决定，不是由调用方决定**：有 `plugin.json`（`Manifest`）说明那个目录整体是一个插件包，整目录复制；只有裸 DLL（`AssemblyMetadata`）时 `SourceDirectory` 只表示「那枚 dll 碰巧躺在哪个目录」（可能就是「下载」文件夹或 `plugin\`），**只复制那一枚**。历史上无条件整目录复制，会出现「从下载文件夹装一枚 dll，把整个下载目录搬进插件目录」以及「只装了 A，邻居 B 也跟着出现」；
+  3. 覆盖安装裸 DLL 前要**清掉上一次的载荷**（程序集与清单），否则目录里留下两枚业务 dll 会让「唯一业务 dll」的识别约定失效；但必须**保留 `data\` 与 `settings.json`** —— 更新一次版本不该清空用户数据。
+- **`PluginInstance` 的两个目录属性不能混用**：`ManagedDirectory` 是宿主拥有的安装目录（删除/改名/写入只能用它）；`Directory` 仅供展示（外部路径登记时返回 `ExternalPath` **所在目录**）。历史上只有 `Directory` 一个属性，而外部登记分支返回的其实是**dll 文件路径**，当时只是靠 `Directory.Exists(文件路径)` 恒为 `false` 才「恰好」没把开发者的输出目录删掉。现在 `Uninstall` 走 `IsExternal` 分支：外部登记只摘登记、不碰磁盘。
+- **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
+- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
+  - **自检整体跑在临时沙箱里**：`PluginPaths.OverrideRootsForTesting` 会把两个根目录钉到 `%TEMP%\StarPie-PluginSelfTest-<随机>\`，跑完即删。**`Configure` 见到根目录已被钉住必须直接返回**，否则沙箱会被覆盖回真实目录，自检就成了「每跑一次回归就动一次用户已装插件」。
+  - **附加 `--skip-invoke` 可跳过第 [4] 段真实调用**：那一节会真的下发键鼠/调节系统状态（实测会把屏幕亮度推高 10%）。日常只关心识别、注册与接缝结论的回归应带上这个开关。
+  - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
 
-### 4.1 代码构建与修改原则
+---
+
+## 5. 🔄 代码生成、编译与发布流水线
+
+### 5.1 代码构建与修改原则
 - **优先直接维护 `WinPieGestures/` 源码**：项目源码已完整解耦，可以直接在 `WinPieGestures` 中进行修改、扩展与调试。
 - **流水线工具 `scratch/Decompiler/Program.cs`**：当需要批量从基线生成或大范围重构时，同步维护 `Program.cs` 并通过 `dotnet run --project scratch/Decompiler` 生成源码。
 
-### 4.2 标准构建与发布命令集
+### 5.2 标准构建与发布命令集
 ```powershell
 # 1. 编译 Release 版本并校验 0 错误
 dotnet build "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release
@@ -313,11 +366,15 @@ dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r w
 # 3. 发布独立免安装版 (Standalone, 自带运行时, 单文件绿色版, 体积 ~65MB)
 dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone"
 
-# 4. 自动化打包生成 ZIP 压缩归档
+# 4. 编译 Inno Setup 自动化安装包 (Setup.exe, 自包含 .NET 8 独立运行时, LZMA2 固实压缩, 体积 ~30MB)
+# (需本地安装 Inno Setup 6, 或直接运行 powershell installer/build-installer.ps1)
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=X.Y.Z" "/DSourceDir=g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone" "/DOutputDir=g:\Users\2 Better\Desktop\design\releases\vX.Y.Z" "/DOutputBaseFilename=StarPie-vX.Y.Z-Setup-win-x64" "g:\Users\2 Better\Desktop\design\installer\StarPie.iss"
+
+# 5. 自动化打包生成 ZIP 压缩归档
 powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Lightweight\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Lightweight-win-x64.zip' -Force; Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Standalone-win-x64.zip' -Force"
 ```
 
-### 4.3 版本号同步五要素检查清单 (Version Sync Checklist)
+### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：
 1. `WinPieGestures.csproj`：`<Version>X.Y.Z</Version>`, `<AssemblyVersion>X.Y.Z.0</AssemblyVersion>`, `<FileVersion>X.Y.Z.0</FileVersion>`
 2. `App.xaml.cs`：启动日志中的 `StarPie vX.Y.Z` 回退文本
@@ -327,9 +384,9 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
 
 ---
 
-## 5. 🎨 UI/UX 与视觉设计规范
+## 6. 🎨 UI/UX 与视觉设计规范
 
-### 5.1 界面布局与卡片规范 (Settings Console)
+### 6.1 界面布局与卡片规范 (Settings Console)
 - **四标签页导航**：
   1. 🎨 **外观与形态**：主轮盘/二级轮盘尺寸、内径、外径、倒角、图标大小、文字字号、切削形态（经典圆弧、圆角胶囊、极简扇区、蜂巢六边形）、主题与自定义配色面板；
   2. ⚡ **手势与动作**：触发按键（右键/中键/侧键）、多级轮盘总开关、二级菜单展示样式（外圈子环 / 蜂窝扇）、动作映射列表（支持 `[ ⚙️ 拼装 ]` 与直接录入）；
@@ -339,19 +396,19 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
   - 位于主界面右侧常驻，支持鼠标悬停、扇区高亮动画即时反馈；
   - 顶部配备 `[ 🔘 一级主轮盘配置    🌟 二级级联轮盘配置 ]` 分段切换开关，左侧尺寸与配色面板随之联动。
 
-### 5.2 深色模式高对比度规范
+### 6.2 深色模式高对比度规范
 - 在极夜曜黑（`ObsidianDark`）与钛金深灰（`TitaniumGray`）主题下：
   - 标题、常规文本与开关控件文字的前景颜色必须严格绑定为高亮度白色（`#F8FAFC` / `#FFFFFF`）；
   - 严禁出现与背景色（`#0F172A` / `#18181B`）对比度低于 4.5:1 的灰暗文字。
 
-### 5.3 对话框与子窗口自包含规范
+### 6.3 对话框与子窗口自包含规范
 - 所有弹窗（如 `HotkeyBuilderDialog`、`InputDialog`、`ColorPickerWindow`）：
   - 必须在 `<Window.Resources>` 内置完整的自包含按钮与控件样式；
   - 必须在构造函数中调用 `AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System")`，跟随主程序主题。
 
 ---
 
-### 6. 📜 版本演进与发布记录
+## 7. 📜 版本演进与发布记录
 
 完整的版本发布时间、功能新增、问题修复与架构演进记录统一维护在：
 
@@ -361,7 +418,7 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
 
 ---
 
-## 7. 🤝 Agent 接力协作与交付验收闭环
+## 8. 🤝 Agent 接力协作与交付验收闭环
 
 当新的 AI Agent 会话开始时，请务必执行以下**五步交付闭环**：
 

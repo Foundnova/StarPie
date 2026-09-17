@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 
 namespace WinPieGestures;
@@ -8,6 +9,9 @@ namespace WinPieGestures;
 public abstract class BaseStyleRenderer : IRadialStyleRenderer
 {
 	protected AppConfig? _config;
+
+	// 高亮光晕颜色在 Initialize 阶段解析一次；高亮切换是最高频路径，不再重复走字符串解析
+	private Color? _glowColorOverride;
 
 	public Brush DefaultSectorBrush { get; protected set; }
 
@@ -127,6 +131,17 @@ public abstract class BaseStyleRenderer : IRadialStyleRenderer
 			CoreBgBrush = CreateSolidBrush("#F018181B");
 			CoreBorderBrush = CreateSolidBrush("#30FFFFFF");
 		}
+		_glowColorOverride = null;
+		if (_config != null && !string.IsNullOrEmpty(_config.HighlightGlowColor))
+		{
+			try
+			{
+				_glowColorOverride = (Color)ColorConverter.ConvertFromString(_config.HighlightGlowColor);
+			}
+			catch
+			{
+			}
+		}
 		PostInitialize();
 	}
 
@@ -153,17 +168,34 @@ public abstract class BaseStyleRenderer : IRadialStyleRenderer
 	{
 	}
 
+	/// <summary>
+	/// 构建一次并冻结的 DropShadowEffect，供扇区高亮反复复用。
+	/// 冻结后的 Freezable 只读且线程安全，可被多个扇区 Path 安全共享，
+	/// 高亮切换因此从「实例化 Effect 并重建渲染资源」降为一次引用赋值。
+	/// </summary>
+	protected static DropShadowEffect CreateFrozenDropShadow(
+		Color color, double blurRadius, double shadowDepth, double opacity, double? direction = null)
+	{
+		DropShadowEffect effect = new DropShadowEffect
+		{
+			Color = color,
+			BlurRadius = blurRadius,
+			ShadowDepth = shadowDepth,
+			Opacity = opacity
+		};
+		if (direction.HasValue)
+		{
+			effect.Direction = direction.Value;
+		}
+		effect.Freeze();
+		return effect;
+	}
+
 	public virtual Color GetEffectiveGlowColor()
 	{
-		if (_config != null && !string.IsNullOrEmpty(_config.HighlightGlowColor))
+		if (_glowColorOverride.HasValue)
 		{
-			try
-			{
-				return (Color)ColorConverter.ConvertFromString(_config.HighlightGlowColor);
-			}
-			catch
-			{
-			}
+			return _glowColorOverride.Value;
 		}
 		if (HighlightBorderBrush is SolidColorBrush { Color: { A: >0 } } solidColorBrush)
 		{

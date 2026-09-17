@@ -387,6 +387,13 @@ public static class ActionExecutor
 				// 所以这里报出来的一定是真正的异常配置。
 				ReportUnknownActionType(action);
 				break;
+			case "Plugin":
+				// 【插件系统 · 唯一的执行接缝】
+				// 插件动作统一持久化为 Type="Plugin"，靠 action.PluginActionRef 分发。
+				// PluginHost.ExecutePluginAction 内部保证不抛异常：绝不能让插件异常冒泡到本方法末尾的
+				// catch —— 那里会弹 MessageBox，在无人值守时会把整个动作线程卡死在弹窗上。
+				ExecutePluginActionItem(action);
+				break;
 			}
 		}
 		catch (Exception ex)

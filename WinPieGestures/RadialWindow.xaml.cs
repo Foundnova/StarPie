@@ -327,6 +327,75 @@ public partial class RadialWindow : Window
 
 	private readonly List<StackPanel> _contentPanels;
 
+	// 内容元素直取缓存：构建扇区时记录文本与图标引用，高亮/重置不再对视觉树做 OfType 线性扫描
+	private readonly List<TextBlock?> _contentTextBlocks = new List<TextBlock?>();
+
+	private readonly List<System.Windows.Shapes.Path?> _contentIconElements = new List<System.Windows.Shapes.Path?>();
+
+	// 冻结复用的缓动模板与动画：参数固定，不需要每次高亮或状态切换重新实例化
+	private static readonly CubicEase _sectorEaseOut = CreateFrozenEase(new CubicEase { EasingMode = EasingMode.EaseOut });
+
+	private static readonly QuadraticEase _fadeQuadraticEase = CreateFrozenEase(new QuadraticEase { EasingMode = EasingMode.EaseOut });
+
+	private static readonly CircleEase _fadeCircleEase = CreateFrozenEase(new CircleEase { EasingMode = EasingMode.EaseOut });
+
+	private static readonly BackEase _introEase = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
+
+	private static readonly BackEase _fanEase = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 });
+
+	private static readonly DoubleAnimation _introScaleAnimation = CreateFrozenAnimation(0.65, 1.0, 110.0, _introEase);
+
+	private static readonly DoubleAnimation _introOpacityAnimation = CreateFrozenAnimation(0.0, 1.0, 90.0, null);
+
+	private static readonly DoubleAnimation _subTierScaleAnimation = CreateFrozenAnimation(0.75, 1.0, 130.0, _introEase);
+
+	private static readonly DoubleAnimation _subTierFadeAnimation = CreateFrozenAnimation(0.0, 1.0, 130.0, _fadeCircleEase);
+
+	private static readonly DoubleAnimation _cachedSubTierFadeAnimation = CreateFrozenAnimation(0.0, 1.0, 110.0, _fadeQuadraticEase);
+
+	private static readonly DoubleAnimation _escapeDimAnimation = CreateFrozenAnimation(null, 0.38, 120.0, _fadeQuadraticEase);
+
+	private static readonly DoubleAnimation _escapeRestoreAnimation = CreateFrozenAnimation(null, 1.0, 120.0, _fadeQuadraticEase);
+
+	// 中心选中态模糊遮罩：参数固定，冻结后常驻复用
+	private static readonly BlurEffect _coreSelectionImageBlurEffect = CreateFrozenBlurEffect();
+
+	private static T CreateFrozenEase<T>(T ease) where T : Freezable, IEasingFunction
+	{
+		ease.Freeze();
+		return ease;
+	}
+
+	private static DoubleAnimation CreateFrozenAnimation(double? from, double to, double milliseconds, IEasingFunction? easing)
+	{
+		DoubleAnimation animation = new DoubleAnimation
+		{
+			To = to,
+			Duration = TimeSpan.FromMilliseconds(milliseconds)
+		};
+		if (from.HasValue)
+		{
+			animation.From = from.Value;
+		}
+		if (easing != null)
+		{
+			animation.EasingFunction = easing;
+		}
+		animation.Freeze();
+		return animation;
+	}
+
+	private static BlurEffect CreateFrozenBlurEffect()
+	{
+		BlurEffect effect = new BlurEffect
+		{
+			Radius = 5.5,
+			RenderingBias = RenderingBias.Performance
+		};
+		effect.Freeze();
+		return effect;
+	}
+
 	private readonly List<TranslateTransform> _sectorTransforms;
 
 	private readonly List<TranslateTransform> _containerTransforms;
@@ -439,7 +508,7 @@ public partial class RadialWindow : Window
 		// 计算轮盘的真实有效可见半径（基于主轮盘外径及多级展开子轮盘外径，而非整个巨幅透明阴影画布）
 		double wheelRadius = (ConfigManager.CurrentConfig != null && ConfigManager.CurrentConfig.WheelRadius > 0.0)
 			? ConfigManager.CurrentConfig.WheelRadius
-			: 138.0;
+			: 133.0;
 		bool enableMultiTier = ConfigManager.CurrentConfig?.EnableMultiTier == true;
 		double ratio = (ConfigManager.CurrentConfig?.SubWheelRadiusRatio > 1.1) ? ConfigManager.CurrentConfig.SubWheelRadiusRatio : 1.55;
 		double subMaxR = (ConfigManager.CurrentConfig?.SubWheelOuterRadius > 0.0)
@@ -530,8 +599,8 @@ public partial class RadialWindow : Window
 		_subSectorTransforms = new List<TranslateTransform>();
 		_subContainerTransforms = new List<TranslateTransform>();
 		_subSectorAngles = new List<double>();
-		_innerRadius = 52.0;
-		_outerRadius = 138.0;
+		_innerRadius = 70.0;
+		_outerRadius = 133.0;
 		_borderThickness = 1.0;
 		_highlightBorderThickness = 1.5;
 		InitializeComponent();
@@ -747,9 +816,8 @@ public partial class RadialWindow : Window
 			}
 			if (i < _contentPanels.Count)
 			{
-				StackPanel panel = _contentPanels[i];
-				TextBlock? text = panel.Children.OfType<TextBlock>().FirstOrDefault();
-				System.Windows.Shapes.Path? icon = panel.Children.OfType<System.Windows.Shapes.Path>().FirstOrDefault();
+				TextBlock? text = (i < _contentTextBlocks.Count) ? _contentTextBlocks[i] : null;
+				System.Windows.Shapes.Path? icon = (i < _contentIconElements.Count) ? _contentIconElements[i] : null;
 				if (text != null)
 				{
 					text.Foreground = _textColorBrush;
@@ -788,6 +856,8 @@ public partial class RadialWindow : Window
 		}
 		_sectorPaths.Clear();
 		_contentPanels.Clear();
+		_contentTextBlocks.Clear();
+		_contentIconElements.Clear();
 		_sectorTransforms.Clear();
 		_containerTransforms.Clear();
 		_sectorAngles.Clear();
@@ -1072,23 +1142,9 @@ public partial class RadialWindow : Window
 			return;
 		}
 
-		BackEase easingFunction = new BackEase
-		{
-			EasingMode = EasingMode.EaseOut,
-			Amplitude = 0.35
-		};
-		DoubleAnimation scaleX = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
-		{
-			EasingFunction = easingFunction
-		};
-		DoubleAnimation scaleY = new DoubleAnimation(0.65, 1.0, new Duration(TimeSpan.FromMilliseconds(110.0)))
-		{
-			EasingFunction = easingFunction
-		};
-		DoubleAnimation contentOpacity = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(90.0)));
-		WindowScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleX);
-		WindowScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleY);
-		MainGrid.BeginAnimation(UIElement.OpacityProperty, contentOpacity);
+		WindowScale.BeginAnimation(ScaleTransform.ScaleXProperty, _introScaleAnimation);
+		WindowScale.BeginAnimation(ScaleTransform.ScaleYProperty, _introScaleAnimation);
+		MainGrid.BeginAnimation(UIElement.OpacityProperty, _introOpacityAnimation);
 	}
 
 	internal void UpdateCenterIconVisuals()
@@ -1619,6 +1675,8 @@ public partial class RadialWindow : Window
 		bool flag = ConfigManager.CurrentConfig.ShowText && text != "IconOnly";
 		_sectorPaths.Clear();
 		_contentPanels.Clear();
+		_contentTextBlocks.Clear();
+		_contentIconElements.Clear();
 		_sectorTransforms.Clear();
 		_containerTransforms.Clear();
 		_sectorAngles.Clear();
@@ -1984,6 +2042,8 @@ public partial class RadialWindow : Window
 			Panel.SetZIndex(grid, 10);
 			WheelCanvas.Children.Add(grid);
 			_contentPanels.Add(stackPanel);
+			_contentTextBlocks.Add(textElement);
+			_contentIconElements.Add(frameworkElement2 as System.Windows.Shapes.Path);
 			_containerTransforms.Add(translateTransform2);
 		}
 	}
@@ -2089,16 +2149,7 @@ public partial class RadialWindow : Window
 		if (_isOuterEscaped != isEscaped)
 		{
 			_isOuterEscaped = isEscaped;
-			DoubleAnimation animation = new DoubleAnimation
-			{
-				To = (isEscaped ? 0.38 : 1.0),
-				Duration = TimeSpan.FromMilliseconds(120.0),
-				EasingFunction = new QuadraticEase
-				{
-					EasingMode = EasingMode.EaseOut
-				}
-			};
-			MainGrid.BeginAnimation(UIElement.OpacityProperty, animation);
+			MainGrid.BeginAnimation(UIElement.OpacityProperty, isEscaped ? _escapeDimAnimation : _escapeRestoreAnimation);
 		}
 	}
 
@@ -2156,6 +2207,9 @@ public partial class RadialWindow : Window
 
 	private void ActivateCachedSubTier(int parentIndex, SubTierVisuals visuals)
 	{
+		// 缓存组可能追加到累计活动列表末尾，只播放本次新增区间的动画。
+		int pathStart = _subSectorPaths.Count;
+		int containerStart = _subContentContainers.Count;
 		_activeSubTierParentSector = parentIndex;
 		_subSectorPaths.AddRange(visuals.Paths);
 		_subContentContainers.AddRange(visuals.Containers);
@@ -2168,17 +2222,12 @@ public partial class RadialWindow : Window
 			_subSectorChildIndices.Add(i);
 		}
 
-		Duration duration = new Duration(TimeSpan.FromMilliseconds(110.0));
-		DoubleAnimation fadeIn = new DoubleAnimation(0.0, 1.0, duration)
-		{
-			EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-		};
-		for (int i = 0; i < _subSectorPaths.Count; i++)
+		for (int i = pathStart; i < _subSectorPaths.Count; i++)
 		{
 			System.Windows.Shapes.Path path = _subSectorPaths[i];
 			path.Visibility = Visibility.Visible;
 			path.Opacity = 0.0;
-			path.BeginAnimation(UIElement.OpacityProperty, fadeIn.Clone());
+			path.BeginAnimation(UIElement.OpacityProperty, _cachedSubTierFadeAnimation);
 			if (i < _subSectorTransforms.Count)
 			{
 				_subSectorTransforms[i].BeginAnimation(TranslateTransform.XProperty, null);
@@ -2187,12 +2236,12 @@ public partial class RadialWindow : Window
 				_subSectorTransforms[i].Y = 0.0;
 			}
 		}
-		for (int i = 0; i < _subContentContainers.Count; i++)
+		for (int i = containerStart; i < _subContentContainers.Count; i++)
 		{
 			Grid container = _subContentContainers[i];
 			container.Visibility = Visibility.Visible;
 			container.Opacity = 0.0;
-			container.BeginAnimation(UIElement.OpacityProperty, fadeIn.Clone());
+			container.BeginAnimation(UIElement.OpacityProperty, _cachedSubTierFadeAnimation);
 			if (i < _subContainerTransforms.Count)
 			{
 				_subContainerTransforms[i].BeginAnimation(TranslateTransform.XProperty, null);
@@ -2201,6 +2250,18 @@ public partial class RadialWindow : Window
 				_subContainerTransforms[i].Y = 0.0;
 			}
 		}
+	}
+
+	private SubTierVisuals SnapshotSubTierVisuals(int startIndex)
+	{
+		// 只截取本次主扇区新增的视觉元素，避免把此前扇区的累计列表混入缓存。
+		int count = _subSectorPaths.Count - startIndex;
+		return new SubTierVisuals(
+			_subSectorPaths.GetRange(startIndex, count),
+			_subContentContainers.GetRange(startIndex, count),
+			_subSectorTransforms.GetRange(startIndex, count),
+			_subContainerTransforms.GetRange(startIndex, count),
+			_subSectorAngles.GetRange(startIndex, count));
 	}
 
 	private void RenderWheelSubTierForSector(int parentIndex, bool animateEntrance)
@@ -2523,23 +2584,8 @@ public partial class RadialWindow : Window
 			_subContainerTransforms.Add(translateTransform2);
 			if (animateEntrance)
 			{
-				BackEase easingFunction = new BackEase
-				{
-					Amplitude = 0.35,
-					EasingMode = EasingMode.EaseOut
-				};
-				Duration duration = new Duration(TimeSpan.FromMilliseconds(130.0));
-				DoubleAnimation animation = new DoubleAnimation(0.75, 1.0, duration)
-				{
-					EasingFunction = easingFunction
-				};
-				DoubleAnimation animation2 = new DoubleAnimation(0.0, 1.0, duration)
-				{
-					EasingFunction = new CircleEase
-					{
-						EasingMode = EasingMode.EaseOut
-					}
-				};
+				DoubleAnimation animation = _subTierScaleAnimation;
+				DoubleAnimation animation2 = _subTierFadeAnimation;
 				scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
 				scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
 				path.BeginAnimation(UIElement.OpacityProperty, animation2);
@@ -2569,13 +2615,9 @@ public partial class RadialWindow : Window
 			return;
 		}
 		_activeSubTierParentSector = parentIndex;
+		int snapshotStart = _subSectorPaths.Count;
 		RenderWheelSubTierForSector(parentIndex, animateEntrance: true);
-		_subTierCache[parentIndex] = new SubTierVisuals(
-			new List<System.Windows.Shapes.Path>(_subSectorPaths),
-			new List<Grid>(_subContentContainers),
-			new List<TranslateTransform>(_subSectorTransforms),
-			new List<TranslateTransform>(_subContainerTransforms),
-			new List<double>(_subSectorAngles));
+		_subTierCache[parentIndex] = SnapshotSubTierVisuals(snapshotStart);
 	}
 
 	private void ShowAllSubTiers()
@@ -2593,7 +2635,9 @@ public partial class RadialWindow : Window
 			ActionItem? actionItem = _profile.GetEffectiveAction(p);
 			if (actionItem != null && actionItem.SubActions != null && actionItem.SubActions.Count > 0)
 			{
+				int snapshotStart = _subSectorPaths.Count;
 				RenderWheelSubTierForSector(p, animateEntrance: false);
+				_subTierCache[p] = SnapshotSubTierVisuals(snapshotStart);
 			}
 		}
 	}
@@ -2626,10 +2670,7 @@ public partial class RadialWindow : Window
 			_ => 80, 
 		})) : ConfigManager.CurrentConfig.CustomAnimationDurationMs);
 		int num2 = (int)num;
-		CubicEase easingFunction = new CubicEase
-		{
-			EasingMode = EasingMode.EaseOut
-		};
+		CubicEase easingFunction = _sectorEaseOut;
 		Duration duration = new Duration(TimeSpan.FromMilliseconds(num2));
 		int num3 = Math.Max(30, (int)((double)num2 * 1.12));
 		Duration duration2 = new Duration(TimeSpan.FromMilliseconds(num3));
@@ -2887,6 +2928,11 @@ public partial class RadialWindow : Window
 		}
 	}
 
+	// 子轮盘光晕按配置修订号缓存：高亮切换只做引用赋值，不再解析颜色字符串并实例化 Effect
+	private long _subGlowEffectRevision = -1L;
+
+	private DropShadowEffect? _cachedSubGlowEffect;
+
 	private void ApplySubSectorGlow(System.Windows.Shapes.Path path, bool isHighlighted)
 	{
 		if (!isHighlighted)
@@ -2894,6 +2940,17 @@ public partial class RadialWindow : Window
 			path.Effect = null;
 			return;
 		}
+		long revision = ConfigManager.ConfigurationRevision;
+		if (_subGlowEffectRevision != revision)
+		{
+			_cachedSubGlowEffect = BuildSubGlowEffect();
+			_subGlowEffectRevision = revision;
+		}
+		path.Effect = _cachedSubGlowEffect;
+	}
+
+	private DropShadowEffect? BuildSubGlowEffect()
+	{
 		string text = ConfigManager.CurrentConfig?.SubWheelHighlightGlowPreset ?? "FollowPrimary";
 		if (text == "FollowPrimary")
 		{
@@ -2901,8 +2958,7 @@ public partial class RadialWindow : Window
 		}
 		if (text == "None")
 		{
-			path.Effect = null;
-			return;
+			return null;
 		}
 		Color color;
 		if (!(text == "Custom") || string.IsNullOrEmpty(ConfigManager.CurrentConfig?.SubWheelHighlightGlowColor))
@@ -2954,13 +3010,15 @@ public partial class RadialWindow : Window
 			num2 = ((currentConfig4 != null && currentConfig4.HighlightGlowOpacity >= 0.0) ? ConfigManager.CurrentConfig.HighlightGlowOpacity : 0.85);
 		}
 		double opacity = num2;
-		path.Effect = new DropShadowEffect
+		DropShadowEffect effect = new DropShadowEffect
 		{
 			Color = color,
 			BlurRadius = blurRadius,
 			ShadowDepth = 0.0,
 			Opacity = opacity
 		};
+		effect.Freeze();
+		return effect;
 	}
 
 	private void UpdateCoreSelectionDisplay(int mainIndex, int subIndex)
@@ -2988,7 +3046,7 @@ public partial class RadialWindow : Window
 			CoreExitIcon.Opacity = (CoreExitIcon.Visibility == Visibility.Visible) ? 0.18 : _defaultCoreExitIconOpacity;
 			CoreCustomImageEllipse.Opacity = _defaultCoreCustomImageOpacity;
 			CoreCustomImageEllipse.Effect = (CoreCustomImageEllipse.Visibility == Visibility.Visible)
-				? new BlurEffect { Radius = 5.5, RenderingBias = RenderingBias.Performance }
+				? _coreSelectionImageBlurEffect
 				: _defaultCoreCustomImageEffect;
 			Panel.SetZIndex(CoreSelectionOverlay, 20);
 			Panel.SetZIndex(CoreSelectionTextPanel, 21);
@@ -3119,7 +3177,7 @@ public partial class RadialWindow : Window
 			double maxFillet = (Math.Sqrt(3.0) / 2.0) * radius * 0.95;
 			double rawCr = (cornerRadius >= 0.0)
 				? cornerRadius
-				: ((ConfigManager.CurrentConfig?.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 4.0);
+				: ((ConfigManager.CurrentConfig?.SubWheelCornerRadius >= 0.0) ? ConfigManager.CurrentConfig.SubWheelCornerRadius : 14.0);
 			double effectiveCr = Math.Max(0.0, Math.Min(rawCr, maxFillet));
 
 			Point[] vertices = new Point[6];
@@ -3241,6 +3299,7 @@ public partial class RadialWindow : Window
 		{
 			return;
 		}
+		int snapshotStart = _subSectorPaths.Count;
 		if (_subTierCache.TryGetValue(parentIndex, out SubTierVisuals? cachedVisuals))
 		{
 			ActivateCachedSubTier(parentIndex, cachedVisuals);
@@ -3581,11 +3640,11 @@ public partial class RadialWindow : Window
 			Duration duration = new Duration(TimeSpan.FromMilliseconds(durationMs * 1.3));
 			DoubleAnimation doubleAnimation = new DoubleAnimation(0.0, 1.0, duration)
 			{
-				EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+				EasingFunction = _sectorEaseOut
 			};
 			DoubleAnimation doubleAnimation2 = new DoubleAnimation(0.75, 1.0, duration)
 			{
-				EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 }
+				EasingFunction = _fanEase
 			};
 			path.BeginAnimation(UIElement.OpacityProperty, doubleAnimation);
 			grid.BeginAnimation(UIElement.OpacityProperty, doubleAnimation);
@@ -3594,12 +3653,7 @@ public partial class RadialWindow : Window
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleXProperty, doubleAnimation2);
 			scaleTransform2.BeginAnimation(ScaleTransform.ScaleYProperty, doubleAnimation2);
 		}
-		_subTierCache[parentIndex] = new SubTierVisuals(
-			new List<System.Windows.Shapes.Path>(_subSectorPaths),
-			new List<Grid>(_subContentContainers),
-			new List<TranslateTransform>(_subSectorTransforms),
-			new List<TranslateTransform>(_subContainerTransforms),
-			new List<double>(_subSectorAngles));
+		_subTierCache[parentIndex] = SnapshotSubTierVisuals(snapshotStart);
 	}
 
 }

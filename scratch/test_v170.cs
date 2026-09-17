@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -530,6 +531,182 @@ public class Program
         {
             Console.WriteLine("FAIL: ExecuteFolder method not found!");
         }
+
+        // 10. Test v1.7.4-beta.3 Defaults
+        Console.WriteLine("\n--- Testing v1.7.4-beta.3 Default Configuration ---");
+        var defCfg = ConfigManager.CreateDefaultConfig();
+        if (defCfg.MappingsCanvasShowText != false)
+            throw new Exception($"FAIL: MappingsCanvasShowText expected false but was {defCfg.MappingsCanvasShowText}");
+        if (defCfg.WheelRadius != 133.0)
+            throw new Exception($"FAIL: WheelRadius expected 133.0 but was {defCfg.WheelRadius}");
+        if (defCfg.InnerRadius != 70.0)
+            throw new Exception($"FAIL: InnerRadius expected 70.0 but was {defCfg.InnerRadius}");
+        if (defCfg.CoreRadius != 36.0)
+            throw new Exception($"FAIL: CoreRadius expected 36.0 but was {defCfg.CoreRadius}");
+        if (defCfg.SectorGap != 4.0)
+            throw new Exception($"FAIL: SectorGap expected 4.0 but was {defCfg.SectorGap}");
+        if (defCfg.SectorCornerRadius != 13.0)
+            throw new Exception($"FAIL: SectorCornerRadius expected 13.0 but was {defCfg.SectorCornerRadius}");
+        if (defCfg.SectorFontSize != 13.0)
+            throw new Exception($"FAIL: SectorFontSize expected 13.0 but was {defCfg.SectorFontSize}");
+        if (defCfg.SubWheelTriggerDistance != 141.0)
+            throw new Exception($"FAIL: SubWheelTriggerDistance expected 141.0 but was {defCfg.SubWheelTriggerDistance}");
+        if (defCfg.SubWheelOuterRadius != 196.0)
+            throw new Exception($"FAIL: SubWheelOuterRadius expected 196.0 but was {defCfg.SubWheelOuterRadius}");
+        if (defCfg.SubWheelInnerGap != 7.0)
+            throw new Exception($"FAIL: SubWheelInnerGap expected 7.0 but was {defCfg.SubWheelInnerGap}");
+        if (defCfg.SubWheelCornerRadius != 14.0)
+            throw new Exception($"FAIL: SubWheelCornerRadius expected 14.0 but was {defCfg.SubWheelCornerRadius}");
+        if (defCfg.SubWheelIconSize != 16.0)
+            throw new Exception($"FAIL: SubWheelIconSize expected 16.0 but was {defCfg.SubWheelIconSize}");
+        if (defCfg.SubWheelUiStyle != "FollowPrimary")
+            throw new Exception($"FAIL: SubWheelUiStyle expected FollowPrimary but was {defCfg.SubWheelUiStyle}");
+        if (defCfg.AutoExpandSubRingsOnPopup != false)
+            throw new Exception($"FAIL: AutoExpandSubRingsOnPopup expected false but was {defCfg.AutoExpandSubRingsOnPopup}");
+        if (defCfg.ShowCoreIcon != false)
+            throw new Exception($"FAIL: ShowCoreIcon expected false but was {defCfg.ShowCoreIcon}");
+        if (defCfg.CoreIconType != "Image")
+            throw new Exception($"FAIL: CoreIconType expected Image but was {defCfg.CoreIconType}");
+        Console.WriteLine("SUCCESS: All v1.7.4-beta.3 default configuration assertions passed!");
+
+        // 11. Test Multi-Layer Global Inheritance Isolation (v1.7.4-beta.4)
+        Console.WriteLine("\n--- Testing Multi-Layer Global Inheritance Isolation (v1.7.4-beta.4) ---");
+        ConfigManager.CurrentConfig.EnableGlobalInheritance = true;
+
+        WheelProfile testGlobal = new WheelProfile
+        {
+            ProcessName = "Global",
+            SectorCount = 8,
+            Layers = new List<WheelLayer>
+            {
+                new WheelLayer
+                {
+                    Name = "第 1 层",
+                    SectorCount = 8,
+                    EnableCenterAction = true,
+                    CenterAction = new ActionItem { Type = "Hotkey", Name = "全局中心1", Parameter = "Ctrl+1" },
+                    Actions = new List<ActionItem>
+                    {
+                        new ActionItem { Type = "Hotkey", Name = "全局L1_动作0", Parameter = "Ctrl+C" },
+                        new ActionItem { Type = "Hotkey", Name = "全局L1_动作1", Parameter = "Ctrl+V" }
+                    }
+                },
+                new WheelLayer
+                {
+                    Name = "第 2 层",
+                    SectorCount = 8,
+                    EnableCenterAction = true,
+                    CenterAction = new ActionItem { Type = "Hotkey", Name = "全局中心2", Parameter = "Ctrl+2" },
+                    Actions = new List<ActionItem>
+                    {
+                        new ActionItem { Type = "Hotkey", Name = "全局L2_动作0", Parameter = "Ctrl+X" },
+                        new ActionItem { Type = "Hotkey", Name = "全局L2_动作1", Parameter = "Ctrl+Z" }
+                    }
+                }
+            }
+        };
+        testGlobal.EnsureLayers();
+
+        WheelProfile testApp = new WheelProfile
+        {
+            ProcessName = "TestApp.exe",
+            SectorCount = 8,
+            Layers = new List<WheelLayer>
+            {
+                new WheelLayer
+                {
+                    Name = "App 第 1 层",
+                    SectorCount = 8,
+                    EnableCenterAction = false, // 留空继承全局
+                    Actions = new List<ActionItem>
+                    {
+                        new ActionItem { Type = "Hotkey", Name = "动作 1", Parameter = "" }, // 留空继承全局
+                        new ActionItem { Type = "Hotkey", Name = "App自身动作1", Parameter = "F5" } // 本地配置，不继承
+                    }
+                },
+                new WheelLayer
+                {
+                    Name = "App 第 2 层",
+                    SectorCount = 8,
+                    EnableCenterAction = false, // 留空继承全局
+                    Actions = new List<ActionItem>
+                    {
+                        new ActionItem { Type = "Hotkey", Name = "动作 1", Parameter = "" }, // 留空继承全局
+                        new ActionItem { Type = "Hotkey", Name = "动作 2", Parameter = "" }  // 留空继承全局
+                    }
+                },
+                new WheelLayer
+                {
+                    Name = "App 第 3 层", // 超额层，全局只有2层
+                    SectorCount = 8,
+                    EnableCenterAction = false,
+                    Actions = new List<ActionItem>
+                    {
+                        new ActionItem { Type = "Hotkey", Name = "动作 1", Parameter = "" }
+                    }
+                }
+            }
+        };
+        testApp.EnsureLayers();
+
+        // 场景 A：全局方案当前停留在第 1 层 (ActiveLayerIndex = 0)
+        testGlobal.ActiveLayerIndex = 0;
+        testGlobal.SyncRootPropertiesFromActiveLayer();
+
+        // App Layer 1 槽位 0 应该继承全局 Layer 1 动作 0 ("全局L1_动作0")
+        testApp.ActiveLayerIndex = 0;
+        testApp.SyncRootPropertiesFromActiveLayer();
+        var effA_L1_0 = testApp.GetEffectiveAction(0, -1, testGlobal, 0);
+        if (effA_L1_0 == null || effA_L1_0.Name != "全局L1_动作0" || !effA_L1_0.IsInherited)
+            throw new Exception($"FAIL: App Layer 1 slot 0 expected 全局L1_动作0 but got {effA_L1_0?.Name}");
+
+        // App Layer 1 槽位 1 是自身动作，不应继承
+        var effA_L1_1 = testApp.GetEffectiveAction(1, -1, testGlobal, 0);
+        if (effA_L1_1 == null || effA_L1_1.Name != "App自身动作1" || effA_L1_1.IsInherited)
+            throw new Exception($"FAIL: App Layer 1 slot 1 expected App自身动作1 but got {effA_L1_1?.Name}");
+
+        // App Layer 2 槽位 0 应该继承全局 Layer 2 动作 0 ("全局L2_动作0")
+        testApp.ActiveLayerIndex = 1;
+        testApp.SyncRootPropertiesFromActiveLayer();
+        var effA_L2_0 = testApp.GetEffectiveAction(0, -1, testGlobal, 1);
+        if (effA_L2_0 == null || effA_L2_0.Name != "全局L2_动作0" || !effA_L2_0.IsInherited)
+            throw new Exception($"FAIL: App Layer 2 slot 0 expected 全局L2_动作0 but got {effA_L2_0?.Name}");
+
+        // 场景 B：关键测试！模拟用户在控制台切换全局方案至第 2 层 (ActiveLayerIndex = 1)
+        testGlobal.ActiveLayerIndex = 1;
+        testGlobal.SyncRootPropertiesFromActiveLayer();
+
+        // 当全局停留在第 2 层时，App Layer 1 槽位 0 依然必须严格继承全局第 1 层！不能被全局的第 2 层污染！
+        testApp.ActiveLayerIndex = 0;
+        testApp.SyncRootPropertiesFromActiveLayer();
+        var effB_L1_0 = testApp.GetEffectiveAction(0, -1, testGlobal, 0);
+        if (effB_L1_0 == null || effB_L1_0.Name != "全局L1_动作0" || !effB_L1_0.IsInherited)
+            throw new Exception($"FAIL (CRITICAL): App Layer 1 polluted by Global Layer 2! Expected 全局L1_动作0 but got {effB_L1_0?.Name}");
+
+        // App Layer 2 槽位 0 应该继续继承全局第 2 层
+        testApp.ActiveLayerIndex = 1;
+        testApp.SyncRootPropertiesFromActiveLayer();
+        var effB_L2_0 = testApp.GetEffectiveAction(0, -1, testGlobal, 1);
+        if (effB_L2_0 == null || effB_L2_0.Name != "全局L2_动作0" || !effB_L2_0.IsInherited)
+            throw new Exception($"FAIL: App Layer 2 slot 0 expected 全局L2_动作0 but got {effB_L2_0?.Name}");
+
+        // 场景 C：超额层优雅回退测试（App Layer 3 继承全局 Layer 1）
+        testApp.ActiveLayerIndex = 2;
+        testApp.SyncRootPropertiesFromActiveLayer();
+        var effC_L3_0 = testApp.GetEffectiveAction(0, -1, testGlobal, 2);
+        if (effC_L3_0 == null || effC_L3_0.Name != "全局L1_动作0" || !effC_L3_0.IsInherited)
+            throw new Exception($"FAIL: App Layer 3 (excess) expected fallback to 全局L1_动作0 but got {effC_L3_0?.Name}");
+
+        // 场景 D：中心核圆按层对应继承与污染防护测试
+        var centerL1 = testApp.GetEffectiveCenterAction(testGlobal, 0);
+        if (centerL1 == null || centerL1.Name != "全局中心1" || !centerL1.IsInherited)
+            throw new Exception($"FAIL: App Layer 1 center expected 全局中心1 but got {centerL1?.Name}");
+
+        var centerL2 = testApp.GetEffectiveCenterAction(testGlobal, 1);
+        if (centerL2 == null || centerL2.Name != "全局中心2" || !centerL2.IsInherited)
+            throw new Exception($"FAIL: App Layer 2 center expected 全局中心2 but got {centerL2?.Name}");
+
+        Console.WriteLine("SUCCESS: Multi-layer global inheritance isolation 100% verified!");
 
         Console.WriteLine("\n=== ALL V1.7.0 COMPREHENSIVE TESTS PASSED! ===");
     }

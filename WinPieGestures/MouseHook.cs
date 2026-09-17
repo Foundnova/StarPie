@@ -129,6 +129,20 @@ public class MouseHook
 
 	public event EventHandler<MouseWheelHookEventArgs>? OnMouseWheel;
 
+	// 钩子回调线程专用的复用事件实例：订阅方必须同步消费，严禁跨线程或异步持有。
+	// 消除每次鼠标移动/滚轮/按键的堆分配，避免 Gen0 GC 抖动干扰手势流畅度。
+	private readonly MouseEventArgs _moveArgs = new MouseEventArgs(0.0, 0.0);
+
+	private readonly MouseEventArgs _rawArgs = new MouseEventArgs(0.0, 0.0);
+
+	private readonly MouseEventArgs _triggerDownArgs = new MouseEventArgs(0.0, 0.0);
+
+	private readonly MouseEventArgs _triggerUpArgs = new MouseEventArgs(0.0, 0.0);
+
+	private readonly MouseWheelHookEventArgs _wheelArgs = new MouseWheelHookEventArgs(0, 0.0, 0.0);
+
+	private readonly RawMouseEventArgs _rawButtonArgs = new RawMouseEventArgs(0, "", 0u, false, 0.0, 0.0);
+
 	public event EventHandler<MouseEventArgs>? OnRightButtonDown
 	{
 		add
@@ -370,7 +384,8 @@ public class MouseHook
 			int num = (int)wParam;
 			if (num == 512)
 			{
-				MouseEventArgs e = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				MouseEventArgs e = _moveArgs;
+				e.Update(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnMouseMove?.Invoke(this, e);
 				if (e.Handled)
 				{
@@ -382,7 +397,8 @@ public class MouseHook
 			if (num == 522) // WM_MOUSEWHEEL
 			{
 				short delta = (short)((mSLLHOOKSTRUCT.mouseData >> 16) & 0xFFFF);
-				MouseWheelHookEventArgs wheelArgs = new MouseWheelHookEventArgs(delta, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				MouseWheelHookEventArgs wheelArgs = _wheelArgs;
+				wheelArgs.Update(delta, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnMouseWheel?.Invoke(this, wheelArgs);
 				if (wheelArgs.Handled)
 				{
@@ -391,7 +407,8 @@ public class MouseHook
 				return CallNextHookEx(_hookId, nCode, wParam, lParam);
 			}
 
-			MouseEventArgs e2 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+			MouseEventArgs e2 = _rawArgs;
+			e2.Update(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 			OnRawMouseEvent?.Invoke(this, e2);
 			string text = "";
 			bool flag = false;
@@ -425,7 +442,8 @@ public class MouseHook
 			}
 			if (!string.IsNullOrEmpty(text))
 			{
-				RawMouseEventArgs e3 = new RawMouseEventArgs(num, text, mSLLHOOKSTRUCT.mouseData, flag, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+				RawMouseEventArgs e3 = _rawButtonArgs;
+				e3.Update(num, text, mSLLHOOKSTRUCT.mouseData, flag, mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 				OnRawMouseButtonEvent?.Invoke(this, e3);
 				if (e3.Handled)
 				{
@@ -442,7 +460,8 @@ public class MouseHook
 				bool flag3 = flag2 && string.Equals(text, text2, StringComparison.OrdinalIgnoreCase);
 				if (num2)
 				{
-					MouseEventArgs e4 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+					MouseEventArgs e4 = _triggerDownArgs;
+					e4.Update(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 					OnTriggerButtonDown?.Invoke(this, e4);
 					if (e4.Handled)
 					{
@@ -453,7 +472,8 @@ public class MouseHook
 				else if (flag3)
 				{
 					_activeMouseTriggerButton = null;
-					MouseEventArgs e5 = new MouseEventArgs(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
+					MouseEventArgs e5 = _triggerUpArgs;
+					e5.Update(mSLLHOOKSTRUCT.pt.x, mSLLHOOKSTRUCT.pt.y);
 					OnTriggerButtonUp?.Invoke(this, e5);
 					if (e5.Handled)
 					{
