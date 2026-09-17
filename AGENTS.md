@@ -141,7 +141,11 @@ g:\Users\2 Better\Desktop\design\
 │   ├── Decompiler/                # Program.cs 流水线生成器工程
 │   └── v152_decompiled/           # 反编译基线源码
 ├── docs/
-│   └── plugin-system-architecture.md # 插件宿主、公共基础设施与动作路径架构文档
+│   └── plugin-system-architecture.md # ⚠ 本分支**不采用**的设计存档（统一调用运行时 + 路径模块方案），仅作设计参考
+├── PLUGIN_SYSTEM_DESIGN.md        # 插件系统设计大纲（设计草案，正文路径非现状，勿照抄）
+├── PLUGIN_SYSTEM_IMPLEMENTATION.md # 实现说明：结构与职责边界、接口用法、已踩过的坑
+├── PLUGIN_SYSTEM_PERFORMANCE_AND_API.md # 性能实测 · 完整接口清单 · 社区开发指南
+├── PLUGIN_FIRST_ROADMAP.md        # 插件化边界规划（三问判据；定位是规划，不是现状描述）
 ├── AGENTS.md                      # 本架构与继承开发规范
 └── CHANGELOG.md                   # 完整版本演进与发布日志
 ```
