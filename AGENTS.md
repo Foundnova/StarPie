@@ -334,6 +334,10 @@ dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r w
 powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Lightweight\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Lightweight-win-x64.zip' -Force; Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Standalone-win-x64.zip' -Force"
 ```
 
+> **发布前必查：`plugin\` 有没有落在发布目录里。** `CopyBundledPlugins`（`AfterTargets="Build"`）把 12 枚随包 dll 拷到 `$(OutDir)plugin`，而 `dotnet publish -o <目录>` 的输出是 `$(PublishDir)` —— **这两个不是同一个目录**，所以另有 `CopyBundledPluginsToPublish`（`AfterTargets="Publish"`）负责发布侧，两者共用顶层 ItemGroup `BundledPluginPayload`（放进 Target 内部会因作用域变空，复制会「成功执行但拷了 0 个文件」且不报错）。
+>
+> 只做 Build 那一半时，开发机上永远看不出问题（`bin\` 里躺着 plugin\），而 ZIP 与 Inno Setup 安装包（`SourceDir` 指向 `publish\Standalone`）**一枚插件 dll 都没有** —— 用户装完之后所有随包动作都不会被安装，配置里配好的扇区一触发就报「找不到提供方」。改动这段后必须实际 `dotnet publish -o <临时目录>` 一次，确认 `plugin\` 里有 12 枚 dll。
+
 ### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：
 1. `WinPieGestures.csproj`：`<Version>X.Y.Z</Version>`, `<AssemblyVersion>X.Y.Z.0</AssemblyVersion>`, `<FileVersion>X.Y.Z.0</FileVersion>`

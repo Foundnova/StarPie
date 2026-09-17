@@ -86,29 +86,34 @@
     <BundledPluginRoot>$(MSBuildThisFileDirectory)..\plugins\</BundledPluginRoot>
   </PropertyGroup>
 
-  <Target Name="CopyBundledPlugins" AfterTargets="Build">
-    <ItemGroup>
-      <!--
-        逐枚列举。刻意不做「整个目录一扫全拷」：那会把
-        StarPie.Plugin.Abstractions.dll 之类的东西一并塞进来源区，
-        而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
-        包多起来以后这条纪律更容易被顺手违反 —— 加包时请老老实实加一行。
-        下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
-      -->
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Launch\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Launch.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Ocr\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Ocr.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WebUrl\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WebUrl.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Folder\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Folder.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Command\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Command.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ShellTool\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ShellTool.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Tile\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Tile.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ToggleTopmost\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ToggleTopmost.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowOpacity\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowOpacity.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.SwitchWindow\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.SwitchWindow.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.System\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.System.dll" />
-    </ItemGroup>
+  <!--
+    【载荷清单放在顶层】`Build` 与 `Publish` 两个 Target 都要用它。
+    放在某个 Target 内部的话，@(BundledPluginPayload) 的作用域就只在那一个 Target 里，
+    另一个 Target 引用到的是空列表 —— 复制会「成功执行、什么都没拷」，且不报错。
+  -->
+  <ItemGroup>
+    <!--
+      逐枚列举。刻意不做「整个目录一扫全拷」：那会把
+      StarPie.Plugin.Abstractions.dll 之类的东西一并塞进来源区，
+      而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
+      包多起来以后这条纪律更容易被顺手违反 —— 加包时请老老实实加一行。
+      下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
+    -->
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Launch\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Launch.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Ocr\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Ocr.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WebUrl\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WebUrl.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Folder\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Folder.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Command\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Command.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ShellTool\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ShellTool.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Tile\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Tile.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ToggleTopmost\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ToggleTopmost.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowOpacity\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowOpacity.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.SwitchWindow\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.SwitchWindow.dll" />
+    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.System\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.System.dll" />
+  </ItemGroup>
 
+  <Target Name="CopyBundledPlugins" AfterTargets="Build">
     <!--
       【必须出声】任何一枚列出的 dll 没构建出来就立刻让构建失败。
       没有这道检查时，Copy 会静默跳过缺失项：构建成功、plugin\ 里少一枚 dll，
@@ -122,6 +127,21 @@
 
     <Copy SourceFiles="@(BundledPluginPayload)"
           DestinationFolder="$(OutDir)plugin"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    【发布也要拷一次 —— $(OutDir) 与 $(PublishDir) 是两个不同的目录】
+    只挂 AfterTargets="Build" 时 plugin\ 只会落在中间构建目录里，于是：
+      · `dotnet build` 的输出是对的（开发机上因此永远看不出问题）；
+      · `dotnet publish -o releases\vX.Y.Z\Lightweight` 的输出里**一枚插件 dll 都没有**，
+        ZIP 包与 Inno Setup 安装包（SourceDir 指向 publish\Standalone）因此都不含来源区。
+    用户侧的表现是：装完之后所有随包动作都不会被安装，配置里配好的扇区一触发就报
+    「找不到提供方」—— 与「忘记加 BundledPluginPayload 那一行」的症状一模一样。
+  -->
+  <Target Name="CopyBundledPluginsToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="@(BundledPluginPayload)"
+          DestinationFolder="$(PublishDir)plugin"
           SkipUnchangedFiles="true" />
   </Target>
 

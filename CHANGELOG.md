@@ -4,6 +4,27 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（发布链路修复：`dotnet publish` 的输出缺整个 `plugin\` 来源区）
+
+检查合并后项目状态时实测发现的独立问题 —— **不是合并引入的**，S4 拆包落地时就存在：`dotnet build` 的产物带 `plugin\`，而 `dotnet publish` 的产物**一枚插件 dll 都没有**。
+
+### 🐛 问题修复
+
+**根因**：`CopyBundledPlugins` 只挂 `AfterTargets="Build"`，复制目标是 `$(OutDir)plugin`；而 `dotnet publish -o <目录>` 的输出目录是 `$(PublishDir)` —— 两者不是同一个目录，`plugin\` 于是只落在中间构建目录里。
+
+**影响**：`dotnet publish` 是 ZIP 包与 Inno Setup 安装包的**唯一来源**（`Compress-Archive -Path "publish/Lightweight/*"`、`SourceDir=publish\Standalone`），因此发行版缺整个来源区。用户装上后 `AutoInstallBundledPlugins` 扫不到任何候选（返回 0），12 个随包动作全部不会被安装 —— 配置里配好的 `Launch` / `Tile` / `Ocr` 等扇区一触发就报「找不到提供方」。开发机上永远复现不了，因为那里 `bin\` 里的 `plugin\` 是构建留下的。
+
+**修法**：
+
+- 把载荷清单 `BundledPluginPayload` 从 Target 内部提到**顶层 ItemGroup**（留在 Target 里时，另一个 Target 引用的 `@(BundledPluginPayload)` 是空列表 —— 复制会静默拷 0 个文件）。
+- 新增 `CopyBundledPluginsToPublish`（`AfterTargets="Publish"`），复制到 `$(PublishDir)plugin`；原有的 Build 侧 Target 与那道「缺失即报错」的检查保持不变。
+- `AGENTS.md` §5.2 补一条发布前必查项，写清两个目录的区别与实测方法。
+
+### 🧪 自检
+
+- `dotnet build WinPieGestures/WinPieGestures.csproj -c Release` → 0 警告 0 错误；`bin\Release\net8.0-windows10.0.19041.0\plugin\` 12 枚 dll（无回归）。
+- `dotnet publish … -c Release -r win-x64 --no-self-contained -o <临时目录>` → 输出目录的 `plugin\` **12 枚 dll 齐全**（修复前：目录都不存在）。
+
 ## [未发布] - 2026-09-17（devplugin 合并遗留修复：三处重复插入与 915 行孤儿模块）
 
 `devplugin` 分支的合并（`bfabbde`）在插件系统上做了一次「取本分支版本」的冲突解决。策略本身是对的 —— 那一侧不含本分支的顶层类型认领、`plugins\` 下的 12 个单动作包与 SDK 1.3 / 1.4 的能力面，直接取它会抹掉整个拆包工程 —— 但它没有处理「那一侧**新增**的文件」，于是留下半截状态：重构的骨架进来了，配套的调用方改造没有。本次修掉合并引入的全部遗留问题，主程序恢复 0 警告 0 错误。
