@@ -8,11 +8,27 @@ public static class PluginApi
     /// <summary>SDK 契约主版本。插件 manifest 的 <c>apiVersion</c> 主版本必须与之相等才能加载。</summary>
     public const int ApiVersionMajor = 1;
 
-    /// <summary>SDK 契约次版本。只增不改的演进在此递增。</summary>
-    public const int ApiVersionMinor = 0;
+    /// <summary>
+    /// SDK 契约次版本。<b>只增不改</b>的能力演进在此递增：
+    /// <list type="bullet">
+    /// <item>1.1 —— 新增 <see cref="IHostCommandService"/> 与 <see cref="IHostShellService"/>，
+    /// 并让 <see cref="PluginCapability.Process"/> 从「安装确认页的标签」变成真实门禁
+    /// （未声明该能力的插件调用这两个服务会抛 <see cref="PluginCapabilityDeniedException"/>）。</item>
+    /// </list>
+    /// </summary>
+    public const int ApiVersionMinor = 1;
 
-    /// <summary>SDK 契约版本字符串，形如 <c>1.0</c>。</summary>
-    public const string ApiVersion = "1.0";
+    /// <summary>
+    /// SDK 契约版本字符串，形如 <c>1.1</c>。
+    /// <para>
+    /// 这里没法用常量插值消掉重复：C# 的常量插值只接受 <c>string</c> 常量，
+    /// 而版本号的两个组成部分是 <c>int</c>。所以「这个字符串」与「上面两个数字」
+    /// 之间存在一处可能漂移的重复 —— 由自检断言守着（<c>PluginSelfTest</c> 会比对三者）。
+    /// 之所以值得守：它正是插件在清单里声明、宿主用来做兼容判断的值，
+    /// 漂了以后报错信息里的版本号会和真实契约对不上，排查时先被误导一轮。
+    /// </para>
+    /// </summary>
+    public const string ApiVersion = "1.1";
 
     /// <summary>本契约程序集的程序集名。宿主的 PluginLoadContext 依赖它做「共享程序集放行」。</summary>
     public const string AbstractionsAssemblyName = "StarPie.Plugin.Abstractions";

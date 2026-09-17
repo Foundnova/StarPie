@@ -50,6 +50,17 @@ internal static class Texts
     internal const string FolderPathHelp = "支持普通路径、文件路径（会定位并选中该文件）以及 shell: 命名空间。";
     internal const string FolderEmpty = "未设置文件夹路径，请在动作设置里选择要打开的目录。";
 
+    internal const string CommandTitle = "运行命令";
+    internal const string CommandDesc = "在指定的终端中执行一条命令行语句。";
+    internal const string CommandLine = "命令行";
+    internal const string CommandTerminalLabel = "终端";
+    internal const string CommandEmpty = "未填写要执行的命令，请在动作设置里输入命令行内容。";
+
+    internal const string ShellToolTitle = "系统与右键工具";
+    internal const string ShellToolVerb = "功能标识";
+    internal const string ShellToolVerbHelp = "填功能标识，例如 copy_path / lock_screen / run_as_admin。";
+    internal const string ShellToolEmpty = "未选择系统工具，请指定一个功能标识。";
+
     // ---------------------------------------------------------------- 注册表
 
     /// <summary>zh-CN 与 en 两套。<see cref="II18nRegistry.Register"/> 一次接收这两种语言。</summary>
@@ -78,6 +89,17 @@ internal static class Texts
         ("folder.path", FolderPath, "Folder path"),
         ("folder.pathHelp", FolderPathHelp, "Plain paths, file paths (the containing folder opens with the file selected) and shell: namespaces are supported."),
         ("folder.empty", FolderEmpty, "No folder path set. Please choose a directory in the action settings."),
+
+        ("command.title", CommandTitle, "Run Command"),
+        ("command.desc", CommandDesc, "Run a command line in the selected terminal."),
+        ("command.line", CommandLine, "Command line"),
+        ("command.terminal", CommandTerminalLabel, "Terminal"),
+        ("command.empty", CommandEmpty, "No command entered. Please fill in the command line in the action settings."),
+
+        ("shell.tool.title", ShellToolTitle, "Shell & System Tools"),
+        ("shell.tool.verb", ShellToolVerb, "Tool ID"),
+        ("shell.tool.verbHelp", ShellToolVerbHelp, "Enter a tool ID such as copy_path, lock_screen or run_as_admin."),
+        ("shell.tool.empty", ShellToolEmpty, "No system tool selected. Please specify a tool ID."),
     };
 
     // ---------------------------------------------------------------- 其余语言
@@ -96,6 +118,11 @@ internal static class Texts
         ["weburl.customPath"] = "自訂瀏覽器路徑",
         ["folder.title"] = "開啟資料夾",
         ["folder.path"] = "資料夾路徑",
+        ["command.title"] = "執行命令",
+        ["command.line"] = "命令列",
+        ["command.terminal"] = "終端",
+        ["shell.tool.title"] = "系統與右鍵工具",
+        ["shell.tool.verb"] = "功能識別碼",
     };
 
     internal static readonly Dictionary<string, string> Ja = new()
@@ -112,6 +139,11 @@ internal static class Texts
         ["weburl.customPath"] = "カスタム ブラウザーのパス",
         ["folder.title"] = "フォルダーを開く",
         ["folder.path"] = "フォルダーのパス",
+        ["command.title"] = "コマンド実行",
+        ["command.line"] = "コマンド",
+        ["command.terminal"] = "ターミナル",
+        ["shell.tool.title"] = "シェル・右クリックツール",
+        ["shell.tool.verb"] = "ツール ID",
     };
 
     /// <summary>把三张表一次性登记进宿主。</summary>

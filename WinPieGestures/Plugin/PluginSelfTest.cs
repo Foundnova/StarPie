@@ -390,118 +390,6 @@ internal static class PluginSelfTest
                 }
             }
 
-            // ---- 3e 内建动作接缝 ----
-            // 内建动作正在向插件模型收敛（统一下形状，执行体不搬家）。这一段验证收敛后的
-            // 「运行命令」与收敛前等价，并确认它确实被那条新接缝接走了。
-            Line("");
-            Line("[3e] 内建动作接缝（注册 / 参数投影 / 校验 / 真实执行）");
-
-            if (!BuiltinActionCatalog.TryGet("Command", out BuiltinActionRegistration builtinCommand))
-            {
-                Fail("内建动作注册", "「Command」不在内建动作表里 —— 用户配好的运行命令动作会落回旧路径");
-            }
-            else
-            {
-                Line($"  已登记：{builtinCommand.FullId}｜{builtinCommand.Contribution.Descriptor.DisplayName}");
-
-                // ① 参数声明。将来统一表单就是按这份 schema 渲染的，字段数与键都不能错。
-                var fields = builtinCommand.Contribution.Parameters;
-                Line($"  参数声明：{fields.Count} 项" +
-                    (fields.Count > 0 ? $"（{string.Join("、", fields.Select(f => $"{f.Key}「{f.Label}」"))}）" : ""));
-
-                if (fields.Count != 2
-                    || !fields.Any(f => f.Key == "commandLine")
-                    || !fields.Any(f => f.Key == "terminal"))
-                {
-                    Fail("内建动作参数", "「运行命令」应恰好声明 commandLine 与 terminal 两个参数");
-                }
-                else if (!fields.First(f => f.Key == "commandLine").Required)
-                {
-                    // 命令行是必填项。不标必填，统一表单就不会把它当必填校验 ——
-                    // 于是「空命令」这种配置又能顺着界面溜进去，绕开下面那条拦截。
-                    Fail("内建动作参数", "commandLine 必须标为必填，否则空命令会重新变成可保存的状态");
-                }
-
-                // ② 裸字段投影。这是「零迁移」成立的前提：参数仍存在 ActionItem 的裸字段上，
-                //    由这一层现读现装成参数字典，所以持久化侧一行都没动。
-                var legacyAction = new ActionItem
-                {
-                    Type = "Command",
-                    Name = "自检用",
-                    Parameter = "echo builtin-probe",
-                    CommandTerminal = "wsl",
-                };
-
-                Dictionary<string, string> projected = builtinCommand.ProjectParameters(legacyAction);
-                Line($"  裸字段投影：commandLine='{projected.GetValueOrDefault("commandLine")}'｜" +
-                    $"terminal='{projected.GetValueOrDefault("terminal")}'");
-
-                if (!string.Equals(projected.GetValueOrDefault("commandLine"), "echo builtin-probe", StringComparison.Ordinal)
-                    || !string.Equals(projected.GetValueOrDefault("terminal"), "wsl", StringComparison.Ordinal))
-                {
-                    Fail("内建动作参数投影", "裸字段没有正确投影成参数字典 —— 用户配的命令送不到执行体");
-                }
-
-                // ③ 校验。空命令必须被拦下：收敛前这里是静默 return（按了扇区什么也不发生、
-                //    也没有任何提示），本轮的刻意行为变更就是这一处。
-                string? emptyVerdict = builtinCommand.Contribution.Validate(
-                    new Dictionary<string, string> { ["commandLine"] = "   ", ["terminal"] = "cmd" });
-
-                if (emptyVerdict == null)
-                {
-                    Fail("内建动作校验", "空命令行没有被拦下 —— 静默失效又回来了");
-                }
-                else
-                {
-                    Line($"  空命令拦截：{emptyVerdict}");
-                }
-
-                if (builtinCommand.Contribution.Validate(projected) != null)
-                {
-                    Fail("内建动作校验", "合法的命令行被误判为不合法");
-                }
-
-                // ④ 真实执行。产物必须真的出现，否则「接缝通了」只是纸面结论 ——
-                //    这一类「断言写到用户真正会走到的那一步」的教训在这个项目里已经有过两次。
-                //
-                //    刻意<b>不受 --skip-invoke 控制</b>：探针命令是无害的（往自检沙箱里写一个文件），
-                //    而它恰恰是本次改动的核心，跳过它等于什么都没验。
-                string probeOutput = Path.Combine(sandboxRoot, "builtin-action-result.txt");
-                var liveAction = new ActionItem
-                {
-                    Type = "Command",
-                    Name = "自检用",
-                    Parameter = $"echo builtin-ok>\"{probeOutput}\"",
-                    CommandTerminal = "cmd_hidden",
-                };
-
-                try
-                {
-                    // 走的是 ActionExecutor 里那个 internal 的接缝方法本体，而不是 Execute()：
-                    // Execute 的外层 catch 会弹 MessageBox，在无人应答的自检进程里会卡死。
-                    ActionExecutor.ExecuteBuiltinActionItem(liveAction, builtinCommand);
-
-                    // 命令行进程是异步拉起的（ExecuteCommand 不等它结束），轮询等产物落地。
-                    for (int wait = 0; wait < 30 && !File.Exists(probeOutput); wait++)
-                    {
-                        System.Threading.Thread.Sleep(100);
-                    }
-
-                    if (!File.Exists(probeOutput))
-                    {
-                        Fail("内建动作执行", $"命令没有产生预期产物（{probeOutput}）—— 接缝没把动作真的送下去");
-                    }
-                    else
-                    {
-                        Line($"  真实执行：产物已生成（{new FileInfo(probeOutput).Length} 字节）");
-                    }
-                }
-                catch (Exception executeError)
-                {
-                    Fail("内建动作执行", $"抛出异常：{executeError.Message}");
-                }
-            }
-
             // ---- 3f 内建动作批量接缝 ----
             //
             // 仍留在内建动作表里的那些动作，只验「注册 / 别名 / 投影 / 校验」四件事，
@@ -511,9 +399,37 @@ internal static class PluginSelfTest
             // 把「接缝连通性」与「动作真实效果」分成两件事，前者每次都验，
             // 后者由用户在真机上自己确认。
             //
-            // 已被随包动作包认领的几个（Launch / WebUrl / Folder）不在本表里 —— 见 [3i]。
+            // 【为什么改成数据驱动】
+            // 下面这份断言表原先是手写的，动作每外移一个就得有人记得删一行。
+            // 忘了删的表现是自检报「某动作不在内建动作表里」—— 而那恰恰是**预期行为**。
+            // 「预期的事被报成缺陷」比不报更坏：它会训练人忽略这条消息。
+            // 所以下面直接遍历 BuiltinActionCatalog.SnapshotAll()，不再手抄清单；
+            // 真正属于设计意图的东西（哪些类型**不该**留在表里）另起一个写死的断言，
+            // 因为那是「我们决定它不在」，无法从快照里推导出来。
             Line("");
             Line("[3f] 内建动作批量接缝（注册 / 别名 / 投影 / 校验）");
+
+            // 【交割不变量】被随包动作包认领的顶层类型，必须已经不在内建动作表里。
+            //
+            // 加认领声明与删内建登记是一次「交割」，必须同时发生：
+            // 只加认领不删登记，同一个 Type 就挂着两条执行路径，而 ClassifyAction
+            // 让内建优先 —— 结果是插件里那份代码永远不会被调用，改了也看不出效果。
+            // 这个清单必须写死：它表达的是设计意图，不是当前实现状态的快照。
+            string[] migratedTypes =
+            {
+                "Launch", "WebUrl", "Url", "Folder", "OpenFolder", "Command", "ShellTool",
+            };
+
+            foreach (string migratedType in migratedTypes)
+            {
+                if (BuiltinActionCatalog.TryGet(migratedType, out BuiltinActionRegistration stillBuiltin))
+                {
+                    Fail("内建动作注册",
+                        $"「{migratedType}」既已被随包动作包认领、又还留在内建动作表里（{stillBuiltin.FullId}）—— " +
+                        "同一个类型挂着两条执行路径，且内建优先，插件里那份代码永远不会被调用。" +
+                        "外移动作时「加认领声明」与「删 BuiltinActionCatalog 里的登记」必须同时完成");
+                }
+            }
 
             var builtinCases = new (string Type, string? Alias, ActionItem Probe, int Fields, string? Key, string Expect, string EmptyLabel)[]
             {
@@ -521,7 +437,8 @@ internal static class PluginSelfTest
                     new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
                     1, "hotkey", "Ctrl+Alt+S", "快捷键"),
 
-                // 【已移出本表】Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）
+                // 【已移出本表】Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
+                //             Command / ShellTool
                 //
                 // 它们不再是内建动作，而是随包插件 StarPie.Plugin.BasicActions 认领的顶层类型。
                 // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，
@@ -530,10 +447,6 @@ internal static class PluginSelfTest
                 ("System", null,
                     new ActionItem { Type = "System", Parameter = "Minimize" },
                     1, "preset", "Minimize", "系统功能"),
-
-                ("ShellTool", null,
-                    new ActionItem { Type = "ShellTool", Parameter = "copy_path" },
-                    1, "verb", "copy_path", "工具标识"),
 
                 // 无参数动作：Key 传 null，只验「已登记 + 参数声明确实为空」。
                 // 它没有必填项，也没有「空值」这一说 —— 硬套下面的必填 / 空值检查只会得到假失败。
@@ -674,42 +587,194 @@ internal static class PluginSelfTest
             // ---- 3g 端到端派发 ----
             //
             // 上面两段验的是「接缝本身好不好使」，但都直接调了接缝方法，绕过了
-            // Execute() 开头那段 TryGet —— 而用户按下扇区走的恰恰是 Execute()。
-            // 万一那段派发写错了位置（比如挪到 switch 之后），上面照样全绿，
+            // Execute() 开头那段判据 —— 而用户按下扇区走的恰恰是 Execute()。
+            // 万一那段判据写错了位置（比如挪到 switch 之后），上面照样全绿，
             // 真机上却依然在走老路径 —— 典型的「测试说没问题、用户说没反应」。
+            //
+            // 【为什么不再用「跑一个动作看产物」的写法】
+            // 这一段原先的探针是 Type="Command" + 一条 echo 命令，靠它产出的文件证明
+            // 「被接走了」。Command 外移成插件动作之后这个探针不再成立；更要紧的是，
+            // 「真跑也无害」的候选动作已经一个不剩 —— 剩下那八个内建动作，每一个真跑
+            // 都会去按热键、抓屏 OCR、或是改用户窗口的平铺与透明度，副作用都不小。
+            //
+            // 所以拆成两层，各自解决一个问题：
+            //   一、判据层：直接断言 ClassifyAction 对每一类 Type 的归属。它就是 Execute
+            //       分派的本体（那边写的是 switch (ClassifyAction(...))），于是「顺序错了」
+            //       这件事在这里就能钉死，不必真跑一个动作再反推它走了哪条路。
+            //   二、端到端层：照旧走真的 Execute()，但改观测「它有没有出声」——
+            //       静默失效的判据从来不是「产物没出来」，而是「什么都没告诉用户」。
+            //       这一层顺带覆盖了 switch 的 default 分支（从前那里是一条 break）。
             Line("");
-            Line("[3g] 端到端派发（Execute → TryGet → 执行体）");
+            Line("[3g] 端到端派发（Execute → ClassifyAction → 各分支）");
 
-            string dispatchOutput = Path.Combine(sandboxRoot, "builtin-dispatch-result.txt");
-            var dispatchProbe = new ActionItem
+            // 一、判据层。
+            //
+            // 遍历快照而不是手抄清单（理由同 [3f]）：内建表里现有几个、叫什么，它自己最清楚。
+            foreach (BuiltinActionRegistration builtinReg in BuiltinActionCatalog.SnapshotAll())
             {
-                Type = "Command",
-                Name = "自检用",
-                Parameter = $"echo dispatch-ok>\"{dispatchOutput}\"",
-                CommandTerminal = "cmd_hidden",
-            };
+                if (ActionExecutor.ClassifyAction(builtinReg.Type) != ActionExecutor.ActionDispatchKind.Builtin)
+                {
+                    Fail("派发判据",
+                        $"内建动作「{builtinReg.Type}」（{builtinReg.FullId}）的归属不是 Builtin —— " +
+                        "有别的分支抢在它前面，用户配好的这个动作不会执行到内建实现");
+                }
+
+                // 别名也要归到同一条路。别名解析靠 BuiltinActionCatalog.TryGet，
+                // 而 ClassifyAction 的第一个判断就是它 —— 这里顺带把这条依赖钉住。
+                foreach (string alias in builtinReg.Aliases)
+                {
+                    if (ActionExecutor.ClassifyAction(alias) != ActionExecutor.ActionDispatchKind.Builtin)
+                    {
+                        Fail("派发判据", $"内建动作别名「{alias}」（{builtinReg.FullId}）的归属不是 Builtin");
+                    }
+                }
+            }
+
+            // 已外移的类型绝不能还是 Builtin。
+            //
+            // 这里只断言「不是 Builtin」而不写死 SpecialCase：此刻认领表是不是空的，
+            // 取决于运行到这里的时机（[2] 装的是社区插件，它认领不了顶层类型，
+            // 所以正常情况下此刻表是空的）。把「非内建」和「已认领」两件事混在一条断言里，
+            // 会让它变脆 —— 而脆的断言最后都会被人删掉。
+            foreach (string migratedType in migratedTypes)
+            {
+                if (ActionExecutor.ClassifyAction(migratedType) == ActionExecutor.ActionDispatchKind.Builtin)
+                {
+                    Fail("派发判据",
+                        $"已外移的「{migratedType}」仍被判为内建动作 —— " +
+                        "它一定还留在 BuiltinActionCatalog 里（见 [3f] 的交割不变量）");
+                }
+            }
+
+            // switch 兜底那三类例外，以及谁都认不出来的类型，必须落在 SpecialCase。
+            // 前三个是契约；最后那个是 default 分支的入口，它决定「配置写错时会不会出声」。
+            foreach (string specialType in new[] { "Text", "String", "TileRestore", "Plugin", "这个类型不存在" })
+            {
+                if (ActionExecutor.ClassifyAction(specialType) != ActionExecutor.ActionDispatchKind.SpecialCase)
+                {
+                    Fail("派发判据", $"「{specialType}」应落在 switch 兜底，实际归属不是 SpecialCase");
+                }
+            }
+
+            if (ActionExecutor.ClassifyAction("   ") != ActionExecutor.ActionDispatchKind.SpecialCase
+                || ActionExecutor.ClassifyAction(null) != ActionExecutor.ActionDispatchKind.SpecialCase)
+            {
+                Fail("派发判据", "空白 / 空 Type 应落在 switch 兜底，由 default 分支出声报错");
+            }
+
+            // 二、端到端层：真的调 Execute()，只观测「有没有出声」。
+            //
+            // 没有通知汇时 NotifyUser 会静默降级为写日志（那正是它在无界面进程里的正确行为），
+            // 所以这里挂一个汇来接收。挂上之后**务必在 finally 里摘掉** ——
+            // 它是全局静态的，留着会让后面所有段落的提示都流进这个已经不再读的列表，
+            // 表面无异常、实际把后续观测悄悄吞掉。
+            var dispatchNotifications = new List<(string Title, string Message)>();
+            Action<string, string> dispatchSink = (title, message) => dispatchNotifications.Add((title, message));
+
+            int dispatchChecks = 0;
 
             try
             {
-                ActionExecutor.Execute(dispatchProbe);
+                PluginNotificationHub.Sink = dispatchSink;
 
-                for (int wait = 0; wait < 30 && !File.Exists(dispatchOutput); wait++)
+                // ① 认不出来的 Type：必须出声。
+                //
+                // 从前这里是一条 break —— 用户按下去什么都不会发生，也没有任何提示。
+                // 这条断言守的就是那次修复：判据可以兜底，但兜底绝不能是静默。
+                dispatchNotifications.Clear();
+                ActionExecutor.Execute(new ActionItem
                 {
-                    System.Threading.Thread.Sleep(100);
-                }
+                    Type = "自检用的未知类型",
+                    Name = "自检探针",
+                });
 
-                if (!File.Exists(dispatchOutput))
+                if (dispatchNotifications.Count == 0)
                 {
-                    Fail("端到端派发", $"经 Execute() 的探针没有产生产物（{dispatchOutput}）—— 内建动作没有被接走");
+                    Fail("端到端派发",
+                        "未知 Type 经 Execute() 之后没有任何提示 —— 用户看到的是「按下去没反应」，与配置错误无关");
                 }
                 else
                 {
-                    Line("  Execute → TryGet → 执行体：产物已生成 ✓");
+                    string unknownMessage = dispatchNotifications[dispatchNotifications.Count - 1].Message;
+
+                    if (unknownMessage.IndexOf("无法识别", StringComparison.Ordinal) < 0)
+                    {
+                        Fail("端到端派发", $"未知 Type 的提示里没说清是类型不认识，实际文案：{unknownMessage}");
+                    }
+                    else
+                    {
+                        Line($"  未知 Type：出声 ✓（{dispatchNotifications.Count} 条提示）");
+                        dispatchChecks++;
+                    }
+                }
+
+                // ② 内建动作的参数校验失败：必须出声，且必须是「先校验、再执行」。
+                //
+                // 这一条同时验证了判据层之外的东西：内建分支确实被接走了（没接走的话它会掉进
+                // default，提示文案会是「无法识别」而不是「必填」）。探针用空白 Parameter，
+                // 于是执行体根本不会被调用 —— 这正是它比旧探针好的地方：
+                // 拿一个**注定不会执行**的动作去验证派发，就不必再找了「真跑也无害」的动作。
+                dispatchNotifications.Clear();
+                ActionExecutor.Execute(new ActionItem
+                {
+                    Type = "Tile",
+                    Name = "自检探针",
+                    Parameter = "   ",
+                });
+
+                if (dispatchNotifications.Count == 0)
+                {
+                    Fail("端到端派发",
+                        "内建动作的参数为空时没有任何提示 —— 用户填漏一个必填项，按下去却什么都没有发生");
+                }
+                else if (dispatchNotifications[dispatchNotifications.Count - 1].Message.IndexOf("无法识别", StringComparison.Ordinal) >= 0)
+                {
+                    Fail("端到端派发", "内建动作掉进了 switch 的 default 分支 —— 内建优先这条判据没生效");
+                }
+                else
+                {
+                    Line($"  内建动作校验失败：出声 ✓（{dispatchNotifications.Count} 条提示）");
+                    dispatchChecks++;
+                }
+
+                // ③ 已外移的类型，在「认领表里没有它」的时点：必须出声，不能静默。
+                //
+                // 这一条正是外移动作最容易出的岔子。把动作从内建表里删掉、却没把认领建起来，
+                // 用户看到的现象与「这个动作从来没做过」完全一样；而这里能证明宿主至少说了话。
+                dispatchNotifications.Clear();
+                ActionExecutor.Execute(new ActionItem
+                {
+                    Type = "Command",
+                    Name = "自检探针",
+                    Parameter = "echo 不应被执行",
+                    CommandTerminal = "cmd_hidden",
+                });
+
+                if (dispatchNotifications.Count == 0)
+                {
+                    Fail("端到端派发",
+                        "已外移的类型在无人认领时静默无事 —— 用户完全无从判断是配置错了、还是动作包没装");
+                }
+                else
+                {
+                    string unclaimedMessage = dispatchNotifications[dispatchNotifications.Count - 1].Message;
+                    Line($"  已外移类型无人认领：出声 ✓（{unclaimedMessage}）");
+                    dispatchChecks++;
                 }
             }
             catch (Exception dispatchError)
             {
-                Fail("端到端派发", $"Execute 抛出异常：{dispatchError.Message}");
+                Fail("端到端派发", $"Execute 抛出异常：{dispatchError}");
+            }
+            finally
+            {
+                // 摘掉汇：它是全局的，留在那里会污染后面所有段落的观测。
+                PluginNotificationHub.Sink = null;
+
+                if (dispatchChecks == 3)
+                {
+                    Line("  三条端到端断言全部通过：判据正确，且三条异常路径都会出声");
+                }
             }
 
             // ---- 3h 随包分发的插件 ----
@@ -820,7 +885,7 @@ internal static class PluginSelfTest
             // ---- 3i 顶层类型认领 ----
             //
             // 这一段验的是「随包动作包接管用户配置里的顶层 Type」这条主干：
-            // Launch / WebUrl / Folder 从内建动作表里搬走、改由插件执行，
+            // Launch / WebUrl / Folder / Command / ShellTool 从内建动作表里搬走、改由插件执行，
             // 而用户配置一个字都不用改（Type 字符串仍是老样子）。
             //
             // 特意跑在这里而不是 [3c]：认领只对**随包**插件生效，而 [2] 走的是社区安装路径
@@ -851,6 +916,41 @@ internal static class PluginSelfTest
                 // 同一个理由，而且这里是硬需求：它会拿到 PluginActionRegistration
                 // （指向插件程序集里的类型实例）。
                 RunTypeClaimChecks(manifest, Line, Fail);
+
+                // ⑧ 认领建起来之后，判据要把这些类型送到 ClaimedType 这条路上去。
+                //
+                // [3g] 里断言的是「它们不是 Builtin」；这里补上另一半：认领生效之后，
+                // Execute() 必须真的把它们交给插件，而不是继续掉进 switch 的 default。
+                // 两段合起来才闭环 —— 只看 [3g] 的话，「从内建删了、认领也没建」同样能过。
+                int claimRouted = 0;
+                foreach (PluginTypeClaim claimed in manifest.ClaimedTypes)
+                {
+                    if (ActionExecutor.ClassifyAction(claimed.TypeName) == ActionExecutor.ActionDispatchKind.ClaimedType)
+                    {
+                        claimRouted++;
+                    }
+                    else
+                    {
+                        Fail("类型认领",
+                            $"已认领的「{claimed.TypeName}」经 Execute() 的判据仍然不是 ClaimedType —— " +
+                            "用户配好的这个动作不会走到插件实现");
+                    }
+                }
+
+                // 反向核对：认领表里不能有任何一项同时还是内建动作。
+                // RebuildClaimTable 里有一条「内建优先」的拒绝规则，这条断言就是它的守卫 ——
+                // 规则被删掉不会有任何编译错误，只会让同一个 Type 悄悄挂上两条路。
+                foreach (PluginHost.PluginTypeClaimBinding claimBinding in PluginHost.SnapshotClaims())
+                {
+                    if (BuiltinActionCatalog.TryGet(claimBinding.TypeName, out BuiltinActionRegistration claimedAlsoBuiltin))
+                    {
+                        Fail("类型认领",
+                            $"「{claimBinding.TypeName}」既在认领表里、又还在内建动作表里" +
+                            $"（{claimedAlsoBuiltin.FullId}）—— 内建优先的拒绝规则没生效");
+                    }
+                }
+
+                Line($"  认领判据：{claimRouted}/{manifest.ClaimedTypes.Count} 项经 Execute() 判据路由到插件 ✓");
 
                 // ⑦ 停用该随包插件之后：认领仍在（只有这样才能对用户说出「包被停用了」），
                 // 但可用性判断必须为 false，并给出可操作的文案 —— 绝不静默什么都不做。
@@ -898,6 +998,178 @@ internal static class PluginSelfTest
             if (Directory.Exists(sandboxScanRoot))
             {
                 Directory.Delete(sandboxScanRoot, recursive: true);
+            }
+
+            // ---- 3j 宿主服务面与能力门禁 ----
+            //
+            // 这一段验的是「插件干活时真正碰到的那两层宿主接口」，与具体插件无关，
+            // 所以刻意放在随包插件清理之后 —— 它不需要任何插件在场，也不加载程序集。
+            //
+            // 守的是一处**设计意图**，而不是某个具体实现：
+            // 「安装确认页上展示的能力，真的对应一个后果」。
+            //
+            // 必须在这里说清的是：门禁换来的**不是安全**。进程内插件本来就能自己
+            // Process.Start，SDK 拦不住 —— 它拦的只是「让宿主替你干活」这条路径。
+            // 用户看到「本插件需要「进程」能力」与「它其实什么都能干」之间的矛盾，
+            // 是进程内插件模型的固有代价；摊开写在这里，免得后来者以为这里守住了什么。
+            //
+            // 反过来，这条门禁要是漏了，插件清单里的能力声明就成了一句空话：
+            // 安装页照旧弹一个「需要「进程」能力」的确认框，用户点了同意，
+            // 而这个勾选在运行时没有任何对应物 —— 那才是真正骗人的地方。
+            Line("");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词）");
+
+            // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
+            //
+            // 后者会让宿主把插件整体标记为加载失败并卸载 —— 而「清单里漏了一行能力声明」
+            // 远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，
+            // 排查方向会完全跑偏。
+            if (typeof(PluginContractException).IsAssignableFrom(typeof(PluginCapabilityDeniedException)))
+            {
+                Fail("能力门禁",
+                    "PluginCapabilityDeniedException 继承了 PluginContractException —— " +
+                    "漏写一行能力声明会让整个插件被卸载，而用户看到的提示是「插件坏了」");
+            }
+
+            const string gateProbePluginId = "starpie.selftest.gate";
+            var deniedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.None);
+            var deniedShellService = new PluginShellService(gateProbePluginId, PluginCapability.None);
+
+            // ② 未声明 Process：必须拒绝。
+            //
+            // 探针传的是空命令 / 空动词 —— 但这一点都不影响结论：
+            // 门禁是 RequireCapability 的第一件事，排在「空值短路」之前，
+            // 所以被拒绝时命令根本没被分析过。更重要的是，它证明门禁确实在 Guard **之外** ——
+            // 若挪进 Guard 里，异常会被吞掉、转成一个 false 返回值，
+            // 用户看到的是「命令没执行」，而不是「本插件缺少「进程」能力」。
+            (bool commandDenied, string commandGateDetail) =
+                ProbeCapabilityGate(() => deniedCommandService.Run(""));
+
+            if (commandDenied)
+            {
+                Line($"  Commands.Run：{commandGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁", $"未声明 Process 的插件调用 Commands.Run 没有被正确拒绝：{commandGateDetail}");
+            }
+
+            (bool shellDenied, string shellGateDetail) =
+                ProbeCapabilityGate(() => deniedShellService.Invoke(""));
+
+            if (shellDenied)
+            {
+                Line($"  Shell.Invoke：{shellGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁", $"未声明 Process 的插件调用 Shell.Invoke 没有被正确拒绝：{shellGateDetail}");
+            }
+
+            // ③ 声明了 Process：同一个调用必须放行。
+            //
+            // 少了这一半，把门禁写成「永远拒绝」也能通过上面两条 ——
+            // 而那会让所有正常插件都废掉，且现象与「插件坏了」一模一样。
+            var allowedCommandService = new PluginCommandService(
+                gateProbePluginId, PluginCapability.Process | PluginCapability.FileSystem);
+
+            try
+            {
+                bool emptyCommandResult = allowedCommandService.Run("   ");
+
+                if (emptyCommandResult)
+                {
+                    Fail("能力门禁", "空命令竟然报告执行成功 —— 空值短路失效，用户会以为命令跑过了");
+                }
+                else
+                {
+                    Line("  已声明 Process：放行 ✓（空命令由空值短路拦下，未真的起进程）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁", $"已声明 Process 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 Process 的调用抛出异常：{gateError}");
+            }
+
+            // ④ 元数据不受门禁约束，这是刻意的。
+            //
+            // 插件的 Parameters 是属性，声明期（注册前）就要读这两份清单。
+            // 在那里抛异常，一个「忘了声明能力」的插件会在注册阶段整个崩掉 ——
+            // 而它其实只是不能在运行时干活而已。门禁拦的是**产生后果**的调用。
+            try
+            {
+                IReadOnlyList<CommandTerminalOption> terminals = deniedCommandService.Terminals;
+                IReadOnlyList<ShellVerbOption> shellVerbs = deniedShellService.Verbs;
+
+                if (terminals.Count == 0)
+                {
+                    Fail("宿主服务面", "终端清单为空 —— 「运行命令」动作的终端下拉会是空的，用户选不了终端");
+                }
+                else if (!terminals.Any(t => string.Equals(t.Id, "cmd", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Fail("宿主服务面", "终端清单里没有 \"cmd\" —— 动作的默认值在界面上选不中任何一项");
+                }
+                else if (terminals.Any(t => string.IsNullOrWhiteSpace(t.DisplayName)))
+                {
+                    Fail("宿主服务面", "终端清单里有显示名为空的项 —— 下拉里会出现一个没有文字的选项");
+                }
+                else if (terminals.Select(t => t.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != terminals.Count)
+                {
+                    Fail("宿主服务面", "终端清单里有重复的标识 —— 下拉选中项会错位到另一个终端上");
+                }
+                else
+                {
+                    Line($"  终端清单：{terminals.Count} 项，含 cmd ✓（未声明能力也能读，因为它不产生后果）");
+                }
+
+                // Shell 动词：用户配置里存的是短 ID（copy_path），不是 Verb（Windows.CopyAsPath）。
+                // 清单漏项不会有任何报错 —— 只会让那个动作在挑选器里找不到对应项。
+                if (shellVerbs.Count == 0)
+                {
+                    Fail("宿主服务面", "Shell 动词清单为空 —— 该动作的下拉会是空的");
+                }
+                else if (!shellVerbs.Any(v => string.Equals(v.Id, "copy_path", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Fail("宿主服务面",
+                        "Shell 动词清单里没有 \"copy_path\" —— 用户配置里存的就是这个短 ID，" +
+                        "少了它老配置在挑选器里找不到对应项（注意：清单要的是 Id，不是 Verb）");
+                }
+                else if (shellVerbs.Select(v => v.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != shellVerbs.Count)
+                {
+                    Fail("宿主服务面", "Shell 动词清单里有重复的标识 —— 选中项会错位");
+                }
+                else
+                {
+                    Line($"  Shell 动词清单：{shellVerbs.Count} 项，含 copy_path ✓");
+                }
+            }
+            catch (PluginCapabilityDeniedException deniedMeta)
+            {
+                Fail("宿主服务面",
+                    $"读元数据（终端 / 动词清单）被能力门禁拦下了（{deniedMeta.ServiceName}）—— " +
+                    "插件的 Parameters 是声明期就要读它的，这会让忘了声明的插件在注册阶段整个崩掉");
+            }
+
+            // ⑤ SDK 契约版本号的内部一致性。
+            //
+            // ApiVersion 是个手写常量：C# 的常量插值只对 string 常量成立，
+            // 这两个组成部分是 int，所以拼不出来（CS0133）。这处重复只能靠断言守。
+            // 漏改的表现极其隐蔽：插件按 ApiVersion 做兼容判断，而它和真实版本号对不上。
+            string expectedApiVersion = $"{PluginApi.ApiVersionMajor}.{PluginApi.ApiVersionMinor}";
+
+            if (!string.Equals(PluginApi.ApiVersion, expectedApiVersion, StringComparison.Ordinal))
+            {
+                Fail("SDK 契约",
+                    $"ApiVersion（{PluginApi.ApiVersion}）与主次版本号（{expectedApiVersion}）不一致 —— " +
+                    "两者手写在两处，改了其中一个却忘了另一个");
+            }
+            else
+            {
+                Line($"  SDK 契约版本：{PluginApi.ApiVersion} ✓（与主次版本号一致）");
             }
 
             // ---- 7 环境还原性检查 ----
@@ -1638,6 +1910,50 @@ internal static class PluginSelfTest
             fail("类型认领派发",
                 $"空参数的 {dispatchProbeAction.Type} 竟然报告成功 —— " +
                 "必填参数没有被拦下，用户的空动作会被当成合法配置执行");
+        }
+    }
+
+    /// <summary>
+    /// 跑一次「应当被能力门禁拒绝」的调用，把结论压成一行可读文本。
+    /// <para>
+    /// 三种结果必须分得清，否则这条断言等于没写：
+    /// <list type="number">
+    /// <item>抛了 <see cref="PluginCapabilityDeniedException"/> —— 门禁生效，再看它拦得够不够清楚；</item>
+    /// <item>抛了别的异常 —— 门禁没生效，是别的东西炸了；</item>
+    /// <item>正常返回 —— 门禁根本不存在。</item>
+    /// </list>
+    /// 只判「有没有抛异常」会把后两种混在一起，而它们的修法完全不同。
+    /// </para>
+    /// <para>
+    /// 「拦得清楚」的三条判据：能力必须是 <see cref="PluginCapability.Process"/>（不是别的）、
+    /// 异常类型不能是 <see cref="PluginContractException"/>（那会让插件被整体卸载）、
+    /// 消息里要给出修复动作（去清单里补一行，而不是「权限不足」四个字）。
+    /// </para>
+    /// </summary>
+    private static (bool Denied, string Detail) ProbeCapabilityGate(Func<bool> call)
+    {
+        try
+        {
+            bool accepted = call();
+            return (false, $"调用被直接放行（返回 {accepted}）—— 门禁不存在");
+        }
+        catch (PluginCapabilityDeniedException denied)
+        {
+            if (denied.Capability != PluginCapability.Process)
+            {
+                return (false, $"拒绝时归因的能力是 {denied.Capability}，应为 Process");
+            }
+
+            if (!denied.Message.Contains("capabilities", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, $"拒绝消息里没说清该怎么修（未提到清单里的 capabilities 数组）：{denied.Message}");
+            }
+
+            return (true, $"已拒绝（{denied.ServiceName} / {denied.Capability}）");
+        }
+        catch (Exception other)
+        {
+            return (false, $"抛出的不是 PluginCapabilityDeniedException，而是 {other.GetType().Name}：{other.Message}");
         }
     }
 

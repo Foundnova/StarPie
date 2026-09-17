@@ -46,6 +46,10 @@ internal sealed class PluginNotificationService : INotificationService
 /// <summary>宿主环境信息实现。</summary>
 internal sealed class PluginHostInfo : IHostInfo
 {
+    private readonly PluginCapability _capabilities;
+
+    public PluginHostInfo(PluginCapability capabilities) => _capabilities = capabilities;
+
     public string HostVersion => PluginManifestReader.HostVersion;
 
     public string ApiVersion => PluginApi.ApiVersion;
@@ -79,6 +83,14 @@ internal sealed class PluginHostInfo : IHostInfo
             }
         }
     }
+
+    /// <summary>
+    /// 读的是<b>本插件自己的清单</b>，不是宿主的全局开关。所以插件可以在
+    /// <c>Initialize</c> 里问一句「我有没有 Process 能力」，据此决定注册一个能用的动作、
+    /// 还是注册一个点了就告诉用户「本插件需要「进程」能力」的动作 ——
+    /// 后者比让那次动作在运行时抛异常友好得多。
+    /// </summary>
+    public bool HasCapability(PluginCapability capability) => (_capabilities & capability) == capability;
 }
 
 /// <summary>UI 线程调度。UI 不可用时降级为「直接执行」或「静默忽略」，绝不抛异常。</summary>
@@ -261,6 +273,181 @@ internal sealed class PluginHostActionInvoker : IHostActionInvoker
         catch (Exception ex)
         {
             AppLogger.LogError($"[plugin:{_pluginId}] 宿主动作服务 {operation} 执行失败", ex);
+            return false;
+        }
+    }
+}
+
+/// <summary>
+/// 命令执行服务实现。
+/// <para>
+/// 它是 SDK 里唯一「参数即任意命令」的攻击面，所以是本项目<b>唯一带真实门禁</b>的服务：
+/// 插件清单没声明 <see cref="PluginCapability.Process"/> 时，<see cref="Run"/> 直接抛
+/// <see cref="PluginCapabilityDeniedException"/>，绝不静默降级。
+/// </para>
+/// <para>
+/// 元数据（<see cref="Terminals"/>）刻意<b>不</b>受门禁约束：插件的 <c>Parameters</c> 属性
+/// 声明期就要读它，若在这里抛异常，一个「忘了声明能力」的插件会在注册阶段就崩掉，
+/// 而它其实只是不能在运行时干活而已。门禁拦的是<b>产生后果</b>的调用。
+/// </para>
+/// </summary>
+internal sealed class PluginCommandService : IHostCommandService
+{
+    private readonly string _pluginId;
+    private readonly PluginCapability _capabilities;
+
+    public PluginCommandService(string pluginId, PluginCapability capabilities)
+    {
+        _pluginId = pluginId;
+        _capabilities = capabilities;
+    }
+
+    /// <summary>
+    /// 终端标识与其词条键。<b>顺序即宿主动作编辑器里的下拉顺序</b>（可见项在前、隐藏变体在后）。
+    /// <para>
+    /// 这是终端清单的<b>唯一来源</b>：外移后的「运行命令」动作（<c>CommandAction</c>）直接
+    /// 从 <see cref="Terminals"/> 取这份清单，不在插件里另抄一份 —— 所以不存在
+    /// 「宿主改了下拉、插件没跟上」这种漂移，切换语言时也是两边同时变。
+    /// </para>
+    /// </summary>
+    private static readonly (string Id, string TextKey)[] TerminalCatalog =
+    {
+        ("cmd", "TerminalCmd"),
+        ("powershell", "TerminalPowerShell"),
+        ("wsl", "TerminalWsl"),
+        ("cmd_hidden", "TerminalCmdHidden"),
+        ("powershell_hidden", "TerminalPowerShellHidden"),
+        ("wsl_hidden", "TerminalWslHidden"),
+    };
+
+    public IReadOnlyList<CommandTerminalOption> Terminals
+    {
+        get
+        {
+            // 每次访问都重新取词条：I18n 的当前语言可以在运行时切换，缓存住的话
+            // 用户切到英文之后下拉里还是中文。这里只有 6 项，重算的代价可以忽略。
+            var list = new List<CommandTerminalOption>(TerminalCatalog.Length);
+            foreach ((string id, string textKey) in TerminalCatalog)
+            {
+                list.Add(new CommandTerminalOption { Id = id, DisplayName = I18n.T(textKey) });
+            }
+            return list;
+        }
+    }
+
+    public bool Run(string command, string terminal = "cmd")
+    {
+        RequireCapability(nameof(IHostCommandService));
+        if (string.IsNullOrWhiteSpace(command)) return false;
+
+        return Guard(nameof(Run), () => ActionExecutor.ExecuteCommand(command, terminal ?? "cmd"));
+    }
+
+    private void RequireCapability(string serviceName)
+    {
+        if ((_capabilities & PluginCapability.Process) != 0) return;
+
+        // 先落日志再抛：异常可能被插件自己的 catch 吞掉，而日志是排查的第一现场。
+        AppLogger.LogError(
+            $"[plugin:{_pluginId}] 调用了 {serviceName}，但清单未声明 Process 能力，调用被拒绝。");
+
+        throw new PluginCapabilityDeniedException(PluginCapability.Process, serviceName, _pluginId);
+    }
+
+    private bool Guard(string operation, Func<bool> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (Exception ex)
+        {
+            // 与 PluginHostActionInvoker 同一条纪律：插件经宿主服务触发的任何异常都不允许
+            // 冒泡到 ActionExecutor.Execute —— 那里会弹 MessageBox 卡住动作线程。
+            AppLogger.LogError($"[plugin:{_pluginId}] 宿主命令服务 {operation} 执行失败", ex);
+            return false;
+        }
+    }
+}
+
+/// <summary>
+/// Shell 上下文动词服务实现。
+/// <para>
+/// 门禁与 <see cref="PluginCommandService"/> 相同（<see cref="PluginCapability.Process"/>）——
+/// 这批动词里既有以 UAC 提权启动进程的 <c>Windows.RunAs</c>，也有清空回收站这类不可撤销的操作，
+/// 用同一个判据拦住是合适的粗粒度做法。
+/// </para>
+/// </summary>
+internal sealed class PluginShellService : IHostShellService
+{
+    private readonly string _pluginId;
+    private readonly PluginCapability _capabilities;
+
+    public PluginShellService(string pluginId, PluginCapability capabilities)
+    {
+        _pluginId = pluginId;
+        _capabilities = capabilities;
+    }
+
+    /// <summary>
+    /// 把宿主挑选器的清单投影成 SDK 选项。
+    /// <para>
+    /// <b>取 <c>Id</c> 而不是 <c>Verb</c></b>：用户配置里存进 <c>Parameter</c> 的是短 ID
+    /// （<c>copy_path</c>），而 <c>Verb</c>（<c>Windows.CopyAsPath</c>）是执行体 switch 里的规范名。
+    /// 传错这一个字段，动作会静默无效 —— 因为 switch 的 default 分支是空的。
+    /// </para>
+    /// <para>
+    /// <c>Title</c> 目前是清单里硬编码的中文（宿主挑选器自己也是这么显示的），
+    /// 所以 <see cref="ShellVerbOption.DisplayName"/> 在英文环境下同样是中文。
+    /// 这是<b>宿主挑选器既有的缺陷</b>，不在本轮范围内；这里刻意与它保持一致 ——
+    /// SDK 与宿主界面显示同一功能的两个名字，是比中文更糟的问题。
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<ShellVerbOption> Verbs
+    {
+        get
+        {
+            var list = new List<ShellVerbOption>();
+            foreach (ShellToolItem item in ShellActionPickerWindow.ShellTools)
+            {
+                if (string.IsNullOrWhiteSpace(item.Id)) continue;
+                list.Add(new ShellVerbOption { Id = item.Id.Trim(), DisplayName = item.Title ?? "" });
+            }
+            return list;
+        }
+    }
+
+    public bool Invoke(string verb)
+    {
+        RequireCapability(nameof(IHostShellService));
+        if (string.IsNullOrWhiteSpace(verb)) return false;
+
+        // 返回 true 的语义刻意保守：只表示「宿主接受了这次调用」。
+        // ExecuteShellTool 是 33 个分支的 switch，其中不少分支在上下文不适用时静默 return
+        // （例如 Windows.RunAs 时没选中可执行文件），它本身不产生失败信号 ——
+        // 与其在这里编一个不可靠的成功/失败判断，不如把语义如实写窄。
+        return Guard(nameof(Invoke), () => { ActionExecutor.ExecuteShellTool(verb); return true; });
+    }
+
+    private void RequireCapability(string serviceName)
+    {
+        if ((_capabilities & PluginCapability.Process) != 0) return;
+
+        AppLogger.LogError(
+            $"[plugin:{_pluginId}] 调用了 {serviceName}，但清单未声明 Process 能力，调用被拒绝。");
+
+        throw new PluginCapabilityDeniedException(PluginCapability.Process, serviceName, _pluginId);
+    }
+
+    private bool Guard(string operation, Func<bool> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError($"[plugin:{_pluginId}] 宿主 Shell 服务 {operation} 执行失败", ex);
             return false;
         }
     }

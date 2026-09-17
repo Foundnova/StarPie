@@ -80,6 +80,8 @@ g:\Users\2 Better\Desktop\design\
 │   │   └── GlassmorphismRenderer.cs   # 液态毛玻璃渲染器
 │   └── Plugin/                    # ★ 插件系统宿主实现（详见 3.7）
 │       ├── PluginHost.cs              # 执行/校验/安装的唯一入口接缝
+│       ├── BuiltinActionCatalog.cs    # 内建动作静态表（编译期注册，不加载任何程序集）
+│       ├── BuiltinActions/             # 内建动作实现，一个动作一个文件（与插件同一个接口）
 │       ├── PluginCatalog.cs           # 贡献点注册表 + 注册会话（暂存→提交的原子性）
 │       ├── PluginLoadContext.cs       # 可回收 ALC（停用即卸载，需重启比例是硬指标）
 │       ├── PluginInstance.cs          # 单个插件的运行时状态机与加载计量
@@ -96,19 +98,19 @@ g:\Users\2 Better\Desktop\design\
 │       ├── PluginPaths.cs             # 插件目录/清单/日志/便携模式判定
 │       ├── PluginRegistryStore.cs     # 启用状态与哈希登记（registry.json）
 │       ├── PluginLogger.cs            # 按插件分文件的日志
-│       ├── PluginContext.cs           # IPluginContext 实现 + 能力门禁 + 词条注册表
-│       └── PluginHostServices.cs      # 动作执行/窗口/剪贴板/通知等宿主服务实现
+│       ├── PluginContext.cs           # IPluginContext 实现（装配宿主服务与元数据）
+│       └── PluginHostServices.cs      # 动作执行/命令/Shell 动词/窗口/剪贴板/通知等宿主服务实现
 ├── StarPie.Plugin.Abstractions/   # ★ 插件 SDK 契约层（插件唯一允许引用的 StarPie 程序集）
 │   ├── IStarPiePlugin.cs          # 插件入口契约（Initialize / Shutdown）
 │   ├── IPluginContext.cs          # 插件可见的宿主能力集合
 │   ├── Actions.cs                 # ActionDescriptor / ParameterField / ActionResult
 │   ├── Registries.cs              # 动作、图标、词条注册表契约
-│   ├── Services.cs                # 宿主服务契约（窗口、剪贴板、通知、事件）
+│   ├── Services.cs                # 宿主服务契约（命令、Shell 动词、窗口、剪贴板、通知、事件）
 │   ├── PluginManifest.cs          # plugin.json 清单模型
 │   ├── PluginMetadata.cs          # 程序集元数据兜底模型
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
 ├── plugins/                       # ★ 随包动作包（与主程序同源构建，随发行包分发到 程序目录\plugin\）
-│   └── StarPie.Plugin.BasicActions/  # S1：启动程序 / 打开网址 / 打开文件夹（认领顶层类型 Launch / WebUrl / Folder）
+│   └── StarPie.Plugin.BasicActions/  # S1：启动程序 / 打开网址 / 打开文件夹；S2：运行命令 / 系统与右键工具（认领顶层类型 Launch / WebUrl / Folder / Command / ShellTool）
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
 │   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
@@ -233,7 +235,7 @@ g:\Users\2 Better\Desktop\design\
   3. 覆盖安装裸 DLL 前要**清掉上一次的载荷**（程序集与清单），否则目录里留下两枚业务 dll 会让「唯一业务 dll」的识别约定失效；但必须**保留 `data\` 与 `settings.json`** —— 更新一次版本不该清空用户数据。
 - **`PluginInstance` 的两个目录属性不能混用**：`ManagedDirectory` 是宿主拥有的安装目录（删除/改名/写入只能用它）；`Directory` 仅供展示（外部路径登记时返回 `ExternalPath` **所在目录**）。历史上只有 `Directory` 一个属性，而外部登记分支返回的其实是**dll 文件路径**，当时只是靠 `Directory.Exists(文件路径)` 恒为 `false` 才「恰好」没把开发者的输出目录删掉。现在 `Uninstall` 走 `IsExternal` 分支：外部登记只摘登记、不碰磁盘。
 - **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
-- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 真实调用 → 停用并核对 ALC 回收 → 卸载 → 顶层类型认领（`[3i]`）→ 环境还原。
+- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 内建动作批量接缝（`[3f]`）→ 端到端派发判据（`[3g]`）→ 随包插件三条规则（`[3h]`）→ 顶层类型认领（`[3i]`）→ 宿主服务面与能力门禁（`[3j]`）→ 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
   - **自检整体跑在临时沙箱里**：`PluginPaths.OverrideRootsForTesting` 会把两个根目录钉到 `%TEMP%\StarPie-PluginSelfTest-<随机>\`，跑完即删。**`Configure` 见到根目录已被钉住必须直接返回**，否则沙箱会被覆盖回真实目录，自检就成了「每跑一次回归就动一次用户已装插件」。
   - **附加 `--skip-invoke` 可跳过第 [4] 段真实调用**：那一节会真的下发键鼠/调节系统状态（实测会把屏幕亮度推高 10%）。日常只关心识别、注册与接缝结论的回归应带上这个开关。
   - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
@@ -250,6 +252,23 @@ g:\Users\2 Better\Desktop\design\
   - **参数零迁移**：认领类型的动作在配置里仍是老形态，参数散在 `ActionItem` 裸字段上，由宿主 `ActionParameterProjection`（**显式白名单，不是反射**）现读现装成字典；键名的事实来源是 SDK 侧常量类 `HostActionFields`，用 `const` 是为了让宿主改名时插件侧变成**编译错误**而不是运行期读到空值。只投影动作参数，**不投影外观字段**（`Name` / `IconKey` / `CustomTextColor` …）。
   - **保留 ID 前缀（`starpie.*` 等）的检查只在「进入系统」那一刻做**（扫描 / 导入），放行条件是「来自只读来源区」或「该插件已登记」。**装载路径不得复查**（`ScanInstalledPlugin(dir, allowReservedIdPrefix: true)`）—— 否则同一枚随包 DLL 会「装得上、永远起不来」，而报错还指着 ID 说事，与真实原因毫无关系。边界查一次，系统内部不复查。
   - **认领类型的失败上报走插件路径**（日志 + 托盘气泡），**不弹 `MessageBox`**。判据是「代码是否在独立程序集里」，不是「是否官方」：内建动作是用户亲手配的，失败要立刻打断他；认领类型已是插件，异常冒泡到 `ActionExecutor.Execute` 的 `catch` 会把无人值守的动作线程卡死在对话框上。
+- **派发顺序是一个可断言的纯判据**：`ActionExecutor.Execute` 的分派本体是 `switch (ClassifyAction(action.Type))`，三条路的顺序（内建 → 认领 → `switch` 兜底）**不可调换**。抽出 `ClassifyAction`（纯函数，返回 `ActionDispatchKind`）的唯一理由是让「顺序本身可被断言」：顺序错了的现象是「界面一切正常、按下去却走了另一条路」，从现象根本反推不出来，而原先那种「跑一个动作看产物」的验证法在动作陆续外移之后已经找不到无害探针了。**改了 `Execute` 的分派就必须同步改 `ClassifyAction`**，否则自检验证的是空气。
+- **`[3f]`/`[3g]` 的断言要数据驱动，但设计意图必须写死**：
+  - 内建动作清单从 `BuiltinActionCatalog.SnapshotAll()` 生成，**不在自检里手抄一份**。手抄的成本已经显现过：动作每外移一个就得有人记得删一行，忘了删的表现是自检报「某动作不在内建动作表里」—— 而那恰恰是**预期行为**。「预期的事被报成缺陷」比不报更坏，它会训练人忽略这条消息。
+  - 反过来，「哪些类型**不该**留在内建表里」必须**写死成独立断言**（`migratedTypes`）：那表达的是设计意图，无法从快照推导。同一份清单在 `[3f]`（不得还在内建表里）与 `[3g]`（不得被判为 `Builtin`）各断言一次 —— 只做一次的话，「从内建删了、认领也没建」同样能过。
+  - **`[3g]` 观测的是「有没有出声」，不是「有没有产物」**。静默失效的判据从来不是「产物没出来」，而是「什么都没告诉用户」。探针挂 `PluginNotificationHub.Sink` 收提示，用**注定不会执行**的动作（未知 Type、空必填项）去验派发 —— 这样不必再去找「真跑也无害」的动作（已经一个不剩了）。**用完必须在 `finally` 里摘掉汇**：它是全局静态的，留着会让后续所有段落的提示悄悄流进一个已经没人读的列表。
+- **能力门禁（Capability Gate）：`PluginCapability.Process` 有真实强制点**：
+  - 带门禁的是那两个「参数即任意字符串」的服务 —— `IHostCommandService.Run` 与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）。清单未声明 `Process` 时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
+  - **门禁必须在 `Guard` 之外**。若挪进 `Guard` 里，异常会被吞掉、转成一个 `false` 返回值，用户看到的是「命令没执行」而不是「本插件缺少「进程」能力」—— 前者会被当成软件 bug 反复报，后者才指向真正该改的地方。
+  - **元数据（`Terminals` / `Verbs`）刻意不受门禁约束**：插件的 `Parameters` 是属性、声明期（注册前）就要读这两份清单，在那里抛异常会让一个「忘了声明能力」的插件在注册阶段整个崩掉 —— 而它其实只是不能在运行时干活而已。**门禁拦的是「产生后果」的调用**。
+  - **`PluginCapabilityDeniedException` 刻意不继承 `PluginContractException`**：后者的语义是「违反注册契约」，宿主会因此把插件整体标记为加载失败并卸载；而「清单里漏了一行能力声明」远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，排查方向会完全跑偏。
+  - **必须说清它换来的不是安全**：进程内插件本来就能自己 `Process.Start`，SDK 拦不住。门禁换到的是「安装确认页上展示的能力真的对应一个后果」—— 漏掉它，那个勾选在运行时没有任何对应物，才是真正骗人的地方。
+  - **只能加在新接口上**。`IHostActionInvoker` 的七个方法是既有契约，补门禁会让已发布、未声明该能力的插件突然失败（破坏性变更）。
+- **宿主服务面的元数据必须只有一份来源**：`PluginCommandService.Terminals` 是终端清单的**唯一事实来源**（外移后的「运行命令」动作直接读它，不在插件里另抄一份），所以不存在「宿主改了下拉、插件没跟上」的漂移。**每次访问都重取词条、不缓存** —— `I18n` 的当前语言可以在运行时切换，缓存住的话用户切到英文之后下拉里还是中文。
+  - 同理 `PluginShellService.Verbs` 取 `ShellToolItem.Id`（`copy_path`）而不是 `Verb`（`Windows.CopyAsPath`）：用户配置里存的是短 ID，而 `Verb` 是执行体 `switch` 里的规范名。**传错这一个字段，动作会静默无效** —— 因为 `ExecuteShellTool` 的 `default` 分支是空的。
+  - **`Verbs` 不是白名单**：`ExecuteShellTool` 的每个功能同时接受 `Id` 与 `Verb` 两套命名，按清单校验会把另一套命名的老配置整体判死。它只用来做下拉与展示。
+  - **ShellTool 的参数刻意声明成自由文本而不是 `Enum`**：它的正式入口是带搜索/分类的 `ShellActionPickerWindow`，压进通用下拉是体验降级、还会让清单出现两份；而执行体接受两套命名，按清单校验会判死老配置。
+- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。当前契约版本 **1.1**（1.0 → 1.1 新增：能力门禁 + `IHostCommandService` / `IHostShellService` + `IHostInfo.HasCapability`）。
 
 ---
 

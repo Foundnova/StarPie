@@ -36,6 +36,22 @@ public interface IPluginContext
     /// <summary>宿主已验证的动作能力（发快捷键 / 启程序 / 剪贴板 / 开网址）。</summary>
     IHostActionInvoker Host { get; }
 
+    /// <summary>
+    /// 命令执行（在指定终端里跑一段命令）。
+    /// <para>
+    /// 需要 <see cref="PluginCapability.Process"/> 能力，否则调用抛
+    /// <see cref="PluginCapabilityDeniedException"/>。想优雅降级就先问
+    /// <see cref="IHostInfo.HasCapability"/>。
+    /// </para>
+    /// </summary>
+    IHostCommandService Commands { get; }
+
+    /// <summary>
+    /// Shell 上下文动词（对活动资源管理器窗口的选中项执行操作）。
+    /// 与 <see cref="Commands"/> 一样需要 <see cref="PluginCapability.Process"/> 能力。
+    /// </summary>
+    IHostShellService Shell { get; }
+
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 

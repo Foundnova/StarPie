@@ -264,6 +264,53 @@ public static class ActionExecutor
 		}
 	}
 
+	/// <summary>
+	/// 一个动作在 <see cref="Execute"/> 里的分派归属。
+	/// </summary>
+	internal enum ActionDispatchKind
+	{
+		/// <summary>由宿主程序集内的内建动作表提供（编译期静态注册，不加载任何程序集）。</summary>
+		Builtin,
+
+		/// <summary>由随包插件认领的顶层类型（例如 <c>Type="Launch"</c> 归基础动作包）。</summary>
+		ClaimedType,
+
+		/// <summary>
+		/// <c>switch</c> 里剩下的三类例外：<c>Text</c> / <c>String</c>（未收敛）、
+		/// <c>TileRestore</c>（历史遗留 Type）、<c>Plugin</c>（插件动作）。
+		/// <b>认不出来的 Type 也落在这里</b>，由那个 <c>default</c> 分支出声报错。
+		/// </summary>
+		SpecialCase,
+	}
+
+	/// <summary>
+	/// 判定一个动作该走哪条路。<b>这个判据就是 <see cref="Execute"/> 分派的本体</b>。
+	/// <para>
+	/// <b>为什么单独抽出来</b>：「内建优先 → 认领其次 → switch 兜底」这条顺序本身是契约，
+	/// 而顺序错了的表现是「界面一切正常、按下去却走了另一条路」—— 从现象根本反推不出来。
+	/// 抽成纯函数后，自检可以直接断言每一类 Type 的归属，不必真跑一个动作再猜它走了哪条路
+	/// （原先那种做法还有个副作用：它必须找一个「真跑也无害」的动作，而随着动作陆续外移，
+	/// 这样的动作已经一个不剩了）。
+	/// </para>
+	/// <para>
+	/// 改了 <see cref="Execute"/> 的分派就必须同步改这里，否则自检验证的是空气。
+	/// </para>
+	/// </summary>
+	internal static ActionDispatchKind ClassifyAction(string? type)
+	{
+		if (Plugins.BuiltinActionCatalog.TryGet(type, out _))
+		{
+			return ActionDispatchKind.Builtin;
+		}
+
+		if (Plugins.PluginHost.TryResolveClaimedType(type, out _))
+		{
+			return ActionDispatchKind.ClaimedType;
+		}
+
+		return ActionDispatchKind.SpecialCase;
+	}
+
 	public static void Execute(ActionItem action)
 	{
 		if (action == null)
@@ -274,24 +321,29 @@ public static class ActionExecutor
 		{
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
 
-			// 【内建动作 · 统一接缝】
-			// 内建动作在这里被统一接走：查目录 → 投影参数 → 校验 → ExecuteAsync。
-			// 目录是编译期静态注册的，不经过扫描、安装与 AssemblyLoadContext ——
-			// 这正是「不装插件时零开销」那条红线的前提。
-			if (Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtinAction))
+			// 【分派：三条路，顺序不可调换】
+			//
+			//   一、内建动作表 —— 宿主程序集内的静态表，编译期注册，不经过扫描 / 安装 / ALC。
+			//       这是「不装插件时零开销」那条红线的前提。
+			//   二、随包插件的顶层类型认领 —— 这些动作在用户配置里仍是 Type="Launch"
+			//       这种老形态，走不到下面 switch 的 "Plugin" 分支，所以必须在 switch 之前。
+			//       认领表在启动期就建好（只读登记表，不加载任何程序集），这里只做一次字典命中：
+			//       轮盘触发路径上不允许出现任何 IO 或程序集加载。
+			//   三、switch 兜底 —— 只剩 Text/String、TileRestore、Plugin 三类。
+			//
+			// 判据抽在 ClassifyAction 里，是为了让<b>顺序本身可被断言</b>：「顺序错了」的表现是
+			// 界面一切正常、按下去却走了另一条路，从现象根本反推不出来；抽成纯函数之后，
+			// 自检可以直接断言每一类 Type 的归属，不必真跑一个动作再猜它走了哪条路。
+			// 改了这里就必须同步改 ClassifyAction，否则自检验证的是空气。
+			switch (ClassifyAction(action.Type))
 			{
+			case ActionDispatchKind.Builtin:
+				Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtinAction);
 				ExecuteBuiltinActionItem(action, builtinAction);
 				return;
-			}
 
-			// 【随包动作包 · 顶层类型认领接缝】
-			// 认领了顶层类型的随包插件（如「基础动作包」认领 Launch / WebUrl / Folder）在
-			// 用户配置里仍然是 Type="Launch" 这种老形态，走不到下面 switch 的 "Plugin" 分支，
-			// 所以这一步必须在 switch 之前。
-			// 认领表在启动期就建好了（只读登记表，不加载任何程序集），这里只做一次字典命中 ——
-			// 轮盘触发路径上不允许出现任何 IO 或程序集加载。
-			if (Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginHost.PluginTypeClaimBinding claim))
-			{
+			case ActionDispatchKind.ClaimedType:
+				Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginHost.PluginTypeClaimBinding claim);
 				ExecuteClaimedActionItem(action, claim);
 				return;
 			}
@@ -387,9 +439,8 @@ public static class ActionExecutor
 			Context = new StarPie.Plugin.ActionContext(),
 		};
 
-		// 同步等待：本方法跑在唯一的动作线程上，而内建动作的实现被约定为「全程同步」
-		// （见 BuiltinActionCommand.ExecuteAsync 的线程约束说明），
-		// 因此这里不会与别的上下文互相卡死。
+		// 同步等待：本方法跑在唯一的动作线程上，而每个内建动作的实现都被约定为「全程同步」
+		// （逐个动作的 ExecuteAsync 里都写着这条线程约束），因此这里不会与别的上下文互相卡死。
 		var result = registration.Contribution
 			.ExecuteAsync(input, CancellationToken.None)
 			.GetAwaiter()
@@ -878,7 +929,22 @@ public static class ActionExecutor
 		}
 	}
 
-	public static void ExecuteShellTool(string verb)
+	/// <summary>
+	/// 对<b>当前活动的资源管理器窗口及其选中项</b>执行一个上下文动词
+	/// （复制路径、以管理员身份运行、在此处打开终端…）。
+	/// <para>
+	/// 调用方是随包动作包（经 <c>PluginShellService</c>）—— 原先的内建动作
+	/// <c>BuiltinActionShellTool</c> 已外移到那里。可见性随之从 <c>public</c>
+	/// 收窄到 <c>internal</c>：它不再有宿主 UI 侧的调用者。
+	/// </para>
+	/// <para>
+	/// <b>刻意保持 void，不改成 bool</b>：下面 33 个分支里有相当一部分在上下文不适用时
+	/// 静默 <c>return</c>（例如「以管理员身份运行」时前台没有选中可执行文件），
+	/// 方法本身不产生失败信号。改成 bool 就得在这里编一个不可靠的成功判断 ——
+	/// 不如让调用方如实知道「我唯一能确定的是这次调用被接受了」。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteShellTool(string verb)
 	{
 		if (string.IsNullOrWhiteSpace(verb)) return;
 		AppLogger.LogInfo($"Executing ShellTool verb: '{verb}'");
@@ -1513,17 +1579,23 @@ public static class ActionExecutor
 	/// <summary>
 	/// 在指定终端里执行一条命令（cmd / PowerShell / WSL），可带窗口也可无窗口。
 	/// <para>
-	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「运行命令」的实现
-	/// （<c>Plugins.BuiltinActions.BuiltinActionCommand</c>）现在也走这条路。
-	/// 统一的是动作的<b>形状</b>（描述 / 参数 / 校验 / 执行入口），执行体本身不搬家 ——
-	/// 把 2500 行的执行器按动作拆成九个文件是纯搬运，回归面极大而收益有限。
+	/// 调用方是<b>随包动作包</b>（经 <c>PluginCommandService</c>）—— 原先的内建动作
+	/// <c>BuiltinActionCommand</c> 已外移到那里。所以本方法<b>刻意不弹对话框</b>：
+	/// 插件侧的失败语义必须是「可诊断、可忽略」，而 MessageBox 会在无人值守时
+	/// 把动作线程永久卡死。失败只记日志并返回 false，要不要告知用户由调用方决定。
+	/// </para>
+	/// <para>
+	/// 这相对它作为内建动作时的行为是一处<b>用户可感知的变化</b>：命令启动失败从
+	/// 「弹出的对话框」降级为「日志 + 托盘气泡」。这是动作搬进独立程序集的必然结果 ——
+	/// 判据是「代码是否在独立程序集里」，而不是「是否官方」。
 	/// </para>
 	/// </summary>
-	internal static void ExecuteCommand(string command, string? terminal)
+	/// <returns>是否成功<b>发起</b>。只代表进程被拉起，不代表命令本身执行成功。</returns>
+	internal static bool ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
 		{
-			return;
+			return false;
 		}
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
 		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
@@ -1560,11 +1632,13 @@ public static class ActionExecutor
 				});
 				break;
 			}
+
+			return true;
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
-			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
+			return false;
 		}
 	}
 
