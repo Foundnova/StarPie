@@ -565,6 +565,43 @@ internal sealed class PluginWindowService : PluginGatedService, IHostWindowServi
 }
 
 /// <summary>
+/// 屏幕截取服务实现。
+/// <para>
+/// 门禁是 <see cref="PluginCapability.ScreenCapture"/>：截屏是隐私敏感的能力，
+/// 安装确认页上必须让用户看见「它会看到我的屏幕」这件事，而不是藏在一句「界面」里。
+/// </para>
+/// <para>
+/// <b>为什么返回 <c>void</c></b>：框选要等用户操作、识别更是异步的，这个调用根本无法同步
+/// 取得结论。返回 <c>bool</c> 只能表示「宿主已受理」，而它是一个很容易被误读成
+/// 「识别成功了吗」的假信号 —— 所以这里宁可什么都不返回。
+/// </para>
+/// <para>
+/// 它是<b>唯一</b>一个不返回布尔的宿主动作服务：其余十几个（<c>Run</c> / <c>Invoke</c> /
+/// <c>ApplyLayout</c> / <c>SetOpacity</c> …）返回的都是「这件事做成了没有」，
+/// 那句话对命令、对窗口成立，对「发起一次框选截屏」不成立。
+/// 自检那边为此单独加了一个 void 专用的门禁探针（<c>ProbeVoidCapabilityGate</c>），
+/// 而不是把返回值硬凑成 <c>false</c> 塞进原来那个 —— 那样打印出来的
+/// 「调用被直接放行（返回 False）」会把一个捏造的布尔值混进结论里。
+/// </para>
+/// </summary>
+internal sealed class PluginScreenCaptureService : PluginGatedService, IHostScreenCaptureService
+{
+    public PluginScreenCaptureService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.ScreenCapture, nameof(IHostScreenCaptureService))
+    {
+    }
+
+    public void CaptureAndRecognize()
+    {
+        RequireCapability();
+
+        // 执行体内部是 Task.Run 起来的异步流程（开头还有一个 35ms 的等待，
+        // 目的是别把尚未淡出干净的轮盘截进全屏图里），所以这里只负责「发起」。
+        Guard(nameof(CaptureAndRecognize), () => { OcrManager.StartCaptureAndRecognize(); return true; });
+    }
+}
+
+/// <summary>
 /// 宿主事件订阅实现。
 /// <para>
 /// <b>所有订阅都必须返回可释放 token</b>，因为订阅链是「宿主静态事件 → 插件实例」，

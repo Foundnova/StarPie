@@ -378,3 +378,31 @@ public interface IHostWindowService
     /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
     bool ActivateTaskbarSlot(int slotIndex);
 }
+
+/// <summary>
+/// 屏幕截取服务。
+/// <para>
+/// 它目前只做一件事：让用户现场框选一块屏幕区域、识别其中的文字，结果按宿主的 OCR 设置处理
+/// （复制到剪贴板 / 弹出结果窗口等）。刻意做成「一个动作一个方法」的形状 ——
+/// 这是为那个动作外移而生的接缝，不是通用截图 API：真要做通用截图能力，
+/// 区域表达、图片格式、返回值都是另一套设计，届时单独添加而不是把这个撑大。
+/// </para>
+/// </summary>
+public interface IHostScreenCaptureService
+{
+    /// <summary>
+    /// 发起一次「框选截屏 + 文字识别」。
+    /// <para>
+    /// <b>无参数是刻意的</b>：识别区域由用户在按下之后现场框选，没有任何需要事先保存的配置 ——
+    /// 所以那个动作本身也就没有参数。
+    /// </para>
+    /// <para>
+    /// <b>返回 <c>void</c> 也是刻意的</b>：框选要等用户操作，识别更是异步的，
+    /// 这个调用根本无法同步取得结论。返回 <c>bool</c> 只能表示「有没有成功发起」，
+    /// 那是一个很容易被误读成「识别成功了吗」的假信号 —— 不如不返回。
+    /// 识别结果走宿主自己的出口（剪贴板 / 结果窗口）。
+    /// </para>
+    /// </summary>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.ScreenCapture"/>。</exception>
+    void CaptureAndRecognize();
+}

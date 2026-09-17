@@ -51,6 +51,19 @@ public enum PluginCapability
     /// </para>
     /// </summary>
     WindowControl = 1 << 8,
+
+    /// <summary>
+    /// 读取<b>屏幕内容</b>（截屏后交给 OCR 识别）。
+    /// <para>
+    /// 单独一项而不是并进 <see cref="Ui"/>：截屏是隐私敏感的能力，用户在安装确认页上
+    /// 需要看到的正是「它会看到我的屏幕」这件事 —— 藏在一句「界面」里等于没说。
+    /// </para>
+    /// <para>
+    /// 与 <see cref="WindowControl"/> 同理，新值取 <c>1 &lt;&lt; 9</c> 而不是插进中间：
+    /// 插入会改变后续所有成员的位值。
+    /// </para>
+    /// </summary>
+    ScreenCapture = 1 << 9,
 }
 
 /// <summary>宿主持有的插件元数据。由宿主从 manifest 解析后经 <see cref="IPluginContext.Me"/> 提供给插件。</summary>

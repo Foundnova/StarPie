@@ -4,6 +4,44 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（S4a：`Ocr` 拆成单动作包 + SDK 1.3 新增屏幕截取服务面）
+
+继 S4c / S4d 之后第三个拆包阶段。`Ocr` 是这批里**唯一需要新开宿主服务面**的动作 —— S4c / S4d 的十个动作都能用既有的 `IHostCommandService` / `IHostShellService` / `IHostWindowService` 表达，而「框选截屏 + 文字识别」在 SDK 里根本没有对应物，所以它必须先扩契约。
+
+### 🌟 核心改进与新增功能
+
+1. **SDK 契约 1.2 → 1.3：新增 `IHostScreenCaptureService`**
+   - 能力项 `PluginCapability.ScreenCapture = 1 << 9`。**取新位而不是插进枚举中间** —— 插入会改变后续所有成员的位值。刻意不合并进 `Ui`：截屏是隐私敏感能力，安装确认页上必须让用户看见「它会看到我的屏幕」，藏在一句「界面」里等于没说。
+   - 接口只有一个方法 `void CaptureAndRecognize()`。**无参数是刻意的**：识别区域由用户按下之后现场框选，没有任何需要事先保存的配置 —— 所以那个动作本身也就没有参数。
+   - **返回 `void` 也是刻意的**：框选要等用户操作、识别更是异步的，这个调用根本无法同步取得结论。返回 `bool` 只能表示「宿主已受理」，而它是一个很容易被误读成「识别成功了吗」的假信号。它是**唯一**一个不返回布尔的宿主动作服务。
+   - `ApiVersion` 是手写常量（`1.3` / `ApiVersionMinor = 3`），不能靠插值 —— C# 常量插值对 `int` 不成立（CS0133）。
+   - `PluginApi` 的版本说明注释同步补上本次新增内容，免得版本号与注释再次错位。
+
+2. **宿主侧：`PluginScreenCaptureService`**
+   - 门禁在 `PluginCapability.ScreenCapture`，未声明直接抛 `PluginCapabilityDeniedException`。
+   - 执行体只转发 `OcrManager.StartCaptureAndRecognize()`。截图、框选、OCR 引擎全在宿主侧，插件里一行 P/Invoke 都没有 —— 它做的只是「请宿主发起一次框选识别」。
+
+3. **`StarPie.Plugin.Ocr` 单动作包**
+   - 认领 `Ocr=ocr;ScreenOcr=ocr`（别名与主类型同包）。清单声明 `Capabilities = ScreenCapture`。
+   - **为什么值得单独一个包**：这个动作的后果是读取屏幕内容，是这批动作里隐私敏感度最高的一个 —— 想单独关掉它的用户不在少数，而它从前与「系统控制」同属一个包，要关就得一起关。
+   - 插件侧对 `PluginCapabilityDeniedException` 的处理是「记日志 + 给用户一句人话」，不把 .NET 异常文本甩给用户。
+
+4. **`BuiltinActionOcr.cs` 删除，内建动作表只剩 `Hotkey` / `System`**
+   - `Hotkey` 永久内建（占位类型必须永远可解析，见文件内注释）；`System` 等 `IHostSystemService`（S4b）。
+
+### 🧪 自检
+
+- **`Ocr` 包跑 `--plugin-selftest --skip-invoke`，全段 PASS**；运行后 `%TEMP%/StarPie-PluginSelfTest-*` 为 0 个，报告中 0 条 WARN / FAIL / SKIP。
+- `[1]` 能力声明读到 `ScreenCapture`，SDK 契约版本 `1.3`。
+- `[3f]` 内建动作表只剩 `Hotkey` / `System` 两项 —— 与「十一个类型已交割」互为印证。
+- `[3i]` 认领表 2 项（`Ocr` / `ScreenOcr`）指向同一个贡献点 `starpie.builtin.ocr.ocr`；停用提示指向正确的包名「截屏识字 (OCR)」。
+- `[3j]` 新增截屏门禁断言：`ScreenCapture.CaptureAndRecognize：已拒绝（IHostScreenCaptureService / ScreenCapture）`。
+  - 这条探针**只断言拒绝路径**，刻意不做「声明后放行」与跨能力交叉断言：它是这批里唯一没有「可以传空值短路的参数」的服务，门禁一旦真的漏了，探针会当场弹出全屏框选界面打断自检者 —— 而那时自检已经在报错，没人会想到这个额外的副作用。放行那一半由真实使用与 `[3i]` 的认领链路保证。
+  - 探针为此单独加了 `ProbeVoidCapabilityGate`（void 专用），而不是重载：`() => M()` 这种语句表达式 lambda 既能转 `Func<bool>` 也能转 `Action`，同名重载会让原有三处探针落进「谁更匹配」的编译器规则里。也不能图省事包成 `() => { call(); return false; }` —— 门禁真缺失时会打印「调用被直接放行（返回 False）」，一个捏造的布尔值混进结论。
+- 来源区恰好 11 枚 dll，不含 `StarPie.Plugin.Abstractions.dll`。
+
+---
+
 ## [未发布] - 2026-09-17（S4d：基础动作类拆成五个单动作包）
 
 与 S4c 同一条路线的后半程：把「打开类 + 命令类」也拆成一个动作一个包。至此**十个动作各自一个包** —— 剩下 `Ocr` / `System` 两个还在宿主里，等各自的服务面补齐后搬走。

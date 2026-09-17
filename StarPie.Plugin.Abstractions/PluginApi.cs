@@ -19,7 +19,7 @@ public static class PluginApi
     /// 使「平铺 / 置顶 / 透明度 / 移到下一屏 / 切换应用」这五个动作不必再硬编码在宿主里。</item>
     /// </list>
     /// </summary>
-    public const int ApiVersionMinor = 2;
+    public const int ApiVersionMinor = 3;
 
     /// <summary>
     /// SDK 契约版本字符串，形如 <c>1.2</c>。
@@ -31,7 +31,7 @@ public static class PluginApi
     /// 漂了以后报错信息里的版本号会和真实契约对不上，排查时先被误导一轮。
     /// </para>
     /// </summary>
-    public const string ApiVersion = "1.2";
+    public const string ApiVersion = "1.3";
 
     /// <summary>本契约程序集的程序集名。宿主的 PluginLoadContext 依赖它做「共享程序集放行」。</summary>
     public const string AbstractionsAssemblyName = "StarPie.Plugin.Abstractions";

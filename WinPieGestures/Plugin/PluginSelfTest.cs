@@ -419,6 +419,7 @@ internal static class PluginSelfTest
             {
                 "Launch", "WebUrl", "Url", "Folder", "OpenFolder", "Command", "ShellTool",
                 "Tile", "ToggleTopmost", "MoveMonitor", "WindowOpacity", "SwitchWindow",
+                "Ocr", "ScreenOcr",
             };
 
             foreach (string migratedType in migratedTypes)
@@ -454,11 +455,9 @@ internal static class PluginSelfTest
                     new ActionItem { Type = "System", Parameter = "Minimize" },
                     1, "preset", "Minimize", "系统功能"),
 
-                // 无参数动作：Key 传 null，只验「已登记 + 参数声明确实为空」。
-                // 它没有必填项，也没有「空值」这一说 —— 硬套下面的必填 / 空值检查只会得到假失败。
-                ("Ocr", "ScreenOcr",
-                    new ActionItem { Type = "Ocr" },
-                    0, null, "", ""),
+                // 【Ocr 已外移】它曾在这里充当「无参数内建动作」的样例（Key 传 null）。
+                // 现在它是 StarPie.Plugin.Ocr 认领的顶层类型，改由 [3i] 按认领链路验证 ——
+                // 那一段对**每个**被自检的包都跑一遍，会断言参数声明与认领指向都对。
             };
 
             int builtinVerified = 0;
@@ -1083,7 +1082,7 @@ internal static class PluginSelfTest
             // 安装页照旧弹一个「需要「窗口控制」能力」的确认框，用户点了同意，
             // 而这个勾选在运行时没有任何对应物 —— 那才是真正骗人的地方。
             Line("");
-            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制）");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取）");
 
             // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
             //
@@ -1101,6 +1100,7 @@ internal static class PluginSelfTest
             var deniedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.None);
             var deniedShellService = new PluginShellService(gateProbePluginId, PluginCapability.None);
             var deniedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.None);
+            var deniedCaptureService = new PluginScreenCaptureService(gateProbePluginId, PluginCapability.None);
 
             // ② 未声明所需能力：必须拒绝。
             //
@@ -1148,6 +1148,28 @@ internal static class PluginSelfTest
             {
                 Fail("能力门禁",
                     $"未声明 WindowControl 的插件调用 Windows.ApplyLayout 没有被正确拒绝：{windowGateDetail}");
+            }
+
+            // 截屏服务<b>只断言拒绝路径</b>，刻意不断言「声明后放行」，也不做跨能力交叉断言。
+            //
+            // 它是这一批里唯一没有「可以传空值短路的参数」的服务：一旦门禁真的漏了，
+            // 探针会当场弹出全屏框选界面，把自检者正在做的事打断 ——
+            // 而那时自检已经在报错了，没人会想到这个额外的副作用。
+            // 「放行」那一半的正确性由真实使用保证（OcrPlugin 的清单声明了 ScreenCapture，
+            // 且 [3i] 会逐项验证它的认领链路）。
+            (bool captureDenied, string captureGateDetail) =
+                ProbeVoidCapabilityGate(
+                    () => deniedCaptureService.CaptureAndRecognize(),
+                    PluginCapability.ScreenCapture);
+
+            if (captureDenied)
+            {
+                Line($"  ScreenCapture.CaptureAndRecognize：{captureGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 ScreenCapture 的插件调用 ScreenCapture.CaptureAndRecognize 没有被正确拒绝：{captureGateDetail}");
             }
 
             // ③ 声明了 Process：同一个调用必须放行。
@@ -2424,7 +2446,61 @@ internal static class PluginSelfTest
             bool accepted = call();
             return (false, $"调用被直接放行（返回 {accepted}）—— 门禁不存在");
         }
-        catch (PluginCapabilityDeniedException denied)
+        catch (Exception ex)
+        {
+            return ClassifyGateOutcome(ex, expected);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ProbeCapabilityGate(Func{bool}, PluginCapability)"/> 的姊妹版，
+    /// 供<b>返回 void</b> 的宿主服务使用（目前只有 <c>ScreenCapture.CaptureAndRecognize</c>）。
+    /// <para>
+    /// 刻意做成<b>另一个名字</b>而不是同名重载。C# 里 <c>() =&gt; M()</c> 这种语句表达式 lambda
+    /// 既能转成 <c>Func&lt;bool&gt;</c>（M 返回 bool 时）也能转成 <c>Action</c>（丢弃返回值），
+    /// 于是同名重载会让上面三处 <c>Run</c> / <c>Invoke</c> / <c>ApplyLayout</c> 的探针
+    /// 落进「谁更匹配」的规则里 —— 那是一个编译器说了算、读代码的人看不出来的选择。
+    /// 名字分开，读一眼就知道哪条探针没有返回值可看。
+    /// </para>
+    /// <para>
+    /// 也不能图省事把它包成 <c>() =&gt; { call(); return false; }</c> 塞进上面那个：
+    /// 门禁真缺失时打印出来的会是「调用被直接放行（返回 False）」——
+    /// 一个凭空捏造的 <c>false</c> 混进结论里，而这条断言的整个意义就是分清
+    /// 「门禁不存在」和「门禁在，但它放行了」。
+    /// </para>
+    /// </summary>
+    private static (bool Denied, string Detail) ProbeVoidCapabilityGate(
+        Action call,
+        PluginCapability expected)
+    {
+        try
+        {
+            call();
+            return (false, "调用被直接放行（void 方法正常返回）—— 门禁不存在");
+        }
+        catch (Exception ex)
+        {
+            return ClassifyGateOutcome(ex, expected);
+        }
+    }
+
+    /// <summary>
+    /// 把「应当被拒绝」的调用<b>实际抛出的异常</b>压成一行可读结论。
+    /// <para>
+    /// 两个探针共用这一段的理由是「拦得清楚」的三条判据与「谁去调用它」无关：
+    /// 能力必须正好是 <paramref name="expected"/>、异常类型不能是
+    /// <see cref="PluginContractException"/>、消息里要给出修复动作。
+    /// </para>
+    /// <para>
+    /// 归因错了说明服务的 required 传错了，而那会让安装确认页上另一项能力的标签变成空话：
+    /// 用户勾的是「窗口控制」，运行时拦的却是「进程」。
+    /// </para>
+    /// </summary>
+    private static (bool Denied, string Detail) ClassifyGateOutcome(
+        Exception ex,
+        PluginCapability expected)
+    {
+        if (ex is PluginCapabilityDeniedException denied)
         {
             if (denied.Capability != expected)
             {
@@ -2438,10 +2514,8 @@ internal static class PluginSelfTest
 
             return (true, $"已拒绝（{denied.ServiceName} / {denied.Capability}）");
         }
-        catch (Exception other)
-        {
-            return (false, $"抛出的不是 PluginCapabilityDeniedException，而是 {other.GetType().Name}：{other.Message}");
-        }
+
+        return (false, $"抛出的不是 PluginCapabilityDeniedException，而是 {ex.GetType().Name}：{ex.Message}");
     }
 
     /// <summary>

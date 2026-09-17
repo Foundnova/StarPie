@@ -59,6 +59,12 @@ public interface IPluginContext
     /// </summary>
     IHostWindowService Windows { get; }
 
+    /// <summary>
+    /// 屏幕截取（框选截屏 + 文字识别）。
+    /// 执行面需要 <see cref="PluginCapability.ScreenCapture"/> 能力。
+    /// </summary>
+    IHostScreenCaptureService ScreenCapture { get; }
+
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 

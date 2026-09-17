@@ -155,23 +155,21 @@ internal static class BuiltinActionCatalog
 			// 所以这一个刻意不外移，哪怕它在形状上已经完全符合插件模型。
 			BuiltinActionHotkey.Create(),
 
-			// 【这两个已在路上，暂时仍由内建提供】
-			//   · Ocr    —— 等 IHostScreenCaptureService（S3c）
-			//   · System —— 等 IHostSystemService（S3d）
-			// 各自的服务面补齐后就搬走，届时本表只剩 Hotkey 一项、且是出于上一条理由。
-			// 它们是最后两个还没找到宿主服务形态的动作：System 内含直接触碰 WPF 的
-			// Dispatcher.BeginInvoke，Ocr 的执行体被四处宿主 UI 复用 ——
-			// 都不是「转发一下」就能了事的，所以排在窗口类之后单独处理。
-			BuiltinActionOcr.Create(),
+			// 【这一个已在路上，暂时仍由内建提供】
+			//   · System —— 等 IHostSystemService
+			// 服务面补齐后就搬走，届时本表只剩 Hotkey 一项、且是出于上一条理由。
+			// 它是最后一个还没找到宿主服务形态的动作：执行体内含直接触碰 WPF 的
+			// Dispatcher.BeginInvoke，不是「转发一下」就能了事的。
 			BuiltinActionSystem.Create(),
 
-			// 【已被随包动作包认领、不再由内建提供的十个】（原登记项见 git 历史）
+			// 【已被随包动作包认领、不再由内建提供的十一个】（原登记项见 git 历史）
 			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）/
 			//   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
-			//   WindowOpacity / SwitchWindow
-			//     → plugins\StarPie.Plugin.<类型名> —— 十个**单动作包**
+			//   WindowOpacity / SwitchWindow / Ocr（含别名 ScreenOcr）
+			//     → plugins\StarPie.Plugin.<类型名> —— 十一个**单动作包**
 			//     每个包只认领自己那一个类型（别名与主类型同包），
-			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」。
+			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」，
+			//     也能单独关掉那个会读屏幕的「截屏识字」。
 			//
 			// 认领表由 PluginHost.RebuildClaimTable 在启动期建立，且<b>内建优先</b>：
 			// 上面这些类型只要还留在这个表里，任何插件对它们的认领都会被拒绝。

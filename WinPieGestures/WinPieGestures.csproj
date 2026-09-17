@@ -68,6 +68,7 @@
       从构建日志里完全看不出来。
     -->
     <ProjectReference Include="..\plugins\StarPie.Plugin.Launch\StarPie.Plugin.Launch.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.Ocr\StarPie.Plugin.Ocr.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.WebUrl\StarPie.Plugin.WebUrl.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.Folder\StarPie.Plugin.Folder.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.Command\StarPie.Plugin.Command.csproj" ReferenceOutputAssembly="false" Private="false" />
@@ -94,6 +95,7 @@
         下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
       -->
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Launch\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Launch.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Ocr\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Ocr.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WebUrl\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WebUrl.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Folder\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Folder.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Command\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Command.dll" />

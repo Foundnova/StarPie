@@ -42,6 +42,7 @@ internal sealed class PluginContext : IPluginContext
         Commands = new PluginCommandService(metadata.Id, metadata.Capabilities);
         Shell = new PluginShellService(metadata.Id, metadata.Capabilities);
         Windows = new PluginWindowService(metadata.Id, metadata.Capabilities);
+        ScreenCapture = new PluginScreenCaptureService(metadata.Id, metadata.Capabilities);
 
         Info = new PluginHostInfo(metadata.Capabilities);
         Notify = new PluginNotificationService(metadata.Id);
@@ -71,6 +72,9 @@ internal sealed class PluginContext : IPluginContext
     public IHostShellService Shell { get; }
 
     public IHostWindowService Windows { get; }
+
+    /// <summary>屏幕截取（框选截屏 + 文字识别）。</summary>
+    public IHostScreenCaptureService ScreenCapture { get; }
 
     public IHostInfo Info { get; }
 

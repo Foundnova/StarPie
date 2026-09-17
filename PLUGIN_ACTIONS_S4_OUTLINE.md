@@ -224,15 +224,18 @@ Initialize:
 
 | 阶段 | 内容 | 前置 | 状态 |
 |---|---|---|---|
-| **S4-0** | 来源区不再分发即清理 + `[3m]` | — | ⬜ |
-| **S4a** | 新建 `Ocr` 包 + `IHostScreenCaptureService` + `ScreenCapture` 能力 | S4-0 | ⬜ |
+| **S4-0** | 来源区不再分发即清理 + `[3m]` | — | ✅ `5106629` |
+| **S4c** | 拆 `WindowActions` → 5 个单动作包 | S4-0 | ✅ `25b1e15` |
+| **S4d** | 拆 `BasicActions` → 5 个单动作包 | S4-0 | ✅ `54250f5` |
+| **S4a** | 新建 `Ocr` 包 + `IHostScreenCaptureService` + `ScreenCapture` 能力 | S4-0 | ✅ |
 | **S4b** | 新建 `System` 包 + `IHostSystemService`（档 1 薄转发）+ `InputSimulation` 能力 | S4-0 | ⬜ |
-| **S4c** | 拆 `WindowActions` → 5 个单动作包 | S4-0 | ⬜ |
-| **S4d** | 拆 `BasicActions` → 5 个单动作包 | S4-0 | ⬜ |
 | **S4e** | 文档同步 + 12 个包逐个自检 + 提交 | 全部 | ⬜ |
 
-> **顺序理由**：先做两件**纯新增**（Ocr / System，只有「加包 + 删内建登记」，没有迁移），
-> 再做两件**拆分**（会触发旧包消失，风险更高）。`BasicActions` 认领 7 个类型、牵连最广，放最后。
+> **原定顺序是「先纯新增、后拆分」，实际执行反了过来**（S4c → S4d → S4a）。
+> 理由是：两个纯新增包里，`Ocr` 必须先扩 SDK 契约（新接口 + 新能力位 + 版本号），
+> 而扩契约会牵动**全部**包的重新构建 —— 先把不依赖新契约的十个包拆完，
+> 契约只在最后动一次，中途任何一次构建失败都能确定不是契约引起的。
+> `System`（S4b）同理会引入 `InputSimulation`，所以同样排在末尾。
 >
 > **为什么不用 S3c/S3d 的原编号**：那两阶段的产出是「`ScreenOcr` 包」与「`SystemActions` 包」，
 > 在单动作粒度下要改名成 `StarPie.Plugin.Ocr` 与 `StarPie.Plugin.System`，产物与阶段名对不上会误导。
