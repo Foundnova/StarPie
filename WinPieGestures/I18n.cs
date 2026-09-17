@@ -1441,6 +1441,587 @@ public static class I18n
 			[LanguageCode.En] = "📦 Overwrite",
 			[LanguageCode.Ja] = "📦 上書きインストール"
 		};
+		dictionary["AboutCheckUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 检查更新",
+			[LanguageCode.ZhTw] = "🔄 檢查更新",
+			[LanguageCode.En] = "🔄 Check for updates",
+			[LanguageCode.Ja] = "🔄 更新を確認"
+		};
+		dictionary["AddGestureMapping"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 添加手势映射",
+			[LanguageCode.ZhTw] = "➕ 新增手勢對應",
+			[LanguageCode.En] = "➕ Add mapping",
+			[LanguageCode.Ja] = "➕ マッピングを追加"
+		};
+		dictionary["AddLayer"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 加层",
+			[LanguageCode.ZhTw] = "➕ 新增圖層",
+			[LanguageCode.En] = "➕ Add layer",
+			[LanguageCode.Ja] = "➕ レイヤーを追加"
+		};
+		dictionary["AddProfileShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 新增",
+			[LanguageCode.ZhTw] = "➕ 新增",
+			[LanguageCode.En] = "➕ New",
+			[LanguageCode.Ja] = "➕ 新規"
+		};
+		dictionary["AnimSpeedCustom"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 自定义速度",
+			[LanguageCode.ZhTw] = "🎛️ 自訂速度",
+			[LanguageCode.En] = "🎛️ Custom speed",
+			[LanguageCode.Ja] = "🎛️ カスタム速度"
+		};
+		dictionary["ApplyRestartUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🚀 立即退出并重启更新",
+			[LanguageCode.ZhTw] = "🚀 立即結束並重新啟動更新",
+			[LanguageCode.En] = "🚀 Exit and restart to update",
+			[LanguageCode.Ja] = "🚀 終了して再起動し更新"
+		};
+		dictionary["BatchLayoutBoth"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖼️+🔤 图文",
+			[LanguageCode.ZhTw] = "🖼️+🔤 圖文",
+			[LanguageCode.En] = "🖼️+🔤 Icon + text",
+			[LanguageCode.Ja] = "🖼️+🔤 アイコン＋文字"
+		};
+		dictionary["BatchLayoutIconOnly"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖼️ 仅图标",
+			[LanguageCode.ZhTw] = "🖼️ 僅圖示",
+			[LanguageCode.En] = "🖼️ Icon only",
+			[LanguageCode.Ja] = "🖼️ アイコンのみ"
+		};
+		dictionary["BatchLayoutInherit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 继承全局",
+			[LanguageCode.ZhTw] = "🌐 繼承全域",
+			[LanguageCode.En] = "🌐 Inherit global",
+			[LanguageCode.Ja] = "🌐 グローバルを継承"
+		};
+		dictionary["BatchLayoutTextOnly"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔤 仅文字",
+			[LanguageCode.ZhTw] = "🔤 僅文字",
+			[LanguageCode.En] = "🔤 Text only",
+			[LanguageCode.Ja] = "🔤 文字のみ"
+		};
+		dictionary["BatchResetCustom"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 清除自定义，恢复跟随全局统一",
+			[LanguageCode.ZhTw] = "🔄 清除自訂，恢復跟隨全域統一",
+			[LanguageCode.En] = "🔄 Clear customisations, follow global",
+			[LanguageCode.Ja] = "🔄 カスタムを消去しグローバルに従う"
+		};
+		dictionary["BrowseCoreImage"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "浏览图片...",
+			[LanguageCode.ZhTw] = "瀏覽圖片...",
+			[LanguageCode.En] = "Browse image...",
+			[LanguageCode.Ja] = "画像を参照…"
+		};
+		dictionary["CancelActionStatusHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 外甩脱离轮盘时，立即执行此自定义动作；回到轮盘中心仍为静默关闭。",
+			[LanguageCode.ZhTw] = "💡 外甩脫離輪盤時，立即執行此自訂動作；回到輪盤中心仍為靜默關閉。",
+			[LanguageCode.En] = "💡 Flicking away from the wheel runs this custom action right away; returning to the centre still cancels silently.",
+			[LanguageCode.Ja] = "💡 外へ振り切るとこのカスタム動作を即実行します。中心に戻した場合は従来どおり何もせず閉じます。"
+		};
+		dictionary["CancelDownload"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✖ 取消下载",
+			[LanguageCode.ZhTw] = "✖ 取消下載",
+			[LanguageCode.En] = "✖ Cancel download",
+			[LanguageCode.Ja] = "✖ ダウンロードを中止"
+		};
+		dictionary["CenterInfoToggle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "ℹ️ 说明 ▾",
+			[LanguageCode.ZhTw] = "ℹ️ 說明 ▾",
+			[LanguageCode.En] = "ℹ️ Help ▾",
+			[LanguageCode.Ja] = "ℹ️ 説明 ▾"
+		};
+		dictionary["CenterPresetsToggle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 常用预设 ▾",
+			[LanguageCode.ZhTw] = "⚡ 常用預設 ▾",
+			[LanguageCode.En] = "⚡ Presets ▾",
+			[LanguageCode.Ja] = "⚡ よく使うプリセット ▾"
+		};
+		dictionary["ClearCoreImage"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "清除",
+			[LanguageCode.ZhTw] = "清除",
+			[LanguageCode.En] = "Clear",
+			[LanguageCode.Ja] = "クリア"
+		};
+		dictionary["CopyLayer"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📑 复制",
+			[LanguageCode.ZhTw] = "📑 複製",
+			[LanguageCode.En] = "📑 Copy",
+			[LanguageCode.Ja] = "📑 複製"
+		};
+		dictionary["CoreSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心核心圆与图案文字设置",
+			[LanguageCode.ZhTw] = "中心核心圓與圖案文字設定",
+			[LanguageCode.En] = "Centre core, pattern and text",
+			[LanguageCode.Ja] = "中央コアと図柄・文字の設定"
+		};
+		dictionary["CustomSoundExportProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💾 导出",
+			[LanguageCode.ZhTw] = "💾 匯出",
+			[LanguageCode.En] = "💾 Export",
+			[LanguageCode.Ja] = "💾 書き出し"
+		};
+		dictionary["CustomSoundImportProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 导入",
+			[LanguageCode.ZhTw] = "📂 匯入",
+			[LanguageCode.En] = "📂 Import",
+			[LanguageCode.Ja] = "📂 読み込み"
+		};
+		dictionary["CustomSoundNewProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 新建",
+			[LanguageCode.ZhTw] = "➕ 新增",
+			[LanguageCode.En] = "➕ New",
+			[LanguageCode.Ja] = "➕ 新規"
+		};
+		dictionary["CustomSoundOpenEditorWindow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 独立大窗",
+			[LanguageCode.ZhTw] = "🎛️ 獨立大視窗",
+			[LanguageCode.En] = "🎛️ Open in window",
+			[LanguageCode.Ja] = "🎛️ 別ウィンドウで開く"
+		};
+		dictionary["CustomSoundPlayFlow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔊 连续模拟完整手势交互体验",
+			[LanguageCode.ZhTw] = "🔊 連續模擬完整手勢互動體驗",
+			[LanguageCode.En] = "🔊 Play the full gesture interaction",
+			[LanguageCode.Ja] = "🔊 一連の操作をまとめて再生"
+		};
+		dictionary["CustomSoundResetProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 重置",
+			[LanguageCode.ZhTw] = "🔄 重設",
+			[LanguageCode.En] = "🔄 Reset",
+			[LanguageCode.Ja] = "🔄 リセット"
+		};
+		dictionary["EdgeOverflowDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "当在屏幕四周边缘（顶部、底部或两侧）呼出轮盘时，智能检测显示器安全边界，防止轮盘扇区被截断并自动对齐光标至轮盘物理中心。",
+			[LanguageCode.ZhTw] = "當在螢幕四周邊緣（頂部、底部或兩側）呼出輪盤時，智慧偵測螢幕安全邊界，防止輪盤扇區被截斷並自動對齊游標至輪盤實際中心。",
+			[LanguageCode.En] = "When the wheel opens near a screen edge (top, bottom or either side), the safe area is detected automatically so sectors are never cut off, and the cursor is aligned to the wheel's true centre.",
+			[LanguageCode.Ja] = "画面の端（上・下・左右）でホイールを呼び出したとき、安全領域を自動判定してセクターの見切れを防ぎ、カーソルをホイールの実際の中心に合わせます。"
+		};
+		dictionary["EdgeOverflowTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "屏幕边缘呼出智能防溢出与光标自动对齐",
+			[LanguageCode.ZhTw] = "螢幕邊緣呼出智慧防溢出與游標自動對齊",
+			[LanguageCode.En] = "Edge-aware overflow prevention and cursor alignment",
+			[LanguageCode.Ja] = "画面端での見切れ防止とカーソル自動整列"
+		};
+		dictionary["EnableCenterAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用中心核圆动作",
+			[LanguageCode.ZhTw] = "啟用中心核圓動作",
+			[LanguageCode.En] = "Enable centre core action",
+			[LanguageCode.Ja] = "中央コアの動作を有効にする"
+		};
+		dictionary["EnableGlobalInheritance"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 继承全局方案未配置槽位",
+			[LanguageCode.ZhTw] = "🌐 繼承全域方案未配置槽位",
+			[LanguageCode.En] = "🌐 Inherit global for unconfigured slots",
+			[LanguageCode.Ja] = "🌐 未設定スロットはグローバルを継承"
+		};
+		dictionary["FocusActionNameLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘显示文本:",
+			[LanguageCode.ZhTw] = "輪盤顯示文字:",
+			[LanguageCode.En] = "Wheel label:",
+			[LanguageCode.Ja] = "ホイール表示テキスト:"
+		};
+		dictionary["FocusAddSubAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 添加二级动作",
+			[LanguageCode.ZhTw] = "➕ 新增二級動作",
+			[LanguageCode.En] = "➕ Add sub-action",
+			[LanguageCode.Ja] = "➕ サブ動作を追加"
+		};
+		dictionary["FocusBackToParent"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "◀ 返回父级扇区",
+			[LanguageCode.ZhTw] = "◀ 返回上層扇區",
+			[LanguageCode.En] = "◀ Back to parent sector",
+			[LanguageCode.Ja] = "◀ 親セクターに戻る"
+		};
+		dictionary["FocusBatchExit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✕ 退出多选",
+			[LanguageCode.ZhTw] = "✕ 結束多選",
+			[LanguageCode.En] = "✕ Exit multi-select",
+			[LanguageCode.Ja] = "✕ 複数選択を終了"
+		};
+		dictionary["FocusCenterCore"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 中心核圆",
+			[LanguageCode.ZhTw] = "🎯 中心核圓",
+			[LanguageCode.En] = "🎯 Centre core",
+			[LanguageCode.Ja] = "🎯 中央コア"
+		};
+		dictionary["FocusClearInheritedIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✕ 清除关联",
+			[LanguageCode.ZhTw] = "✕ 清除關聯",
+			[LanguageCode.En] = "✕ Clear link",
+			[LanguageCode.Ja] = "✕ 関連付けを解除"
+		};
+		dictionary["FocusClearSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🗑️ 清空",
+			[LanguageCode.ZhTw] = "🗑️ 清空",
+			[LanguageCode.En] = "🗑️ Clear all",
+			[LanguageCode.Ja] = "🗑️ すべて消去"
+		};
+		dictionary["FocusNextSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "下一槽 ▶",
+			[LanguageCode.ZhTw] = "下一槽 ▶",
+			[LanguageCode.En] = "Next slot ▶",
+			[LanguageCode.Ja] = "次のスロット ▶"
+		};
+		dictionary["FocusPickShellTool"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 挑选功能...",
+			[LanguageCode.ZhTw] = "⚡ 挑選功能...",
+			[LanguageCode.En] = "⚡ Pick a tool...",
+			[LanguageCode.Ja] = "⚡ 機能を選択…"
+		};
+		dictionary["FocusPluginReload"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 停用后重新加载",
+			[LanguageCode.ZhTw] = "🔄 停用後重新載入",
+			[LanguageCode.En] = "🔄 Reload after disabling",
+			[LanguageCode.Ja] = "🔄 無効化して再読み込み"
+		};
+		dictionary["FocusPopulateTileSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✨ 预设 8 布局二级轮盘",
+			[LanguageCode.ZhTw] = "✨ 預設 8 佈局二級輪盤",
+			[LanguageCode.En] = "✨ Fill 8 tile layouts",
+			[LanguageCode.Ja] = "✨ 8分割レイアウトを設定"
+		};
+		dictionary["FocusPrevSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "◀ 上一槽",
+			[LanguageCode.ZhTw] = "◀ 上一槽",
+			[LanguageCode.En] = "◀ Previous slot",
+			[LanguageCode.Ja] = "◀ 前のスロット"
+		};
+		dictionary["FocusRestoreInherit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 恢复继承全局",
+			[LanguageCode.ZhTw] = "🌐 恢復繼承全域",
+			[LanguageCode.En] = "🌐 Restore global inheritance",
+			[LanguageCode.Ja] = "🌐 グローバル継承に戻す"
+		};
+		dictionary["FocusTestAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "▶ 测试触发",
+			[LanguageCode.ZhTw] = "▶ 測試觸發",
+			[LanguageCode.En] = "▶ Test trigger",
+			[LanguageCode.Ja] = "▶ テスト実行"
+		};
+		dictionary["FocusUndoSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "↩️ 撤销",
+			[LanguageCode.ZhTw] = "↩️ 復原",
+			[LanguageCode.En] = "↩️ Undo",
+			[LanguageCode.Ja] = "↩️ 元に戻す"
+		};
+		dictionary["GesturesPageSubheader"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "支持针对不同前台应用程序设置专属的多向手势轮盘、按键动作、中心核圆与级联子动作。",
+			[LanguageCode.ZhTw] = "支援針對不同前景應用程式設定專屬的多向手勢輪盤、按鍵動作、中心核圓與串聯子動作。",
+			[LanguageCode.En] = "Configure a dedicated multi-directional wheel, hotkeys, centre core and cascading sub-actions for each foreground application.",
+			[LanguageCode.Ja] = "前面にあるアプリごとに、多方向ホイール・キー操作・中央コア・連鎖サブ動作を個別に設定できます。"
+		};
+		dictionary["IconLayoutModeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "排版模式:",
+			[LanguageCode.ZhTw] = "排版模式:",
+			[LanguageCode.En] = "Layout mode:",
+			[LanguageCode.Ja] = "レイアウトモード:"
+		};
+		dictionary["LayerSwitchTriggerLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 切换:",
+			[LanguageCode.ZhTw] = "🔄 切換:",
+			[LanguageCode.En] = "🔄 Switch:",
+			[LanguageCode.Ja] = "🔄 切り替え:"
+		};
+		dictionary["LayoutOptionsSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "图标与排版选项",
+			[LanguageCode.ZhTw] = "圖示與排版選項",
+			[LanguageCode.En] = "Icon and layout options",
+			[LanguageCode.Ja] = "アイコンとレイアウトの設定"
+		};
+		dictionary["MappingsSectorCount12"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "12 键钟表方位",
+			[LanguageCode.ZhTw] = "12 鍵鐘錶方位",
+			[LanguageCode.En] = "12 positions (clock)",
+			[LanguageCode.Ja] = "12方位（時計）"
+		};
+		dictionary["MappingsSectorCount4"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "4 键十字方位",
+			[LanguageCode.ZhTw] = "4 鍵十字方位",
+			[LanguageCode.En] = "4 positions (cross)",
+			[LanguageCode.Ja] = "4方位（十字）"
+		};
+		dictionary["MappingsSectorCount8"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "8 键全向方位 (推荐)",
+			[LanguageCode.ZhTw] = "8 鍵全向方位 (推薦)",
+			[LanguageCode.En] = "8 positions (recommended)",
+			[LanguageCode.Ja] = "8方位（推奨）"
+		};
+		dictionary["MappingsTier1Segment"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔘 一级主轮盘",
+			[LanguageCode.ZhTw] = "🔘 一級主輪盤",
+			[LanguageCode.En] = "🔘 Tier 1 wheel",
+			[LanguageCode.Ja] = "🔘 第1階層ホイール"
+		};
+		dictionary["MappingsTier2Segment"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌟 二级级联",
+			[LanguageCode.ZhTw] = "🌟 二級串聯",
+			[LanguageCode.En] = "🌟 Tier 2 cascade",
+			[LanguageCode.Ja] = "🌟 第2階層カスケード"
+		};
+		dictionary["MappingsViewModeCanvas"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 画布联动精调 (推荐)",
+			[LanguageCode.ZhTw] = "🎯 畫布關聯精調 (推薦)",
+			[LanguageCode.En] = "🎯 Canvas live editor (recommended)",
+			[LanguageCode.Ja] = "🎯 キャンバス連動編集（推奨）"
+		};
+		dictionary["MappingsViewModeList"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📋 紧凑全览列表",
+			[LanguageCode.ZhTw] = "📋 精簡總覽清單",
+			[LanguageCode.En] = "📋 Compact list",
+			[LanguageCode.Ja] = "📋 コンパクト一覧"
+		};
+		dictionary["OpenUpdateFolder"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 打开文件位置",
+			[LanguageCode.ZhTw] = "📂 開啟檔案位置",
+			[LanguageCode.En] = "📂 Open file location",
+			[LanguageCode.Ja] = "📂 ファイルの場所を開く"
+		};
+		dictionary["OpenWebRelease"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 前往网页",
+			[LanguageCode.ZhTw] = "🌐 前往網頁",
+			[LanguageCode.En] = "🌐 Open release page",
+			[LanguageCode.Ja] = "🌐 リリースページを開く"
+		};
+		dictionary["OuterEscapeCheckboxDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "超过轮盘外圈范围后立即解除高亮，松开右键 0 误触安全放弃。",
+			[LanguageCode.ZhTw] = "超過輪盤外圈範圍後立即解除高亮，放開右鍵 0 誤觸安全放棄。",
+			[LanguageCode.En] = "Highlight clears as soon as the cursor leaves the wheel, and releasing the right button cancels safely with no misclicks.",
+			[LanguageCode.Ja] = "ホイールの外周を越えるとハイライトを解除し、右ボタンを離すと誤操作なく安全に中断します。"
+		};
+		dictionary["PickCoreIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "选择图标...",
+			[LanguageCode.ZhTw] = "選擇圖示...",
+			[LanguageCode.En] = "Choose icon...",
+			[LanguageCode.Ja] = "アイコンを選択…"
+		};
+		dictionary["ProfileBrowseExe"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📁 浏览...",
+			[LanguageCode.ZhTw] = "📁 瀏覽...",
+			[LanguageCode.En] = "📁 Browse...",
+			[LanguageCode.Ja] = "📁 参照…"
+		};
+		dictionary["ProfileCaptureWindow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 捕捉窗口...",
+			[LanguageCode.ZhTw] = "🎯 擷取視窗...",
+			[LanguageCode.En] = "🎯 Capture window...",
+			[LanguageCode.Ja] = "🎯 ウィンドウを取得…"
+		};
+		dictionary["ProfilePickProgram"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖥️ 软件库...",
+			[LanguageCode.ZhTw] = "🖥️ 軟體庫...",
+			[LanguageCode.En] = "🖥️ App library...",
+			[LanguageCode.Ja] = "🖥️ アプリ一覧…"
+		};
+		dictionary["ResetProcessTrigger"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复默认",
+			[LanguageCode.ZhTw] = "🔄 恢復預設",
+			[LanguageCode.En] = "🔄 Restore default",
+			[LanguageCode.Ja] = "🔄 既定に戻す"
+		};
+		dictionary["ResetSubDimensions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复二级轮盘默认尺寸",
+			[LanguageCode.ZhTw] = "🔄 恢復二級輪盤預設尺寸",
+			[LanguageCode.En] = "🔄 Restore default tier 2 size",
+			[LanguageCode.Ja] = "🔄 第2階層の既定サイズに戻す"
+		};
+		dictionary["ResetSubTheme"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复与一级轮盘相同主题",
+			[LanguageCode.ZhTw] = "🔄 恢復與一級輪盤相同主題",
+			[LanguageCode.En] = "🔄 Match tier 1 theme",
+			[LanguageCode.Ja] = "🔄 第1階層と同じテーマに戻す"
+		};
+		dictionary["ResetTextOffset"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 位置归位",
+			[LanguageCode.ZhTw] = "🔄 位置歸位",
+			[LanguageCode.En] = "🔄 Reset position",
+			[LanguageCode.Ja] = "🔄 位置を初期化"
+		};
+		dictionary["RestoreSystemAudio"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔊 一键解除静音并恢复音量 (50%)",
+			[LanguageCode.ZhTw] = "🔊 一鍵解除靜音並恢復音量 (50%)",
+			[LanguageCode.En] = "🔊 Unmute and restore volume (50%)",
+			[LanguageCode.Ja] = "🔊 ミュート解除して音量を復元（50%）"
+		};
+		dictionary["SectorFontSizeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文字字号大小:",
+			[LanguageCode.ZhTw] = "文字字號大小:",
+			[LanguageCode.En] = "Text size:",
+			[LanguageCode.Ja] = "文字サイズ:"
+		};
+		dictionary["SectorIconSizeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "图标尺寸大小:",
+			[LanguageCode.ZhTw] = "圖示尺寸大小:",
+			[LanguageCode.En] = "Icon size:",
+			[LanguageCode.Ja] = "アイコンサイズ:"
+		};
+		dictionary["SectorTextPlacementTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文字相对位置:",
+			[LanguageCode.ZhTw] = "文字相對位置:",
+			[LanguageCode.En] = "Text position:",
+			[LanguageCode.Ja] = "文字の位置:"
+		};
+		dictionary["ShowCoreIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用中心图案/图标显示",
+			[LanguageCode.ZhTw] = "啟用中心圖案/圖示顯示",
+			[LanguageCode.En] = "Show centre pattern / icon",
+			[LanguageCode.Ja] = "中央の図柄／アイコンを表示"
+		};
+		dictionary["StartDownloadUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⬇️ 立即下载更新",
+			[LanguageCode.ZhTw] = "⬇️ 立即下載更新",
+			[LanguageCode.En] = "⬇️ Download update",
+			[LanguageCode.Ja] = "⬇️ 更新をダウンロード"
+		};
+		dictionary["SubCustomColorsExpanderDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "展开后可精准微调二级扇区底色、高亮光晕、边框线条、文字等各项色彩。",
+			[LanguageCode.ZhTw] = "展開後可精準微調二級扇區底色、高亮光暈、邊框線條、文字等各項色彩。",
+			[LanguageCode.En] = "Expand to fine-tune the tier 2 sector fill, glow, border, text and other colours.",
+			[LanguageCode.Ja] = "展開すると第2階層セクターの背景色・グロー・枠線・文字などの色を細かく調整できます。"
+		};
+		dictionary["SubCustomColorsExpanderTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎨 二级轮盘高级配色",
+			[LanguageCode.ZhTw] = "🎨 二級輪盤進階配色",
+			[LanguageCode.En] = "🎨 Tier 2 advanced colours",
+			[LanguageCode.Ja] = "🎨 第2階層の詳細配色"
+		};
+		dictionary["SubWheelTriggerDistDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。",
+			[LanguageCode.ZhTw] = "調節游標划出距離中心多遠時展開二級串聯選單。數值較小時輕划即可展開，數值較大時需向外划出更遠距離才展開二級，防止快速觸發一級動作時產生視覺干擾。",
+			[LanguageCode.En] = "How far the cursor must move from the centre before the tier 2 cascade opens. Smaller values open it with a light flick; larger values require a longer outward movement, avoiding visual noise when tier 1 actions fire quickly.",
+			[LanguageCode.Ja] = "カーソルが中心からどれだけ離れたら第2階層カスケードを展開するかを調整します。小さい値では少し動かすだけで開き、大きい値ではより遠くへ動かす必要があり、第1階層の動作を素早く実行する際の視覚的な邪魔を防げます。"
+		};
+		dictionary["SubWheelTriggerDistLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二级轮盘展开触发距离:",
+			[LanguageCode.ZhTw] = "二級輪盤展開觸發距離:",
+			[LanguageCode.En] = "Tier 2 trigger distance:",
+			[LanguageCode.Ja] = "第2階層の展開距離:"
+		};
+		dictionary["SystemAudioWarning"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚠️ 检测到 Windows 系统主音量当前为 0% 或已静音，会导致所有交互音效无声。",
+			[LanguageCode.ZhTw] = "⚠️ 偵測到 Windows 系統主音量目前為 0% 或已靜音，會導致所有互動音效無聲。",
+			[LanguageCode.En] = "⚠️ The Windows master volume is at 0% or muted — all interaction sounds will be silent.",
+			[LanguageCode.Ja] = "⚠️ Windows のシステム音量が 0% かミュートのため、すべての操作音が無音になります。"
+		};
+		dictionary["TestCancelAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🧪 模拟测试触发",
+			[LanguageCode.ZhTw] = "🧪 模擬測試觸發",
+			[LanguageCode.En] = "🧪 Test trigger",
+			[LanguageCode.Ja] = "🧪 テスト実行"
+		};
+		dictionary["Tier2DimensionsExpander"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 二级轮盘几何形态与尺寸 (展开微调)",
+			[LanguageCode.ZhTw] = "🌐 二級輪盤幾何形態與尺寸 (展開微調)",
+			[LanguageCode.En] = "🌐 Tier 2 geometry and size (expand to fine-tune)",
+			[LanguageCode.Ja] = "🌐 第2階層の形状とサイズ（展開して微調整）"
+		};
+		dictionary["Tier2ThemeExpander"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 二级轮盘风格与配色 (展开定制)",
+			[LanguageCode.ZhTw] = "🌐 二級輪盤風格與配色 (展開自訂)",
+			[LanguageCode.En] = "🌐 Tier 2 style and colours (expand to customise)",
+			[LanguageCode.Ja] = "🌐 第2階層のスタイルと配色（展開してカスタマイズ）"
+		};
+		dictionary["UpdatePkgLightweight"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "依赖 .NET 8 运行时轻量版 (~2.7 MB)",
+			[LanguageCode.ZhTw] = "依賴 .NET 8 執行階段輕量版 (~2.7 MB)",
+			[LanguageCode.En] = "Lightweight, needs .NET 8 runtime (~2.7 MB)",
+			[LanguageCode.Ja] = "軽量版・.NET 8 ランタイムが必要（約 2.7 MB）"
+		};
+		dictionary["UpdatePkgStandalone"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "独立免安装单文件版 (~68 MB, 推荐)",
+			[LanguageCode.ZhTw] = "獨立免安裝單檔案版 (~68 MB, 推薦)",
+			[LanguageCode.En] = "Standalone, no install needed (~68 MB, recommended)",
+			[LanguageCode.Ja] = "単体動作・インストール不要（約 68 MB、推奨）"
+		};
+		dictionary["ViewReleasesWeb"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 网页发布页",
+			[LanguageCode.ZhTw] = "🌐 網頁發佈頁",
+			[LanguageCode.En] = "🌐 Release page",
+			[LanguageCode.Ja] = "🌐 リリースページ"
+		};
 		dictionary["SidebarCollapse"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "折叠侧边栏",

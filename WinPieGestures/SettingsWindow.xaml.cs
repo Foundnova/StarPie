@@ -2501,6 +2501,385 @@ public partial class SettingsWindow : Window
 		{
 			PreviewPanHintText.Text = I18n.T("PreviewPanHint");
 		}
+		// ===== 补接漏接的 UI 文案（合并后新增/遗留控件）=====
+		// 说明：XAML 里的中文只是设计期占位，运行时必须由本方法按当前语言重设，
+		// 否则切换语言后这些控件会一直保持中文。以下 94 处原先从未被赋值过。
+		if (SubWheelTriggerDistLabel != null)
+		{
+			SubWheelTriggerDistLabel.Text = I18n.T("SubWheelTriggerDistLabel");
+		}
+		if (SubWheelTriggerDistDesc != null)
+		{
+			SubWheelTriggerDistDesc.Text = I18n.T("SubWheelTriggerDistDesc");
+		}
+		if (AddGestureMappingButton != null)
+		{
+			AddGestureMappingButton.Content = I18n.T("AddGestureMapping");
+		}
+		if (AnimSpeedCustomRadio != null)
+		{
+			AnimSpeedCustomRadio.Content = I18n.T("AnimSpeedCustom");
+		}
+		if (CustomSoundNewProfileBtn != null)
+		{
+			CustomSoundNewProfileBtn.Content = I18n.T("CustomSoundNewProfile");
+		}
+		if (CustomSoundDeleteProfileBtn != null)
+		{
+			CustomSoundDeleteProfileBtn.Content = I18n.T("BtnDeleteProfile");
+		}
+		if (CustomSoundImportProfileBtn != null)
+		{
+			CustomSoundImportProfileBtn.Content = I18n.T("CustomSoundImportProfile");
+		}
+		if (CustomSoundExportProfileBtn != null)
+		{
+			CustomSoundExportProfileBtn.Content = I18n.T("CustomSoundExportProfile");
+		}
+		if (CustomSoundResetProfileBtn != null)
+		{
+			CustomSoundResetProfileBtn.Content = I18n.T("CustomSoundResetProfile");
+		}
+		if (CustomSoundOpenEditorWindowBtn != null)
+		{
+			CustomSoundOpenEditorWindowBtn.Content = I18n.T("CustomSoundOpenEditorWindow");
+		}
+		if (CustomSoundPlayFlowButton != null)
+		{
+			CustomSoundPlayFlowButton.Content = I18n.T("CustomSoundPlayFlow");
+		}
+		if (SystemAudioWarningText != null)
+		{
+			SystemAudioWarningText.Text = I18n.T("SystemAudioWarning");
+		}
+		if (RestoreSystemAudioButton != null)
+		{
+			RestoreSystemAudioButton.Content = I18n.T("RestoreSystemAudio");
+		}
+		if (OuterEscapeCheckboxDescText != null)
+		{
+			OuterEscapeCheckboxDescText.Text = I18n.T("OuterEscapeCheckboxDesc");
+		}
+		if (TestCancelActionButton != null)
+		{
+			TestCancelActionButton.Content = I18n.T("TestCancelAction");
+		}
+		if (CancelActionStatusHint != null)
+		{
+			CancelActionStatusHint.Text = I18n.T("CancelActionStatusHint");
+		}
+		if (EdgeOverflowTitleText != null)
+		{
+			EdgeOverflowTitleText.Text = I18n.T("EdgeOverflowTitle");
+		}
+		if (EdgeOverflowDescText != null)
+		{
+			EdgeOverflowDescText.Text = I18n.T("EdgeOverflowDesc");
+		}
+		if (ResetProcessTriggerButton != null)
+		{
+			ResetProcessTriggerButton.Content = I18n.T("ResetProcessTrigger");
+		}
+		if (Tier2ThemeExpander != null)
+		{
+			Tier2ThemeExpander.Header = I18n.T("Tier2ThemeExpander");
+		}
+		if (NewSubCustomColorPresetButton != null)
+		{
+			NewSubCustomColorPresetButton.Content = I18n.T("NewCustomPresetButton");
+		}
+		if (RenameSubCustomColorPresetButton != null)
+		{
+			RenameSubCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
+		}
+		if (DeleteSubCustomColorPresetButton != null)
+		{
+			DeleteSubCustomColorPresetButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (SubCustomColorsExpanderTitleText != null)
+		{
+			SubCustomColorsExpanderTitleText.Text = I18n.T("SubCustomColorsExpanderTitle");
+		}
+		if (SubCustomColorsExpanderDescText != null)
+		{
+			SubCustomColorsExpanderDescText.Text = I18n.T("SubCustomColorsExpanderDesc");
+		}
+		if (SaveAsNewSubPresetButton != null)
+		{
+			SaveAsNewSubPresetButton.Content = I18n.T("SaveAsNewPresetButton");
+		}
+		if (DeleteSubPresetInPanelButton != null)
+		{
+			DeleteSubPresetInPanelButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (ResetSubThemeButton != null)
+		{
+			ResetSubThemeButton.Content = I18n.T("ResetSubTheme");
+		}
+		if (Tier2DimensionsExpander != null)
+		{
+			Tier2DimensionsExpander.Header = I18n.T("Tier2DimensionsExpander");
+		}
+		if (ResetSubDimensionsButton != null)
+		{
+			ResetSubDimensionsButton.Content = I18n.T("ResetSubDimensions");
+		}
+		if (LayoutOptionsSectionTitle != null)
+		{
+			LayoutOptionsSectionTitle.Text = I18n.T("LayoutOptionsSectionTitle");
+		}
+		if (IconLayoutModeTitleText != null)
+		{
+			IconLayoutModeTitleText.Text = I18n.T("IconLayoutModeTitle");
+		}
+		if (SectorIconSizeTitleText != null)
+		{
+			SectorIconSizeTitleText.Text = I18n.T("SectorIconSizeTitle");
+		}
+		if (SectorFontSizeTitleText != null)
+		{
+			SectorFontSizeTitleText.Text = I18n.T("SectorFontSizeTitle");
+		}
+		if (SectorTextPlacementTitleText != null)
+		{
+			SectorTextPlacementTitleText.Text = I18n.T("SectorTextPlacementTitle");
+		}
+		if (ResetTextOffsetBtn != null)
+		{
+			ResetTextOffsetBtn.Content = I18n.T("ResetTextOffset");
+		}
+		if (CoreSectionTitle != null)
+		{
+			CoreSectionTitle.Text = I18n.T("CoreSectionTitle");
+		}
+		if (ShowCoreIconCheckBox != null)
+		{
+			ShowCoreIconCheckBox.Content = I18n.T("ShowCoreIcon");
+		}
+		if (PickCoreIconButton != null)
+		{
+			PickCoreIconButton.Content = I18n.T("PickCoreIcon");
+		}
+		if (BrowseCoreImageButton != null)
+		{
+			BrowseCoreImageButton.Content = I18n.T("BrowseCoreImage");
+		}
+		if (ClearCoreImageButton != null)
+		{
+			ClearCoreImageButton.Content = I18n.T("ClearCoreImage");
+		}
+		if (Tier1ConfigSegmentRadio != null)
+		{
+			Tier1ConfigSegmentRadio.Content = I18n.T("Tier1ConfigSegment");
+		}
+		if (Tier2ConfigSegmentRadio != null)
+		{
+			Tier2ConfigSegmentRadio.Content = I18n.T("Tier2ConfigSegment");
+		}
+		if (AddLayerBtn != null)
+		{
+			AddLayerBtn.Content = I18n.T("AddLayer");
+		}
+		if (CopyLayerBtn != null)
+		{
+			CopyLayerBtn.Content = I18n.T("CopyLayer");
+		}
+		if (LayerSwitchTriggerLabel != null)
+		{
+			LayerSwitchTriggerLabel.Text = I18n.T("LayerSwitchTriggerLabel");
+		}
+		if (GesturesPageSubheader != null)
+		{
+			GesturesPageSubheader.Text = I18n.T("GesturesPageSubheader");
+		}
+		if (MappingsViewModeCanvasRadio != null)
+		{
+			MappingsViewModeCanvasRadio.Content = I18n.T("MappingsViewModeCanvas");
+		}
+		if (MappingsViewModeListRadio != null)
+		{
+			MappingsViewModeListRadio.Content = I18n.T("MappingsViewModeList");
+		}
+		if (AddProfileBtn2 != null)
+		{
+			AddProfileBtn2.Content = I18n.T("AddProfileShort");
+		}
+		if (RenameProfileBtn2 != null)
+		{
+			RenameProfileBtn2.Content = I18n.T("BtnRenameProfile");
+		}
+		if (ProfileCaptureWindowBtn != null)
+		{
+			ProfileCaptureWindowBtn.Content = I18n.T("ProfileCaptureWindow");
+		}
+		if (ProfilePickProgramBtn != null)
+		{
+			ProfilePickProgramBtn.Content = I18n.T("ProfilePickProgram");
+		}
+		if (ProfileBrowseExeBtn != null)
+		{
+			ProfileBrowseExeBtn.Content = I18n.T("ProfileBrowseExe");
+		}
+		if (MappingsSectorCount4Radio != null)
+		{
+			MappingsSectorCount4Radio.Content = I18n.T("MappingsSectorCount4");
+		}
+		if (MappingsSectorCount8Radio != null)
+		{
+			MappingsSectorCount8Radio.Content = I18n.T("MappingsSectorCount8");
+		}
+		if (MappingsSectorCount12Radio != null)
+		{
+			MappingsSectorCount12Radio.Content = I18n.T("MappingsSectorCount12");
+		}
+		if (EnableGlobalInheritanceCheckBox != null)
+		{
+			EnableGlobalInheritanceCheckBox.Content = I18n.T("EnableGlobalInheritance");
+		}
+		if (FocusBackToParentBtn != null)
+		{
+			FocusBackToParentBtn.Content = I18n.T("FocusBackToParent");
+		}
+		if (FocusPrevSlotBtn != null)
+		{
+			FocusPrevSlotBtn.Content = I18n.T("FocusPrevSlot");
+		}
+		if (FocusNextSlotBtn != null)
+		{
+			FocusNextSlotBtn.Content = I18n.T("FocusNextSlot");
+		}
+		if (FocusCenterCoreBtn != null)
+		{
+			FocusCenterCoreBtn.Content = I18n.T("FocusCenterCore");
+		}
+		if (EnableCenterActionCheckBox != null)
+		{
+			EnableCenterActionCheckBox.Content = I18n.T("EnableCenterAction");
+		}
+		if (CenterPresetsToggleBtn != null)
+		{
+			CenterPresetsToggleBtn.Content = I18n.T("CenterPresetsToggle");
+		}
+		if (CenterInfoToggleBtn != null)
+		{
+			CenterInfoToggleBtn.Content = I18n.T("CenterInfoToggle");
+		}
+		if (FocusActionNameLabel != null)
+		{
+			FocusActionNameLabel.Text = I18n.T("FocusActionNameLabel");
+		}
+		if (FocusRestoreInheritBtn != null)
+		{
+			FocusRestoreInheritBtn.Content = I18n.T("FocusRestoreInherit");
+		}
+		if (FocusTestActionBtn != null)
+		{
+			FocusTestActionBtn.Content = I18n.T("FocusTestAction");
+		}
+		if (FocusPluginReloadBtn != null)
+		{
+			FocusPluginReloadBtn.Content = I18n.T("FocusPluginReload");
+		}
+		if (FocusPopulateTileSubActionsBtn != null)
+		{
+			FocusPopulateTileSubActionsBtn.Content = I18n.T("FocusPopulateTileSubActions");
+		}
+		if (FocusPickShellToolBtn != null)
+		{
+			FocusPickShellToolBtn.Content = I18n.T("FocusPickShellTool");
+		}
+		if (FocusClearInheritedIconBtn != null)
+		{
+			FocusClearInheritedIconBtn.Content = I18n.T("FocusClearInheritedIcon");
+		}
+		if (FocusAddSubActionBtn != null)
+		{
+			FocusAddSubActionBtn.Content = I18n.T("FocusAddSubAction");
+		}
+		if (FocusClearSubActionsBtn != null)
+		{
+			FocusClearSubActionsBtn.Content = I18n.T("FocusClearSubActions");
+		}
+		if (FocusUndoSubActionsBtn != null)
+		{
+			FocusUndoSubActionsBtn.Content = I18n.T("FocusUndoSubActions");
+		}
+		if (FocusBatchExitBtn != null)
+		{
+			FocusBatchExitBtn.Content = I18n.T("FocusBatchExit");
+		}
+		if (BatchLayoutBothBtn != null)
+		{
+			BatchLayoutBothBtn.Content = I18n.T("BatchLayoutBoth");
+		}
+		if (BatchLayoutIconOnlyBtn != null)
+		{
+			BatchLayoutIconOnlyBtn.Content = I18n.T("BatchLayoutIconOnly");
+		}
+		if (BatchLayoutTextOnlyBtn != null)
+		{
+			BatchLayoutTextOnlyBtn.Content = I18n.T("BatchLayoutTextOnly");
+		}
+		if (BatchLayoutInheritBtn != null)
+		{
+			BatchLayoutInheritBtn.Content = I18n.T("BatchLayoutInherit");
+		}
+		if (BatchResetCustomBtn != null)
+		{
+			BatchResetCustomBtn.Content = I18n.T("BatchResetCustom");
+		}
+		if (MappingsTier1SegmentRadio != null)
+		{
+			MappingsTier1SegmentRadio.Content = I18n.T("MappingsTier1Segment");
+		}
+		if (MappingsTier2SegmentRadio != null)
+		{
+			MappingsTier2SegmentRadio.Content = I18n.T("MappingsTier2Segment");
+		}
+		if (ViewReleasesWebBtn != null)
+		{
+			ViewReleasesWebBtn.Content = I18n.T("ViewReleasesWeb");
+		}
+		if (StartDownloadUpdateBtn != null)
+		{
+			StartDownloadUpdateBtn.Content = I18n.T("StartDownloadUpdate");
+		}
+		if (OpenWebReleaseBtn != null)
+		{
+			OpenWebReleaseBtn.Content = I18n.T("OpenWebRelease");
+		}
+		if (UpdatePkgStandaloneRadio != null)
+		{
+			UpdatePkgStandaloneRadio.Content = I18n.T("UpdatePkgStandalone");
+		}
+		if (UpdatePkgLightweightRadio != null)
+		{
+			UpdatePkgLightweightRadio.Content = I18n.T("UpdatePkgLightweight");
+		}
+		if (CancelDownloadBtn != null)
+		{
+			CancelDownloadBtn.Content = I18n.T("CancelDownload");
+		}
+		if (ApplyRestartUpdateBtn != null)
+		{
+			ApplyRestartUpdateBtn.Content = I18n.T("ApplyRestartUpdate");
+		}
+		if (OpenUpdateFolderBtn != null)
+		{
+			OpenUpdateFolderBtn.Content = I18n.T("OpenUpdateFolder");
+		}
+		if (AboutCheckUpdateBtn != null)
+		{
+			AboutCheckUpdateBtn.Content = I18n.T("AboutCheckUpdate");
+		}
+		if (OpenChangelogButton != null)
+		{
+			OpenChangelogButton.Content = I18n.T("BtnOpenChangelog");
+		}
+		if (OlderMilestonesExpander != null)
+		{
+			OlderMilestonesExpander.Header = I18n.T("MilestonesOlderExpander");
+		}
 
 		UpdateFocusActionTypeItemsSource();
 		App.RefreshTrayMenu();
