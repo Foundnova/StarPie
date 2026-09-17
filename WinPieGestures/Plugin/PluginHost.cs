@@ -660,6 +660,12 @@ internal static class PluginHost
     /// <summary>主程序唯一的插件动作入口，具体行为由动作路径模块负责。</summary>
     public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
 
+    public static bool TryResolveClaimedType(string? type, out PluginTypeClaimBinding binding) =>
+        PluginActionClaimRegistry.TryResolve(type, out binding);
+
+    public static PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding) =>
+        Runtime.ExecuteClaimedAction(action, binding);
+
     // ------------------------------------------------------------------ 界面数据
 
     /// <summary>动作下拉里的插件动作分组（供 <c>SlotViewModel</c> 聚合）。</summary>
@@ -1412,6 +1418,7 @@ internal static class PluginHost
 
     private static void NotifyPluginSetChanged()
     {
+        PluginActionClaimRegistry.Rebuild(PluginRegistryStore.SnapshotEntries());
         try
         {
             ConfigManager.MarkConfigurationChanged();

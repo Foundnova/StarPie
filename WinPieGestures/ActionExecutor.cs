@@ -273,6 +273,17 @@ public static class ActionExecutor
 		try
 		{
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
+			if (Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtin))
+			{
+				ExecuteBuiltinActionItem(action, builtin);
+				return;
+			}
+
+			if (Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginTypeClaimBinding claim))
+			{
+				ExecuteClaimedActionItem(action, claim);
+				return;
+			}
 			switch (action.Type.Trim())
 			{
 			case "Launch":
@@ -349,6 +360,39 @@ public static class ActionExecutor
 	///    插件是社区代码，它的失败必须可诊断、可忽略，绝不能打断用户。
 	/// </para>
 	/// </summary>
+	internal static void ExecuteBuiltinActionItem(ActionItem action, Plugins.BuiltinActionRegistration registration)
+	{
+		var parameters = registration.ProjectParameters(action);
+		string? invalid = registration.Contribution.Validate(parameters);
+		if (!string.IsNullOrWhiteSpace(invalid))
+		{
+			Plugins.PluginHost.NotifyUser(registration.Contribution.Descriptor.DisplayName, invalid);
+			return;
+		}
+
+		var input = new StarPie.Plugin.PluginActionInput
+		{
+			ContributionId = registration.FullId,
+			Parameters = parameters,
+			Context = new StarPie.Plugin.ActionContext(),
+		};
+		StarPie.Plugin.ActionResult result = registration.Contribution.ExecuteAsync(input, CancellationToken.None)
+			.GetAwaiter().GetResult();
+		if (!result.Success)
+		{
+			throw new InvalidOperationException(result.Message ?? $"内建动作 {registration.FullId} 执行失败。");
+		}
+	}
+
+	private static void ExecuteClaimedActionItem(ActionItem action, Plugins.PluginTypeClaimBinding claim)
+	{
+		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecuteClaimedAction(action, claim);
+		if (!outcome.Success)
+		{
+			AppLogger.LogWarn($"Claimed action failed: {claim.FullId}, Reason='{outcome.Message}'");
+			Plugins.PluginHost.NotifyUser("内置动作执行失败", outcome.Message);
+		}
+	}
 	private static void ExecutePluginActionItem(ActionItem action)
 	{
 		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecutePluginAction(action);
