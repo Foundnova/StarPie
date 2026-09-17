@@ -136,12 +136,25 @@ g:\Users\2 Better\Desktop\design\
 │       ├── Standalone/            # 独立单文件免安装自解压包 (~65MB)
 │       ├── StarPie-vX.Y.Z-Lightweight-win-x64.zip
 │       └── StarPie-vX.Y.Z-Standalone-win-x64.zip
+├── assets/                        # 品牌素材（app_icon / tray_icon / 各版 logo / screenshots）
 ├── attachments/                   # 文档与演示动图素材库 (GIF / PNG)
-├── scratch/                       # 代码反编译基线与代码生成流水线工具
-│   ├── Decompiler/                # Program.cs 流水线生成器工程
-│   └── v152_decompiled/           # 反编译基线源码
+├── 主题尺寸配置文件/               # 轮盘尺寸预设 JSON（用户可在「高级与系统设置」最下方导入）
+├── scratch/                       # 一次性开发工具与验证脚本 —— 不参与构建，可随时清理
+│   ├── IconGenerator/             # 从 attachments/cover.v3.png 生成 logo / app_icon / tray_icon
+│   ├── Issue17Demo/               # 复现用户反馈用的小 Demo 工程
+│   ├── Everything-SDK/            # 本地搜索联调用的 SDK 头文件
+│   └── *.ps1 / *.png / test_v170.cs   # 临时验证脚本与对照截图
+├── tests/                         # UI 回归套件（pywinauto + UIA；会弹 GUI，由用户手动运行）
+│   ├── conftest.py                # 隔离 AppData 沙箱 fixture
+│   ├── test_settings.py           # 设置窗口回归
+│   └── test_plugins.py            # 插件页回归
+├── installer/                     # Inno Setup 打包
+│   ├── StarPie.iss                # 安装脚本（语言文件在 Languages/）
+│   └── build-installer.ps1        # 打包入口 —— 版本号 6 处同步点之一（$Version 兜底值）
 ├── docs/
-│   └── plugin-system-architecture.md # ⚠ 本分支**不采用**的设计存档（统一调用运行时 + 路径模块方案），仅作设计参考
+│   ├── plugin-system-architecture.md # ⚠ 本分支**不采用**的设计存档（统一调用运行时 + 路径模块方案），仅作设计参考
+│   ├── prototypes/                # 早期交互原型（v1.6.0 / v1.6.5，纯 HTML，仅供设计参考，不参与构建）
+│   └── issue100.txt               # 用户反馈原始记录（对应修复留档）
 ├── PLUGIN_SYSTEM_DESIGN.md        # 插件系统设计大纲（设计草案，正文路径非现状，勿照抄）
 ├── PLUGIN_SYSTEM_IMPLEMENTATION.md # 实现说明：结构与职责边界、接口用法、已踩过的坑
 ├── PLUGIN_SYSTEM_PERFORMANCE_AND_API.md # 性能实测 · 完整接口清单 · 社区开发指南
