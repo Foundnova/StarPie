@@ -46,6 +46,10 @@ internal sealed class PluginNotificationService : INotificationService
 /// <summary>宿主环境信息实现。</summary>
 internal sealed class PluginHostInfo : IHostInfo
 {
+    private readonly PluginCapability _capabilities;
+
+    public PluginHostInfo(PluginCapability capabilities) => _capabilities = capabilities;
+
     public string HostVersion => PluginManifestReader.HostVersion;
 
     public string ApiVersion => PluginApi.ApiVersion;
@@ -62,6 +66,9 @@ internal sealed class PluginHostInfo : IHostInfo
     }
 
     public bool IsPortable => PluginPaths.IsPortable;
+
+    public bool HasCapability(PluginCapability capability) =>
+        (_capabilities & capability) == capability;
 
     public string HostExecutablePath
     {

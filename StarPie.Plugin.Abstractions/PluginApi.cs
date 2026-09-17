@@ -28,6 +28,11 @@ public static class PluginApi
     /// </summary>
     public const string ActionTypeName = "Plugin";
 
+    /// <summary>
+    /// 顶层动作类型认领的程序集元数据键。值使用“类型=贡献点短 ID”的分号分隔格式，
+    /// 供宿主在不加载插件程序集的前提下建立兼容路由表。
+    /// </summary>
+    public const string TypeClaimsMetadataKey = "StarPiePluginTypeClaims";
     /// <summary>插件语言词条的完整 key 前缀，最终形如 <c>plugin.&lt;pluginId&gt;.&lt;key&gt;</c>。</summary>
     public const string I18nKeyPrefix = "plugin.";
 

@@ -62,6 +62,20 @@ public sealed class PluginManifest
     /// <summary>能力声明。见 <see cref="PluginCapability"/>。</summary>
     public List<string> Capabilities { get; set; } = new();
 
+    /// <summary>
+    /// 本插件认领的顶层动作类型。只有随包分发的插件可以使用，社区插件请留空。
+    /// <para>
+    /// 认领之后，用户在配置里写的 <c>Type="Command"</c> 就由本插件负责执行 ——
+    /// 宿主通过 <see cref="PluginApi.TypeClaimsMetadataKey"/> 读静态元数据建立这张表，
+    /// <b>不需要加载程序集</b>。
+    /// </para>
+    /// <para>
+    /// 停用插件会让这些类型整体失效（宿主会明确提示，而不是静默无操作）。
+    /// 不要认领 <c>"Plugin"</c> —— 那是社区插件动作的保留类型名。
+    /// </para>
+    /// </summary>
+    public List<PluginTypeClaim> ClaimedTypes { get; set; } = new();
+
     /// <summary>贡献点预声明（用于安装确认页展示与运行时交叉校验）。</summary>
     public PluginContributions Contributions { get; set; } = new();
 
@@ -145,4 +159,73 @@ public sealed class PluginDependency
 
     /// <summary>版本区间，简化语义化语法：<c>"1.2.0"</c>（≥）、<c>"[1.0,2.0)"</c>、<c>"*"</c>（任意）。</summary>
     public string VersionRange { get; set; } = "*";
+}
+
+/// <summary>
+/// 一条顶层动作类型认领：<see cref="TypeName"/> 这个类型名由本插件的
+/// <see cref="ContributionId"/> 这个贡献点负责。
+/// </summary>
+public sealed class PluginTypeClaim
+{
+    /// <summary>用户配置里 <c>ActionItem.Type</c> 的取值，如 <c>Command</c>。区分大小写无关。</summary>
+    public string TypeName { get; set; } = "";
+
+    /// <summary>插件内贡献点的短 ID，与 <see cref="ActionDescriptor.Id"/> 一致，如 <c>command</c>。</summary>
+    public string ContributionId { get; set; } = "";
+
+    /// <summary>
+    /// 解析 <c>"Command=command;Hotkey=hotkey"</c> 形态的认领串。
+    /// <para>
+    /// 容错但不含糊：空段直接跳过；缺了 <c>=</c>、或某一侧为空、或与已解析项重复的段
+    /// 一律<b>整条丢弃</b>并记进 <paramref name="malformed"/>，由调用方决定怎么告警 ——
+    /// 悄悄接受一个半残的认领，结果是「这个动作有时能用有时不能」，最难排查。
+    /// </para>
+    /// </summary>
+    public static List<PluginTypeClaim> ParseAll(string? raw, out List<string> malformed)
+    {
+        var claims = new List<PluginTypeClaim>();
+        malformed = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(raw)) return claims;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string segment in raw!.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string piece = segment.Trim();
+            if (piece.Length == 0) continue;
+
+            int separator = piece.IndexOf('=');
+            if (separator <= 0 || separator == piece.Length - 1)
+            {
+                malformed.Add(piece);
+                continue;
+            }
+
+            string typeName = piece.Substring(0, separator).Trim();
+            string contributionId = piece.Substring(separator + 1).Trim();
+
+            if (typeName.Length == 0 || contributionId.Length == 0)
+            {
+                malformed.Add(piece);
+                continue;
+            }
+
+            // 同一个类型被同一份清单认领两次：保留第一条，第二条丢弃。
+            // 这不是「后者覆盖前者」能解决的 —— 两条指的可能压根不是同一个贡献点，
+            // 静默取一条等于替用户做了个他看不见的选择。
+            if (!seen.Add(typeName))
+            {
+                malformed.Add(piece);
+                continue;
+            }
+
+            claims.Add(new PluginTypeClaim { TypeName = typeName, ContributionId = contributionId });
+        }
+
+        return claims;
+    }
+
+    /// <summary>序列化回 <c>"类型=短ID"</c> 形态，供登记表持久化。</summary>
+    public string ToWire() => $"{TypeName}={ContributionId}";
 }

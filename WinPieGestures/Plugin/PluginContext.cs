@@ -34,7 +34,7 @@ internal sealed class PluginContext : IPluginContext
         I18n = new PluginI18nRegistry(session, metadata.Id);
         Icons = new PluginIconRegistry(session, metadata.Id);
         Host = new PluginHostActionInvoker(metadata.Id);
-        Info = new PluginHostInfo();
+        Info = new PluginHostInfo(metadata.Capabilities);
         Notify = new PluginNotificationService(metadata.Id);
         Dispatcher = new PluginDispatcherFacade();
     }
