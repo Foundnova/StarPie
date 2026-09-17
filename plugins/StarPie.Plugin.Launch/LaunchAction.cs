@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.BasicActions;
+namespace StarPie.Plugin.Launch;
 
 /// <summary>
 /// 动作「启动程序」。对应配置里的 <c>Type="Launch"</c>。

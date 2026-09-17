@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.BasicActions;
+namespace StarPie.Plugin.ShellTool;
 
 /// <summary>
 /// 动作「系统与右键工具」。对应配置里的 <c>Type="ShellTool"</c>。

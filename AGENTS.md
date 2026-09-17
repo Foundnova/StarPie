@@ -110,14 +110,20 @@ g:\Users\2 Better\Desktop\design\
 │   ├── PluginMetadata.cs          # 程序集元数据兜底模型
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
 ├── plugins/                       # ★ 随包动作包（与主程序同源构建，随发行包分发到 程序目录\plugin\）
-│   ├── StarPie.Plugin.BasicActions/   # 启动程序 / 打开网址 / 打开文件夹 / 运行命令 / 系统与右键工具（认领 Launch / WebUrl / Folder / Command / ShellTool）
+│   ├── StarPie.Plugin.Launch/         # 启动程序（认领 Launch）
+│   ├── StarPie.Plugin.WebUrl/         # 打开网址（认领 WebUrl + 别名 Url）
+│   ├── StarPie.Plugin.Folder/         # 打开文件夹（认领 Folder + 别名 OpenFolder）
+│   ├── StarPie.Plugin.Command/        # 运行命令（认领 Command）
+│   ├── StarPie.Plugin.ShellTool/      # 系统与右键工具（认领 ShellTool）
 │   ├── StarPie.Plugin.Tile/           # 平铺窗口（认领 Tile）
 │   ├── StarPie.Plugin.ToggleTopmost/  # 窗口置顶/取消置顶（认领 ToggleTopmost）
 │   ├── StarPie.Plugin.MoveMonitor/    # 窗口移到下一屏（认领 MoveMonitor）
 │   ├── StarPie.Plugin.WindowOpacity/  # 窗口透明度（认领 WindowOpacity）
 │   └── StarPie.Plugin.SwitchWindow/   # 切换窗口（认领 SwitchWindow）
-│       # 窗口类这五个刻意**一个动作一个包**：停用粒度精确到动作，
+│       # 十个动作包一律**一个动作一个包**：拆包粒度就是停用粒度，
 │       # 用户能把「窗口透明度」关掉而继续用「平铺窗口」。
+│       # **别名必须与主类型同包**（Url / OpenFolder / ScreenOcr 三对）——
+│       # 否则同一个动作在两种写法下由不同插件执行，停用其中一个只失效一半配置。
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
 │   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）

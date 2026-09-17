@@ -438,10 +438,12 @@ internal static class PluginSelfTest
                     new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
                     1, "hotkey", "Ctrl+Alt+S", "快捷键"),
 
-                // 【已移出本表】Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
-                //             Command / ShellTool  → StarPie.Plugin.BasicActions
-                //             Tile / ToggleTopmost / MoveMonitor / WindowOpacity /
-                //             SwitchWindow          → 五个同名单动作包（一个动作一个包）
+                // 【已移出本表】以下十个类型现在各自是一个**单动作包**：
+                //   Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
+                //   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
+                //   WindowOpacity / SwitchWindow
+                // 包名一律 StarPie.Plugin.<类型名>，认领串只有自己那一项
+                // （别名与主类型同包）。拆包粒度就是停用粒度。
                 //
                 // 它们不再是内建动作，而是随包插件认领的顶层类型。
                 // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，

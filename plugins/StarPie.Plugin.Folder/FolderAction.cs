@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.BasicActions;
+namespace StarPie.Plugin.Folder;
 
 /// <summary>
 /// 动作「打开文件夹」。对应配置里的 <c>Type="Folder"</c>，也认历史别名 <c>Type="OpenFolder"</c>。

@@ -166,12 +166,11 @@ internal static class BuiltinActionCatalog
 			BuiltinActionSystem.Create(),
 
 			// 【已被随包动作包认领、不再由内建提供的十个】（原登记项见 git 历史）
-			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）  —— 第一批
-			//   Command / ShellTool                                        —— 第二批
-			//     → plugins\StarPie.Plugin.BasicActions
-			//   Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow —— 第三批
-			//     → plugins\StarPie.Plugin.{Tile,ToggleTopmost,MoveMonitor,WindowOpacity,SwitchWindow}
-			//     第三批按「一个动作一个包」拆开（不再是一个包认领五个类型）——
+			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）/
+			//   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
+			//   WindowOpacity / SwitchWindow
+			//     → plugins\StarPie.Plugin.<类型名> —— 十个**单动作包**
+			//     每个包只认领自己那一个类型（别名与主类型同包），
 			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」。
 			//
 			// 认领表由 PluginHost.RebuildClaimTable 在启动期建立，且<b>内建优先</b>：

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.BasicActions;
+namespace StarPie.Plugin.WebUrl;
 
 /// <summary>
 /// 动作「打开网址」。对应配置里的 <c>Type="WebUrl"</c>，也认历史别名 <c>Type="Url"</c>。

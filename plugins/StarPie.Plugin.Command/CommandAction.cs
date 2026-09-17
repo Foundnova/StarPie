@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.BasicActions;
+namespace StarPie.Plugin.Command;
 
 /// <summary>
 /// 动作「运行命令」。对应配置里的 <c>Type="Command"</c>。

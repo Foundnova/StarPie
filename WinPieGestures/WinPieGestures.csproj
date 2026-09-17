@@ -67,7 +67,11 @@
       验证目录时，通配写法会把它默默卷进发行包，而那种「多了一枚没打算分发的插件」
       从构建日志里完全看不出来。
     -->
-    <ProjectReference Include="..\plugins\StarPie.Plugin.BasicActions\StarPie.Plugin.BasicActions.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.Launch\StarPie.Plugin.Launch.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.WebUrl\StarPie.Plugin.WebUrl.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.Folder\StarPie.Plugin.Folder.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.Command\StarPie.Plugin.Command.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.ShellTool\StarPie.Plugin.ShellTool.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.Tile\StarPie.Plugin.Tile.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.ToggleTopmost\StarPie.Plugin.ToggleTopmost.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.MoveMonitor\StarPie.Plugin.MoveMonitor.csproj" ReferenceOutputAssembly="false" Private="false" />
@@ -89,7 +93,11 @@
         包多起来以后这条纪律更容易被顺手违反 —— 加包时请老老实实加一行。
         下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
       -->
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.BasicActions\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.BasicActions.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Launch\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Launch.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WebUrl\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WebUrl.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Folder\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Folder.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Command\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Command.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ShellTool\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ShellTool.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Tile\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Tile.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ToggleTopmost\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ToggleTopmost.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />

@@ -4,6 +4,30 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（S4d：基础动作类拆成五个单动作包）
+
+与 S4c 同一条路线的后半程：把「打开类 + 命令类」也拆成一个动作一个包。至此**十个动作各自一个包** —— 剩下 `Ocr` / `System` 两个还在宿主里，等各自的服务面补齐后搬走。
+
+### 🌟 核心改进与新增功能
+
+1. **`StarPie.Plugin.BasicActions` 拆分为五个单动作包**
+   - `StarPie.Plugin.Launch`（认领 `Launch`）/ `WebUrl`（`WebUrl` + 别名 `Url`）/ `Folder`（`Folder` + 别名 `OpenFolder`）/ `Command`（`Command`）/ `ShellTool`（`ShellTool`）。
+   - **别名与主类型同包**：`Url` 与 `WebUrl` 是同一个动作的两种历史写法。拆到两个包会出现「同一个动作在两种写法下由不同插件执行」，停用其中一个只失效一半配置，而用户完全看不出另一半为什么还活着。
+   - 五个包各自的词条只带自己那一组（原 `Texts.cs` 已经按 `launch.` / `weburl.` / `folder.` / `command.` / `shell.tool.` 前缀分好组），切分是机械操作。
+
+2. **顺带收紧了一处过时的能力声明**
+   - 原 `BasicActions` 声明的是 `Process;Ui`。全项目核查后确认 **`Ui` 没有任何强制点** —— 唯一的引用是设置页里的一句展示文案（`· 显示界面与通知`），而这两个动作的后果没有一个是「打开自己的窗口」。
+   - 按「安装确认页展示的能力必须对应一个真实后果」这条既有原则，五个新包**只声明 `Process`**。拆包正是做这件事的时机：每个包重新审视自己真正需要什么，而不是照抄原包的一整行。
+
+### 🧪 自检
+
+- **十个包逐个跑 `--plugin-selftest`，全部全段 PASS**；运行后 `%TEMP%/StarPie-PluginSelfTest-*` 为 0 个。
+- 来源区恰好 10 枚 dll，不含 `StarPie.Plugin.Abstractions.dll`。
+- `[3i]` 对别名包的断言是两行、指向同一个贡献点（`WebUrl→…webUrl`、`Url→…webUrl`）—— 这正是「别名与主类型同包」的机器可验证形态。
+- `[3f]` 显示内建动作表此时只剩 `Hotkey` / `System` / `Ocr` 三项。
+
+---
+
 ## [未发布] - 2026-09-17（S4c：窗口类拆成五个单动作包）
 
 把上一阶段合在一枚 dll 里的五个窗口动作拆成**一个动作一个包** —— 拆包的粒度就是停用的粒度。
