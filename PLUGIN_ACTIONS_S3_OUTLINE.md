@@ -425,15 +425,24 @@ plugins/StarPie.Plugin.TerminalActions/   （仅方案乙）TerminalActionsPlugi
 
 ## 6. 阶段划分与顺序
 
-| 阶段 | 内容 | 前置 | 可独立验证 |
+| 阶段 | 内容 | 前置 | 状态 |
 |---|---|---|---|
-| **S3-0** | 修 §2.1 的认领快照刷新 + `[3k]` 断言 | — | ✅ 单独提交 |
-| **S3a** | 新建 `WindowActions` 包 + `IHostWindowService` + `WindowControl` 能力；移除 5 条内建登记 | S3-0 | ✅ |
-| **S3b** | 新建 `TerminalActions` 包（方案乙才会做）+ 从 `BasicActions` 移除两项认领 | S3-0（**强依赖，无此则冲突**） | ✅ |
-| **S3c** | 新建 `ScreenOcr` 包 + `IHostScreenCaptureService` + `ScreenCapture` 能力 | S3-0 | ✅ |
-| **S3d** | 新建 `SystemActions` 包 + `IHostSystemService`（档 1 起步）+ `InputSimulation` 能力 | S3-0 | ✅ |
-| **S3e** | `CopyBundledPlugins` 改为多包列举 + 构建校验 | 任一新包存在 | ✅ |
-| **S3f** | 文档同步 + 自检全段回归 + 提交 | 全部 | ✅ |
+| **S3-0** | 修 §2.1 的认领快照刷新 + `[3k]` 断言 | — | ✅ `77788b3` |
+| **S3a** | 新建 `WindowActions` 包 + `IHostWindowService` + `WindowControl` 能力；移除 5 条内建登记 | S3-0 | ✅ `7e95b02` |
+| **S3e** | `CopyBundledPlugins` 改为多包列举 + 构建校验 | 任一新包存在 | ✅ 随 S3a 完成（缺失即构建失败） |
+| **S3c** | 新建 `ScreenOcr` 包 + `IHostScreenCaptureService` + `ScreenCapture` 能力 | S3-0 | ⬜ 下一阶段 |
+| **S3d** | 新建 `SystemActions` 包 + `IHostSystemService`（档 1 起步）+ `InputSimulation` 能力 | S3-0 | ⬜ |
+| **S3b** | 新建 `TerminalActions` 包 + 从 `BasicActions` 移除 `Command`/`ShellTool` 两项认领 | S3-0（**强依赖，无此则冲突**） | ⬜ 放最后（有迁移风险） |
+| **S3f** | 文档同步 + 自检全段回归 + 提交 | 全部 | ⬜ |
+
+> **S3a 实际落地时与原估的三处偏差**（记下来，免得后续阶段重复踩）：
+> 1. `[3g]` 里写死 `Type="Tile"` 的校验探针，在 Tile 外移的同一刻变成**误报** ——
+>    它报出的「掉进 default」其实是正确行为（那时 `[3h]` 还没装包）。现在改为从
+>    `SnapshotAll()` 取第一个带必填项的动作。**凡是拿具体动作当探针的地方都要随外移一起复查。**
+> 2. 三个带门禁的服务共用一个基类之后，「required 传错」**没有编译期保护** ——
+>    补了 `[3j]` 跨能力交叉断言（只声明 A 的插件调 B 的服务）。
+> 3. 门禁探针一律传空参数：万一门禁写错、调用被放行，也只会撞上空值短路，
+>    **不会当场改掉自检者自己的窗口**。
 
 > 顺序建议：**S3-0 → S3a → S3c → S3d → S3b**（把风险最高的 `System` 放在窗口/截屏都验证过之后，
 > 把有迁移风险的 `BasicActions` 拆分放最后）。S3e 可以在第一个新包落地时就顺手做。
