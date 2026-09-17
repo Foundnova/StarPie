@@ -441,7 +441,7 @@ internal static class PluginSelfTest
                 // 【已移出本表】Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
                 //             Command / ShellTool  → StarPie.Plugin.BasicActions
                 //             Tile / ToggleTopmost / MoveMonitor / WindowOpacity /
-                //             SwitchWindow          → StarPie.Plugin.WindowActions
+                //             SwitchWindow          → 五个同名单动作包（一个动作一个包）
                 //
                 // 它们不再是内建动作，而是随包插件认领的顶层类型。
                 // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，

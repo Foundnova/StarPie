@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.WindowActions;
+namespace StarPie.Plugin.Tile;
 
 /// <summary>
 /// 动作「平铺窗口」。对应配置里的 <c>Type="Tile"</c>。

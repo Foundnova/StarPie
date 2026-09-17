@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.WindowActions;
+namespace StarPie.Plugin.MoveMonitor;
 
 /// <summary>
 /// 动作「窗口移到下一屏」。对应配置里的 <c>Type="MoveMonitor"</c>。

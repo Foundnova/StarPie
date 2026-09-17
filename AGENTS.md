@@ -111,7 +111,13 @@ g:\Users\2 Better\Desktop\design\
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
 ├── plugins/                       # ★ 随包动作包（与主程序同源构建，随发行包分发到 程序目录\plugin\）
 │   ├── StarPie.Plugin.BasicActions/   # 启动程序 / 打开网址 / 打开文件夹 / 运行命令 / 系统与右键工具（认领 Launch / WebUrl / Folder / Command / ShellTool）
-│   └── StarPie.Plugin.WindowActions/  # 平铺窗口 / 窗口置顶 / 窗口透明度 / 移到下一屏 / 切换窗口（认领 Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow）
+│   ├── StarPie.Plugin.Tile/           # 平铺窗口（认领 Tile）
+│   ├── StarPie.Plugin.ToggleTopmost/  # 窗口置顶/取消置顶（认领 ToggleTopmost）
+│   ├── StarPie.Plugin.MoveMonitor/    # 窗口移到下一屏（认领 MoveMonitor）
+│   ├── StarPie.Plugin.WindowOpacity/  # 窗口透明度（认领 WindowOpacity）
+│   └── StarPie.Plugin.SwitchWindow/   # 切换窗口（认领 SwitchWindow）
+│       # 窗口类这五个刻意**一个动作一个包**：停用粒度精确到动作，
+│       # 用户能把「窗口透明度」关掉而继续用「平铺窗口」。
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
 │   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）

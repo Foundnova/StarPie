@@ -62,14 +62,17 @@
     正因为它是静默的，下面才配了一道缺失检查。
   -->
   <ItemGroup>
-    <ProjectReference Include="..\plugins\StarPie.Plugin.BasicActions\StarPie.Plugin.BasicActions.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\plugins\StarPie.Plugin.WindowActions\StarPie.Plugin.WindowActions.csproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <Private>false</Private>
-    </ProjectReference>
+    <!--
+      逐枚列举，**刻意不用 ..\plugins\*\*.csproj 通配**：新加一个实验工程或临时
+      验证目录时，通配写法会把它默默卷进发行包，而那种「多了一枚没打算分发的插件」
+      从构建日志里完全看不出来。
+    -->
+    <ProjectReference Include="..\plugins\StarPie.Plugin.BasicActions\StarPie.Plugin.BasicActions.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.Tile\StarPie.Plugin.Tile.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.ToggleTopmost\StarPie.Plugin.ToggleTopmost.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.MoveMonitor\StarPie.Plugin.MoveMonitor.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.WindowOpacity\StarPie.Plugin.WindowOpacity.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.SwitchWindow\StarPie.Plugin.SwitchWindow.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -84,9 +87,14 @@
         StarPie.Plugin.Abstractions.dll 之类的东西一并塞进来源区，
         而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
         包多起来以后这条纪律更容易被顺手违反 —— 加包时请老老实实加一行。
+        下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
       -->
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.BasicActions\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.BasicActions.dll" />
-      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowActions\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowActions.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Tile\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Tile.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ToggleTopmost\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ToggleTopmost.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowOpacity\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowOpacity.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.SwitchWindow\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.SwitchWindow.dll" />
     </ItemGroup>
 
     <!--

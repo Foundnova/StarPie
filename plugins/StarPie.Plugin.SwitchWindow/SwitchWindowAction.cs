@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.WindowActions;
+namespace StarPie.Plugin.SwitchWindow;
 
 /// <summary>
 /// 动作「切换窗口」。对应配置里的 <c>Type="SwitchWindow"</c>。

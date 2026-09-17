@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.WindowActions;
+namespace StarPie.Plugin.WindowOpacity;
 
 /// <summary>
 /// 动作「设置窗口透明度」。对应配置里的 <c>Type="WindowOpacity"</c>。

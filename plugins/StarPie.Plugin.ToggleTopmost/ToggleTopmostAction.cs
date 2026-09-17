@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StarPie.Plugin;
 
-namespace StarPie.Plugin.WindowActions;
+namespace StarPie.Plugin.ToggleTopmost;
 
 /// <summary>
 /// 动作「窗口置顶 / 取消置顶」。对应配置里的 <c>Type="ToggleTopmost"</c>。

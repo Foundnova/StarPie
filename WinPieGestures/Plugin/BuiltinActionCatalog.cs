@@ -170,7 +170,9 @@ internal static class BuiltinActionCatalog
 			//   Command / ShellTool                                        —— 第二批
 			//     → plugins\StarPie.Plugin.BasicActions
 			//   Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow —— 第三批
-			//     → plugins\StarPie.Plugin.WindowActions
+			//     → plugins\StarPie.Plugin.{Tile,ToggleTopmost,MoveMonitor,WindowOpacity,SwitchWindow}
+			//     第三批按「一个动作一个包」拆开（不再是一个包认领五个类型）——
+			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」。
 			//
 			// 认领表由 PluginHost.RebuildClaimTable 在启动期建立，且<b>内建优先</b>：
 			// 上面这些类型只要还留在这个表里，任何插件对它们的认领都会被拒绝。
