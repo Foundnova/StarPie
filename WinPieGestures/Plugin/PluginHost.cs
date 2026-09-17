@@ -665,6 +665,35 @@ internal static class PluginHost
 
     public static PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding) =>
         Runtime.ExecuteClaimedAction(action, binding);
+    public static IReadOnlyList<string> ClaimedTypeNamesOf(string pluginId) =>
+        PluginActionClaimRegistry.Snapshot()
+            .Where(binding => string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .Select(binding => binding.TypeName)
+            .ToArray();
+
+    public static bool IsClaimedTypeAvailable(string? type, out string reason)
+    {
+        reason = "";
+        if (!PluginActionClaimRegistry.TryResolve(type, out PluginTypeClaimBinding binding)) return true;
+
+        PluginInstance? instance = Find(binding.PluginId);
+        if (instance == null)
+        {
+            reason = $"该动作由内置动作包「{binding.PluginId}」提供，但登记记录已经丢失。";
+            return false;
+        }
+        if (!instance.Entry.Enabled)
+        {
+            reason = $"该动作属于内置动作包「{instance.Entry.Name}」，它当前已被停用。";
+            return false;
+        }
+        if (instance.State == PluginRuntimeState.Quarantined)
+        {
+            reason = $"内置动作包「{instance.Entry.Name}」因连续出错已被隔离。";
+            return false;
+        }
+        return true;
+    }
 
     // ------------------------------------------------------------------ 界面数据
 
@@ -684,7 +713,13 @@ internal static class PluginHost
     }
 
     /// <summary>已注册的插件动作（供槽位编辑器按插件分组展示）。</summary>
-    public static List<PluginActionRegistration> GetRegisteredActions() => Catalog.SnapshotActions();
+    public static List<PluginActionRegistration> GetRegisteredActions()
+    {
+        HashSet<string> claimed = PluginActionClaimRegistry.Snapshot()
+            .Select(binding => binding.FullId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return Catalog.SnapshotActions().Where(action => !claimed.Contains(action.FullId)).ToList();
+    }
 
     public static bool TryGetAction(string fullId, out PluginActionRegistration registration) =>
         Catalog.TryGetAction(fullId, out registration);

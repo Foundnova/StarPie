@@ -2888,6 +2888,9 @@
                     <!-- 模块 2：触发动作类型选择与参数配置 -->
                     <Border Name="FocusActionTypeAndParamsBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                       <StackPanel>
+                        <Border Name="FocusActionUnavailableBanner" Background="#1ADF2626" BorderBrush="#DC2626" BorderThickness="1" CornerRadius="6" Padding="10,7" Margin="0,0,0,10" Visibility="Collapsed">
+                          <TextBlock Name="FocusActionUnavailableText" FontSize="11.5" Foreground="#DC2626" TextWrapping="Wrap" />
+                        </Border>
                         <Grid Margin="0,0,0,10">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
