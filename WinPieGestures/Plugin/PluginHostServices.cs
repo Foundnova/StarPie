@@ -344,9 +344,15 @@ internal abstract class PluginGatedService
 /// <summary>
 /// 命令执行服务实现。
 /// <para>
-/// 它是 SDK 里唯一「参数即任意命令」的攻击面，所以是本项目<b>唯一带真实门禁</b>的服务：
+/// 它是 SDK 里唯一「参数即任意命令」的攻击面，也是本项目<b>第一个带真实门禁</b>的服务：
 /// 插件清单没声明 <see cref="PluginCapability.Process"/> 时，<see cref="Run"/> 直接抛
 /// <see cref="PluginCapabilityDeniedException"/>，绝不静默降级。
+/// </para>
+/// <para>
+/// <b>「第一个」而不是「唯一」</b>：自它之后，窗口控制、屏幕截取、系统功能各自带上了门禁
+/// （分别要求 <see cref="PluginCapability.WindowControl"/> / <see cref="PluginCapability.ScreenCapture"/> /
+/// <see cref="PluginCapability.InputSimulation"/>）。这里曾写作「唯一带真实门禁的服务」，
+/// 在窗口服务落地时就已成了一句不实的话 —— 留着它会让后来者以为其余服务不必声明能力。
 /// </para>
 /// <para>
 /// 元数据（<see cref="Terminals"/>）刻意<b>不</b>受门禁约束：插件的 <c>Parameters</c> 属性
@@ -598,6 +604,79 @@ internal sealed class PluginScreenCaptureService : PluginGatedService, IHostScre
         // 执行体内部是 Task.Run 起来的异步流程（开头还有一个 35ms 的等待，
         // 目的是别把尚未淡出干净的轮盘截进全屏图里），所以这里只负责「发起」。
         Guard(nameof(CaptureAndRecognize), () => { OcrManager.StartCaptureAndRecognize(); return true; });
+    }
+}
+
+/// <summary>
+/// 系统功能服务实现。
+/// <para>
+/// 门禁是 <see cref="PluginCapability.InputSimulation"/>，<b>不是</b>
+/// <see cref="PluginCapability.Process"/>：这一族动作里占绝大多数的是
+/// 「向当前前台窗口投递一组按键」（最小化 = <c>Win+Down</c>、任务视图 = <c>Win+Tab</c>、
+/// 音量 / 媒体键 …），那正是 <c>InputSimulation</c> 这个名字对应的后果。
+/// 少数预设（任务管理器 / 计算器 / 关机）确实会起进程，所以
+/// <c>StarPie.Plugin.System</c> 两个能力都声明 —— 但门禁只认 <c>InputSimulation</c>：
+/// 一个只声明了 <c>Process</c> 的插件不该能往用户正在打字的窗口里按键。
+/// </para>
+/// <para>
+/// 元数据面（<see cref="Presets"/>）与其它服务同理<b>不受门禁约束</b>：
+/// 它要供注册期的 <c>Parameters</c> 读取。
+/// </para>
+/// </summary>
+internal sealed class PluginSystemService : PluginGatedService, IHostSystemService
+{
+    public PluginSystemService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.InputSimulation, nameof(IHostSystemService))
+    {
+    }
+
+    /// <summary>
+    /// 宿主预设表的投影。<b>每次访问重新构造</b>，与 <see cref="PluginCommandService.Terminals"/> 同思路。
+    /// <para>
+    /// 这里不必像终端清单那样为「切语言」而重算（预设表的文案是硬编码的，不随语言变），
+    /// 那为什么仍然不缓存：一旦将来有人把 <c>SystemPresetList</c> 接进 i18n，
+    /// 一个 <c>static</c> 缓存就会把旧语言的文案<b>永久钉住</b>，而现象是
+    /// 「切到英文后只有这一个下拉还是中文」—— 很难想到是缓存。表里四十来项，
+    /// 重建的代价是几十个小对象，不值得为它引入一个会静默失效的缓存。
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<SystemPresetOption> Presets
+    {
+        get
+        {
+            var list = new List<SystemPresetOption>(SlotViewModel.SystemPresetList.Count);
+
+            foreach (SystemPresetItem item in SlotViewModel.SystemPresetList)
+            {
+                list.Add(new SystemPresetOption
+                {
+                    Key = item.Key,
+
+                    // 用 FormattedDisplay（"[分类] 名称"）而不是裸 DisplayName：
+                    // 宿主设置页里那个下拉显示的就是它，两处必须逐字一致 ——
+                    // 用户在两个界面之间对照时，多一个分类前缀就会以为选错了。
+                    DisplayName = item.FormattedDisplay,
+                });
+            }
+
+            return list;
+        }
+    }
+
+    public bool RunPreset(string presetKey)
+    {
+        RequireCapability();
+
+        // 门禁<b>之后</b>才判空值 —— 与 PluginCommandService.Run / PluginWindowService.ApplyLayout 同序。
+        // 这个顺序有两层作用，两条都被自检 [3j] 直接用到：
+        //   ① 它证明门禁排在「空值短路」之前：一个没声明能力的插件连空键都调不动；
+        //   ② 反过来，声明了能力的插件用空键调下来的代价为零 ——
+        //      「声明后放行」那半条断言正是靠这一点才敢真的调下去（不起进程、不按键）。
+        if (string.IsNullOrWhiteSpace(presetKey)) return false;
+
+        // 返回值的语义直接透传 ExecuteSystem：它认不认识这个键。
+        // 不在这里额外包装成「成功 / 失败」——那样会把「已发起」说成「已执行完」。
+        return Guard(nameof(RunPreset), () => ActionExecutor.ExecuteSystem(presetKey));
     }
 }
 

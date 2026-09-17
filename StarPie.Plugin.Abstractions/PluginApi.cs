@@ -17,12 +17,23 @@ public static class PluginApi
     /// <item>1.2 —— 新增 <see cref="IHostWindowService"/>（装配到
     /// <see cref="IPluginContext.Windows"/>）与 <see cref="PluginCapability.WindowControl"/>，
     /// 使「平铺 / 置顶 / 透明度 / 移到下一屏 / 切换应用」这五个动作不必再硬编码在宿主里。</item>
+    /// <item>1.3 —— 新增 <see cref="IHostScreenCaptureService"/>（装配到
+    /// <see cref="IPluginContext.ScreenCapture"/>）与 <see cref="PluginCapability.ScreenCapture"/>，
+    /// 使「截屏识字」不必再硬编码在宿主里。</item>
+    /// <item>1.4 —— 新增 <see cref="IHostSystemService"/>（装配到
+    /// <see cref="IPluginContext.System"/>）与 <see cref="PluginCapability.InputSimulation"/>，
+    /// 使「系统控制」不必再硬编码在宿主里。</item>
     /// </list>
+    /// <para>
+    /// <b>每加一个服务面就在这里补一条，别只改数字。</b>这份清单是后来者判断
+    /// 「某个接口从哪一版开始存在」的唯一依据 —— 数字变了而清单没变，
+    /// 插件作者会按旧清单去推断版本兼容性，而结论是错的。
+    /// </para>
     /// </summary>
-    public const int ApiVersionMinor = 3;
+    public const int ApiVersionMinor = 4;
 
     /// <summary>
-    /// SDK 契约版本字符串，形如 <c>1.2</c>。
+    /// SDK 契约版本字符串，形如 <c>1.4</c>。
     /// <para>
     /// 这里没法用常量插值消掉重复：C# 的常量插值只接受 <c>string</c> 常量，
     /// 而版本号的两个组成部分是 <c>int</c>。所以「这个字符串」与「上面两个数字」
@@ -31,7 +42,7 @@ public static class PluginApi
     /// 漂了以后报错信息里的版本号会和真实契约对不上，排查时先被误导一轮。
     /// </para>
     /// </summary>
-    public const string ApiVersion = "1.3";
+    public const string ApiVersion = "1.4";
 
     /// <summary>本契约程序集的程序集名。宿主的 PluginLoadContext 依赖它做「共享程序集放行」。</summary>
     public const string AbstractionsAssemblyName = "StarPie.Plugin.Abstractions";

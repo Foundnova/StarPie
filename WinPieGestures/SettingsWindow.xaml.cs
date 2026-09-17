@@ -6567,19 +6567,17 @@ public partial class SettingsWindow : Window
 			MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
-	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities)
-	{
-		var parts = new List<string>();
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Process)) parts.Add("· 启动进程 / 操作其他程序");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.FileSystem)) parts.Add("· 读写你的文件");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Network)) parts.Add("· 访问网络");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Clipboard)) parts.Add("· 读取或修改剪贴板");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Registry)) parts.Add("· 读写注册表");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.GlobalHook)) parts.Add("· 安装全局键盘/鼠标钩子");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Ui)) parts.Add("· 显示界面与通知");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Admin)) parts.Add("· 需要管理员权限");
-		return parts.Count == 0 ? "（无）" : string.Join("\n", parts);
-	}
+	/// <summary>
+	/// 安装确认页上的风险清单。
+	/// <para>
+	/// 实现在 <see cref="PluginCapabilityLabels"/> 里 —— 搬出去的理由是它原先内联在此处，
+	/// 于是新增能力位时只能靠人记得来补一行，而这件事连着漏了两次
+	/// （<c>WindowControl</c> 与 <c>ScreenCapture</c> 至今没在确认页上出现过）。
+	/// 现在自检会遍历枚举的每个成员要求那里有一行非空文案。
+	/// </para>
+	/// </summary>
+	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities) =>
+		PluginCapabilityLabels.Describe(capabilities);
 
 	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
 	{

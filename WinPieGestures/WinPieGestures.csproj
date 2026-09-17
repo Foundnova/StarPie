@@ -78,6 +78,7 @@
     <ProjectReference Include="..\plugins\StarPie.Plugin.MoveMonitor\StarPie.Plugin.MoveMonitor.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.WindowOpacity\StarPie.Plugin.WindowOpacity.csproj" ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\plugins\StarPie.Plugin.SwitchWindow\StarPie.Plugin.SwitchWindow.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\plugins\StarPie.Plugin.System\StarPie.Plugin.System.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -105,6 +106,7 @@
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowOpacity\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowOpacity.dll" />
       <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.SwitchWindow\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.SwitchWindow.dll" />
+      <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.System\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.System.dll" />
     </ItemGroup>
 
     <!--

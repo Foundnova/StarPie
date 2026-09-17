@@ -153,20 +153,14 @@ internal static class BuiltinActionCatalog
 			// 一旦它由随包插件提供，用户停用那个包之后，所有空扇区按下去都会报
 			// 「动作所属的包已停用」—— 而他压根没配过那些扇区。
 			// 所以这一个刻意不外移，哪怕它在形状上已经完全符合插件模型。
+			// 至此**它是本表里唯一一项**，而且理由是上一条、不是「还没轮到」。
 			BuiltinActionHotkey.Create(),
 
-			// 【这一个已在路上，暂时仍由内建提供】
-			//   · System —— 等 IHostSystemService
-			// 服务面补齐后就搬走，届时本表只剩 Hotkey 一项、且是出于上一条理由。
-			// 它是最后一个还没找到宿主服务形态的动作：执行体内含直接触碰 WPF 的
-			// Dispatcher.BeginInvoke，不是「转发一下」就能了事的。
-			BuiltinActionSystem.Create(),
-
-			// 【已被随包动作包认领、不再由内建提供的十一个】（原登记项见 git 历史）
+			// 【已被随包动作包认领、不再由内建提供的十二个】（原登记项见 git 历史）
 			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）/
 			//   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
-			//   WindowOpacity / SwitchWindow / Ocr（含别名 ScreenOcr）
-			//     → plugins\StarPie.Plugin.<类型名> —— 十一个**单动作包**
+			//   WindowOpacity / SwitchWindow / Ocr（含别名 ScreenOcr）/ System
+			//     → plugins\StarPie.Plugin.<类型名> —— 十二个**单动作包**
 			//     每个包只认领自己那一个类型（别名与主类型同包），
 			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」，
 			//     也能单独关掉那个会读屏幕的「截屏识字」。

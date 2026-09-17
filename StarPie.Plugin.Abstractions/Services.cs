@@ -406,3 +406,72 @@ public interface IHostScreenCaptureService
     /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.ScreenCapture"/>。</exception>
     void CaptureAndRecognize();
 }
+
+/// <summary>一项系统功能预设。</summary>
+public sealed class SystemPresetOption
+{
+    /// <summary>预设键，如 <c>Minimize</c>、<c>TaskView</c>、<c>Shutdown</c>。写进动作参数的就是这个值。</summary>
+    public string Key { get; init; } = "";
+
+    /// <summary>显示名（宿主已按当前语言与分类拼好，与宿主设置页里的下拉逐字一致）。</summary>
+    public string DisplayName { get; init; } = "";
+}
+
+/// <summary>
+/// 宿主已验证的系统功能能力：触发一个预设 —— 最小化 / 最大化 / 任务视图 / 音量 / 媒体控制 /
+/// 锁屏 / 关机 / 重启 / 任务管理器 / 计算器 …
+/// <para>
+/// 需要 <see cref="PluginCapability.InputSimulation"/>，否则执行面抛
+/// <see cref="PluginCapabilityDeniedException"/>。
+/// </para>
+/// <para>
+/// <b>为什么传的是一个预设键，而不是让插件自己发快捷键</b>：
+/// 这张表里有一部分确实就是组合键（最小化 = <c>Win+Down</c>），但也有相当一部分
+/// <b>根本不是</b>快捷键 —— 任务管理器、资源管理器、计算器、关机、重启、睡眠都是起进程，
+/// 打开星梦设置与快速搜索则是让宿主弹自己的窗口。<c>RunPreset</c> 的统一语义是
+/// 「宿主，请替我执行这个系统功能」，把实现细节留在宿主里。
+/// </para>
+/// <para>
+/// 附带的好处是<b>历史别名只能由宿主认识</b>：配置里沉淀了 <c>SnapLeft</c> / <c>靠左分屏</c> /
+/// <c>lock</c> / <c>锁屏</c> / <c>starpie控制台</c> 这类跨年代写法，
+/// 让插件自己翻译是翻译不出来的 —— 它只能照抄宿主那份 <c>switch</c>，而那份会变。
+/// </para>
+/// </summary>
+public interface IHostSystemService
+{
+    /// <summary>
+    /// 预设清单（有序），就是宿主自己那个下拉的<b>同一份数据源</b>。
+    /// <para>
+    /// 插件的 <c>Parameters</c> 应当直接用它生成选项，<b>不要另抄一份</b>：
+    /// 抄一份的代价是宿主以后加预设时要改两处，漏一处就会出现
+    /// 「新预设在这个面板里能选、在那个面板里选不到」的分裂，而且不会有任何报错。
+    /// </para>
+    /// <para>
+    /// 与其它服务的元数据面同理，<b>刻意不受门禁约束</b>：
+    /// <c>Parameters</c> 是属性，注册期就会被读取，在这里抛异常会让一个
+    /// 「忘了声明能力」的插件在注册阶段整个崩掉 —— 而它其实只是不能在运行时干活。
+    /// </para>
+    /// <para>
+    /// <b>这不是白名单</b>，见 <see cref="RunPreset"/>。
+    /// </para>
+    /// </summary>
+    IReadOnlyList<SystemPresetOption> Presets { get; }
+
+    /// <summary>
+    /// 执行一个系统功能预设。只负责<b>发起</b>，不等待结果。
+    /// <para>
+    /// <b>返回值是「有没有匹配到一个已实现的预设」，不是「执行成功了没有」</b> ——
+    /// 关机要几秒、任务管理器要等它启动，这些都无法在这里同步判定。
+    /// 返回 <c>false</c> 的可操作含义是：<b>这个键已经不认识了，多半是配置过期</b>。
+    /// 插件应当据此给用户一句人话，而不是让按下扇区后什么都没发生。
+    /// </para>
+    /// <para>
+    /// <b>不按 <see cref="Presets"/> 校验</b>：那张表里没有 <c>SnapLeft</c> 的历史别名，
+    /// 按表校验会把老配置整体判死 —— 本想防静默失效，结果造出一个更糟的静默失效。
+    /// </para>
+    /// </summary>
+    /// <param name="presetKey">预设键（大小写不敏感，两端空白会被忽略）。</param>
+    /// <returns>是否匹配到一个预设并已发起。空键、或键无任何匹配时为 <c>false</c>。</returns>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.InputSimulation"/>。</exception>
+    bool RunPreset(string presetKey);
+}

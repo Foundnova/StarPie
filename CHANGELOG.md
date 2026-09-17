@@ -4,6 +4,43 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（S4b：`System` 拆成单动作包 + SDK 1.4 新增系统服务面）
+
+继 S4a 之后第四个拆包阶段。至此**内建动作表只剩 `Hotkey` 一项** —— 13 个动作里 12 个已全部交割给随包单动作包，`Hotkey` 因「占位类型必须永远可解析」永久留下（见 `BuiltinActionCatalog.cs` 内注释）。
+
+### 🌟 核心改进与新增功能
+
+1. **SDK 契约 1.3 → 1.4：新增 `IHostSystemService` 与 `InputSimulation` 能力**
+   - 能力项 `PluginCapability.InputSimulation = 1 << 10`。**门禁认它而不认 `Process`**：「系统控制」的执行既会起进程（关机 / 注销）也会往当前窗口发按键（音量、任务视图、最小化），两者后果不同 —— 前者是多一个后台进程，后者是往用户正在打字的窗口里按键。若门禁错用 `Process`，一个只声明「进程」的插件就能模拟按键。
+   - 接口两个成员：`IReadOnlyList<SystemPresetOption> Presets { get; }`（元数据面，不设门禁 —— 插件注册参数下拉时就要读它）与 `bool RunPreset(string preset)`（执行面，门禁 `InputSimulation`）。
+   - **预设表保持宿主为唯一数据源**：`Presets` 直接转发 `SlotViewModel.SystemPresetList`，插件不另抄一份。抄一份的后果是宿主加预设后插件下拉里没有它 —— 无报错、无异常，用户只知道「新选项选不到」。
+   - 补上 S4a 遗漏的 1.3 版本说明条目（提交信息里声称补了，实际没补 —— 本次一并修正）。
+
+2. **宿主侧：`ExecuteSystem` 由 `void` 改为 `bool`，新增 `PluginSystemService`**
+   - `ActionExecutor.ExecuteSystem` 返回「是否匹配到预设」。这是插件包判断「老配置里的预设名还能不能识别」的唯一途径 —— 返回 `void` 的话，插件只能对每个未知值报一句不知所云的错误。
+   - 41 处 switch `break;` → `return true;`，补 `default: return false;`。这次用了限定区间的脚本整词替换（41 处逐条 Edit 不现实），替换前后都做了断言与 diff 分类核对。
+   - `PluginSystemService` 门禁 `InputSimulation`；`RunPreset` 空键短路，放行探针不会真的起进程、按键。
+
+3. **`StarPie.Plugin.System` 单动作包**
+   - 认领 `System=system`，清单声明 `Capabilities = InputSimulation; Process`。
+   - **参数键用 `HostActionFields.Parameter` 而不是老的 `preset`**：宿主对被认领类型的通用投影把裸字段 `Parameter` 投成键 `Parameter`，老配置的预设值就住在那里 —— 键名写 `preset` 会让所有迁移过来的老配置静默失联（值还在，只是永远读不到）。
+   - 参数下拉的选项从 `context.System.Presets` 即时生成，不硬编码。
+   - **命名空间遮蔽**：包的命名空间叫 `StarPie.Plugin.System`，方法体里裸写 `System.Globalization...` 会被解析成它自己（CS0234）。一律 `using System.Globalization;` + 简单名。
+
+4. **`BuiltinActionSystem.cs` 删除，内建动作表只剩 `Hotkey`**
+
+5. **安装确认页能力文案集中化：新增 `PluginCapabilityLabels`**
+   - 复查时发现一处**已存在的缺陷**：`DescribeCapabilities` 里没有 `WindowControl`（S3c 加的）与 `ScreenCapture`（S4a 加的）的文案 —— 那两项能力加进来时声称的「让用户在确认页看见后果」实际从未生效。本次补齐，并把映射集中到宿主侧一个表里。
+   - `[3j]` 加机器护栏：**枚举里每个非空能力位都必须有确认页文案**，漏一个当场报错 —— 「加能力位必须加文案」从口头约定变成断言。
+
+### 🧪 自检
+
+- **`System` 包跑 `--plugin-selftest --skip-invoke`，全段 PASS**；报告中 0 条 WARN / FAIL / SKIP，`%TEMP%/StarPie-PluginSelfTest-*` 为 0 个。
+- `[3f]` 内建动作表断言收紧为 **1 项（只剩 `Hotkey`）**；原先住在 `[3f]` 的两条「选项数 = 宿主表项数」断言挪到 `[3i]` 认领链路上 —— Tile（S4c）与 System（S4b）相继改成认领类型后，`[3f]` 的循环再也走不到它们，断言还在源码里却永远不会执行（守卫静默失效）。
+- `[3i]` 认领表 1 项（`System → starpie.builtin.system.system`）；选项数 41 项与宿主表逐项同源 ✓。
+- `[3i]` 新增第 ⑦ 条**参数键健全性**断言：重复键报错；与宿主裸字段只差大小写的键名报错（投影是精确匹配，`preset` 险情就属于这一族）。
+- `[3j]` 新增系统服务三段断言：未声明拒绝 / 只声明 `Process` 仍拒绝（门禁认 `InputSimulation` 的机器化版本）/ 已声明放行（空键短路）。另断言未声明能力也能读预设清单（元数据面不设门禁）。
+
 ## [未发布] - 2026-09-17（S4a：`Ocr` 拆成单动作包 + SDK 1.3 新增屏幕截取服务面）
 
 继 S4c / S4d 之后第三个拆包阶段。`Ocr` 是这批里**唯一需要新开宿主服务面**的动作 —— S4c / S4d 的十个动作都能用既有的 `IHostCommandService` / `IHostShellService` / `IHostWindowService` 表达，而「框选截屏 + 文字识别」在 SDK 里根本没有对应物，所以它必须先扩契约。

@@ -35,14 +35,16 @@ internal sealed class PluginContext : IPluginContext
         Icons = new PluginIconRegistry(session, metadata.Id);
         Host = new PluginHostActionInvoker(metadata.Id);
 
-        // 这三个服务带能力门禁：构造时就把清单里的 Capabilities 交给它们，
+        // 这四个服务带能力门禁：构造时就把清单里的 Capabilities 交给它们，
         // 未声明对应能力的插件拿到的是一个「调用即拒绝」的对象。
         // 判定放在服务内部而不是这里 —— 因为「未声明」与「已声明」两种情况下
-        // 服务的元数据（终端清单 / 动词清单 / 布局清单）都应当照常可读，只有产生后果的调用该被拦。
+        // 服务的元数据（终端清单 / 动词清单 / 布局清单 / 预设清单）都应当照常可读，
+        // 只有产生后果的调用该被拦。
         Commands = new PluginCommandService(metadata.Id, metadata.Capabilities);
         Shell = new PluginShellService(metadata.Id, metadata.Capabilities);
         Windows = new PluginWindowService(metadata.Id, metadata.Capabilities);
         ScreenCapture = new PluginScreenCaptureService(metadata.Id, metadata.Capabilities);
+        System = new PluginSystemService(metadata.Id, metadata.Capabilities);
 
         Info = new PluginHostInfo(metadata.Capabilities);
         Notify = new PluginNotificationService(metadata.Id);
@@ -75,6 +77,9 @@ internal sealed class PluginContext : IPluginContext
 
     /// <summary>屏幕截取（框选截屏 + 文字识别）。</summary>
     public IHostScreenCaptureService ScreenCapture { get; }
+
+    /// <summary>系统功能（最小化 / 任务视图 / 音量 / 锁屏 / 关机 …）。</summary>
+    public IHostSystemService System { get; }
 
     public IHostInfo Info { get; }
 

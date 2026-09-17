@@ -419,7 +419,7 @@ internal static class PluginSelfTest
             {
                 "Launch", "WebUrl", "Url", "Folder", "OpenFolder", "Command", "ShellTool",
                 "Tile", "ToggleTopmost", "MoveMonitor", "WindowOpacity", "SwitchWindow",
-                "Ocr", "ScreenOcr",
+                "Ocr", "ScreenOcr", "System",
             };
 
             foreach (string migratedType in migratedTypes)
@@ -439,10 +439,10 @@ internal static class PluginSelfTest
                     new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
                     1, "hotkey", "Ctrl+Alt+S", "快捷键"),
 
-                // 【已移出本表】以下十个类型现在各自是一个**单动作包**：
+                // 【已移出本表】以下十二个类型现在各自是一个**单动作包**：
                 //   Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
                 //   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
-                //   WindowOpacity / SwitchWindow
+                //   WindowOpacity / SwitchWindow / Ocr（别名 ScreenOcr）/ System
                 // 包名一律 StarPie.Plugin.<类型名>，认领串只有自己那一项
                 // （别名与主类型同包）。拆包粒度就是停用粒度。
                 //
@@ -450,15 +450,19 @@ internal static class PluginSelfTest
                 // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，
                 // 不是缺陷。它们的注册 / 参数 / 投影 / 校验改由 [3i] 按认领链路验证
                 // （那段对**每个**被自检的包都跑一遍，所以新包不需要在这里补任何东西），
-                // 并且那里多验一条本表没有的：认领指向的贡献点必须真的存在。
-                ("System", null,
-                    new ActionItem { Type = "System", Parameter = "Minimize" },
-                    1, "preset", "Minimize", "系统功能"),
-
-                // 【Ocr 已外移】它曾在这里充当「无参数内建动作」的样例（Key 传 null）。
-                // 现在它是 StarPie.Plugin.Ocr 认领的顶层类型，改由 [3i] 按认领链路验证 ——
-                // 那一段对**每个**被自检的包都跑一遍，会断言参数声明与认领指向都对。
+                // 并且那里多验两条本表没有的：认领指向的贡献点必须真的存在，
+                // 以及「宿主表仍是插件下拉的唯一数据源」。
             };
+
+            // 内建动作表<b>只剩 Hotkey 一项</b>，而且它的存在理由是「占位类型必须永远可解析」，
+            // 不是「还没轮到」。这条断言的意义在于：将来若有人往 Build() 里再加一项，
+            // 这里会立刻红，逼他说清那一项凭什么不能外移。
+            if (BuiltinActionCatalog.SnapshotAll().Count != 1)
+            {
+                Fail("内建动作注册",
+                    $"内建动作表里有 {BuiltinActionCatalog.SnapshotAll().Count} 项，应为 1 项（只剩 Hotkey）—— " +
+                    "新增内建动作前请先回答：它为什么不能是一个随包动作包？");
+            }
 
             int builtinVerified = 0;
 
@@ -501,33 +505,13 @@ internal static class PluginSelfTest
                     continue;
                 }
 
-                // System 的选项是从 SlotViewModel 的预设表即时生成的。这条断言守的是
-                // 「将来有人图省事把它改回硬编码」—— 那样每加一个系统预设就会漏掉同步，
-                // 而且不会有任何报错，只是新预设在这个面板里选不到。
-                if (caseType == "System")
-                {
-                    int optionCount = caseReg.Contribution.Parameters[0].Options?.Count ?? 0;
-
-                    if (optionCount != SlotViewModel.SystemPresetList.Count)
-                    {
-                        Fail("内建动作参数",
-                            $"System 的选项数（{optionCount}）与预设表（{SlotViewModel.SystemPresetList.Count}）不一致 —— 预设表已不是唯一数据源");
-                    }
-                }
-
-                // Tile 的选项 = 全部布局码 + 循环 / 反向循环 / 还原三个特殊标记。
-                // 少一个标记的后果是那种用法在界面上彻底选不到，而且不会有任何报错。
-                if (caseType == "Tile")
-                {
-                    int optionCount = caseReg.Contribution.Parameters[0].Options?.Count ?? 0;
-                    int expectedOptions = WindowTiler.LayoutKeys.Count + 3;
-
-                    if (optionCount != expectedOptions)
-                    {
-                        Fail("内建动作参数",
-                            $"Tile 的选项数（{optionCount}）应为布局表 {WindowTiler.LayoutKeys.Count} + 3 个特殊标记 = {expectedOptions}");
-                    }
-                }
+                // 【原先这里有两条「选项数 = 宿主表项数」的断言：System 对预设表、Tile 对布局表】
+                //
+                // 它们现在已经搬到了 [3i] 的认领链路上（见 RunTypeClaimChecks 里的第 ⑥ 条）。
+                // 搬家不是整理，是修一个已经发生的失效：Tile 在 S4c 就外移了，System 在 S4b 外移，
+                // 而断言一直留在这个循环里 —— 循环再也走不到它们，于是它们成了**不会执行**的死代码。
+                // 守卫失效是静默的：既没有编译错误，也没有自检红字，只有「以后加布局码没人再核对」。
+                // 留在本表里只会重复一次同样的结局。
 
                 // 必填项漏标，统一表单就会放行空值，等于把静默失效的门重新打开。
                 if (!caseReg.Contribution.Parameters.Any(f => f.Key == caseKey && f.Required))
@@ -1082,7 +1066,7 @@ internal static class PluginSelfTest
             // 安装页照旧弹一个「需要「窗口控制」能力」的确认框，用户点了同意，
             // 而这个勾选在运行时没有任何对应物 —— 那才是真正骗人的地方。
             Line("");
-            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取）");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取 / 系统功能）");
 
             // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
             //
@@ -1101,6 +1085,7 @@ internal static class PluginSelfTest
             var deniedShellService = new PluginShellService(gateProbePluginId, PluginCapability.None);
             var deniedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.None);
             var deniedCaptureService = new PluginScreenCaptureService(gateProbePluginId, PluginCapability.None);
+            var deniedSystemService = new PluginSystemService(gateProbePluginId, PluginCapability.None);
 
             // ② 未声明所需能力：必须拒绝。
             //
@@ -1172,6 +1157,7 @@ internal static class PluginSelfTest
                     $"未声明 ScreenCapture 的插件调用 ScreenCapture.CaptureAndRecognize 没有被正确拒绝：{captureGateDetail}");
             }
 
+            // 系统功能服务的三段断言挪到 ③d（与窗口服务那三条并排，读起来才成体系）。
             // ③ 声明了 Process：同一个调用必须放行。
             //
             // 少了这一半，把门禁写成「永远拒绝」也能通过上面两条 ——
@@ -1260,6 +1246,142 @@ internal static class PluginSelfTest
             {
                 Fail("能力门禁", $"已声明 WindowControl 的调用抛出异常：{gateError}");
             }
+
+            // ③d 系统功能服务：三段都验，一个不漏。
+            //
+            // 它与前三个服务有一处不同，也是这一段存在的理由：门禁认的是
+            // <b>InputSimulation 而不是 Process</b>。系统控制这个包里两者都会发生
+            // （最小化 = 合成按键，关机 = 起进程），所以「认错能力」在这里的后果最具体 ——
+            // 若哪天有人把 required 改成 Process，一个只声明了「进程」的插件
+            // 就能往用户正在打字的窗口里按键，而安装确认页上那句「模拟输入」变成空话。
+            //
+            // 三段探针一律传<b>空键</b>：门禁排在空值短路之前，所以拒绝路径照样被验到；
+            // 而万一门禁真漏了，空值短路会让它返回 false —— 不起进程、不按键。
+            (bool systemDenied, string systemGateDetail) =
+                ProbeCapabilityGate(() => deniedSystemService.RunPreset(""), PluginCapability.InputSimulation);
+
+            if (systemDenied)
+            {
+                Line($"  System.RunPreset：{systemGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 InputSimulation 的插件调用 System.RunPreset 没有被正确拒绝：{systemGateDetail}");
+            }
+
+            // 「只声明 Process 也不行」——把上面那句「门禁认的不是 Process」变成机器可验的。
+            var processOnlySystemService = new PluginSystemService(
+                gateProbePluginId, PluginCapability.Process);
+
+            (bool processOnlyDenied, string processOnlyDetail) =
+                ProbeCapabilityGate(() => processOnlySystemService.RunPreset(""), PluginCapability.InputSimulation);
+
+            if (processOnlyDenied)
+            {
+                Line($"  跨能力：只声明 Process 调用系统服务仍被拒绝 ✓（{processOnlyDetail}）");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    "只声明了 Process 的插件调用 System.RunPreset 竟然被放行 —— " +
+                    "两种能力在系统控制里都会发生，但后果不同：前者是多一个后台进程，" +
+                    $"后者是往用户正在打字的窗口里按键。{processOnlyDetail}");
+            }
+
+            // 反过来：声明了 InputSimulation 就必须放行，否则「门禁写成永远拒绝」也能过上面两条。
+            var allowedSystemService = new PluginSystemService(
+                gateProbePluginId, PluginCapability.InputSimulation);
+
+            try
+            {
+                bool emptyPresetResult = allowedSystemService.RunPreset("   ");
+
+                if (emptyPresetResult)
+                {
+                    Fail("能力门禁",
+                        "空预设键竟然报告「已匹配到预设」—— 空值短路失效，用户会以为系统功能执行过了");
+                }
+                else
+                {
+                    Line("  已声明 InputSimulation：放行 ✓（空键由空值短路拦下，未起进程、未按键）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁",
+                    $"已声明 InputSimulation 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 InputSimulation 的调用抛出异常：{gateError}");
+            }
+
+            // 预设清单未声明能力也必须可读 —— 它要供注册期的 Parameters 使用。
+            // 顺带钉住「宿主表是唯一数据源」：插件下拉的选项数只能等于这张表的项数
+            // （另一处同源断言在 [3i] 的认领链路上，按被认领的类型逐个核对）。
+            int unprivilegedPresetCount = deniedSystemService.Presets.Count;
+            int hostPresetCount = SlotViewModel.SystemPresetList.Count;
+
+            if (unprivilegedPresetCount != hostPresetCount)
+            {
+                Fail("宿主服务面",
+                    $"未声明能力的插件读到的预设清单是 {unprivilegedPresetCount} 项，宿主表是 {hostPresetCount} 项 —— " +
+                    "两者必须是同一份数据");
+            }
+            else
+            {
+                Line($"  预设清单：{unprivilegedPresetCount} 项（未声明能力也能读，因为它不产生后果）✓");
+            }
+
+            // ⑤ 每一个能力位都必须在安装确认页上有一句人话。
+            //
+            // 这条护栏是被两处真实遗漏逼出来的：WindowControl（S4c）与 ScreenCapture（S4a）
+            // 各自独立成项的理由，写的都是「安装确认页上必须让用户看见后果」——
+            // 而确认页那份清单当初是内联在 SettingsWindow 里的一个 if 串，
+            // 没人记得回去补，于是这两项能力至今没在用户眼前出现过一行字。
+            //
+            // 能力位的全部意义就是「让用户在安装前看见后果」。一个查不到文案的能力位，
+            // 既骗用户（什么都没说）也骗审核者（以为已经说过了）。所以这里逐个成员核对，
+            // 而不是抽查几个常见的 —— 漏掉的恰好总是新加的那一个。
+            string[] labeledCapabilities = PluginCapabilityLabels.All
+                .Select(entry => entry.Capability.ToString())
+                .ToArray();
+
+            foreach (PluginCapability capability in Enum.GetValues<PluginCapability>())
+            {
+                if (capability == PluginCapability.None) continue;
+
+                if (!labeledCapabilities.Contains(capability.ToString(), StringComparer.Ordinal))
+                {
+                    Fail("能力文案",
+                        $"能力位「{capability}」在安装确认页上没有对应文案（PluginCapabilityLabels.All）—— " +
+                        "用户勾选确认时看不到这项能力的后果，而这个能力位存在的全部理由就是要让他看见");
+                }
+            }
+
+            foreach ((PluginCapability capability, string label) in PluginCapabilityLabels.All)
+            {
+                if (string.IsNullOrWhiteSpace(label))
+                {
+                    Fail("能力文案", $"能力位「{capability}」的确认页文案是空的 —— 确认框里会出现一行空白");
+                }
+
+                // 反向核对：表里挂着一个枚举里已经没有的位，通常意味着能力位被改名后这里没跟上。
+                if (!Enum.IsDefined(capability))
+                {
+                    Fail("能力文案", $"确认页文案表里的「{capability}」已不是 PluginCapability 的成员 —— 能力位改过名？");
+                }
+            }
+
+            Line($"  能力文案：{PluginCapabilityLabels.All.Length} 项，覆盖枚举里全部非空能力位 ✓");
+
+            // 两组服务面逐一验完之后，报一次确认页的实际渲染结果。
+            // 这一段是给「自检通过但用户看不到」这种情况准备的：断言只看表，这里看拼出来的文本。
+            string sampleLabels = PluginCapabilityLabels.Describe(
+                PluginCapability.Process | PluginCapability.InputSimulation | PluginCapability.ScreenCapture);
+
+            Line($"  确认页示例（进程+模拟输入+截屏）：{sampleLabels.Replace("\n", "｜")}");
 
             // ④ 元数据不受门禁约束，这是刻意的。
             //
@@ -2324,6 +2446,79 @@ internal static class PluginSelfTest
 
             line($"  {declared.TypeName} → {claimedAction.FullId}｜{claimedAction.DisplayName}｜" +
                 $"参数 {claimedAction.Parameters.Count} 项｜已排除出子下拉 ✓");
+
+            // ⑥ 宿主表仍是插件下拉的唯一数据源。
+            //
+            // 这两个动作的参数选项都由宿主的表**即时生成**，插件不另抄一份。
+            // 抄一份的后果是宿主加了布局码 / 系统功能之后插件下拉里没有它 ——
+            // 没有报错、没有异常，用户只知道「这个新选项选不到」。
+            //
+            // 【为什么是这一层而不是 [3f]】这两条断言原先住在 [3f] 的内建动作循环里，
+            // 而 Tile（S4c）与 System（S4b）相继改成认领类型之后，那个循环再也走不到它们：
+            // 断言还在源码里，却永远不会执行 —— 守卫静默失效，编译与自检都不出声。
+            // 挪到认领链路上之后，它跟着「类型被谁认领」走，不再依赖某个循环恰好覆盖到它。
+            int? expectedOptionCount = declared.TypeName switch
+            {
+                // Tile 的选项 = 全部布局码 + 循环 / 反向循环 / 还原三个特殊标记。
+                "Tile" => WindowTiler.LayoutKeys.Count + 3,
+
+                // System 的选项 = 宿主那张有序预设表，一项不多一项不少。
+                "System" => SlotViewModel.SystemPresetList.Count,
+
+                _ => null,
+            };
+
+            if (expectedOptionCount is int expected)
+            {
+                int optionCount = claimedAction.Parameters.Count > 0
+                    ? claimedAction.Parameters[0].Options?.Count ?? 0
+                    : -1;
+
+                if (optionCount != expected)
+                {
+                    fail("类型认领",
+                        $"{declared.TypeName} 的参数选项数（{optionCount}）与宿主表（{expected}）不一致 —— " +
+                        "宿主表已不再是插件下拉的唯一数据源");
+                }
+                else
+                {
+                    // 断言只在失败时出声会让「守卫还在不在」变得不可知 ——
+                    // 自检报告里看得见的结论，才是下次改动时能对照的东西。
+                    line($"    · 选项数 {optionCount} 项，与宿主表逐项同源 ✓");
+                }
+            }
+
+            // ⑦ 参数键健全性：键是插件与宿主之间的隐形契约，拼错不会有任何报错。
+            //
+            // 两类真实风险：
+            // · 重复键 —— 编辑器把两份用户输入写进同一个 ExtensionData 槽位，
+            //   后写的覆盖先写的，界面上看不出任何异样。
+            // · 大小写漂移 —— 宿主投影器对裸字段是**精确匹配**（"Parameter" ≠ "parameter"），
+            //   手敲一个差一个大小写的键名，插件永远读到空值。
+            //   「preset 险情」就是这一族：老配置的值住在裸字段 Parameter 里，
+            //   键名写错一格，迁移过来的老配置就全部静默失联。
+            var declaredKeys = new List<string>();
+            foreach (ParameterField parameter in claimedAction.Parameters)
+            {
+                if (declaredKeys.Contains(parameter.Key, StringComparer.Ordinal))
+                {
+                    fail("类型认领",
+                        $"{expectedFullId} 声明了重复的参数键 \"{parameter.Key}\" —— " +
+                        "两份输入会写进同一个存储槽位，后写的静默覆盖先写的");
+                }
+
+                string? hostField = HostActionFields.All.FirstOrDefault(f =>
+                    string.Equals(f, parameter.Key, StringComparison.OrdinalIgnoreCase));
+
+                if (hostField != null && hostField != parameter.Key)
+                {
+                    fail("类型认领",
+                        $"{expectedFullId} 的参数键 \"{parameter.Key}\" 与宿主裸字段 \"{hostField}\" 只差大小写 —— " +
+                        "投影是精确匹配，这个键永远读不到宿主投影出来的值");
+                }
+
+                declaredKeys.Add(parameter.Key);
+            }
         }
 
         // ⑤ 宿主字段白名单与投影器不能漂移。

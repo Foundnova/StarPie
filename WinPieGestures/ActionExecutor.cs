@@ -2001,16 +2001,30 @@ public static class ActionExecutor
 	/// <summary>
 	/// 执行一个系统预设（最小化 / 关机 / 音量 …）。
 	/// <para>
-	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「系统控制」的实现
-	/// （<c>Plugins.BuiltinActions.BuiltinActionSystem</c>）现在也走这条路。
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：系统控制动作的插件实现
+	/// （<c>StarPie.Plugin.System</c>，经宿主的 <c>PluginSystemService</c>）走这条路。
 	/// 与 <see cref="ExecuteCommand"/> 同理，统一的是动作形状，执行体不搬家。
 	/// </para>
+	/// <para>
+	/// <b>返回值是「有没有匹配到一个已实现的预设」，不是「执行成功了没有」</b>：
+	/// 关机要几秒、任务管理器要等它起来，这些在这里同步判定不了。
+	/// 之所以值得返回，是因为原先的 <c>void</c> 让「这个键已经不认识了」这件事
+	/// <b>没有任何出口</b> —— 用户的配置里留着上一代预设键时，按下扇区后什么都没有发生，
+	/// 也没有任何提示，与「按键本身没生效」长得一模一样。现在调用方可以据此出声。
+	/// </para>
+	/// <para>
+	/// <b>刻意不按预设表校验</b>：下面 <c>switch</c> 里的历史别名（<c>snapleft</c> /
+	/// <c>靠左分屏</c> / <c>lock</c> / <c>锁屏</c> / <c>starpie控制台</c> …）
+	/// 早就不在当前预设表里了，按表校验会把那些年代的配置整体判死。
+	/// 所以「认不认识这个键」只能由这个 <c>switch</c> 自己说了算 —— 它认出哪个就是哪个。
+	/// </para>
 	/// </summary>
-	internal static void ExecuteSystem(string presetName)
+	/// <returns>匹配到预设并已发起为 <c>true</c>；空键或无法识别的键为 <c>false</c>。</returns>
+	internal static bool ExecuteSystem(string presetName)
 	{
 		if (string.IsNullOrEmpty(presetName))
 		{
-			return;
+			return false;
 		}
 		string text = presetName.Trim().ToLowerInvariant();
 
@@ -2020,44 +2034,44 @@ public static class ActionExecutor
 		case "taskswitcher":
 		case "alttabsticky":
 			ExecuteHotkey("Ctrl+Alt+Tab");
-			break;
+			return true;
 		case "alttab":
 		case "switchwindow":
 			ExecuteHotkey("Alt+Tab");
-			break;
+			return true;
 		case "closewindow":
 			ExecuteHotkey("Alt+F4");
-			break;
+			return true;
 		case "minimize":
 			ExecuteHotkey("Win+Down");
-			break;
+			return true;
 		case "maximize":
 			ExecuteHotkey("Win+Up");
-			break;
+			return true;
 		case "snapleft":
 			ExecuteHotkey("Win+Left");
-			break;
+			return true;
 		case "snapright":
 			ExecuteHotkey("Win+Right");
-			break;
+			return true;
 		case "taskview":
 			ExecuteHotkey("Win+Tab");
-			break;
+			return true;
 		case "prevdesktop":
 			ExecuteHotkey("Win+Ctrl+Left");
-			break;
+			return true;
 		case "nextdesktop":
 			ExecuteHotkey("Win+Ctrl+Right");
-			break;
+			return true;
 		case "showdesktop":
 			ExecuteHotkey("Win+D");
-			break;
+			return true;
 		case "fullscreen":
 			ExecuteHotkey("F11");
-			break;
+			return true;
 		case "screenshot":
 			ExecuteHotkey("Win+Shift+S");
-			break;
+			return true;
 		case "taskmanager":
 			if (!TryToggleProcessWindow("taskmgr"))
 			{
@@ -2074,7 +2088,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Ctrl+Shift+Esc");
 				}
 			}
-			break;
+			return true;
 		case "explorer":
 			try
 			{
@@ -2088,7 +2102,7 @@ public static class ActionExecutor
 			{
 				ExecuteHotkey("Win+E");
 			}
-			break;
+			return true;
 		case "opensettings":
 		case "openstarpie":
 		case "starpie":
@@ -2098,7 +2112,7 @@ public static class ActionExecutor
 			{
 				App.ShowSettingsWindow();
 			});
-			break;
+			return true;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -2115,7 +2129,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+I");
 				}
 			}
-			break;
+			return true;
 		case "calculator":
 			AppLogger.LogInfo("Launching System Calculator");
 			try
@@ -2143,13 +2157,13 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+R");
 				}
 			}
-			break;
+			return true;
 		case "rundialog":
 			ExecuteHotkey("Win+R");
-			break;
+			return true;
 		case "windowssearch":
 			ExecuteHotkey("Win+S");
-			break;
+			return true;
 		case "quicksearch":
 		case "quickfinder":
 		case "nativesearch":
@@ -2160,61 +2174,61 @@ public static class ActionExecutor
 			{
 				QuickSearchWindow.ShowOrActivate();
 			});
-			break;
+			return true;
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
-			break;
+			return true;
 		case "lockworkstation":
 		case "锁定屏幕":
 		case "锁屏":
 		case "lock":
 			LockWorkStation();
-			break;
+			return true;
 		case "volumeup":
 			SimulateSingleKey(175);
-			break;
+			return true;
 		case "volumedown":
 			SimulateSingleKey(174);
-			break;
+			return true;
 		case "volumemute":
 			SimulateSingleKey(173);
-			break;
+			return true;
 		case "playpause":
 			SimulateSingleKey(179);
-			break;
+			return true;
 		case "nexttrack":
 			SimulateSingleKey(176);
-			break;
+			return true;
 		case "prevtrack":
 			SimulateSingleKey(177);
-			break;
+			return true;
 		case "stopmedia":
 			SimulateSingleKey(178);
-			break;
+			return true;
 		case "newtab":
 			ExecuteHotkey("Ctrl+T");
-			break;
+			return true;
 		case "closetab":
 			ExecuteHotkey("Ctrl+W");
-			break;
+			return true;
 		case "reopentab":
 			ExecuteHotkey("Ctrl+Shift+T");
-			break;
+			return true;
 		case "refresh":
 			ExecuteHotkey("F5");
-			break;
+			return true;
 		case "hardrefresh":
 			ExecuteHotkey("Ctrl+F5");
-			break;
+			return true;
 		case "zoomin":
 			ExecuteHotkey("Ctrl+Plus");
-			break;
+			return true;
 		case "zoomout":
 			ExecuteHotkey("Ctrl+Minus");
-			break;
+			return true;
 		case "zoomreset":
 			ExecuteHotkey("Ctrl+0");
-			break;
+			return true;
 		case "sleep":
 		case "睡眠":
 		case "休眠":
@@ -2229,7 +2243,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "restart":
 		case "重启":
 		case "reboot":
@@ -2243,7 +2257,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "shutdown":
 		case "关机":
 		case "poweroff":
@@ -2257,7 +2271,9 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
+		default:
+			return false;
 		}
 	}
 

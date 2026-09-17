@@ -65,6 +65,13 @@ public interface IPluginContext
     /// </summary>
     IHostScreenCaptureService ScreenCapture { get; }
 
+    /// <summary>
+    /// 系统功能（最小化 / 任务视图 / 音量 / 锁屏 / 关机 …）。
+    /// 执行面需要 <see cref="PluginCapability.InputSimulation"/> 能力；
+    /// 预设清单（<see cref="IHostSystemService.Presets"/>）始终可读，理由见该接口。
+    /// </summary>
+    IHostSystemService System { get; }
+
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 

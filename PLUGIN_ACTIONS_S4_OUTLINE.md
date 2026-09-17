@@ -228,7 +228,7 @@ Initialize:
 | **S4c** | 拆 `WindowActions` → 5 个单动作包 | S4-0 | ✅ `25b1e15` |
 | **S4d** | 拆 `BasicActions` → 5 个单动作包 | S4-0 | ✅ `54250f5` |
 | **S4a** | 新建 `Ocr` 包 + `IHostScreenCaptureService` + `ScreenCapture` 能力 | S4-0 | ✅ |
-| **S4b** | 新建 `System` 包 + `IHostSystemService`（档 1 薄转发）+ `InputSimulation` 能力 | S4-0 | ⬜ |
+| **S4b** | 新建 `System` 包 + `IHostSystemService`（档 1 薄转发）+ `InputSimulation` 能力 | S4-0 | ✅ |
 | **S4e** | 文档同步 + 12 个包逐个自检 + 提交 | 全部 | ⬜ |
 
 > **原定顺序是「先纯新增、后拆分」，实际执行反了过来**（S4c → S4d → S4a）。

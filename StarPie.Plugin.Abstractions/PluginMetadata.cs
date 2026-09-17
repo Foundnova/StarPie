@@ -64,6 +64,26 @@ public enum PluginCapability
     /// </para>
     /// </summary>
     ScreenCapture = 1 << 9,
+
+    /// <summary>
+    /// 模拟<b>键盘输入</b>：向当前前台窗口投递组合键，或触发一个以合成按键实现的系统功能
+    /// （最小化 / 最大化 / 任务视图 / 音量 / 媒体控制 …）。
+    /// <para>
+    /// 与 <see cref="Process"/> 分开是刻意的，不要合并：两者在系统控制这个动作里都会发生，
+    /// 但后果不同 —— 「进程」是<b>多出一个后台进程</b>，「模拟输入」是
+    /// <b>往用户正在打字的那个窗口里按键</b>。用户能接受前者不代表能接受后者。
+    /// </para>
+    /// <para>
+    /// 它拦的是「让宿主替你按键」这条路径（<c>IHostSystemService.RunPreset</c>）。
+    /// 进程内的插件当然仍可自己 P/Invoke <c>SendInput</c>，SDK 拦不住 ——
+    /// 门禁换来的从来不是安全，而是「安装确认页上的声明有对应物」。
+    /// </para>
+    /// <para>
+    /// 与 <see cref="WindowControl"/> / <see cref="ScreenCapture"/> 同理，新值取
+    /// <c>1 &lt;&lt; 10</c> 而不是插进中间：插入会改变后续所有成员的位值。
+    /// </para>
+    /// </summary>
+    InputSimulation = 1 << 10,
 }
 
 /// <summary>宿主持有的插件元数据。由宿主从 manifest 解析后经 <see cref="IPluginContext.Me"/> 提供给插件。</summary>
