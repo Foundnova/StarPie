@@ -4870,6 +4870,8 @@ public partial class SettingsWindow : Window
 
 			ActionItem displayItem = (isInherited && effectiveInheritedAction != null) ? effectiveInheritedAction : item;
 
+			UpdateFocusActionUnavailableHint(displayItem);
+
 			if (_selectedSlotIndex == -1)
 			{
 				// Center Core
@@ -6056,6 +6058,22 @@ public partial class SettingsWindow : Window
 		RefreshPluginManagerUi();
 	}
 
+	private void UpdateFocusActionUnavailableHint(ActionItem displayItem)
+	{
+		if (FocusActionUnavailableText == null || FocusActionUnavailableBanner == null) return;
+
+		if (!string.IsNullOrWhiteSpace(displayItem.Type) &&
+			!string.Equals(displayItem.Type, PluginActionBinding.TypeName, StringComparison.Ordinal) &&
+			PluginHost.TryResolveClaimedType(displayItem.Type, out _) &&
+			!PluginHost.IsClaimedTypeAvailable(displayItem.Type, out string reason))
+		{
+			FocusActionUnavailableText.Text = "⚠️ " + reason;
+			FocusActionUnavailableBanner.Visibility = Visibility.Visible;
+			return;
+		}
+
+		FocusActionUnavailableBanner.Visibility = Visibility.Collapsed;
+	}
 	// ==================== 🧩 插件与扩展 ====================
 
 	/// <summary>
@@ -6495,21 +6513,8 @@ public partial class SettingsWindow : Window
 			MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
-	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities)
-	{
-		var parts = new List<string>();
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Process)) parts.Add("· 启动进程 / 操作其他程序");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.FileSystem)) parts.Add("· 读写你的文件");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Network)) parts.Add("· 访问网络");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Clipboard)) parts.Add("· 读取或修改剪贴板");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Registry)) parts.Add("· 读写注册表");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.GlobalHook)) parts.Add("· 安装全局键盘/鼠标钩子");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Ui)) parts.Add("· 显示界面与通知");
-		if (capabilities.HasFlag(StarPie.Plugin.PluginCapability.Admin)) parts.Add("· 需要管理员权限");
-		return parts.Count == 0 ? "（无）" : string.Join("\n", parts);
-	}
-
-	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
+	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities) =>
+		PluginCapabilityLabels.Describe(capabilities);	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
 	{
 		int discovered = PluginHost.SyncFromDisk();
 
@@ -6589,6 +6594,24 @@ public partial class SettingsWindow : Window
 		}
 
 		bool desired = box.IsChecked == true;
+		if (!desired)
+		{
+			int affected = PluginImpactAnalyzer.CountAffectedActions(ConfigManager.CurrentConfig, pluginId);
+			if (affected > 0)
+			{
+				string pluginName = PluginHost.Find(pluginId)?.Entry.Name ?? pluginId;
+				MessageBoxResult choice = System.Windows.MessageBox.Show(this,
+					$"确定停用「{pluginName}」吗？\n\n" +
+					$"· 当前配置中有 {affected} 个动作由它提供，停用期间这些动作会暂时失效\n" +
+					"· 配置不会丢失，重新启用即可恢复",
+					"停用插件", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+				if (choice != MessageBoxResult.Yes)
+				{
+					box.IsChecked = true;
+					return;
+				}
+			}
+		}
 		box.IsEnabled = false;
 		try
 		{

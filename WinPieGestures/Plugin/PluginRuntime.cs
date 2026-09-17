@@ -416,6 +416,17 @@ internal sealed class PluginRuntime
                 Message = "插件动作运行时发生内部错误，详情见日志。",
             });
 
+    public PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding) =>
+        _calls.Invoke(
+            PluginPathIds.ActionExecution,
+            "执行认领动作",
+            () => Actions.ExecuteClaimed(action, binding),
+            static _ => new PluginExecuteOutcome
+            {
+                Handled = true,
+                Success = false,
+                Message = "认领动作运行时发生内部错误，详情见日志。",
+            });
     public IDisposable RegisterWheelOpening(string pluginId, Action<ActionContext> handler) =>
         _calls.Invoke(
             PluginPathIds.InteractionEvent,

@@ -33,6 +33,9 @@ internal sealed class PluginInstallOptions
     /// <para>用途只有一个：日后排查「这个插件是怎么进来的」。不做任何逻辑分支。</para>
     /// </summary>
     public string SourceKind { get; set; } = "UserSelectedFile";
+
+    /// <summary>是否为随主程序分发的官方插件。</summary>
+    public bool Bundled { get; set; }
 }
 
 internal sealed class PluginInstallResult
@@ -138,11 +141,12 @@ internal static class PluginHost
 
             CheckSafeMode();
 
+            int bundledChanged = BundledPluginLifecycle.Synchronize(ScanCandidateFile, CommitInstall);
             int discovered = SyncFromDisk();
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
-                $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
+                $"（本次扫描新发现 {discovered} 个，随包同步 {bundledChanged} 项），安全模式={_safeModeActive}");
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -322,6 +326,10 @@ internal static class PluginHost
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
+                    Bundled = options.Bundled,
+                    ClaimedTypes = options.Bundled
+                        ? BundledPluginLifecycle.BuildClaimWire(manifest)
+                        : new List<string>(),
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -553,10 +561,23 @@ internal static class PluginHost
         return result.Success;
     }
 
-    public static async Task<PluginUninstallResult> UninstallAsync(
+    public static Task<PluginUninstallResult> UninstallAsync(
         string pluginId,
         bool removePluginData,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: true, cancellationToken);
+
+    internal static Task<PluginUninstallResult> UninstallForSelfTestAsync(
+        string pluginId,
+        bool removePluginData,
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: false, cancellationToken);
+
+    private static async Task<PluginUninstallResult> UninstallCoreAsync(
+        string pluginId,
+        bool removePluginData,
+        bool respectBundledGuard,
+        CancellationToken cancellationToken)
     {
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
@@ -564,6 +585,14 @@ internal static class PluginHost
             return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
         }
 
+        if (respectBundledGuard && instance.Entry.Bundled)
+        {
+            return new PluginUninstallResult
+            {
+                Success = false,
+                Error = $"「{instance.Entry.Name}」随 StarPie 一起分发，不能卸载；如不需要请停用。",
+            };
+        }
         PluginStopResult stop = await DisableAsync(
             pluginId,
             PluginStopReason.Uninstall,
@@ -644,6 +673,41 @@ internal static class PluginHost
     /// <summary>主程序唯一的插件动作入口，具体行为由动作路径模块负责。</summary>
     public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
 
+    public static bool TryResolveClaimedType(string? type, out PluginTypeClaimBinding binding) =>
+        PluginActionClaimRegistry.TryResolve(type, out binding);
+
+    public static PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding) =>
+        Runtime.ExecuteClaimedAction(action, binding);
+    public static IReadOnlyList<string> ClaimedTypeNamesOf(string pluginId) =>
+        PluginActionClaimRegistry.Snapshot()
+            .Where(binding => string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .Select(binding => binding.TypeName)
+            .ToArray();
+
+    public static bool IsClaimedTypeAvailable(string? type, out string reason)
+    {
+        reason = "";
+        if (!PluginActionClaimRegistry.TryResolve(type, out PluginTypeClaimBinding binding)) return true;
+
+        PluginInstance? instance = Find(binding.PluginId);
+        if (instance == null)
+        {
+            reason = $"该动作由内置动作包「{binding.PluginId}」提供，但登记记录已经丢失。";
+            return false;
+        }
+        if (!instance.Entry.Enabled)
+        {
+            reason = $"该动作属于内置动作包「{instance.Entry.Name}」，它当前已被停用。";
+            return false;
+        }
+        if (instance.State == PluginRuntimeState.Quarantined)
+        {
+            reason = $"内置动作包「{instance.Entry.Name}」因连续出错已被隔离。";
+            return false;
+        }
+        return true;
+    }
+
     // ------------------------------------------------------------------ 界面数据
 
     /// <summary>动作下拉里的插件动作分组（供 <c>SlotViewModel</c> 聚合）。</summary>
@@ -662,7 +726,13 @@ internal static class PluginHost
     }
 
     /// <summary>已注册的插件动作（供槽位编辑器按插件分组展示）。</summary>
-    public static List<PluginActionRegistration> GetRegisteredActions() => Catalog.SnapshotActions();
+    public static List<PluginActionRegistration> GetRegisteredActions()
+    {
+        HashSet<string> claimed = PluginActionClaimRegistry.Snapshot()
+            .Select(binding => binding.FullId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return Catalog.SnapshotActions().Where(action => !claimed.Contains(action.FullId)).ToList();
+    }
 
     public static bool TryGetAction(string fullId, out PluginActionRegistration registration) =>
         Catalog.TryGetAction(fullId, out registration);
@@ -1052,11 +1122,13 @@ internal static class PluginHost
     }
 
     /// <summary>识别扫描目录里的一枚 dll。异常一律转成「识别未通过」而不是上抛 —— 一枚坏文件不该让整页空掉。</summary>
-    private static PluginScanResult ScanCandidateFile(string file)
+    internal static PluginScanResult ScanCandidateFile(string file)
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(file);
+            return PluginScanner.ScanSelectedDll(
+                file,
+                allowReservedIdPrefix: IsFileInsideScanRoot(file));
         }
         catch (Exception ex)
         {
@@ -1068,6 +1140,21 @@ internal static class PluginHost
                 Failure = PluginScanFailure.NotDotNetAssembly,
                 ErrorDetail = ex.Message,
             };
+        }
+    }
+
+    private static bool IsFileInsideScanRoot(string file)
+    {
+        try
+        {
+            string parent = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(Path.GetDirectoryName(file) ?? ""));
+            string scanRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(PluginPaths.ScanRoot));
+            return string.Equals(parent, scanRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1189,6 +1276,7 @@ internal static class PluginHost
             OverwriteExisting = true,
             EnableAfterInstall = true,
             SourceKind = "ScanDirectory",
+            Bundled = PluginPaths.IsReservedPluginId(scan.Manifest.Id),
             AcknowledgedCapabilities = scan.Manifest.Capabilities is { Count: > 0 } capabilities
                 ? new List<string>(capabilities)
                 : new List<string>(),
@@ -1236,7 +1324,9 @@ internal static class PluginHost
                 PluginPaths.Root,
                 string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
 
-            return PluginScanner.ScanInstalledPlugin(directory);
+            return PluginScanner.ScanInstalledPlugin(
+                directory,
+                allowReservedIdPrefix: entry.Bundled);
         }
         catch (Exception ex)
         {
@@ -1396,6 +1486,7 @@ internal static class PluginHost
 
     private static void NotifyPluginSetChanged()
     {
+        PluginActionClaimRegistry.Rebuild(PluginRegistryStore.SnapshotEntries());
         try
         {
             ConfigManager.MarkConfigurationChanged();
@@ -1448,7 +1539,7 @@ internal static class PluginHost
     /// </para></item>
     /// </list>
     /// </summary>
-    private static bool CopyPayload(PluginScanResult scan, string targetDirectory, bool overwrite, out string error)
+    internal static bool CopyPayload(PluginScanResult scan, string targetDirectory, bool overwrite, out string error)
     {
         if (string.Equals(scan.ManifestSource, "Manifest", StringComparison.Ordinal))
         {

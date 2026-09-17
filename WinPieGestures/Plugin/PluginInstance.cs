@@ -360,7 +360,9 @@ internal sealed class PluginInstance
         try
         {
             // ① 加载前重新静态识别一次：文件可能在上次识别之后被替换或损坏
-            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(Directory);
+            PluginScanResult scan = PluginScanner.ScanInstalledPlugin(
+                Directory,
+                allowReservedIdPrefix: Entry.Bundled);
             if (!scan.Accepted)
             {
                 LastError = scan.DescribeFailure();

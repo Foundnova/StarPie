@@ -43,6 +43,17 @@ internal sealed class PluginActionRequest
     public string ActionName { get; }
     public IReadOnlyDictionary<string, string> Parameters { get; }
 
+    public static PluginActionRequest CreateClaimed(ActionItem action, PluginTypeClaimBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(binding);
+
+        return new PluginActionRequest(
+            binding.PluginId,
+            binding.ContributionId,
+            string.IsNullOrWhiteSpace(action.Name) ? binding.TypeName : action.Name,
+            new ReadOnlyDictionary<string, string>(ActionParameterProjection.Project(action)));
+    }
     public static bool TryCreate(ActionItem? action, out PluginActionRequest? request)
     {
         request = null;
@@ -144,8 +155,16 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
             return PluginExecuteOutcome.NotHandled;
         }
 
+        return ExecuteRequest(request!);
+    }
+
+    public PluginExecuteOutcome ExecuteClaimed(ActionItem action, PluginTypeClaimBinding binding) =>
+        ExecuteRequest(PluginActionRequest.CreateClaimed(action, binding));
+
+    private PluginExecuteOutcome ExecuteRequest(PluginActionRequest request)
+    {
         PluginActivationResult activation = _activation.EnsureLoaded(
-            request!.PluginId,
+            request.PluginId,
             PluginActivationReason.ActionExecution,
             requireEnabled: true);
 
@@ -183,7 +202,6 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
 
         return PluginInvoker.Invoke(instance, registration, request.Parameters, _calls);
     }
-
     private PluginActionValidation ValidateResolved(
         PluginActionRegistration registration,
         IReadOnlyDictionary<string, string> parameters)

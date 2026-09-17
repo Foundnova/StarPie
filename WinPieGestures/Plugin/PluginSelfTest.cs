@@ -141,7 +141,9 @@ internal static class PluginSelfTest
             Line("");
             Line("[1] 静态识别（不加载程序集）");
             sw.Restart();
-            PluginScanResult scan = PluginHost.PrepareInstall(dllPath);
+            PluginScanResult scan = PluginScanner.ScanSelectedDll(
+                dllPath,
+                allowReservedIdPrefix: true);
             sw.Stop();
             Line($"  识别耗时：{sw.Elapsed.TotalMilliseconds:F2} ms");
             Line($"  结论：{(scan.Accepted ? "通过" : "拒绝")}");
@@ -180,6 +182,7 @@ internal static class PluginSelfTest
                 Acknowledged = true,
                 OverwriteExisting = true,
                 EnableAfterInstall = false,
+                Bundled = PluginPaths.IsReservedPluginId(manifest.Id),
                 AcknowledgedCapabilities = manifest.Capabilities,
             };
             PluginInstallResult install = PluginHost.CommitInstall(scan, options);
@@ -217,9 +220,9 @@ internal static class PluginSelfTest
             instance = PluginHost.Find(install.PluginId);
             Line($"  停用后状态：{instance?.State}");
             Line($"  活动调用数：{instance?.ActiveCallCount}");
-            Line($"  剩余已注册动作：{PluginHost.GetRegisteredActions().Count} 个");
+            Line($"  剩余已注册动作：{PluginHost.Catalog.SnapshotActions().Count} 个");
 
-            if (PluginHost.GetRegisteredActions().Count != 0)
+            if (PluginHost.Catalog.SnapshotActions().Count != 0)
             {
                 Fail("贡献点撤销", "停用后仍有动作残留在注册表里");
             }
@@ -233,7 +236,7 @@ internal static class PluginSelfTest
             // ---- 6 卸载 ----
             Line("");
             Line("[6] 卸载（删除目录 + 移除登记）");
-            PluginUninstallResult uninstall = PluginHost.UninstallAsync(
+            PluginUninstallResult uninstall = PluginHost.UninstallForSelfTestAsync(
                     install.PluginId,
                     removePluginData: true)
                 .GetAwaiter().GetResult();
@@ -390,7 +393,7 @@ internal static class PluginSelfTest
                     _ = PluginHost.DisableAsync(real.PluginId!, PluginStopReason.SelfTest).GetAwaiter().GetResult();
                     PluginHost.Find(real.PluginId!)?.WaitForUnloadVerdict(5000);
 
-                    PluginUninstallResult cleanup = PluginHost.UninstallAsync(real.PluginId!, removePluginData: true).GetAwaiter().GetResult();
+                    PluginUninstallResult cleanup = PluginHost.UninstallForSelfTestAsync(real.PluginId!, removePluginData: true).GetAwaiter().GetResult();
                     string cleanupError = cleanup.Error;
                     if (!cleanup.Success)
                     {
@@ -434,7 +437,7 @@ internal static class PluginSelfTest
             {
                 try
                 {
-                    _ = PluginHost.UninstallAsync(installedPluginId, removePluginData: true).GetAwaiter().GetResult();
+                    _ = PluginHost.UninstallForSelfTestAsync(installedPluginId, removePluginData: true).GetAwaiter().GetResult();
                 }
                 catch
                 {
@@ -492,7 +495,9 @@ internal static class PluginSelfTest
         line($"  加载耗时（内部计量）：{instance?.LastLoadMs:F1} ms");
         line($"  运行时状态：{instance?.State}");
 
-        List<PluginActionRegistration> actions = PluginHost.GetRegisteredActions();
+        List<PluginActionRegistration> actions = PluginHost.Catalog.SnapshotActions()
+            .Where(action => string.Equals(action.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
         line($"  已注册动作：{actions.Count} 个");
         foreach (PluginActionRegistration action in actions)
         {
@@ -686,14 +691,45 @@ internal static class PluginSelfTest
             return $"类型下拉的插件项 Tag 应为 {PluginApi.ActionTypeName}，实际是「{typeItems[0].Tag}」。";
         }
 
-        // 子下拉候选：每个已注册动作都必须出现，且同一插件的动作落在同一分组。
-        List<PluginActionRegistration> registered = PluginHost.GetRegisteredActions();
-        List<PluginActionItem> options = PluginActionBinding.BuildPluginActionItems();
+        // 子下拉只展示社区插件动作；被顶层 Type 认领的官方动作必须从这里排除，
+        // 否则同一个功能会同时拥有两种互不兼容的持久化形态。
+        HashSet<string> claimedFullIds = PluginActionClaimRegistry.Snapshot()
+            .Where(binding => string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .Select(binding => binding.FullId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<PluginActionRegistration> registered = PluginHost.GetRegisteredActions()
+            .Where(action => string.Equals(action.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        List<PluginActionItem> options = PluginActionBinding.BuildPluginActionItems()
+            .Where(option => string.Equals(option.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        List<PluginActionRegistration> expectedVisible = actions
+            .Where(action => !claimedFullIds.Contains(action.FullId))
+            .ToList();
 
-        line($"    子下拉候选：{options.Count} 项 / 已注册动作 {registered.Count} 项");
-        if (options.Count != registered.Count)
+        line($"    子下拉候选：{options.Count} 项 / 应显示动作 {expectedVisible.Count} 项 / 认领隐藏 {claimedFullIds.Count} 项");
+        if (registered.Count != expectedVisible.Count || options.Count != expectedVisible.Count)
         {
-            return "子下拉候选数与已注册动作数不一致 —— 用户会看到少了动作，却无从判断少了哪些。";
+            return "普通插件子下拉没有精确排除认领动作，界面会出现重复入口或漏掉社区动作。";
+        }
+        foreach (PluginActionRegistration expected in expectedVisible)
+        {
+            if (!registered.Any(action => string.Equals(action.FullId, expected.FullId, StringComparison.OrdinalIgnoreCase)) ||
+                !options.Any(option => string.Equals(option.FullId, expected.FullId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"普通插件动作 {expected.FullId} 未出现在子下拉候选中。";
+            }
+        }
+        foreach (string claimedFullId in claimedFullIds)
+        {
+            if (!actions.Any(action => string.Equals(action.FullId, claimedFullId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"类型认领指向的贡献点 {claimedFullId} 没有真实注册。";
+            }
+            if (options.Any(option => string.Equals(option.FullId, claimedFullId, StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"认领动作 {claimedFullId} 仍出现在普通插件子下拉中。";
+            }
         }
 
         var groupOfPlugin = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -795,14 +831,21 @@ internal static class PluginSelfTest
 
         // 切回内置类型必须清干净，否则留下「内置类型 + 悬挂插件引用 + 插件参数」的混合状态，
         // 那种配置界面上看不出来，却会在导出与执行时各表现一次。
-        var cleared = new ActionItem { Type = PluginApi.ActionTypeName };
-        PluginActionBinding.Apply(cleared, registered[0].FullId);
-        PluginActionBinding.Clear(cleared);
-        if (cleared.PluginActionRef != null || cleared.ExtensionData != null)
+        if (registered.Count > 0)
         {
-            return "Clear 之后仍有插件引用或插件参数残留。";
+            var cleared = new ActionItem { Type = PluginApi.ActionTypeName };
+            PluginActionBinding.Apply(cleared, registered[0].FullId);
+            PluginActionBinding.Clear(cleared);
+            if (cleared.PluginActionRef != null || cleared.ExtensionData != null)
+            {
+                return "Clear 之后仍有插件引用或插件参数残留。";
+            }
+            line("    切回内置类型：插件引用与插件参数均已清空");
         }
-        line("    切回内置类型：插件引用与插件参数均已清空");
+        else
+        {
+            line("    本插件的贡献点全部由顶层 Type 认领，普通插件写读往返与清理断言跳过。");
+        }
 
         // ---- 4 调用 ----
         line("");
@@ -1006,7 +1049,7 @@ internal static class PluginSelfTest
         PluginInstance? instance = PluginHost.Find(pluginId);
         if (instance == null) return "停用后找不到插件实例。";
         if (instance.IsLoaded) return "探针开始前插件仍处于加载状态，无法模拟重启现场。";
-        if (PluginHost.GetRegisteredActions().Count != 0) return "探针开始前 Catalog 仍有动作残留。";
+        if (PluginHost.Catalog.SnapshotActions().Count != 0) return "探针开始前 Catalog 仍有动作残留。";
 
         PluginExecuteOutcome disabledOutcome = PluginHost.ExecutePluginAction(probe);
         line($"  禁用状态调用：处理={disabledOutcome.Handled} 成功={disabledOutcome.Success} 信息={disabledOutcome.Message}");
@@ -1058,7 +1101,7 @@ internal static class PluginSelfTest
             return failure ?? "惰性加载探针结束后 ALC 未被回收。";
         }
 
-        if (PluginHost.GetRegisteredActions().Count != 0)
+        if (PluginHost.Catalog.SnapshotActions().Count != 0)
         {
             return failure ?? "惰性加载探针停用后仍有动作残留。";
         }

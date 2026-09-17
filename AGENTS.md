@@ -92,6 +92,12 @@ g:\Users\2 Better\Desktop\design\
 │       ├── PluginParameterValidator.cs # 声明式参数约束校验（Required/MaxLength/Min/Max/Regex）
 │       ├── PluginParameterForm.cs     # 参数表单动态渲染（9 种 ParameterFieldType）
 │       ├── PluginActionBinding.cs     # 「Type + PluginActionRef ⇄ 单 Tag」双向投影
+│       ├── ActionParameterProjection.cs # 认领动作的宿主裸字段 → 参数字典投影
+│       ├── PluginActionClaimRegistry.cs # 随包动作的顶层 Type 认领快照与冲突拒绝
+│       ├── BundledPluginLifecycle.cs  # 随包动作包的同步、刷新、补回与安全清理
+│       ├── BuiltinActionCatalog.cs     # 仅保留 Hotkey 的进程内动作目录
+│       ├── BuiltinActions/             # 内建动作的插件模型适配实现
+│       ├── PluginCapabilityLabels.cs   # 能力位 → 安装确认风险文案
 │       ├── PluginI18n.cs              # 插件词条 key 的统一解析（短键 ⇄ 全键）
 │       ├── PluginListItem.cs          # 插件管理页的列表项 DTO
 │       ├── PluginSelfTest.cs          # --plugin-selftest 无界面端到端自检通道
