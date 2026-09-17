@@ -173,20 +173,6 @@ public static class WindowTiler
 	/// <summary>主轴布局的 Master 占比（同 Dwalia 默认 0.6）。</summary>
 	public const double MasterFactor = 0.6;
 
-	/// <summary>
-	/// 窗口透明度的可选下界（百分比）。
-	/// <para>
-	/// 与 <see cref="MaxOpacityPercent"/> 一起提到这里，是为了让「1~100」这个范围
-	/// <b>只有一处定义</b>：外移后的「窗口透明度」动作靠它声明参数的 Min/Max，
-	/// 校验提示也据此生成。写死两处的后果是宿主把上界改成 90 之后，
-	/// 插件里那份仍然告诉用户「1~100」，并且把 95 判成合法。
-	/// </para>
-	/// </summary>
-	public const double MinOpacityPercent = 1.0;
-
-	/// <summary>窗口透明度的可登上界（百分比，100 = 完全不透明）。</summary>
-	public const double MaxOpacityPercent = 100.0;
-
 	public static bool IsValidLayout(string key)
 	{
 		return LayoutKeys.Contains(key);
@@ -857,10 +843,7 @@ public static class WindowTiler
 		}
 	}
 
-	/// <summary>
-	/// 设置当前前台窗口透明度（参数 <see cref="MinOpacityPercent"/>~<see cref="MaxOpacityPercent"/>，
-	/// 空参数默认 50；100 = 不透明）。
-	/// </summary>
+	/// <summary>设置当前前台窗口透明度（参数 1~100，空参数默认 50；100 = 不透明）。</summary>
 	public static void SetWindowOpacity(string? param)
 	{
 		try
@@ -881,7 +864,7 @@ public static class WindowTiler
 			{
 				level = v;
 			}
-			level = Math.Max(MinOpacityPercent, Math.Min(MaxOpacityPercent, level));
+			level = Math.Max(1.0, Math.Min(100.0, level));
 			nint ex = GetWindowLongPtr(fg, GWL_EXSTYLE);
 			SetWindowLongPtr(fg, GWL_EXSTYLE, new nint(ex.ToInt64() | WS_EX_LAYERED));
 			SetLayeredWindowAttributes(fg, 0, (byte)Math.Round(level * 255.0 / 100.0), LWA_ALPHA);

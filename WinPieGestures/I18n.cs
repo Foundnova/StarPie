@@ -784,30 +784,6 @@ public static class I18n
 			[LanguageCode.En] = "Run Command",
 			[LanguageCode.Ja] = "コマンド実行"
 		};
-		// 「运行命令」动作的字段与说明。内建动作走统一的参数声明后，
-		// 标签来源从 XAML 里的硬编码挪到了这里 —— 与插件通过 II18nRegistry 声明词条是同一个思路，
-		// 区别只是宿主词条是编译期就存在的。
-		dictionary["ActionTypeCommandDesc"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "在指定的终端中执行一条命令行语句。",
-			[LanguageCode.ZhTw] = "在指定的終端中執行一條命令列語句。",
-			[LanguageCode.En] = "Run a command line in the selected terminal.",
-			[LanguageCode.Ja] = "指定したターミナルでコマンドを実行します。"
-		};
-		dictionary["CommandFieldLine"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "命令行",
-			[LanguageCode.ZhTw] = "命令列",
-			[LanguageCode.En] = "Command line",
-			[LanguageCode.Ja] = "コマンド"
-		};
-		dictionary["CommandFieldTerminal"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "终端",
-			[LanguageCode.ZhTw] = "終端",
-			[LanguageCode.En] = "Terminal",
-			[LanguageCode.Ja] = "ターミナル"
-		};
 		dictionary["ActionTypeSwitchWindowShort"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "切换窗口",

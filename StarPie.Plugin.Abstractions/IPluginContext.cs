@@ -36,42 +36,6 @@ public interface IPluginContext
     /// <summary>宿主已验证的动作能力（发快捷键 / 启程序 / 剪贴板 / 开网址）。</summary>
     IHostActionInvoker Host { get; }
 
-    /// <summary>
-    /// 命令执行（在指定终端里跑一段命令）。
-    /// <para>
-    /// 需要 <see cref="PluginCapability.Process"/> 能力，否则调用抛
-    /// <see cref="PluginCapabilityDeniedException"/>。想优雅降级就先问
-    /// <see cref="IHostInfo.HasCapability"/>。
-    /// </para>
-    /// </summary>
-    IHostCommandService Commands { get; }
-
-    /// <summary>
-    /// Shell 上下文动词（对活动资源管理器窗口的选中项执行操作）。
-    /// 与 <see cref="Commands"/> 一样需要 <see cref="PluginCapability.Process"/> 能力。
-    /// </summary>
-    IHostShellService Shell { get; }
-
-    /// <summary>
-    /// 窗口控制（平铺 / 置顶 / 透明度 / 搬到下一屏 / 激活任务栏槽位）。
-    /// 执行面需要 <see cref="PluginCapability.WindowControl"/> 能力；
-    /// 元数据面（<see cref="IHostWindowService.Layouts"/> 等）始终可读，理由见该接口。
-    /// </summary>
-    IHostWindowService Windows { get; }
-
-    /// <summary>
-    /// 屏幕截取（框选截屏 + 文字识别）。
-    /// 执行面需要 <see cref="PluginCapability.ScreenCapture"/> 能力。
-    /// </summary>
-    IHostScreenCaptureService ScreenCapture { get; }
-
-    /// <summary>
-    /// 系统功能（最小化 / 任务视图 / 音量 / 锁屏 / 关机 …）。
-    /// 执行面需要 <see cref="PluginCapability.InputSimulation"/> 能力；
-    /// 预设清单（<see cref="IHostSystemService.Presets"/>）始终可读，理由见该接口。
-    /// </summary>
-    IHostSystemService System { get; }
-
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 
