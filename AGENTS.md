@@ -9,7 +9,7 @@
 1. [🌟 项目起源、使命与设计哲学](#1-项目起源使命与设计哲学)
 2. [🏗️ 源码架构与核心模块分工](#2-源码架构与核心模块分工)
 3. [⚙️ 核心技术机制与避坑规范](#3-核心技术机制与避坑规范)
-4. [🧩 插件系统架构与开发规范](#4-插件系统架构与开发规范)
+4. [🧩 插件系统运行时重构](#4-插件系统运行时重构)
 5. [🔄 代码生成、编译与发布流水线](#5-代码生成编译与发布流水线)
 6. [🎨 UI/UX 与视觉设计规范](#6-uiux-与视觉设计规范)
 7. [📜 版本演进与发布记录](CHANGELOG.md)
@@ -125,12 +125,29 @@ g:\Users\2 Better\Desktop\design\
 │       ├── Standalone/            # 独立单文件免安装自解压包 (~65MB)
 │       ├── StarPie-vX.Y.Z-Lightweight-win-x64.zip
 │       └── StarPie-vX.Y.Z-Standalone-win-x64.zip
+├── assets/                        # 品牌素材（app_icon / tray_icon / 各版 logo / screenshots）
 ├── attachments/                   # 文档与演示动图素材库 (GIF / PNG)
-├── scratch/                       # 代码反编译基线与代码生成流水线工具
-│   ├── Decompiler/                # Program.cs 流水线生成器工程
-│   └── v152_decompiled/           # 反编译基线源码
+├── 主题尺寸配置文件/               # 轮盘尺寸预设 JSON（用户可在「高级与系统设置」最下方导入）
+├── scratch/                       # 一次性开发工具与验证脚本 —— 不参与构建，可随时清理
+│   ├── IconGenerator/             # 从 attachments/cover.v3.png 生成 logo / app_icon / tray_icon
+│   ├── Issue17Demo/               # 复现用户反馈用的小 Demo 工程
+│   ├── Everything-SDK/            # 本地搜索联调用的 SDK 头文件
+│   └── *.ps1 / *.png / test_v170.cs   # 临时验证脚本与对照截图
+├── tests/                         # UI 回归套件（pywinauto + UIA；会弹 GUI，由用户手动运行）
+│   ├── conftest.py                # 隔离 AppData 沙箱 fixture
+│   ├── test_settings.py           # 设置窗口回归
+│   └── test_plugins.py            # 插件页回归
+├── installer/                     # Inno Setup 打包
+│   ├── StarPie.iss                # 安装脚本（语言文件在 Languages/）
+│   └── build-installer.ps1        # 打包入口 —— 版本号 6 处同步点之一（$Version 兜底值）
 ├── docs/
-│   └── plugin-system-architecture.md # 插件宿主、公共基础设施与动作路径架构文档
+│   ├── plugin-system-architecture.md # 插件系统**现行实现**说明（统一调用运行时 + 路径模块 + 活动调用租约 + 异步停用状态机）
+│   ├── prototypes/                # 早期交互原型（v1.6.0 / v1.6.5，纯 HTML，仅供设计参考，不参与构建）
+│   └── issue100.txt               # 用户反馈原始记录（对应修复留档）
+├── PLUGIN_SYSTEM_DESIGN.md        # 插件系统设计大纲（设计草案，正文路径非现状，勿照抄）
+├── PLUGIN_SYSTEM_IMPLEMENTATION.md # 实现说明：结构与职责边界、接口用法、已踩过的坑
+├── PLUGIN_SYSTEM_PERFORMANCE_AND_API.md # 性能实测 · 完整接口清单 · 社区开发指南
+├── PLUGIN_FIRST_ROADMAP.md        # 插件化边界规划（三问判据；定位是规划，不是现状描述）
 ├── AGENTS.md                      # 本架构与继承开发规范
 └── CHANGELOG.md                   # 完整版本演进与发布日志
 ```
@@ -207,17 +224,11 @@ g:\Users\2 Better\Desktop\design\
 
 ---
 
-## 4. 🧩 插件系统架构与开发规范
-- **详细架构文档**：宿主分层、插件加载与原子注册、`PluginInstance` 包装、活动调用租约、异步停用和动作执行全链路统一维护在 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
+### 3.7 插件系统 (`StarPie.Plugin.Abstractions` + `WinPieGestures/Plugin/`)
 - **三层分界，任何一层都不许越界**：
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
   - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
   - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
-- **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
-- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。用户停用、更新与卸载必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载；插件系统总开关和应用退出只停止当前运行时，不得清空插件自身的启用偏好。实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
-- **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
-- **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
-- **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
 - **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
   1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
   2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
@@ -250,10 +261,63 @@ g:\Users\2 Better\Desktop\design\
   3. 覆盖安装裸 DLL 前要**清掉上一次的载荷**（程序集与清单），否则目录里留下两枚业务 dll 会让「唯一业务 dll」的识别约定失效；但必须**保留 `data\` 与 `settings.json`** —— 更新一次版本不该清空用户数据。
 - **`PluginInstance` 的两个目录属性不能混用**：`ManagedDirectory` 是宿主拥有的安装目录（删除/改名/写入只能用它）；`Directory` 仅供展示（外部路径登记时返回 `ExternalPath` **所在目录**）。历史上只有 `Directory` 一个属性，而外部登记分支返回的其实是**dll 文件路径**，当时只是靠 `Directory.Exists(文件路径)` 恒为 `false` 才「恰好」没把开发者的输出目录删掉。现在 `Uninstall` 走 `IsExternal` 分支：外部登记只摘登记、不碰磁盘。
 - **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
-- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
+- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 内建动作批量接缝（`[3f]`）→ 端到端派发判据（`[3g]`）→ 随包插件三条规则（`[3h]`）→ 顶层类型认领（`[3i]`）→ 随包插件登记信息随文件刷新（`[3k]`）→ 宿主服务面与能力门禁（`[3j]`）→ 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
+  - **一次只验传入的那一枚 dll，所以每个随包包都要各跑一次**：`[3h]`~`[3k]` 全部围绕这一个插件展开（认领表断言也只看它自己的清单）。外移动作后只跑其中一个包，另一个包的认领链路（尤其是「认领指向的贡献点真的存在」）就完全没有被覆盖 —— 而那条链路的失效表现恰恰是最难查的「动作找得到归属、却永远执行不了」。`[3f]`/`[3g]`/`[3j]` 与具体插件无关，跑哪个包都会执行。
+  - **编号顺序与实际执行顺序不完全一致，不是笔误**：`[3k]` 排在 `[3j]` 之前跑，因为它需要随包插件在场（要按启动顺序重跑 `AutoInstall → SyncFromDisk → RebuildClaimTable`），必须在「清理现场」之前；而 `[3j]` 验的是与具体插件无关的宿主服务面，刻意放在清理之后。新增段落时请一并说明它为什么落在这个位置。
   - **自检整体跑在临时沙箱里**：`PluginPaths.OverrideRootsForTesting` 会把两个根目录钉到 `%TEMP%\StarPie-PluginSelfTest-<随机>\`，跑完即删。**`Configure` 见到根目录已被钉住必须直接返回**，否则沙箱会被覆盖回真实目录，自检就成了「每跑一次回归就动一次用户已装插件」。
   - **附加 `--skip-invoke` 可跳过第 [4] 段真实调用**：那一节会真的下发键鼠/调节系统状态（实测会把屏幕亮度推高 10%）。日常只关心识别、注册与接缝结论的回归应带上这个开关。
   - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
+  - **等待 ALC 回收结论的代码，绝不能和持有插件侧对象的代码处在同一个栈帧上**。`PluginActionRegistration` 指向插件程序集里的类型实例，是本栈帧的 GC 根；它还活着时结论永远是「需要重启」，文件锁不释放，而**删沙箱恰恰发生在 `Run` 内部** —— 于是每跑一次自检就在 `%TEMP%` 里留下一坨删不掉的 `.pending-delete` 残留。这就是 `RunEnableAndInvoke` / `RunRestartEquivalenceProbe` / `RunTypeClaimChecks` 全部标注 `[MethodImpl(MethodImplOptions.NoInlining)]` 的唯一理由；新增自检段时请照此办理。删沙箱前还要先催一次 GC 并退避重试（ALC 卸载是异步的，判定跑完不等于 CLR 已放开句柄）。
+- **顶层类型认领（Type Claim）：外移的内建动作如何对用户完全不可见**：
+  - **`ActionItem.Type` 是不可变身份**，全项目近两百处引用；要外移动作就必须让插件反过来声明「我负责哪些 `Type`」，而不是改配置形态。声明写在清单里（`StarPiePluginTypeClaims` 元数据，形如 `Launch=launch;WebUrl=webUrl`），落进登记表 `PluginRegistryEntry.ClaimedTypes`。
+  - **认领表必须在不加载任何程序集的前提下可建**（`RebuildClaimTable` 只读登记表）：轮盘首次触发路径上不允许出现 IO 或程序集加载。调用顺序上它必须在 `SyncFromDisk()` **之后** —— 实例由后者建立。
+  - **只有 `Bundled=true` 的随包插件能认领**。写入侧 `ClaimWire` 与读取侧 `RebuildClaimTable` 各拦一次（后者是因为 `registry.json` 是用户能手改的纯文本）。认领等于接管用户配置里的一整类动作，这个权力不给第三方。
+  - **内建优先**：仍留在 `BuiltinActionCatalog` 里的类型，任何认领一律拒绝 —— 同一 `Type` 挂两条执行路径（双轨制）正是这套机制要消除的东西。
+  - **`Hotkey` 永远不许外移**：它既是 `ActionItem.Type` 的默认值，也是未配置扇区的占位类型（`WheelLayer.EnsureLayers`）。外移之后用户一停用动作包，所有空扇区都会报「包已停用」。
+  - **多提供方整对拒绝**：两个插件抢同一个类型时全部丢弃并记 Error，绝不「后者覆盖前者」——那是静默劫持。
+  - **登记信息必须随来源区文件刷新，认领清单尤其如此**（`PluginHost.RefreshBundledMetadata`）：`ClaimedTypes` / 版本 / 能力集合此前只在**首次安装**时写入一次、之后永不更新。这有两个后果，第二个是灾难级的：①「随包插件升级后新增的认领」永远不生效；②**拆包**（把某个类型从一个包挪到另一个包）时，旧包的老快照与新包的新声明会同时认领同一个类型，撞上上面那条「多提供方整对拒绝」，**一次干掉两个包的全部动作**，而用户唯一能看到的线索是日志里一行 Error。所以 `EnsureBundledPlugin` 对已登记的随包条目要**先按当前 dll 的元数据刷新登记信息、再判断宿主区文件在不在**（两件事互不相干，不能用 `||` 短路掉任一件）。刷新**只同步「文件是什么」，绝不同步「用户怎么选」**：`Enabled` / `Preload` / `InstallPath` / `Bundled` / `ExternalPath` / 确认时间戳一律不碰。**只在值真的变了时落盘** —— 无条件写会让 `registry.json` 的修改时间每次启动都变，「配置有没有被改过」的判断随之全部失效。自检 `[3k]` 守这条。
+  - **拆包时的两条硬约束**：① 「新包加认领」与「旧包删认领」必须在同一个版本里同时发生，且**强依赖上面那条元数据刷新** —— 否则老用户的旧包快照仍认领该类型，与新包形成「多提供方」，触发整对拒绝，一次干掉两个包的全部动作；② **包 ID 与文件名若要改，必须依赖「已停止分发清理」**（`PluginHost.PruneUndistributedBundledPlugins`，跑在 `SyncFromDisk` 之前）：它把「来源区里已经没有了的」随包条目的登记条目与宿主区安装副本一起带走（插件私有 `data\` 保留）。这与上面那条元数据刷新是**互补的两半** —— 那个的前置是「来源区里**还有**这枚 dll」，而拆包恰恰让它没有了。两者缺任一个，改名都会留下幽灵包：宿主区存着副本、来源区已无对应文件，它照常出现在插件列表里、照常可停用，还带着过时的认领快照和新包抢同一个类型。清理的**三条保守守卫**（来源区不存在 / 空目录 / 有文件读不出来 ⇒ 一律不清理）不可松 —— 清理不可逆，判据不完整时最坏只能是「留下一个幽灵包」，绝不能是「误删用户正在用的包」。自检 `[3m]` 守这条。
+  - **认领 ≠ 可用**：插件停用时认领仍留在表里，`IsClaimedTypeAvailable` 才判断此刻能不能干活并给出可操作文案。`ActionExecutor.Execute` 的认领接缝必须在 `switch` **之前**（认领类型走不到 `case "Plugin"`），`switch` 的 `default:` 必须出声报「无法识别的动作类型」而不是静默 `break`。
+  - **被认领的贡献点要从「🔌 插件」子下拉里排除**（`IsClaimedContribution`），否则同一个动作在两处都能配，而两处的持久化形态互不兼容（`Type="Launch"` vs `Type="Plugin"` + 引用）。
+  - **参数零迁移**：认领类型的动作在配置里仍是老形态，参数散在 `ActionItem` 裸字段上，由宿主 `ActionParameterProjection`（**显式白名单，不是反射**）现读现装成字典；键名的事实来源是 SDK 侧常量类 `HostActionFields`，用 `const` 是为了让宿主改名时插件侧变成**编译错误**而不是运行期读到空值。只投影动作参数，**不投影外观字段**（`Name` / `IconKey` / `CustomTextColor` …）。
+  - **保留 ID 前缀（`starpie.*` 等）的检查只在「进入系统」那一刻做**（扫描 / 导入），放行条件是「来自只读来源区」或「该插件已登记」。**装载路径不得复查**（`ScanInstalledPlugin(dir, allowReservedIdPrefix: true)`）—— 否则同一枚随包 DLL 会「装得上、永远起不来」，而报错还指着 ID 说事，与真实原因毫无关系。边界查一次，系统内部不复查。
+  - **认领类型的失败上报走插件路径**（日志 + 托盘气泡），**不弹 `MessageBox`**。判据是「代码是否在独立程序集里」，不是「是否官方」：内建动作是用户亲手配的，失败要立刻打断他；认领类型已是插件，异常冒泡到 `ActionExecutor.Execute` 的 `catch` 会把无人值守的动作线程卡死在对话框上。
+- **派发顺序是一个可断言的纯判据**：`ActionExecutor.Execute` 的分派本体是 `switch (ClassifyAction(action.Type))`，三条路的顺序（内建 → 认领 → `switch` 兜底）**不可调换**。抽出 `ClassifyAction`（纯函数，返回 `ActionDispatchKind`）的唯一理由是让「顺序本身可被断言」：顺序错了的现象是「界面一切正常、按下去却走了另一条路」，从现象根本反推不出来，而原先那种「跑一个动作看产物」的验证法在动作陆续外移之后已经找不到无害探针了。**改了 `Execute` 的分派就必须同步改 `ClassifyAction`**，否则自检验证的是空气。
+- **`[3f]`/`[3g]` 的断言要数据驱动，但设计意图必须写死**：
+  - 内建动作清单从 `BuiltinActionCatalog.SnapshotAll()` 生成，**不在自检里手抄一份**。手抄的成本已经显现过：动作每外移一个就得有人记得删一行，忘了删的表现是自检报「某动作不在内建动作表里」—— 而那恰恰是**预期行为**。「预期的事被报成缺陷」比不报更坏，它会训练人忽略这条消息。
+  - 反过来，「哪些类型**不该**留在内建表里」必须**写死成独立断言**（`migratedTypes`）：那表达的是设计意图，无法从快照推导。同一份清单在 `[3f]`（不得还在内建表里）与 `[3g]`（不得被判为 `Builtin`）各断言一次 —— 只做一次的话，「从内建删了、认领也没建」同样能过。
+  - **`[3g]` 观测的是「有没有出声」，不是「有没有产物」**。静默失效的判据从来不是「产物没出来」，而是「什么都没告诉用户」。探针挂 `PluginNotificationHub.Sink` 收提示，用**注定不会执行**的动作（未知 Type、空必填项）去验派发 —— 这样不必再去找「真跑也无害」的动作（已经一个不剩了）。**用完必须在 `finally` 里摘掉汇**：它是全局静态的，留着会让后续所有段落的提示悄悄流进一个已经没人读的列表。
+  - **探针用的具体类型名同样会过期**。「内建动作校验失败必须出声」那条原先是拿 `Type="Tile"` 做的探针，而 S3a 把 Tile 外移之后它立刻变成误报 —— 报出来的「掉进 default」其实是**正确行为**（那一刻 `[3h]` 还没装包，认领表本来就是空的）。现在改成「从 `SnapshotAll()` 里找第一个带必填参数的动作」：空白 `Parameter` 必然触发它的必填拦截，动作不会真的执行。**凡是拿某个具体动作当探针的地方，都要问一句「它外移之后这条断言还成立吗」** —— 外移过的动作已经撞出两次这类误报。
+- **能力门禁（Capability Gate）：`Process` / `WindowControl` 各有一个真实强制点**：
+  - 带门禁的是三个「产生不可忽略后果」的服务：`IHostCommandService.Run`（命令）与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）挂 `Process`；`IHostWindowService` 的五个执行方法（挪走 / 置顶 / 改透明度 / 切走用户正在用的窗口）挂 `WindowControl`。清单未声明对应能力时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
+  - **每个服务认自己那项能力，不复用别人的**。`WindowControl` 刻意不与 `Process` 合并：安装确认页上展示的能力必须对应一个真实后果，用户看到「进程」想的是「它要启动程序」，而实际后果是他的窗口被挪走 —— 那是标签名不副实。`Ui` 同样不符（它的语义是「打开自己的窗口」）。三个服务的门禁实现共用一个基类（`PluginGatedService`），所以**复制粘贴时把 required 传错不会有任何编译错误** —— 自检 `[3j]` 用「只声明 A 的插件调 B 的服务」这一组交叉断言守它，否则「认错能力标志」会让上面那些断言照样全绿。
+  - **门禁必须在 `Guard` 之外**。若挪进 `Guard` 里，异常会被吞掉、转成一个 `false` 返回值，用户看到的是「命令没执行」而不是「本插件缺少「进程」能力」—— 前者会被当成软件 bug 反复报，后者才指向真正该改的地方。
+  - **元数据（`Terminals` / `Verbs` / `Layouts` / `OpacityMinPercent` …）刻意不受门禁约束**：插件的 `Parameters` 是属性、声明期（注册前）就要读这几份清单，在那里抛异常会让一个「忘了声明能力」的插件在注册阶段整个崩掉 —— 而它其实只是不能在运行时干活而已。**门禁拦的是「产生后果」的调用**。
+  - **`PluginCapabilityDeniedException` 刻意不继承 `PluginContractException`**：后者的语义是「违反注册契约」，宿主会因此把插件整体标记为加载失败并卸载；而「清单里漏了一行能力声明」远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，排查方向会完全跑偏。
+  - **必须说清它换来的不是安全**：进程内插件本来就能自己 `Process.Start` / P/Invoke `SetWindowPos`，SDK 拦不住。门禁换到的是「安装确认页上展示的能力真的对应一个后果」—— 漏掉它，那个勾选在运行时没有任何对应物，才是真正骗人的地方。
+  - **只能加在新接口上**。`IHostActionInvoker` 的七个方法是既有契约，补门禁会让已发布、未声明该能力的插件突然失败（破坏性变更）。
+  - **新增能力项要一次只加「有强制点的那一项」**。S3a 只加了 `WindowControl`（同时落地了它的门禁），`ScreenCapture` / `InputSimulation` 各自等 `IHostScreenCaptureService`（S4a）/ `IHostSystemService`（S4b）落地时再加（均已落地）—— 提前加会出现「安装确认页展示了这个能力、运行时却没有任何对应物」，正是上面那条要消除的东西。**配套纪律**：确认页能力文案集中在 `PluginCapabilityLabels`，枚举每加一个非空能力位必须同步加文案，自检 `[3j]` 有机器护栏 —— 文案缺失的症状是用户在确认页看到一个勾选项却读不到它意味着什么。
+  - **选探针时用「注定无副作用」的调用**：`[3j]` 验门禁一律传空参数（空命令 / 空动词 / 空布局码）。这样即使门禁真的写错了、调用被放行，也只会撞上服务内部的空值短路并返回 `false`，**不会动到自检者自己的窗口或起一个真进程** —— 否则门禁一错，自检就会顺手改掉用户窗口的状态，而那时所有人都在看报错，没人会想到这个附加副作用。
+- **宿主服务面的元数据必须只有一份来源**：`PluginCommandService.Terminals` 是终端清单的**唯一事实来源**（外移后的「运行命令」动作直接读它，不在插件里另抄一份），所以不存在「宿主改了下拉、插件没跟上」的漂移。**每次访问都重取词条、不缓存** —— `I18n` 的当前语言可以在运行时切换，缓存住的话用户切到英文之后下拉里还是中文。
+  - 同理 `PluginShellService.Verbs` 取 `ShellToolItem.Id`（`copy_path`）而不是 `Verb`（`Windows.CopyAsPath`）：用户配置里存的是短 ID，而 `Verb` 是执行体 `switch` 里的规范名。**传错这一个字段，动作会静默无效** —— 因为 `ExecuteShellTool` 的 `default` 分支是空的。
+  - 同理 `PluginWindowService.Layouts` 由 `WindowTiler.LayoutKeys` + `LayoutDisplayName` 现取，三个标记（`Cycle` / `CycleBack` / `Restore`）与透明度范围（`MinOpacityPercent` / `MaxOpacityPercent`）也一律转发宿主常量。**这些值写死在插件里必然漂**：宿主加一个布局、或把透明度上界从 100 调到 90，插件那份会继续把旧范围展示给用户并据此判断合法性。自检 `[3j]` 用 `SequenceEqual` 逐项比对（连顺序都比 —— 顺序即下拉顺序）。
+  - **`Verbs` 不是白名单**：`ExecuteShellTool` 的每个功能同时接受 `Id` 与 `Verb` 两套命名，按清单校验会把另一套命名的老配置整体判死。它只用来做下拉与展示。
+  - **ShellTool 的参数刻意声明成自由文本而不是 `Enum`**：它的正式入口是带搜索/分类的 `ShellActionPickerWindow`，压进通用下拉是体验降级、还会让清单出现两份；而执行体接受两套命名，按清单校验会判死老配置。
+- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。当前契约版本 **1.2**（1.0 → 1.1 新增能力门禁 + `IHostCommandService` / `IHostShellService` / `IHostInfo.HasCapability`；1.1 → 1.2 新增 `IHostWindowService` + `PluginCapability.WindowControl`）。
+
+---
+
+## 4. 🧩 插件系统运行时重构
+
+> 本节是 2026-09-17 与 `devplugin` 侧同步后**已采用**的运行时形态；插件系统的通用规范
+> （两个插件目录、候选安装三条规则、顶层类型认领、宿主能力门禁、派发顺序等）见 **§3.7**。
+
+- **详细架构文档**：宿主分层、插件加载与原子注册、`PluginInstance` 包装、活动调用租约、异步停用和动作执行全链路统一维护在 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
+- **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
+- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。用户停用、更新与卸载必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载；插件系统总开关和应用退出只停止当前运行时，不得清空插件自身的启用偏好。实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
+- **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
+- **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
+- **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
 
 ---
 
@@ -281,6 +345,10 @@ dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r w
 # 5. 自动化打包生成 ZIP 压缩归档
 powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Lightweight\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Lightweight-win-x64.zip' -Force; Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Standalone-win-x64.zip' -Force"
 ```
+
+> **发布前必查：`plugin\` 有没有落在发布目录里。** `CopyBundledPlugins`（`AfterTargets="Build"`）把 12 枚随包 dll 拷到 `$(OutDir)plugin`，而 `dotnet publish -o <目录>` 的输出是 `$(PublishDir)` —— **这两个不是同一个目录**，所以另有 `CopyBundledPluginsToPublish`（`AfterTargets="Publish"`）负责发布侧，两者共用顶层 ItemGroup `BundledPluginPayload`（放进 Target 内部会因作用域变空，复制会「成功执行但拷了 0 个文件」且不报错）。
+>
+> 只做 Build 那一半时，开发机上永远看不出问题（`bin\` 里躺着 plugin\），而 ZIP 与 Inno Setup 安装包（`SourceDir` 指向 `publish\Standalone`）**一枚插件 dll 都没有** —— 用户装完之后所有随包动作都不会被安装，配置里配好的扇区一触发就报「找不到提供方」。改动这段后必须实际 `dotnet publish -o <临时目录>` 一次，确认 `plugin\` 里有 12 枚 dll。
 
 ### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：

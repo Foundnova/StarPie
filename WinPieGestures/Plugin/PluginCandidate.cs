@@ -91,14 +91,14 @@ internal sealed class PluginCandidate
         {
             var parts = new List<string>();
             string? author = Scan.Manifest?.Author;
-            if (!string.IsNullOrWhiteSpace(author)) parts.Add($"作者 {author}");
+            if (!string.IsNullOrWhiteSpace(author)) parts.Add(I18n.TF("PluginCandidateAuthor", author));
 
             string? description = Scan.Manifest?.Description;
             if (!string.IsNullOrWhiteSpace(description)) parts.Add(description!);
 
             if (Scan.Manifest?.Capabilities is { Count: > 0 } capabilities)
             {
-                parts.Add($"声明能力：{string.Join("、", capabilities)}");
+                parts.Add(I18n.TF("PluginCandidateCapabilities", string.Join("、", capabilities)));
             }
 
             if (parts.Count == 0) parts.Add(FileName);
@@ -109,15 +109,15 @@ internal sealed class PluginCandidate
     /// <summary>状态徽标文案。</summary>
     public string StateText => State switch
     {
-        PluginCandidateState.Installable => "可安装",
-        PluginCandidateState.Installed => "已装同版本",
-        PluginCandidateState.Replaced => "内容已变",
-        PluginCandidateState.Update => "有新版本",
-        PluginCandidateState.Downgrade => "版本更旧",
-        PluginCandidateState.VersionUnknown => "版本待确认",
-        PluginCandidateState.ExternalRegistered => "已外部引用",
-        PluginCandidateState.Duplicate => "ID 重复",
-        PluginCandidateState.Rejected => "无法识别",
+        PluginCandidateState.Installable => I18n.T("PluginCandidateStateInstallable"),
+        PluginCandidateState.Installed => I18n.T("PluginCandidateStateInstalled"),
+        PluginCandidateState.Replaced => I18n.T("PluginCandidateStateReplaced"),
+        PluginCandidateState.Update => I18n.T("PluginCandidateStateUpdate"),
+        PluginCandidateState.Downgrade => I18n.T("PluginCandidateStateDowngrade"),
+        PluginCandidateState.VersionUnknown => I18n.T("PluginCandidateStateVersionUnknown"),
+        PluginCandidateState.ExternalRegistered => I18n.T("PluginCandidateStateExternalRegistered"),
+        PluginCandidateState.Duplicate => I18n.T("PluginCandidateStateDuplicate"),
+        PluginCandidateState.Rejected => I18n.T("PluginCandidateStateRejected"),
         _ => State.ToString(),
     };
 
@@ -156,11 +156,11 @@ internal sealed class PluginCandidate
     /// <summary>安装按钮文案。</summary>
     public string InstallButtonText => State switch
     {
-        PluginCandidateState.Update => "⬆️ 更新",
-        PluginCandidateState.Downgrade => "⬇️ 降级安装",
-        PluginCandidateState.Replaced => "🔁 覆盖安装",
-        PluginCandidateState.VersionUnknown => "📦 覆盖安装",
-        _ => "📦 安装",
+        PluginCandidateState.Update => I18n.T("PluginCandidateInstallUpdate"),
+        PluginCandidateState.Downgrade => I18n.T("PluginCandidateInstallDowngrade"),
+        PluginCandidateState.Replaced => I18n.T("PluginCandidateInstallOverwrite"),
+        PluginCandidateState.VersionUnknown => I18n.T("PluginCandidateInstallOverwrite"),
+        _ => I18n.T("PluginCandidateInstall"),
     };
 
     /// <summary>供 DataTrigger 判断是否显示说明行。</summary>

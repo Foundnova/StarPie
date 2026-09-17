@@ -59,102 +59,35 @@ public static class I18n
 			}
 			return;
 		}
-		if (code != null)
+		// 反编译残留清理：原文是 ILSpy 还原结构化控制流失败后吐出的「长度 + 字符试探 + 跳转表」
+		// （31 处 `IL_xxxx` 标签跳转），这里改回它本来的形状 —— 对受支持的语言代码做精确匹配。
+		// 注意 code 为 null（配置文件里 Language 缺失）时，原实现兜底落到的同样是 ZhCn，
+		// 因此并入 `_` 分支，语义与原来逐条等价。
+		CurrentLanguage = code switch
 		{
-			int length = code.Length;
-			if (length != 2)
-			{
-				if (length != 5)
-				{
-					if (length == 7 && code == "zh-Hant")
-					{
-						goto IL_0169;
-					}
-				}
-				else
-				{
-					switch (code[3])
-					{
-					case 'T':
-						break;
-					case 'H':
-						goto IL_0100;
-					case 'U':
-						goto IL_010f;
-					case 'G':
-						goto IL_011e;
-					case 'J':
-						goto IL_012d;
-					default:
-						goto IL_0175;
-					}
-					if (code == "zh-TW")
-					{
-						goto IL_0169;
-					}
-				}
-			}
-			else
-			{
-				char c = code[0];
-				if (c != 'e')
-				{
-					if (c == 'j' && code == "ja")
-					{
-						goto IL_0171;
-					}
-				}
-				else if (code == "en")
-				{
-					goto IL_016d;
-				}
-			}
-		}
-		goto IL_0175;
-		IL_012d:
-		if (code == "ja-JP")
-		{
-			goto IL_0171;
-		}
-		goto IL_0175;
-		IL_0100:
-		if (code == "zh-HK")
-		{
-			goto IL_0169;
-		}
-		goto IL_0175;
-		IL_010f:
-		if (code == "en-US")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
-		IL_0169:
-		LanguageCode currentLanguage = LanguageCode.ZhTw;
-		goto IL_0177;
-		IL_0175:
-		currentLanguage = LanguageCode.ZhCn;
-		goto IL_0177;
-		IL_0171:
-		currentLanguage = LanguageCode.Ja;
-		goto IL_0177;
-		IL_0177:
-		CurrentLanguage = currentLanguage;
-		return;
-		IL_016d:
-		currentLanguage = LanguageCode.En;
-		goto IL_0177;
-		IL_011e:
-		if (code == "en-GB")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
+			"zh-TW" or "zh-Hant" or "zh-HK" => LanguageCode.ZhTw,
+			"en" or "en-US" or "en-GB" => LanguageCode.En,
+			"ja" or "ja-JP" => LanguageCode.Ja,
+			_ => LanguageCode.ZhCn
+		};
 	}
 
 	public static string T(string key)
 	{
 		return GetString(key);
+	}
+
+	/// <summary>
+	/// 查表并填充占位符（词条里写 <c>{0}</c> / <c>{1}</c>）。
+	/// <para>
+	/// 单独开这个方法、而不是让每个调用方各自写 <c>string.Format</c>：一是省掉重复代码，
+	/// 二是键缺失时 <see cref="T"/> 会原样返回键名，此时 <c>string.Format</c> 作用在不含
+	/// 占位符的字符串上是安全的（不会抛）—— 失败路径不会把界面搞崩。
+	/// </para>
+	/// </summary>
+	public static string TF(string key, params object?[] args)
+	{
+		return string.Format(T(key), args);
 	}
 
 	public static string GetString(string key)
@@ -243,20 +176,6 @@ public static class I18n
 	static I18n()
 	{
 		Dictionary<string, Dictionary<LanguageCode, string>> dictionary = new Dictionary<string, Dictionary<LanguageCode, string>>();
-		dictionary["SidebarModeSimple"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "💡 简单模式",
-			[LanguageCode.ZhTw] = "💡 簡易模式",
-			[LanguageCode.En] = "💡 Simple Mode",
-			[LanguageCode.Ja] = "💡 シンプルモード"
-		};
-		dictionary["SidebarModePro"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "⚙️ 高级全星模式",
-			[LanguageCode.ZhTw] = "⚙️ 進階全星模式",
-			[LanguageCode.En] = "⚙️ Pro Full Mode",
-			[LanguageCode.Ja] = "⚙️ プロ全星モード"
-		};
 		dictionary["NewCustomPresetButton"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "➕ 新建配色",
@@ -595,20 +514,6 @@ public static class I18n
 			[LanguageCode.En] = "\ud83d\udee1\ufe0f Whitelist Mode (Only active in whitelisted apps, bypass elsewhere)",
 			[LanguageCode.Ja] = "\ud83d\udee1\ufe0f ホワイトリストモード (登録アプリのみ有効、他は右クリック通過)"
 		};
-		dictionary["BlacklistTitle"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "进程排除黑名单",
-			[LanguageCode.ZhTw] = "處理程序排除黑名單",
-			[LanguageCode.En] = "Process Exclusion Blacklist",
-			[LanguageCode.Ja] = "プロセス除外ブラックリスト"
-		};
-		dictionary["BlacklistDesc"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "在排除黑名单中的应用程序（如远程桌面、画图、3D建模软件）中，完全放行鼠标右键。",
-			[LanguageCode.ZhTw] = "在排除黑名單中的應用程式（如遠端桌面、小畫家、3D建模軟體）中，完全放行滑鼠右鍵。",
-			[LanguageCode.En] = "Bypass mouse gestures in blacklisted applications (e.g. Remote Desktop, Paint, CAD tools).",
-			[LanguageCode.Ja] = "ブラックリストに登録されたアプリ（リモートデスクトップ、ペイントなど）ではジェスチャーを無効化します。"
-		};
 		dictionary["WhitelistTitle"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "进程启用白名单",
@@ -861,14 +766,19 @@ public static class I18n
 			[LanguageCode.En] = "➕ Add Custom Profile",
 			[LanguageCode.Ja] = "➕ カスタム設定を追加"
 		};
-		dictionary["BtnRenameProfile"] = new Dictionary<LanguageCode, string>
+		// 拆键说明（2026-09-17）：下面两键供列表模式的整宽按钮 —— 同一面板统一用长标签
+		// （见上方的「➕ 新建自定义配置」与下方的「📑 复制方案」）。画布模式的紧凑工具条按钮
+		// 另用短标签的 BtnRenameProfile / BtnDeleteProfile。两组原先各共用一个键，而短文案的
+		// 定义写在后面、静默覆盖了长文案，于是列表模式按钮少显示「当前配置」。此处把被顶掉的
+		// 长文案独立成键，恢复它原本的设计。
+		dictionary["BtnRenameCurrentProfile"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "✏\ufe0f 重命名当前配置",
 			[LanguageCode.ZhTw] = "✏\ufe0f 重新命名當前配置",
 			[LanguageCode.En] = "✏\ufe0f Rename Profile",
 			[LanguageCode.Ja] = "✏\ufe0f 名前を変更"
 		};
-		dictionary["BtnDeleteProfile"] = new Dictionary<LanguageCode, string>
+		dictionary["BtnDeleteCurrentProfile"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "\ud83d\uddd1\ufe0f 删除当前配置",
 			[LanguageCode.ZhTw] = "\ud83d\uddd1\ufe0f 刪除當前配置",
@@ -1126,6 +1036,951 @@ public static class I18n
 			[LanguageCode.ZhTw] = "關於軟體",
 			[LanguageCode.En] = "About StarPie",
 			[LanguageCode.Ja] = "バージョン情報"
+		};
+		dictionary["TabPlugins"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "插件与扩展",
+			[LanguageCode.ZhTw] = "外掛與擴充",
+			[LanguageCode.En] = "Plugins",
+			[LanguageCode.Ja] = "プラグイン"
+		};
+		dictionary["PluginsPageSubheader"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "把插件 .dll 放进程序目录的 plugin 文件夹，或手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。",
+			[LanguageCode.ZhTw] = "把外掛 .dll 放進程式目錄的 plugin 資料夾，或手動選擇 .dll 安裝。外掛以 StarPie 目前權限在行程內執行，請只安裝你信任的來源。",
+			[LanguageCode.En] = "Drop a plugin .dll into the \"plugin\" folder next to the program, or install one manually. Plugins run in-process with StarPie's own privileges, so only install sources you trust.",
+			[LanguageCode.Ja] = "プラグインの .dll をプログラムフォルダー内の plugin フォルダーに置くか、手動で .dll を選択してインストールします。プラグインは StarPie と同じ権限でプロセス内実行されるため、信頼できる提供元のみインストールしてください。"
+		};
+		dictionary["PluginsInstallButton"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 安装插件 (.dll)...",
+			[LanguageCode.ZhTw] = "➕ 安裝外掛 (.dll)...",
+			[LanguageCode.En] = "➕ Install Plugin (.dll)...",
+			[LanguageCode.Ja] = "➕ プラグインをインストール (.dll)..."
+		};
+		dictionary["PluginsRescanButton"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 重新扫描",
+			[LanguageCode.ZhTw] = "🔄 重新掃描",
+			[LanguageCode.En] = "🔄 Rescan",
+			[LanguageCode.Ja] = "🔄 再スキャン"
+		};
+		dictionary["PluginsOpenDataFolderButton"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 打开数据目录",
+			[LanguageCode.ZhTw] = "📂 開啟資料目錄",
+			[LanguageCode.En] = "📂 Open Data Folder",
+			[LanguageCode.Ja] = "📂 データフォルダーを開く"
+		};
+		dictionary["PluginsOpenScanFolderButton"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 打开扫描目录",
+			[LanguageCode.ZhTw] = "📂 開啟掃描目錄",
+			[LanguageCode.En] = "📂 Open Scan Folder",
+			[LanguageCode.Ja] = "📂 スキャンフォルダーを開く"
+		};
+		dictionary["PluginsEnableCheckBox"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用插件系统",
+			[LanguageCode.ZhTw] = "啟用外掛系統",
+			[LanguageCode.En] = "Enable plugin system",
+			[LanguageCode.Ja] = "プラグイン機能を有効にする"
+		};
+		dictionary["PluginsDataDirectoryHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "数据目录：{0}",
+			[LanguageCode.ZhTw] = "資料目錄：{0}",
+			[LanguageCode.En] = "Data folder: {0}",
+			[LanguageCode.Ja] = "データフォルダー：{0}"
+		};
+		dictionary["PluginsStatusEmpty"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "尚未安装任何插件。{0}",
+			[LanguageCode.ZhTw] = "尚未安裝任何外掛。{0}",
+			[LanguageCode.En] = "No plugins installed yet. {0}",
+			[LanguageCode.Ja] = "プラグインはまだインストールされていません。{0}"
+		};
+		dictionary["PluginsStatusSummary"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "共 {0} 个插件，{1} 个已启用。{2}",
+			[LanguageCode.ZhTw] = "共 {0} 個外掛，{1} 個已啟用。{2}",
+			[LanguageCode.En] = "{0} plugin(s), {1} enabled. {2}",
+			[LanguageCode.Ja] = "プラグイン {0} 個、有効 {1} 個。{2}"
+		};
+		dictionary["PluginsSafeModeWarning"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚠️ 安全模式：上次启动时插件引发异常，已自动禁用问题插件，避免反复崩溃。",
+			[LanguageCode.ZhTw] = "⚠️ 安全模式：上次啟動時外掛引發例外，已自動停用問題外掛，避免反覆崩潰。",
+			[LanguageCode.En] = "⚠️ Safe mode: a plugin threw an exception during the last startup. The offending plugin was disabled automatically to prevent repeated crashes.",
+			[LanguageCode.Ja] = "⚠️ セーフモード：前回の起動時にプラグインが例外を発生させたため、問題のあるプラグインを自動的に無効化しました。"
+		};
+		dictionary["PluginsScanHeaderFound"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扫描目录里发现 {0} 个 .dll，其中 {1} 个可以安装",
+			[LanguageCode.ZhTw] = "掃描目錄裡發現 {0} 個 .dll，其中 {1} 個可以安裝",
+			[LanguageCode.En] = "Found {0} .dll file(s) in the scan folder, {1} installable",
+			[LanguageCode.Ja] = "スキャンフォルダーに .dll が {0} 個あり、うち {1} 個がインストール可能です"
+		};
+		dictionary["PluginsScanHeaderNone"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扫描目录里没有可安装的插件",
+			[LanguageCode.ZhTw] = "掃描目錄裡沒有可安裝的外掛",
+			[LanguageCode.En] = "No installable plugins in the scan folder",
+			[LanguageCode.Ja] = "スキャンフォルダーにインストール可能なプラグインはありません"
+		};
+		dictionary["PluginsScanHeaderMissing"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扫描目录不存在（宿主不会创建它）",
+			[LanguageCode.ZhTw] = "掃描目錄不存在（宿主不會建立它）",
+			[LanguageCode.En] = "Scan folder does not exist (StarPie will not create it)",
+			[LanguageCode.Ja] = "スキャンフォルダーが存在しません（StarPie は作成しません）"
+		};
+		dictionary["PluginsScanPathHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。该目录由你自己创建：StarPie 装在只读位置时无权创建它。",
+			[LanguageCode.ZhTw] = "把外掛 .dll 放進這個資料夾後點「重新掃描」即可識別。該目錄由你自己建立：StarPie 裝在唯讀位置時無權建立它。",
+			[LanguageCode.En] = "Drop the plugin .dll into this folder and hit \"Rescan\" to pick it up. You create this folder yourself: StarPie has no permission to create it when installed in a read-only location.",
+			[LanguageCode.Ja] = "このフォルダーにプラグインの .dll を置いて「再スキャン」を押すと認識されます。このフォルダーはご自身で作成してください（StarPie が読み取り専用の場所にインストールされている場合、作成する権限がありません）。"
+		};
+		dictionary["PluginsMsgTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "StarPie 插件",
+			[LanguageCode.ZhTw] = "StarPie 外掛",
+			[LanguageCode.En] = "StarPie Plugins",
+			[LanguageCode.Ja] = "StarPie プラグイン"
+		};
+		dictionary["PluginsDisableFailed"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "停用失败：{0}",
+			[LanguageCode.ZhTw] = "停用失敗：{0}",
+			[LanguageCode.En] = "Disable failed: {0}",
+			[LanguageCode.Ja] = "無効化に失敗しました：{0}"
+		};
+		dictionary["PluginsReloadFailed"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "重新加载失败：{0}",
+			[LanguageCode.ZhTw] = "重新載入失敗：{0}",
+			[LanguageCode.En] = "Reload failed: {0}",
+			[LanguageCode.Ja] = "再読み込みに失敗しました：{0}"
+		};
+		dictionary["PluginsReloadNotStopped"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "旧插件尚未完全停止，不能重新加载：\n\n{0}",
+			[LanguageCode.ZhTw] = "舊外掛尚未完全停止，不能重新載入：\n\n{0}",
+			[LanguageCode.En] = "The old plugin has not fully stopped, so it cannot be reloaded:\n\n{0}",
+			[LanguageCode.Ja] = "古いプラグインがまだ完全に停止していないため、再読み込みできません：\n\n{0}"
+		};
+		dictionary["PluginsReloaded"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "{0} 已重新加载。",
+			[LanguageCode.ZhTw] = "{0} 已重新載入。",
+			[LanguageCode.En] = "{0} reloaded.",
+			[LanguageCode.Ja] = "{0} を再読み込みしました。"
+		};
+		dictionary["PluginsReloadedRestartNeeded"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "{0} 已重新加载，但旧程序集未能立即从内存释放，需要重启 StarPie 才能完全生效。",
+			[LanguageCode.ZhTw] = "{0} 已重新載入，但舊組件未能立即從記憶體釋放，需要重新啟動 StarPie 才能完全生效。",
+			[LanguageCode.En] = "{0} reloaded, but the old assembly could not be released from memory right away; restart StarPie for the change to fully take effect.",
+			[LanguageCode.Ja] = "{0} を再読み込みしましたが、古いアセンブリをメモリから解放できませんでした。完全に反映するには StarPie を再起動してください。"
+		};
+		dictionary["PluginsCandidateGone"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "这枚候选已经不在扫描目录里了（可能刚被移走或改名）。已重新扫描，请再试一次。",
+			[LanguageCode.ZhTw] = "這枚候選已經不在掃描目錄裡了（可能剛被移走或改名）。已重新掃描，請再試一次。",
+			[LanguageCode.En] = "This candidate is no longer in the scan folder (it may have been moved or renamed). Rescanned, please try again.",
+			[LanguageCode.Ja] = "この候補はスキャンフォルダーに存在しません（移動または名前変更された可能性があります）。再スキャンしましたので、もう一度お試しください。"
+		};
+		dictionary["PluginsInstallFailed"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "安装失败：{0}",
+			[LanguageCode.ZhTw] = "安裝失敗：{0}",
+			[LanguageCode.En] = "Install failed: {0}",
+			[LanguageCode.Ja] = "インストールに失敗しました：{0}"
+		};
+		dictionary["PluginsUpdatedAndEnabled"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "{0} 已更新到 {1} 并已启用。\n\n如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。",
+			[LanguageCode.ZhTw] = "{0} 已更新到 {1} 並已啟用。\n\n如果它之前已經在執行，舊組件要到下次啟動 StarPie 才會完全從記憶體釋放。",
+			[LanguageCode.En] = "{0} was updated to {1} and enabled.\n\nIf it was already running, the old assembly stays in memory until the next StarPie restart.",
+			[LanguageCode.Ja] = "{0} を {1} に更新して有効化しました。\n\n既に実行中だった場合、古いアセンブリは次回 StarPie を起動するまでメモリに残ります。"
+		};
+		dictionary["PluginsConfirmAboutToInstall"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "即将安装：{0} {1}",
+			[LanguageCode.ZhTw] = "即將安裝：{0} {1}",
+			[LanguageCode.En] = "About to install: {0} {1}",
+			[LanguageCode.Ja] = "インストール予定：{0} {1}"
+		};
+		dictionary["PluginsConfirmFile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文件：{0}",
+			[LanguageCode.ZhTw] = "檔案：{0}",
+			[LanguageCode.En] = "File: {0}",
+			[LanguageCode.Ja] = "ファイル：{0}"
+		};
+		dictionary["PluginsConfirmCapabilities"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "该插件声明了以下能力：",
+			[LanguageCode.ZhTw] = "此外掛宣告了以下能力：",
+			[LanguageCode.En] = "This plugin declares the following capabilities:",
+			[LanguageCode.Ja] = "このプラグインは以下の機能を宣言しています："
+		};
+		dictionary["PluginsConfirmScanResult"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扫描结果：{0}",
+			[LanguageCode.ZhTw] = "掃描結果：{0}",
+			[LanguageCode.En] = "Scan result: {0}",
+			[LanguageCode.Ja] = "スキャン結果：{0}"
+		};
+		dictionary["PluginsConfirmUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "点击「确定」后将用扫描目录里的新版覆盖现有安装并立即启用。如果插件正在运行，宿主会先自动停用它再替换文件。",
+			[LanguageCode.ZhTw] = "點擊「確定」後將用掃描目錄裡的新版覆蓋現有安裝並立即啟用。如果外掛正在執行，宿主會先自動停用它再取代檔案。",
+			[LanguageCode.En] = "Clicking OK will overwrite the existing installation with the newer copy from the scan folder and enable it right away. If the plugin is running, StarPie disables it first, then replaces the files.",
+			[LanguageCode.Ja] = "「OK」を押すと、スキャンフォルダー内の新しい版で既存のインストールを上書きし、すぐに有効化します。プラグインが実行中の場合は、先に自動で無効化してからファイルを置き換えます。"
+		};
+		dictionary["PluginsConfirmDowngrade"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "点击「确定」后将用更旧的版本覆盖现有安装。除非你明确需要退回旧版，否则不建议这样做。",
+			[LanguageCode.ZhTw] = "點擊「確定」後將用更舊的版本覆蓋現有安裝。除非你明確需要退回舊版，否則不建議這樣做。",
+			[LanguageCode.En] = "Clicking OK will overwrite the existing installation with an older version. Not recommended unless you specifically need to roll back.",
+			[LanguageCode.Ja] = "「OK」を押すと、より古い版で既存のインストールを上書きします。旧版へ戻す必要が明確でない限り推奨しません。"
+		};
+		dictionary["PluginsConfirmReplaced"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "点击「确定」后将用扫描目录里的文件覆盖现有安装（版本号相同但内容不同）。",
+			[LanguageCode.ZhTw] = "點擊「確定」後將用掃描目錄裡的檔案覆蓋現有安裝（版本號相同但內容不同）。",
+			[LanguageCode.En] = "Clicking OK will overwrite the existing installation with the file from the scan folder (same version number, different content).",
+			[LanguageCode.Ja] = "「OK」を押すと、スキャンフォルダー内のファイルで既存のインストールを上書きします（バージョンは同じでも内容が異なります）。"
+		};
+		dictionary["PluginsConfirmFresh"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "点击「确定」后插件将被复制到 StarPie 的数据目录并立即启用。",
+			[LanguageCode.ZhTw] = "點擊「確定」後外掛將被複製到 StarPie 的資料目錄並立即啟用。",
+			[LanguageCode.En] = "Clicking OK copies the plugin into StarPie's data folder and enables it right away.",
+			[LanguageCode.Ja] = "「OK」を押すと、プラグインが StarPie のデータフォルダーにコピーされ、すぐに有効化されます。"
+		};
+		dictionary["PluginsConfirmPrivileges"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。",
+			[LanguageCode.ZhTw] = "外掛以 StarPie 目前權限在行程內執行，請只安裝你信任的來源。",
+			[LanguageCode.En] = "Plugins run in-process with StarPie's own privileges, so only install sources you trust.",
+			[LanguageCode.Ja] = "プラグインは StarPie と同じ権限でプロセス内実行されるため、信頼できる提供元のみインストールしてください。"
+		};
+		dictionary["PluginsConfirmTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "确认安装插件",
+			[LanguageCode.ZhTw] = "確認安裝外掛",
+			[LanguageCode.En] = "Confirm plugin installation",
+			[LanguageCode.Ja] = "プラグインのインストール確認"
+		};
+		dictionary["PluginsScanFolderMissing"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "扫描目录还不存在：\n{0}\n\nStarPie 不会替你创建它 —— 程序可能装在只读位置，宿主对这里只读不写。\n如需使用随包附带的插件，请手工创建该文件夹，把插件 .dll 放进去，再点「重新扫描」。",
+			[LanguageCode.ZhTw] = "掃描目錄還不存在：\n{0}\n\nStarPie 不會替你建立它 —— 程式可能裝在唯讀位置，宿主對這裡唯讀不寫。\n如需使用隨附的外掛，請手動建立該資料夾，把外掛 .dll 放進去，再點「重新掃描」。",
+			[LanguageCode.En] = "The scan folder does not exist yet:\n{0}\n\nStarPie will not create it for you — the program may be installed in a read-only location, and StarPie never writes there.\nTo use the plugins shipped with the package, create the folder yourself, drop the plugin .dll into it, then click \"Rescan\".",
+			[LanguageCode.Ja] = "スキャンフォルダーがまだ存在しません：\n{0}\n\nStarPie が代わりに作成することはありません（読み取り専用の場所にインストールされている場合があり、ホストはここへ書き込みません）。\n同梱のプラグインを使う場合は、このフォルダーを手動で作成し、プラグインの .dll を置いてから「再スキャン」を押してください。"
+		};
+		dictionary["PluginsEmptyTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "还没有安装任何插件",
+			[LanguageCode.ZhTw] = "還沒有安裝任何外掛",
+			[LanguageCode.En] = "No plugins installed yet",
+			[LanguageCode.Ja] = "プラグインはまだインストールされていません"
+		};
+		dictionary["PluginsEmptyHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "把插件 .dll 放进程序目录的 plugin 文件夹并点上方「重新扫描」，或直接点右上角「安装插件 (.dll)」选择文件",
+			[LanguageCode.ZhTw] = "把外掛 .dll 放進程式目錄的 plugin 資料夾並點上方「重新掃描」，或直接點右上角「安裝外掛 (.dll)」選擇檔案",
+			[LanguageCode.En] = "Drop the plugin .dll into the \"plugin\" folder next to the program and hit \"Rescan\" above, or click \"Install Plugin (.dll)\" at the top right to pick a file",
+			[LanguageCode.Ja] = "プラグインの .dll をプログラムフォルダー内の plugin フォルダーに置いて上の「再スキャン」を押すか、右上の「プラグインをインストール (.dll)」でファイルを選択してください"
+		};
+		dictionary["PluginCandidateAuthor"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "作者 {0}",
+			[LanguageCode.ZhTw] = "作者 {0}",
+			[LanguageCode.En] = "by {0}",
+			[LanguageCode.Ja] = "作者 {0}"
+		};
+		dictionary["PluginCandidateCapabilities"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "声明能力：{0}",
+			[LanguageCode.ZhTw] = "宣告能力：{0}",
+			[LanguageCode.En] = "Capabilities: {0}",
+			[LanguageCode.Ja] = "宣言機能：{0}"
+		};
+		dictionary["PluginCandidateStateInstallable"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "可安装",
+			[LanguageCode.ZhTw] = "可安裝",
+			[LanguageCode.En] = "Installable",
+			[LanguageCode.Ja] = "インストール可能"
+		};
+		dictionary["PluginCandidateStateInstalled"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "已装同版本",
+			[LanguageCode.ZhTw] = "已裝同版本",
+			[LanguageCode.En] = "Same version installed",
+			[LanguageCode.Ja] = "同じバージョンを導入済み"
+		};
+		dictionary["PluginCandidateStateReplaced"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "内容已变",
+			[LanguageCode.ZhTw] = "內容已變",
+			[LanguageCode.En] = "Content changed",
+			[LanguageCode.Ja] = "内容が変更されています"
+		};
+		dictionary["PluginCandidateStateUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "有新版本",
+			[LanguageCode.ZhTw] = "有新版本",
+			[LanguageCode.En] = "Update available",
+			[LanguageCode.Ja] = "新しいバージョンあり"
+		};
+		dictionary["PluginCandidateStateDowngrade"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "版本更旧",
+			[LanguageCode.ZhTw] = "版本更舊",
+			[LanguageCode.En] = "Older version",
+			[LanguageCode.Ja] = "古いバージョン"
+		};
+		dictionary["PluginCandidateStateVersionUnknown"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "版本待确认",
+			[LanguageCode.ZhTw] = "版本待確認",
+			[LanguageCode.En] = "Version unknown",
+			[LanguageCode.Ja] = "バージョン未確認"
+		};
+		dictionary["PluginCandidateStateExternalRegistered"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "已外部引用",
+			[LanguageCode.ZhTw] = "已外部引用",
+			[LanguageCode.En] = "Externally registered",
+			[LanguageCode.Ja] = "外部参照済み"
+		};
+		dictionary["PluginCandidateStateDuplicate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "ID 重复",
+			[LanguageCode.ZhTw] = "ID 重複",
+			[LanguageCode.En] = "Duplicate ID",
+			[LanguageCode.Ja] = "ID 重複"
+		};
+		dictionary["PluginCandidateStateRejected"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "无法识别",
+			[LanguageCode.ZhTw] = "無法識別",
+			[LanguageCode.En] = "Unrecognized",
+			[LanguageCode.Ja] = "認識できません"
+		};
+		dictionary["PluginCandidateInstall"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📦 安装",
+			[LanguageCode.ZhTw] = "📦 安裝",
+			[LanguageCode.En] = "📦 Install",
+			[LanguageCode.Ja] = "📦 インストール"
+		};
+		dictionary["PluginCandidateInstallUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⬆️ 更新",
+			[LanguageCode.ZhTw] = "⬆️ 更新",
+			[LanguageCode.En] = "⬆️ Update",
+			[LanguageCode.Ja] = "⬆️ 更新"
+		};
+		dictionary["PluginCandidateInstallDowngrade"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⬇️ 降级安装",
+			[LanguageCode.ZhTw] = "⬇️ 降級安裝",
+			[LanguageCode.En] = "⬇️ Downgrade",
+			[LanguageCode.Ja] = "⬇️ ダウングレード"
+		};
+		dictionary["PluginCandidateInstallOverwrite"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📦 覆盖安装",
+			[LanguageCode.ZhTw] = "📦 覆蓋安裝",
+			[LanguageCode.En] = "📦 Overwrite",
+			[LanguageCode.Ja] = "📦 上書きインストール"
+		};
+		dictionary["AboutCheckUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 检查更新",
+			[LanguageCode.ZhTw] = "🔄 檢查更新",
+			[LanguageCode.En] = "🔄 Check for updates",
+			[LanguageCode.Ja] = "🔄 更新を確認"
+		};
+		dictionary["AddGestureMapping"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 添加手势映射",
+			[LanguageCode.ZhTw] = "➕ 新增手勢對應",
+			[LanguageCode.En] = "➕ Add mapping",
+			[LanguageCode.Ja] = "➕ マッピングを追加"
+		};
+		dictionary["AddLayer"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 加层",
+			[LanguageCode.ZhTw] = "➕ 新增圖層",
+			[LanguageCode.En] = "➕ Add layer",
+			[LanguageCode.Ja] = "➕ レイヤーを追加"
+		};
+		dictionary["AddProfileShort"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 新增",
+			[LanguageCode.ZhTw] = "➕ 新增",
+			[LanguageCode.En] = "➕ New",
+			[LanguageCode.Ja] = "➕ 新規"
+		};
+		dictionary["AnimSpeedCustom"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 自定义速度",
+			[LanguageCode.ZhTw] = "🎛️ 自訂速度",
+			[LanguageCode.En] = "🎛️ Custom speed",
+			[LanguageCode.Ja] = "🎛️ カスタム速度"
+		};
+		dictionary["ApplyRestartUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🚀 立即退出并重启更新",
+			[LanguageCode.ZhTw] = "🚀 立即結束並重新啟動更新",
+			[LanguageCode.En] = "🚀 Exit and restart to update",
+			[LanguageCode.Ja] = "🚀 終了して再起動し更新"
+		};
+		dictionary["BatchLayoutBoth"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖼️+🔤 图文",
+			[LanguageCode.ZhTw] = "🖼️+🔤 圖文",
+			[LanguageCode.En] = "🖼️+🔤 Icon + text",
+			[LanguageCode.Ja] = "🖼️+🔤 アイコン＋文字"
+		};
+		dictionary["BatchLayoutIconOnly"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖼️ 仅图标",
+			[LanguageCode.ZhTw] = "🖼️ 僅圖示",
+			[LanguageCode.En] = "🖼️ Icon only",
+			[LanguageCode.Ja] = "🖼️ アイコンのみ"
+		};
+		dictionary["BatchLayoutInherit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 继承全局",
+			[LanguageCode.ZhTw] = "🌐 繼承全域",
+			[LanguageCode.En] = "🌐 Inherit global",
+			[LanguageCode.Ja] = "🌐 グローバルを継承"
+		};
+		dictionary["BatchLayoutTextOnly"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔤 仅文字",
+			[LanguageCode.ZhTw] = "🔤 僅文字",
+			[LanguageCode.En] = "🔤 Text only",
+			[LanguageCode.Ja] = "🔤 文字のみ"
+		};
+		dictionary["BatchResetCustom"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 清除自定义，恢复跟随全局统一",
+			[LanguageCode.ZhTw] = "🔄 清除自訂，恢復跟隨全域統一",
+			[LanguageCode.En] = "🔄 Clear customisations, follow global",
+			[LanguageCode.Ja] = "🔄 カスタムを消去しグローバルに従う"
+		};
+		dictionary["BrowseCoreImage"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "浏览图片...",
+			[LanguageCode.ZhTw] = "瀏覽圖片...",
+			[LanguageCode.En] = "Browse image...",
+			[LanguageCode.Ja] = "画像を参照…"
+		};
+		dictionary["CancelActionStatusHint"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💡 外甩脱离轮盘时，立即执行此自定义动作；回到轮盘中心仍为静默关闭。",
+			[LanguageCode.ZhTw] = "💡 外甩脫離輪盤時，立即執行此自訂動作；回到輪盤中心仍為靜默關閉。",
+			[LanguageCode.En] = "💡 Flicking away from the wheel runs this custom action right away; returning to the centre still cancels silently.",
+			[LanguageCode.Ja] = "💡 外へ振り切るとこのカスタム動作を即実行します。中心に戻した場合は従来どおり何もせず閉じます。"
+		};
+		dictionary["CancelDownload"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✖ 取消下载",
+			[LanguageCode.ZhTw] = "✖ 取消下載",
+			[LanguageCode.En] = "✖ Cancel download",
+			[LanguageCode.Ja] = "✖ ダウンロードを中止"
+		};
+		dictionary["CenterInfoToggle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "ℹ️ 说明 ▾",
+			[LanguageCode.ZhTw] = "ℹ️ 說明 ▾",
+			[LanguageCode.En] = "ℹ️ Help ▾",
+			[LanguageCode.Ja] = "ℹ️ 説明 ▾"
+		};
+		dictionary["CenterPresetsToggle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 常用预设 ▾",
+			[LanguageCode.ZhTw] = "⚡ 常用預設 ▾",
+			[LanguageCode.En] = "⚡ Presets ▾",
+			[LanguageCode.Ja] = "⚡ よく使うプリセット ▾"
+		};
+		dictionary["ClearCoreImage"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "清除",
+			[LanguageCode.ZhTw] = "清除",
+			[LanguageCode.En] = "Clear",
+			[LanguageCode.Ja] = "クリア"
+		};
+		dictionary["CopyLayer"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📑 复制",
+			[LanguageCode.ZhTw] = "📑 複製",
+			[LanguageCode.En] = "📑 Copy",
+			[LanguageCode.Ja] = "📑 複製"
+		};
+		dictionary["CoreSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "中心核心圆与图案文字设置",
+			[LanguageCode.ZhTw] = "中心核心圓與圖案文字設定",
+			[LanguageCode.En] = "Centre core, pattern and text",
+			[LanguageCode.Ja] = "中央コアと図柄・文字の設定"
+		};
+		dictionary["CustomSoundExportProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "💾 导出",
+			[LanguageCode.ZhTw] = "💾 匯出",
+			[LanguageCode.En] = "💾 Export",
+			[LanguageCode.Ja] = "💾 書き出し"
+		};
+		dictionary["CustomSoundImportProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 导入",
+			[LanguageCode.ZhTw] = "📂 匯入",
+			[LanguageCode.En] = "📂 Import",
+			[LanguageCode.Ja] = "📂 読み込み"
+		};
+		dictionary["CustomSoundNewProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 新建",
+			[LanguageCode.ZhTw] = "➕ 新增",
+			[LanguageCode.En] = "➕ New",
+			[LanguageCode.Ja] = "➕ 新規"
+		};
+		dictionary["CustomSoundOpenEditorWindow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎛️ 独立大窗",
+			[LanguageCode.ZhTw] = "🎛️ 獨立大視窗",
+			[LanguageCode.En] = "🎛️ Open in window",
+			[LanguageCode.Ja] = "🎛️ 別ウィンドウで開く"
+		};
+		dictionary["CustomSoundPlayFlow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔊 连续模拟完整手势交互体验",
+			[LanguageCode.ZhTw] = "🔊 連續模擬完整手勢互動體驗",
+			[LanguageCode.En] = "🔊 Play the full gesture interaction",
+			[LanguageCode.Ja] = "🔊 一連の操作をまとめて再生"
+		};
+		dictionary["CustomSoundResetProfile"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 重置",
+			[LanguageCode.ZhTw] = "🔄 重設",
+			[LanguageCode.En] = "🔄 Reset",
+			[LanguageCode.Ja] = "🔄 リセット"
+		};
+		dictionary["EdgeOverflowDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "当在屏幕四周边缘（顶部、底部或两侧）呼出轮盘时，智能检测显示器安全边界，防止轮盘扇区被截断并自动对齐光标至轮盘物理中心。",
+			[LanguageCode.ZhTw] = "當在螢幕四周邊緣（頂部、底部或兩側）呼出輪盤時，智慧偵測螢幕安全邊界，防止輪盤扇區被截斷並自動對齊游標至輪盤實際中心。",
+			[LanguageCode.En] = "When the wheel opens near a screen edge (top, bottom or either side), the safe area is detected automatically so sectors are never cut off, and the cursor is aligned to the wheel's true centre.",
+			[LanguageCode.Ja] = "画面の端（上・下・左右）でホイールを呼び出したとき、安全領域を自動判定してセクターの見切れを防ぎ、カーソルをホイールの実際の中心に合わせます。"
+		};
+		dictionary["EdgeOverflowTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "屏幕边缘呼出智能防溢出与光标自动对齐",
+			[LanguageCode.ZhTw] = "螢幕邊緣呼出智慧防溢出與游標自動對齊",
+			[LanguageCode.En] = "Edge-aware overflow prevention and cursor alignment",
+			[LanguageCode.Ja] = "画面端での見切れ防止とカーソル自動整列"
+		};
+		dictionary["EnableCenterAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用中心核圆动作",
+			[LanguageCode.ZhTw] = "啟用中心核圓動作",
+			[LanguageCode.En] = "Enable centre core action",
+			[LanguageCode.Ja] = "中央コアの動作を有効にする"
+		};
+		dictionary["EnableGlobalInheritance"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 继承全局方案未配置槽位",
+			[LanguageCode.ZhTw] = "🌐 繼承全域方案未配置槽位",
+			[LanguageCode.En] = "🌐 Inherit global for unconfigured slots",
+			[LanguageCode.Ja] = "🌐 未設定スロットはグローバルを継承"
+		};
+		dictionary["FocusActionNameLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "轮盘显示文本:",
+			[LanguageCode.ZhTw] = "輪盤顯示文字:",
+			[LanguageCode.En] = "Wheel label:",
+			[LanguageCode.Ja] = "ホイール表示テキスト:"
+		};
+		dictionary["FocusAddSubAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "➕ 添加二级动作",
+			[LanguageCode.ZhTw] = "➕ 新增二級動作",
+			[LanguageCode.En] = "➕ Add sub-action",
+			[LanguageCode.Ja] = "➕ サブ動作を追加"
+		};
+		dictionary["FocusBackToParent"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "◀ 返回父级扇区",
+			[LanguageCode.ZhTw] = "◀ 返回上層扇區",
+			[LanguageCode.En] = "◀ Back to parent sector",
+			[LanguageCode.Ja] = "◀ 親セクターに戻る"
+		};
+		dictionary["FocusBatchExit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✕ 退出多选",
+			[LanguageCode.ZhTw] = "✕ 結束多選",
+			[LanguageCode.En] = "✕ Exit multi-select",
+			[LanguageCode.Ja] = "✕ 複数選択を終了"
+		};
+		dictionary["FocusCenterCore"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 中心核圆",
+			[LanguageCode.ZhTw] = "🎯 中心核圓",
+			[LanguageCode.En] = "🎯 Centre core",
+			[LanguageCode.Ja] = "🎯 中央コア"
+		};
+		dictionary["FocusClearInheritedIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✕ 清除关联",
+			[LanguageCode.ZhTw] = "✕ 清除關聯",
+			[LanguageCode.En] = "✕ Clear link",
+			[LanguageCode.Ja] = "✕ 関連付けを解除"
+		};
+		dictionary["FocusClearSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🗑️ 清空",
+			[LanguageCode.ZhTw] = "🗑️ 清空",
+			[LanguageCode.En] = "🗑️ Clear all",
+			[LanguageCode.Ja] = "🗑️ すべて消去"
+		};
+		dictionary["FocusNextSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "下一槽 ▶",
+			[LanguageCode.ZhTw] = "下一槽 ▶",
+			[LanguageCode.En] = "Next slot ▶",
+			[LanguageCode.Ja] = "次のスロット ▶"
+		};
+		dictionary["FocusPickShellTool"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚡ 挑选功能...",
+			[LanguageCode.ZhTw] = "⚡ 挑選功能...",
+			[LanguageCode.En] = "⚡ Pick a tool...",
+			[LanguageCode.Ja] = "⚡ 機能を選択…"
+		};
+		dictionary["FocusPluginReload"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 停用后重新加载",
+			[LanguageCode.ZhTw] = "🔄 停用後重新載入",
+			[LanguageCode.En] = "🔄 Reload after disabling",
+			[LanguageCode.Ja] = "🔄 無効化して再読み込み"
+		};
+		dictionary["FocusPopulateTileSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "✨ 预设 8 布局二级轮盘",
+			[LanguageCode.ZhTw] = "✨ 預設 8 佈局二級輪盤",
+			[LanguageCode.En] = "✨ Fill 8 tile layouts",
+			[LanguageCode.Ja] = "✨ 8分割レイアウトを設定"
+		};
+		dictionary["FocusPrevSlot"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "◀ 上一槽",
+			[LanguageCode.ZhTw] = "◀ 上一槽",
+			[LanguageCode.En] = "◀ Previous slot",
+			[LanguageCode.Ja] = "◀ 前のスロット"
+		};
+		dictionary["FocusRestoreInherit"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 恢复继承全局",
+			[LanguageCode.ZhTw] = "🌐 恢復繼承全域",
+			[LanguageCode.En] = "🌐 Restore global inheritance",
+			[LanguageCode.Ja] = "🌐 グローバル継承に戻す"
+		};
+		dictionary["FocusTestAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "▶ 测试触发",
+			[LanguageCode.ZhTw] = "▶ 測試觸發",
+			[LanguageCode.En] = "▶ Test trigger",
+			[LanguageCode.Ja] = "▶ テスト実行"
+		};
+		dictionary["FocusUndoSubActions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "↩️ 撤销",
+			[LanguageCode.ZhTw] = "↩️ 復原",
+			[LanguageCode.En] = "↩️ Undo",
+			[LanguageCode.Ja] = "↩️ 元に戻す"
+		};
+		dictionary["GesturesPageSubheader"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "支持针对不同前台应用程序设置专属的多向手势轮盘、按键动作、中心核圆与级联子动作。",
+			[LanguageCode.ZhTw] = "支援針對不同前景應用程式設定專屬的多向手勢輪盤、按鍵動作、中心核圓與串聯子動作。",
+			[LanguageCode.En] = "Configure a dedicated multi-directional wheel, hotkeys, centre core and cascading sub-actions for each foreground application.",
+			[LanguageCode.Ja] = "前面にあるアプリごとに、多方向ホイール・キー操作・中央コア・連鎖サブ動作を個別に設定できます。"
+		};
+		dictionary["IconLayoutModeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "排版模式:",
+			[LanguageCode.ZhTw] = "排版模式:",
+			[LanguageCode.En] = "Layout mode:",
+			[LanguageCode.Ja] = "レイアウトモード:"
+		};
+		dictionary["LayerSwitchTriggerLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 切换:",
+			[LanguageCode.ZhTw] = "🔄 切換:",
+			[LanguageCode.En] = "🔄 Switch:",
+			[LanguageCode.Ja] = "🔄 切り替え:"
+		};
+		dictionary["LayoutOptionsSectionTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "图标与排版选项",
+			[LanguageCode.ZhTw] = "圖示與排版選項",
+			[LanguageCode.En] = "Icon and layout options",
+			[LanguageCode.Ja] = "アイコンとレイアウトの設定"
+		};
+		dictionary["MappingsSectorCount12"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "12 键钟表方位",
+			[LanguageCode.ZhTw] = "12 鍵鐘錶方位",
+			[LanguageCode.En] = "12 positions (clock)",
+			[LanguageCode.Ja] = "12方位（時計）"
+		};
+		dictionary["MappingsSectorCount4"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "4 键十字方位",
+			[LanguageCode.ZhTw] = "4 鍵十字方位",
+			[LanguageCode.En] = "4 positions (cross)",
+			[LanguageCode.Ja] = "4方位（十字）"
+		};
+		dictionary["MappingsSectorCount8"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "8 键全向方位 (推荐)",
+			[LanguageCode.ZhTw] = "8 鍵全向方位 (推薦)",
+			[LanguageCode.En] = "8 positions (recommended)",
+			[LanguageCode.Ja] = "8方位（推奨）"
+		};
+		dictionary["MappingsTier1Segment"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔘 一级主轮盘",
+			[LanguageCode.ZhTw] = "🔘 一級主輪盤",
+			[LanguageCode.En] = "🔘 Tier 1 wheel",
+			[LanguageCode.Ja] = "🔘 第1階層ホイール"
+		};
+		dictionary["MappingsTier2Segment"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌟 二级级联",
+			[LanguageCode.ZhTw] = "🌟 二級串聯",
+			[LanguageCode.En] = "🌟 Tier 2 cascade",
+			[LanguageCode.Ja] = "🌟 第2階層カスケード"
+		};
+		dictionary["MappingsViewModeCanvas"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 画布联动精调 (推荐)",
+			[LanguageCode.ZhTw] = "🎯 畫布關聯精調 (推薦)",
+			[LanguageCode.En] = "🎯 Canvas live editor (recommended)",
+			[LanguageCode.Ja] = "🎯 キャンバス連動編集（推奨）"
+		};
+		dictionary["MappingsViewModeList"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📋 紧凑全览列表",
+			[LanguageCode.ZhTw] = "📋 精簡總覽清單",
+			[LanguageCode.En] = "📋 Compact list",
+			[LanguageCode.Ja] = "📋 コンパクト一覧"
+		};
+		dictionary["OpenUpdateFolder"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📂 打开文件位置",
+			[LanguageCode.ZhTw] = "📂 開啟檔案位置",
+			[LanguageCode.En] = "📂 Open file location",
+			[LanguageCode.Ja] = "📂 ファイルの場所を開く"
+		};
+		dictionary["OpenWebRelease"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 前往网页",
+			[LanguageCode.ZhTw] = "🌐 前往網頁",
+			[LanguageCode.En] = "🌐 Open release page",
+			[LanguageCode.Ja] = "🌐 リリースページを開く"
+		};
+		dictionary["OuterEscapeCheckboxDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "超过轮盘外圈范围后立即解除高亮，松开右键 0 误触安全放弃。",
+			[LanguageCode.ZhTw] = "超過輪盤外圈範圍後立即解除高亮，放開右鍵 0 誤觸安全放棄。",
+			[LanguageCode.En] = "Highlight clears as soon as the cursor leaves the wheel, and releasing the right button cancels safely with no misclicks.",
+			[LanguageCode.Ja] = "ホイールの外周を越えるとハイライトを解除し、右ボタンを離すと誤操作なく安全に中断します。"
+		};
+		dictionary["PickCoreIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "选择图标...",
+			[LanguageCode.ZhTw] = "選擇圖示...",
+			[LanguageCode.En] = "Choose icon...",
+			[LanguageCode.Ja] = "アイコンを選択…"
+		};
+		dictionary["ProfileBrowseExe"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "📁 浏览...",
+			[LanguageCode.ZhTw] = "📁 瀏覽...",
+			[LanguageCode.En] = "📁 Browse...",
+			[LanguageCode.Ja] = "📁 参照…"
+		};
+		dictionary["ProfileCaptureWindow"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎯 捕捉窗口...",
+			[LanguageCode.ZhTw] = "🎯 擷取視窗...",
+			[LanguageCode.En] = "🎯 Capture window...",
+			[LanguageCode.Ja] = "🎯 ウィンドウを取得…"
+		};
+		dictionary["ProfilePickProgram"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🖥️ 软件库...",
+			[LanguageCode.ZhTw] = "🖥️ 軟體庫...",
+			[LanguageCode.En] = "🖥️ App library...",
+			[LanguageCode.Ja] = "🖥️ アプリ一覧…"
+		};
+		dictionary["ResetProcessTrigger"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复默认",
+			[LanguageCode.ZhTw] = "🔄 恢復預設",
+			[LanguageCode.En] = "🔄 Restore default",
+			[LanguageCode.Ja] = "🔄 既定に戻す"
+		};
+		dictionary["ResetSubDimensions"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复二级轮盘默认尺寸",
+			[LanguageCode.ZhTw] = "🔄 恢復二級輪盤預設尺寸",
+			[LanguageCode.En] = "🔄 Restore default tier 2 size",
+			[LanguageCode.Ja] = "🔄 第2階層の既定サイズに戻す"
+		};
+		dictionary["ResetSubTheme"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 恢复与一级轮盘相同主题",
+			[LanguageCode.ZhTw] = "🔄 恢復與一級輪盤相同主題",
+			[LanguageCode.En] = "🔄 Match tier 1 theme",
+			[LanguageCode.Ja] = "🔄 第1階層と同じテーマに戻す"
+		};
+		dictionary["ResetTextOffset"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔄 位置归位",
+			[LanguageCode.ZhTw] = "🔄 位置歸位",
+			[LanguageCode.En] = "🔄 Reset position",
+			[LanguageCode.Ja] = "🔄 位置を初期化"
+		};
+		dictionary["RestoreSystemAudio"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🔊 一键解除静音并恢复音量 (50%)",
+			[LanguageCode.ZhTw] = "🔊 一鍵解除靜音並恢復音量 (50%)",
+			[LanguageCode.En] = "🔊 Unmute and restore volume (50%)",
+			[LanguageCode.Ja] = "🔊 ミュート解除して音量を復元（50%）"
+		};
+		dictionary["SectorFontSizeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文字字号大小:",
+			[LanguageCode.ZhTw] = "文字字號大小:",
+			[LanguageCode.En] = "Text size:",
+			[LanguageCode.Ja] = "文字サイズ:"
+		};
+		dictionary["SectorIconSizeTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "图标尺寸大小:",
+			[LanguageCode.ZhTw] = "圖示尺寸大小:",
+			[LanguageCode.En] = "Icon size:",
+			[LanguageCode.Ja] = "アイコンサイズ:"
+		};
+		dictionary["SectorTextPlacementTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "文字相对位置:",
+			[LanguageCode.ZhTw] = "文字相對位置:",
+			[LanguageCode.En] = "Text position:",
+			[LanguageCode.Ja] = "文字の位置:"
+		};
+		dictionary["ShowCoreIcon"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "启用中心图案/图标显示",
+			[LanguageCode.ZhTw] = "啟用中心圖案/圖示顯示",
+			[LanguageCode.En] = "Show centre pattern / icon",
+			[LanguageCode.Ja] = "中央の図柄／アイコンを表示"
+		};
+		dictionary["StartDownloadUpdate"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⬇️ 立即下载更新",
+			[LanguageCode.ZhTw] = "⬇️ 立即下載更新",
+			[LanguageCode.En] = "⬇️ Download update",
+			[LanguageCode.Ja] = "⬇️ 更新をダウンロード"
+		};
+		dictionary["SubCustomColorsExpanderDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "展开后可精准微调二级扇区底色、高亮光晕、边框线条、文字等各项色彩。",
+			[LanguageCode.ZhTw] = "展開後可精準微調二級扇區底色、高亮光暈、邊框線條、文字等各項色彩。",
+			[LanguageCode.En] = "Expand to fine-tune the tier 2 sector fill, glow, border, text and other colours.",
+			[LanguageCode.Ja] = "展開すると第2階層セクターの背景色・グロー・枠線・文字などの色を細かく調整できます。"
+		};
+		dictionary["SubCustomColorsExpanderTitle"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🎨 二级轮盘高级配色",
+			[LanguageCode.ZhTw] = "🎨 二級輪盤進階配色",
+			[LanguageCode.En] = "🎨 Tier 2 advanced colours",
+			[LanguageCode.Ja] = "🎨 第2階層の詳細配色"
+		};
+		dictionary["SubWheelTriggerDistDesc"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "调节光标划出距离中心多远时展开二级级联菜单。数值较小时轻划即可展开，数值较大时需向外划出更远距离才展开二级，防止快速触发一级动作时产生视觉干扰。",
+			[LanguageCode.ZhTw] = "調節游標划出距離中心多遠時展開二級串聯選單。數值較小時輕划即可展開，數值較大時需向外划出更遠距離才展開二級，防止快速觸發一級動作時產生視覺干擾。",
+			[LanguageCode.En] = "How far the cursor must move from the centre before the tier 2 cascade opens. Smaller values open it with a light flick; larger values require a longer outward movement, avoiding visual noise when tier 1 actions fire quickly.",
+			[LanguageCode.Ja] = "カーソルが中心からどれだけ離れたら第2階層カスケードを展開するかを調整します。小さい値では少し動かすだけで開き、大きい値ではより遠くへ動かす必要があり、第1階層の動作を素早く実行する際の視覚的な邪魔を防げます。"
+		};
+		dictionary["SubWheelTriggerDistLabel"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "二级轮盘展开触发距离:",
+			[LanguageCode.ZhTw] = "二級輪盤展開觸發距離:",
+			[LanguageCode.En] = "Tier 2 trigger distance:",
+			[LanguageCode.Ja] = "第2階層の展開距離:"
+		};
+		dictionary["SystemAudioWarning"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "⚠️ 检测到 Windows 系统主音量当前为 0% 或已静音，会导致所有交互音效无声。",
+			[LanguageCode.ZhTw] = "⚠️ 偵測到 Windows 系統主音量目前為 0% 或已靜音，會導致所有互動音效無聲。",
+			[LanguageCode.En] = "⚠️ The Windows master volume is at 0% or muted — all interaction sounds will be silent.",
+			[LanguageCode.Ja] = "⚠️ Windows のシステム音量が 0% かミュートのため、すべての操作音が無音になります。"
+		};
+		dictionary["TestCancelAction"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🧪 模拟测试触发",
+			[LanguageCode.ZhTw] = "🧪 模擬測試觸發",
+			[LanguageCode.En] = "🧪 Test trigger",
+			[LanguageCode.Ja] = "🧪 テスト実行"
+		};
+		dictionary["Tier2DimensionsExpander"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 二级轮盘几何形态与尺寸 (展开微调)",
+			[LanguageCode.ZhTw] = "🌐 二級輪盤幾何形態與尺寸 (展開微調)",
+			[LanguageCode.En] = "🌐 Tier 2 geometry and size (expand to fine-tune)",
+			[LanguageCode.Ja] = "🌐 第2階層の形状とサイズ（展開して微調整）"
+		};
+		dictionary["Tier2ThemeExpander"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 二级轮盘风格与配色 (展开定制)",
+			[LanguageCode.ZhTw] = "🌐 二級輪盤風格與配色 (展開自訂)",
+			[LanguageCode.En] = "🌐 Tier 2 style and colours (expand to customise)",
+			[LanguageCode.Ja] = "🌐 第2階層のスタイルと配色（展開してカスタマイズ）"
+		};
+		dictionary["UpdatePkgLightweight"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "依赖 .NET 8 运行时轻量版 (~2.7 MB)",
+			[LanguageCode.ZhTw] = "依賴 .NET 8 執行階段輕量版 (~2.7 MB)",
+			[LanguageCode.En] = "Lightweight, needs .NET 8 runtime (~2.7 MB)",
+			[LanguageCode.Ja] = "軽量版・.NET 8 ランタイムが必要（約 2.7 MB）"
+		};
+		dictionary["UpdatePkgStandalone"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "独立免安装单文件版 (~68 MB, 推荐)",
+			[LanguageCode.ZhTw] = "獨立免安裝單檔案版 (~68 MB, 推薦)",
+			[LanguageCode.En] = "Standalone, no install needed (~68 MB, recommended)",
+			[LanguageCode.Ja] = "単体動作・インストール不要（約 68 MB、推奨）"
+		};
+		dictionary["ViewReleasesWeb"] = new Dictionary<LanguageCode, string>
+		{
+			[LanguageCode.ZhCn] = "🌐 网页发布页",
+			[LanguageCode.ZhTw] = "🌐 網頁發佈頁",
+			[LanguageCode.En] = "🌐 Release page",
+			[LanguageCode.Ja] = "🌐 リリースページ"
 		};
 		dictionary["SidebarCollapse"] = new Dictionary<LanguageCode, string>
 		{
@@ -2030,13 +2885,6 @@ public static class I18n
 			[LanguageCode.En] = "Center Text Color:",
 			[LanguageCode.Ja] = "中央文字色:"
 		};
-		dictionary["ClickSectorHint"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "💡 提示：在右侧画布中点击任意扇区可直接选中",
-			[LanguageCode.ZhTw] = "💡 提示：在右側畫布中點選任意扇區可直接選取",
-			[LanguageCode.En] = "Tip: Click any sector on the canvas to select",
-			[LanguageCode.Ja] = "ヒント: キャンバス上の扇形をクリックして直接選択"
-		};
 		dictionary["InheritGlobal"] = new Dictionary<LanguageCode, string>
 		{
 			[LanguageCode.ZhCn] = "跟随全局默认",
@@ -2365,20 +3213,6 @@ public static class I18n
 			[LanguageCode.ZhTw] = "在 Windows 開機登入時靜默自啟動並在後台托盤駐留。",
 			[LanguageCode.En] = "Automatically start StarPie silently minimized to tray on login.",
 			[LanguageCode.Ja] = "Windows起動時に自動でタスクトレイに常駐します。"
-		};
-		dictionary["AutoStartAsAdminTitle"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "以管理员权限自启动 (推荐)",
-			[LanguageCode.ZhTw] = "以系統管理員權限自啟動 (推薦)",
-			[LanguageCode.En] = "Run with Administrator Privileges on Startup",
-			[LanguageCode.Ja] = "管理者権限で自動起動 (推奨)"
-		};
-		dictionary["AutoStartAsAdminDesc"] = new Dictionary<LanguageCode, string>
-		{
-			[LanguageCode.ZhCn] = "通过 Windows 任务计划程序以最高权限静默自启，无需每次弹出 UAC，可在各类高权限窗口中正常响应手势。",
-			[LanguageCode.ZhTw] = "透過 Windows 工作排程器以最高權限靜默自啟，無需每次彈出 UAC，可在各類高權限視窗中正常回應手勢。",
-			[LanguageCode.En] = "Launches via Windows Task Scheduler with highest privileges without UAC prompt, ensuring gestures work in elevated windows.",
-			[LanguageCode.Ja] = "Windowsタスクスケジューラを利用してUACなしで最高権限で自動起動し、管理者権限ウィンドウでも動作します。"
 		};
 		dictionary["ProgramPickerRefresh"] = new Dictionary<LanguageCode, string>
 		{

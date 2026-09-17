@@ -807,8 +807,8 @@ public partial class SettingsWindow : Window
 			}
 		}
 
-		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
-		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
+		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[6] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4, NavTab5 };
+		TextBlock[] navigationTexts = new TextBlock[6] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text, NavTab5Text };
 		for (int i = 0; i < navigationButtons.Length; i++)
 		{
 			if (navigationButtons[i] == null) continue;
@@ -1788,6 +1788,11 @@ public partial class SettingsWindow : Window
 		{
 			NavTab4Text.Text = I18n.T("TabAbout");
 		}
+		if (NavTab5Text != null)
+		{
+			NavTab5Text.Text = I18n.T("TabPlugins");
+		}
+		ApplyPluginsPageLocalization();
 		if (SidebarToggleButton != null)
 		{
 			string toggleText = I18n.T(_isSidebarCollapsed ? "SidebarExpand" : "SidebarCollapse");
@@ -2253,11 +2258,13 @@ public partial class SettingsWindow : Window
 		}
 		if (RenameProfileButton != null)
 		{
-			RenameProfileButton.Content = I18n.T("BtnRenameProfile");
+			// 列表模式的整宽按钮用长标签；画布模式的紧凑工具条按钮
+			// （RenameProfileBtn / RenameProfileBtn2）另用短标签键。见 I18n.cs 的拆键说明。
+			RenameProfileButton.Content = I18n.T("BtnRenameCurrentProfile");
 		}
 		if (DeleteProfileButton != null)
 		{
-			DeleteProfileButton.Content = I18n.T("BtnDeleteProfile");
+			DeleteProfileButton.Content = I18n.T("BtnDeleteCurrentProfile");
 		}
 		if (DuplicateProfileBtn != null)
 		{
@@ -2496,6 +2503,385 @@ public partial class SettingsWindow : Window
 		{
 			PreviewPanHintText.Text = I18n.T("PreviewPanHint");
 		}
+		// ===== 补接漏接的 UI 文案（合并后新增/遗留控件）=====
+		// 说明：XAML 里的中文只是设计期占位，运行时必须由本方法按当前语言重设，
+		// 否则切换语言后这些控件会一直保持中文。以下 94 处原先从未被赋值过。
+		if (SubWheelTriggerDistLabel != null)
+		{
+			SubWheelTriggerDistLabel.Text = I18n.T("SubWheelTriggerDistLabel");
+		}
+		if (SubWheelTriggerDistDesc != null)
+		{
+			SubWheelTriggerDistDesc.Text = I18n.T("SubWheelTriggerDistDesc");
+		}
+		if (AddGestureMappingButton != null)
+		{
+			AddGestureMappingButton.Content = I18n.T("AddGestureMapping");
+		}
+		if (AnimSpeedCustomRadio != null)
+		{
+			AnimSpeedCustomRadio.Content = I18n.T("AnimSpeedCustom");
+		}
+		if (CustomSoundNewProfileBtn != null)
+		{
+			CustomSoundNewProfileBtn.Content = I18n.T("CustomSoundNewProfile");
+		}
+		if (CustomSoundDeleteProfileBtn != null)
+		{
+			CustomSoundDeleteProfileBtn.Content = I18n.T("BtnDeleteProfile");
+		}
+		if (CustomSoundImportProfileBtn != null)
+		{
+			CustomSoundImportProfileBtn.Content = I18n.T("CustomSoundImportProfile");
+		}
+		if (CustomSoundExportProfileBtn != null)
+		{
+			CustomSoundExportProfileBtn.Content = I18n.T("CustomSoundExportProfile");
+		}
+		if (CustomSoundResetProfileBtn != null)
+		{
+			CustomSoundResetProfileBtn.Content = I18n.T("CustomSoundResetProfile");
+		}
+		if (CustomSoundOpenEditorWindowBtn != null)
+		{
+			CustomSoundOpenEditorWindowBtn.Content = I18n.T("CustomSoundOpenEditorWindow");
+		}
+		if (CustomSoundPlayFlowButton != null)
+		{
+			CustomSoundPlayFlowButton.Content = I18n.T("CustomSoundPlayFlow");
+		}
+		if (SystemAudioWarningText != null)
+		{
+			SystemAudioWarningText.Text = I18n.T("SystemAudioWarning");
+		}
+		if (RestoreSystemAudioButton != null)
+		{
+			RestoreSystemAudioButton.Content = I18n.T("RestoreSystemAudio");
+		}
+		if (OuterEscapeCheckboxDescText != null)
+		{
+			OuterEscapeCheckboxDescText.Text = I18n.T("OuterEscapeCheckboxDesc");
+		}
+		if (TestCancelActionButton != null)
+		{
+			TestCancelActionButton.Content = I18n.T("TestCancelAction");
+		}
+		if (CancelActionStatusHint != null)
+		{
+			CancelActionStatusHint.Text = I18n.T("CancelActionStatusHint");
+		}
+		if (EdgeOverflowTitleText != null)
+		{
+			EdgeOverflowTitleText.Text = I18n.T("EdgeOverflowTitle");
+		}
+		if (EdgeOverflowDescText != null)
+		{
+			EdgeOverflowDescText.Text = I18n.T("EdgeOverflowDesc");
+		}
+		if (ResetProcessTriggerButton != null)
+		{
+			ResetProcessTriggerButton.Content = I18n.T("ResetProcessTrigger");
+		}
+		if (Tier2ThemeExpander != null)
+		{
+			Tier2ThemeExpander.Header = I18n.T("Tier2ThemeExpander");
+		}
+		if (NewSubCustomColorPresetButton != null)
+		{
+			NewSubCustomColorPresetButton.Content = I18n.T("NewCustomPresetButton");
+		}
+		if (RenameSubCustomColorPresetButton != null)
+		{
+			RenameSubCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
+		}
+		if (DeleteSubCustomColorPresetButton != null)
+		{
+			DeleteSubCustomColorPresetButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (SubCustomColorsExpanderTitleText != null)
+		{
+			SubCustomColorsExpanderTitleText.Text = I18n.T("SubCustomColorsExpanderTitle");
+		}
+		if (SubCustomColorsExpanderDescText != null)
+		{
+			SubCustomColorsExpanderDescText.Text = I18n.T("SubCustomColorsExpanderDesc");
+		}
+		if (SaveAsNewSubPresetButton != null)
+		{
+			SaveAsNewSubPresetButton.Content = I18n.T("SaveAsNewPresetButton");
+		}
+		if (DeleteSubPresetInPanelButton != null)
+		{
+			DeleteSubPresetInPanelButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (ResetSubThemeButton != null)
+		{
+			ResetSubThemeButton.Content = I18n.T("ResetSubTheme");
+		}
+		if (Tier2DimensionsExpander != null)
+		{
+			Tier2DimensionsExpander.Header = I18n.T("Tier2DimensionsExpander");
+		}
+		if (ResetSubDimensionsButton != null)
+		{
+			ResetSubDimensionsButton.Content = I18n.T("ResetSubDimensions");
+		}
+		if (LayoutOptionsSectionTitle != null)
+		{
+			LayoutOptionsSectionTitle.Text = I18n.T("LayoutOptionsSectionTitle");
+		}
+		if (IconLayoutModeTitleText != null)
+		{
+			IconLayoutModeTitleText.Text = I18n.T("IconLayoutModeTitle");
+		}
+		if (SectorIconSizeTitleText != null)
+		{
+			SectorIconSizeTitleText.Text = I18n.T("SectorIconSizeTitle");
+		}
+		if (SectorFontSizeTitleText != null)
+		{
+			SectorFontSizeTitleText.Text = I18n.T("SectorFontSizeTitle");
+		}
+		if (SectorTextPlacementTitleText != null)
+		{
+			SectorTextPlacementTitleText.Text = I18n.T("SectorTextPlacementTitle");
+		}
+		if (ResetTextOffsetBtn != null)
+		{
+			ResetTextOffsetBtn.Content = I18n.T("ResetTextOffset");
+		}
+		if (CoreSectionTitle != null)
+		{
+			CoreSectionTitle.Text = I18n.T("CoreSectionTitle");
+		}
+		if (ShowCoreIconCheckBox != null)
+		{
+			ShowCoreIconCheckBox.Content = I18n.T("ShowCoreIcon");
+		}
+		if (PickCoreIconButton != null)
+		{
+			PickCoreIconButton.Content = I18n.T("PickCoreIcon");
+		}
+		if (BrowseCoreImageButton != null)
+		{
+			BrowseCoreImageButton.Content = I18n.T("BrowseCoreImage");
+		}
+		if (ClearCoreImageButton != null)
+		{
+			ClearCoreImageButton.Content = I18n.T("ClearCoreImage");
+		}
+		if (Tier1ConfigSegmentRadio != null)
+		{
+			Tier1ConfigSegmentRadio.Content = I18n.T("Tier1ConfigSegment");
+		}
+		if (Tier2ConfigSegmentRadio != null)
+		{
+			Tier2ConfigSegmentRadio.Content = I18n.T("Tier2ConfigSegment");
+		}
+		if (AddLayerBtn != null)
+		{
+			AddLayerBtn.Content = I18n.T("AddLayer");
+		}
+		if (CopyLayerBtn != null)
+		{
+			CopyLayerBtn.Content = I18n.T("CopyLayer");
+		}
+		if (LayerSwitchTriggerLabel != null)
+		{
+			LayerSwitchTriggerLabel.Text = I18n.T("LayerSwitchTriggerLabel");
+		}
+		if (GesturesPageSubheader != null)
+		{
+			GesturesPageSubheader.Text = I18n.T("GesturesPageSubheader");
+		}
+		if (MappingsViewModeCanvasRadio != null)
+		{
+			MappingsViewModeCanvasRadio.Content = I18n.T("MappingsViewModeCanvas");
+		}
+		if (MappingsViewModeListRadio != null)
+		{
+			MappingsViewModeListRadio.Content = I18n.T("MappingsViewModeList");
+		}
+		if (AddProfileBtn2 != null)
+		{
+			AddProfileBtn2.Content = I18n.T("AddProfileShort");
+		}
+		if (RenameProfileBtn2 != null)
+		{
+			RenameProfileBtn2.Content = I18n.T("BtnRenameProfile");
+		}
+		if (ProfileCaptureWindowBtn != null)
+		{
+			ProfileCaptureWindowBtn.Content = I18n.T("ProfileCaptureWindow");
+		}
+		if (ProfilePickProgramBtn != null)
+		{
+			ProfilePickProgramBtn.Content = I18n.T("ProfilePickProgram");
+		}
+		if (ProfileBrowseExeBtn != null)
+		{
+			ProfileBrowseExeBtn.Content = I18n.T("ProfileBrowseExe");
+		}
+		if (MappingsSectorCount4Radio != null)
+		{
+			MappingsSectorCount4Radio.Content = I18n.T("MappingsSectorCount4");
+		}
+		if (MappingsSectorCount8Radio != null)
+		{
+			MappingsSectorCount8Radio.Content = I18n.T("MappingsSectorCount8");
+		}
+		if (MappingsSectorCount12Radio != null)
+		{
+			MappingsSectorCount12Radio.Content = I18n.T("MappingsSectorCount12");
+		}
+		if (EnableGlobalInheritanceCheckBox != null)
+		{
+			EnableGlobalInheritanceCheckBox.Content = I18n.T("EnableGlobalInheritance");
+		}
+		if (FocusBackToParentBtn != null)
+		{
+			FocusBackToParentBtn.Content = I18n.T("FocusBackToParent");
+		}
+		if (FocusPrevSlotBtn != null)
+		{
+			FocusPrevSlotBtn.Content = I18n.T("FocusPrevSlot");
+		}
+		if (FocusNextSlotBtn != null)
+		{
+			FocusNextSlotBtn.Content = I18n.T("FocusNextSlot");
+		}
+		if (FocusCenterCoreBtn != null)
+		{
+			FocusCenterCoreBtn.Content = I18n.T("FocusCenterCore");
+		}
+		if (EnableCenterActionCheckBox != null)
+		{
+			EnableCenterActionCheckBox.Content = I18n.T("EnableCenterAction");
+		}
+		if (CenterPresetsToggleBtn != null)
+		{
+			CenterPresetsToggleBtn.Content = I18n.T("CenterPresetsToggle");
+		}
+		if (CenterInfoToggleBtn != null)
+		{
+			CenterInfoToggleBtn.Content = I18n.T("CenterInfoToggle");
+		}
+		if (FocusActionNameLabel != null)
+		{
+			FocusActionNameLabel.Text = I18n.T("FocusActionNameLabel");
+		}
+		if (FocusRestoreInheritBtn != null)
+		{
+			FocusRestoreInheritBtn.Content = I18n.T("FocusRestoreInherit");
+		}
+		if (FocusTestActionBtn != null)
+		{
+			FocusTestActionBtn.Content = I18n.T("FocusTestAction");
+		}
+		if (FocusPluginReloadBtn != null)
+		{
+			FocusPluginReloadBtn.Content = I18n.T("FocusPluginReload");
+		}
+		if (FocusPopulateTileSubActionsBtn != null)
+		{
+			FocusPopulateTileSubActionsBtn.Content = I18n.T("FocusPopulateTileSubActions");
+		}
+		if (FocusPickShellToolBtn != null)
+		{
+			FocusPickShellToolBtn.Content = I18n.T("FocusPickShellTool");
+		}
+		if (FocusClearInheritedIconBtn != null)
+		{
+			FocusClearInheritedIconBtn.Content = I18n.T("FocusClearInheritedIcon");
+		}
+		if (FocusAddSubActionBtn != null)
+		{
+			FocusAddSubActionBtn.Content = I18n.T("FocusAddSubAction");
+		}
+		if (FocusClearSubActionsBtn != null)
+		{
+			FocusClearSubActionsBtn.Content = I18n.T("FocusClearSubActions");
+		}
+		if (FocusUndoSubActionsBtn != null)
+		{
+			FocusUndoSubActionsBtn.Content = I18n.T("FocusUndoSubActions");
+		}
+		if (FocusBatchExitBtn != null)
+		{
+			FocusBatchExitBtn.Content = I18n.T("FocusBatchExit");
+		}
+		if (BatchLayoutBothBtn != null)
+		{
+			BatchLayoutBothBtn.Content = I18n.T("BatchLayoutBoth");
+		}
+		if (BatchLayoutIconOnlyBtn != null)
+		{
+			BatchLayoutIconOnlyBtn.Content = I18n.T("BatchLayoutIconOnly");
+		}
+		if (BatchLayoutTextOnlyBtn != null)
+		{
+			BatchLayoutTextOnlyBtn.Content = I18n.T("BatchLayoutTextOnly");
+		}
+		if (BatchLayoutInheritBtn != null)
+		{
+			BatchLayoutInheritBtn.Content = I18n.T("BatchLayoutInherit");
+		}
+		if (BatchResetCustomBtn != null)
+		{
+			BatchResetCustomBtn.Content = I18n.T("BatchResetCustom");
+		}
+		if (MappingsTier1SegmentRadio != null)
+		{
+			MappingsTier1SegmentRadio.Content = I18n.T("MappingsTier1Segment");
+		}
+		if (MappingsTier2SegmentRadio != null)
+		{
+			MappingsTier2SegmentRadio.Content = I18n.T("MappingsTier2Segment");
+		}
+		if (ViewReleasesWebBtn != null)
+		{
+			ViewReleasesWebBtn.Content = I18n.T("ViewReleasesWeb");
+		}
+		if (StartDownloadUpdateBtn != null)
+		{
+			StartDownloadUpdateBtn.Content = I18n.T("StartDownloadUpdate");
+		}
+		if (OpenWebReleaseBtn != null)
+		{
+			OpenWebReleaseBtn.Content = I18n.T("OpenWebRelease");
+		}
+		if (UpdatePkgStandaloneRadio != null)
+		{
+			UpdatePkgStandaloneRadio.Content = I18n.T("UpdatePkgStandalone");
+		}
+		if (UpdatePkgLightweightRadio != null)
+		{
+			UpdatePkgLightweightRadio.Content = I18n.T("UpdatePkgLightweight");
+		}
+		if (CancelDownloadBtn != null)
+		{
+			CancelDownloadBtn.Content = I18n.T("CancelDownload");
+		}
+		if (ApplyRestartUpdateBtn != null)
+		{
+			ApplyRestartUpdateBtn.Content = I18n.T("ApplyRestartUpdate");
+		}
+		if (OpenUpdateFolderBtn != null)
+		{
+			OpenUpdateFolderBtn.Content = I18n.T("OpenUpdateFolder");
+		}
+		if (AboutCheckUpdateBtn != null)
+		{
+			AboutCheckUpdateBtn.Content = I18n.T("AboutCheckUpdate");
+		}
+		if (OpenChangelogButton != null)
+		{
+			OpenChangelogButton.Content = I18n.T("BtnOpenChangelog");
+		}
+		if (OlderMilestonesExpander != null)
+		{
+			OlderMilestonesExpander.Header = I18n.T("MilestonesOlderExpander");
+		}
 
 		UpdateFocusActionTypeItemsSource();
 		App.RefreshTrayMenu();
@@ -2646,9 +3032,6 @@ public partial class SettingsWindow : Window
 
 	private void ScheduleAutoSave()
 	{
-		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Expected O, but got Unknown
 		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
@@ -6034,6 +6417,12 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
+		// 进程内插件无法原地热替换 —— 已加载的程序集不会被重新读取。
+		// 必须走「停用 → 启用」才会真正把磁盘上的新二进制加载进来。
+		string msgTitle = I18n.T("PluginsMsgTitle");
+
+		// 用 DisableAsync 而不是同步 Disable：前者会等未归还的调用租约，IsFullyStopped
+		// 为 false 说明还有调用在跑，此时替换程序集等于让旧实例继续吃旧代码。
 		PluginStopResult stop = await PluginHost.DisableAsync(
 			reference.PluginId,
 			PluginStopReason.Reload,
@@ -6042,19 +6431,29 @@ public partial class SettingsWindow : Window
 		if (!stop.IsFullyStopped)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"旧插件尚未完全停止，不能重新加载：\n\n{stop.Message}",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				I18n.TF("PluginsReloadNotStopped", stop.Message),
+				msgTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
 		if (!PluginHost.Enable(reference.PluginId, out string enableError))
 		{
-			System.Windows.MessageBox.Show(this, $"重新加载失败：{enableError}", "StarPie 插件",
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsReloadFailed", enableError), msgTitle,
 				MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
-		PluginHost.NotifyUser("StarPie 插件", $"{reference.PluginId} 已重新加载。");
+		PluginInstance? reloaded = PluginHost.Find(reference.PluginId);
+		PluginHost.NotifyUser(msgTitle, I18n.TF("PluginsReloaded", reference.PluginId));
+
+		if (reloaded?.RequiresRestart == true)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsReloadedRestartNeeded", reference.PluginId),
+				msgTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		UpdateFocusEditorUi();
 		RefreshPluginManagerUi();
 	}
 
@@ -6142,10 +6541,10 @@ public partial class SettingsWindow : Window
 		if (PluginsStatusSummaryText != null)
 		{
 			int enabledCount = items.Count(i => i.IsEnabled);
-			string directoryHint = $"数据目录：{PluginPaths.Root}";
+			string directoryHint = I18n.TF("PluginsDataDirectoryHint", PluginPaths.Root);
 			PluginsStatusSummaryText.Text = items.Count == 0
-				? $"尚未安装任何插件。{directoryHint}"
-				: $"共 {items.Count} 个插件，{enabledCount} 个已启用。{directoryHint}";
+				? I18n.TF("PluginsStatusEmpty", directoryHint)
+				: I18n.TF("PluginsStatusSummary", items.Count, enabledCount, directoryHint);
 		}
 
 		if (PluginsSafeModeText != null)
@@ -6153,7 +6552,7 @@ public partial class SettingsWindow : Window
 			PluginsSafeModeText.Visibility = PluginHost.IsSafeModeActive ? Visibility.Visible : Visibility.Collapsed;
 			if (PluginHost.IsSafeModeActive)
 			{
-				PluginsSafeModeText.Text = "⚠️ 安全模式：上次启动时插件引发异常，已自动禁用问题插件，避免反复崩溃。";
+				PluginsSafeModeText.Text = I18n.T("PluginsSafeModeWarning");
 			}
 		}
 
@@ -6168,6 +6567,58 @@ public partial class SettingsWindow : Window
 	/// 所以这里始终把<b>实际路径</b>写出来，并明确说明宿主不会替用户创建它。
 	/// </para>
 	/// </summary>
+	/// <summary>
+	/// 插件页的静态文案：页头、副标题、各按钮与复选框。
+	/// <para>
+	/// 覆盖的是 <c>SettingsWindow.xaml</c> 里那几个硬编码中文默认值。插件页是 S4 拆包时新加的，
+	/// 当时没有同步接进 <see cref="ApplyLocalization"/>，于是切到英文 / 日文时整页仍是中文。
+	/// 列表状态、候选区那几段带数字的文案各自在刷新方法里取（见 <see cref="TF"/>）。
+	/// </para>
+	/// </summary>
+	private void ApplyPluginsPageLocalization()
+	{
+		if (PluginsPageHeader != null)
+		{
+			PluginsPageHeader.Text = I18n.T("TabPlugins");
+		}
+		if (PluginsPageSubheader != null)
+		{
+			PluginsPageSubheader.Text = I18n.T("PluginsPageSubheader");
+		}
+		if (InstallPluginButton != null)
+		{
+			InstallPluginButton.Content = I18n.T("PluginsInstallButton");
+		}
+		if (RescanPluginsButton != null)
+		{
+			RescanPluginsButton.Content = I18n.T("PluginsRescanButton");
+		}
+		if (OpenPluginsFolderButton != null)
+		{
+			OpenPluginsFolderButton.Content = I18n.T("PluginsOpenDataFolderButton");
+		}
+		if (OpenPluginScanFolderButton != null)
+		{
+			OpenPluginScanFolderButton.Content = I18n.T("PluginsOpenScanFolderButton");
+		}
+		if (PluginSystemEnabledCheckBox != null)
+		{
+			PluginSystemEnabledCheckBox.Content = I18n.T("PluginsEnableCheckBox");
+		}
+		if (PluginsEmptyTitleText != null)
+		{
+			PluginsEmptyTitleText.Text = I18n.T("PluginsEmptyTitle");
+		}
+		if (PluginsEmptyHintText != null)
+		{
+			PluginsEmptyHintText.Text = I18n.T("PluginsEmptyHint");
+		}
+
+		// 候选卡片的状态徽标与安装按钮文案是 getter（每次读取时才查表），
+		// 光设静态文本不会让它们换语言 —— 得重新绑定一次数据源。
+		RefreshPluginManagerUi();
+	}
+
 	private void RefreshPluginCandidatesUi()
 	{
 		if (PluginCandidatesPanel == null) return;
@@ -6189,17 +6640,16 @@ public partial class SettingsWindow : Window
 		{
 			PluginCandidatesHeaderText.Text = PluginPaths.ScanRootExists
 				? (installable > 0
-					? $"扫描目录里发现 {candidates.Count} 个 .dll，其中 {installable} 个可以安装"
-					: "扫描目录里没有可安装的插件")
-				: "扫描目录不存在（宿主不会创建它）";
+					? I18n.TF("PluginsScanHeaderFound", candidates.Count, installable)
+					: I18n.T("PluginsScanHeaderNone"))
+				: I18n.T("PluginsScanHeaderMissing");
 		}
 
 		if (PluginCandidatesPathText != null)
 		{
 			PluginCandidatesPathText.Text = PluginPaths.ScanRootExists
 				? PluginPaths.ScanRoot
-				: $"{PluginPaths.ScanRoot}　—　把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。" +
-				  "该目录由你自己创建：StarPie 装在只读位置时无权创建它。";
+				: PluginPaths.ScanRoot + "　—　" + I18n.T("PluginsScanPathHint");
 		}
 
 		if (PluginCandidateItemsControl != null)
@@ -6223,8 +6673,8 @@ public partial class SettingsWindow : Window
 		if (candidate == null)
 		{
 			System.Windows.MessageBox.Show(this,
-				"这枚候选已经不在扫描目录里了（可能刚被移走或改名）。已重新扫描，请再试一次。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.T("PluginsCandidateGone"),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 			RefreshPluginManagerUi();
 			return;
 		}
@@ -6237,13 +6687,13 @@ public partial class SettingsWindow : Window
 		if (!installResult.Success)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"安装失败：{error}", "StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				I18n.TF("PluginsInstallFailed", error), I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 		else if (candidate.State == PluginCandidateState.Update)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"{candidate.DisplayName} 已完成安全停用、更新到 {candidate.VersionText} 并重新启用。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsUpdatedAndEnabled", candidate.DisplayName, candidate.VersionText),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
 		RefreshPluginManagerUi();
@@ -6253,39 +6703,35 @@ public partial class SettingsWindow : Window
 	private bool ConfirmCandidateInstall(PluginCandidate candidate)
 	{
 		var text = new System.Text.StringBuilder();
-		text.AppendLine($"即将安装：{candidate.DisplayName} {candidate.VersionText}");
-		text.AppendLine($"文件：{candidate.DllPath}");
+		text.AppendLine(I18n.TF("PluginsConfirmAboutToInstall", candidate.DisplayName, candidate.VersionText));
+		text.AppendLine(I18n.TF("PluginsConfirmFile", candidate.DllPath));
 		text.AppendLine();
 
 		if (candidate.Scan.Manifest?.Capabilities is { Count: > 0 } capabilities)
 		{
-			text.AppendLine("该插件声明了以下能力：");
+			text.AppendLine(I18n.T("PluginsConfirmCapabilities"));
 			text.AppendLine(DescribeCapabilities(candidate.Scan.Manifest.ResolveCapabilities()));
 			text.AppendLine();
 		}
 
 		if (candidate.HasNote)
 		{
-			text.AppendLine($"扫描结果：{candidate.Note}");
+			text.AppendLine(I18n.TF("PluginsConfirmScanResult", candidate.Note));
 			text.AppendLine();
 		}
 
 		text.AppendLine(candidate.State switch
 		{
-			PluginCandidateState.Update =>
-				"点击「确定」后将用扫描目录里的新版覆盖现有安装并立即启用。" +
-				"如果插件正在运行，宿主会先自动停用它再替换文件。",
-			PluginCandidateState.Downgrade =>
-				"点击「确定」后将用更旧的版本覆盖现有安装。除非你明确需要退回旧版，否则不建议这样做。",
-			PluginCandidateState.Replaced =>
-				"点击「确定」后将用扫描目录里的文件覆盖现有安装（版本号相同但内容不同）。",
-			_ => "点击「确定」后插件将被复制到 StarPie 的数据目录并立即启用。",
+			PluginCandidateState.Update => I18n.T("PluginsConfirmUpdate"),
+			PluginCandidateState.Downgrade => I18n.T("PluginsConfirmDowngrade"),
+			PluginCandidateState.Replaced => I18n.T("PluginsConfirmReplaced"),
+			_ => I18n.T("PluginsConfirmFresh"),
 		});
 		text.AppendLine();
-		text.Append("插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。");
+		text.Append(I18n.T("PluginsConfirmPrivileges"));
 
 		return System.Windows.MessageBox.Show(this, text.ToString(),
-			"确认安装插件", MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+			I18n.T("PluginsConfirmTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
 	/// <summary>打开只读扫描目录。目录不存在时只提示路径，绝不代为创建。</summary>
@@ -6296,10 +6742,8 @@ public partial class SettingsWindow : Window
 		if (!PluginPaths.ScanRootExists)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"扫描目录还不存在：\n{scanRoot}\n\n" +
-				"StarPie 不会替你创建它 —— 程序可能装在只读位置，宿主对这里只读不写。\n" +
-				"如需使用随包附带的插件，请手工创建该文件夹，把插件 .dll 放进去，再点「重新扫描」。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsScanFolderMissing", scanRoot),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
 
@@ -8434,6 +8878,8 @@ public partial class SettingsWindow : Window
 						IsHitTestVisible = false
 					};
 
+					// 这个判空不能删：上面的兜底块是 try { iconElement = new Path { Data = Geometry.Parse(...) } }
+					// catch { } —— 空 catch 吞掉异常时 iconElement 依然是 null。CA1508 报「恒真」是误报。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)
@@ -8486,6 +8932,7 @@ public partial class SettingsWindow : Window
 				}
 				else
 				{
+					// 同上：兜底块的 catch 会吞异常，iconElement 仍可能为 null。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)
@@ -9670,28 +10117,6 @@ public partial class SettingsWindow : Window
 
 	public void ProcessRawMouseButton(string mouseButton, uint mouseData = 0u)
 	{
-		//IL_0077: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0083: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0085: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0096: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013e: Invalid comparison between Unknown and I4
-		//IL_0146: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0148: Unknown result type (might be due to invalid IL or missing references)
-		//IL_014a: Invalid comparison between Unknown and I4
-		//IL_0152: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0154: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0156: Invalid comparison between Unknown and I4
-		//IL_015e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0160: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0162: Invalid comparison between Unknown and I4
 		if ((base.IsVisible || _isRecordingTrigger || _isRecordingProcessTrigger) && ConfigManager.CurrentConfig != null)
 		{
 			string text = mouseButton switch
@@ -9788,67 +10213,6 @@ public partial class SettingsWindow : Window
 
 	private void ProcessRawKeyEvent(GlobalKeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_000a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0011: Invalid comparison between Unknown and I4
-		//IL_0024: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0029: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0082: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0087: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0090: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009b: Invalid comparison between Unknown and I4
-		//IL_00d8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00da: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c0: Invalid comparison between Unknown and I4
-		//IL_009e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Invalid comparison between Unknown and I4
-		//IL_00fd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ff: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00de: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e5: Invalid comparison between Unknown and I4
-		//IL_00c3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ca: Invalid comparison between Unknown and I4
-		//IL_0103: Unknown result type (might be due to invalid IL or missing references)
-		//IL_010a: Invalid comparison between Unknown and I4
-		//IL_00e8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ef: Invalid comparison between Unknown and I4
-		//IL_010d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0114: Invalid comparison between Unknown and I4
-		//IL_01bf: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c6: Invalid comparison between Unknown and I4
-		//IL_01c9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01d0: Invalid comparison between Unknown and I4
-		//IL_01d3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01da: Invalid comparison between Unknown and I4
-		//IL_01dd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01e4: Invalid comparison between Unknown and I4
-		//IL_01e7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ee: Invalid comparison between Unknown and I4
-		//IL_01f1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01f8: Invalid comparison between Unknown and I4
-		//IL_01fb: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0202: Invalid comparison between Unknown and I4
-		//IL_0205: Unknown result type (might be due to invalid IL or missing references)
-		//IL_020c: Invalid comparison between Unknown and I4
-		//IL_0226: Unknown result type (might be due to invalid IL or missing references)
-		//IL_022b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024f: Invalid comparison between Unknown and I4
-		//IL_0257: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0259: Unknown result type (might be due to invalid IL or missing references)
-		//IL_025b: Invalid comparison between Unknown and I4
-		//IL_0263: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0265: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0267: Invalid comparison between Unknown and I4
-		//IL_026f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0271: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0273: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 0)
 		{
 			return;
@@ -14660,8 +15024,6 @@ public partial class SettingsWindow : Window
 
 	private void NewBlacklistProcessTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0007: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 6)
 		{
 			AddBlacklistButton_Click(sender, e);
@@ -16304,7 +16666,6 @@ public partial class SettingsWindow : Window
 
 	private void RenderLiveWheelPreview()
 	{
-		//IL_09d6: Unknown result type (might be due to invalid IL or missing references)
 		if (_isRenderingPreview || LiveWheelPreviewCanvas == null || ConfigManager.CurrentConfig == null)
 		{
 			return;

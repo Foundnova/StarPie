@@ -1,5 +1,7 @@
 # StarPie 插件系统架构与动作执行路径
 
+> **本分支采用本方案**（2026-09-17 与上游 `dev-plugin` 同步后并入）：本文档描述的是「统一调用运行时 + 路径模块 + 活动调用租约 + 异步停用状态机」重构，即本分支的**现行实现**。此前曾判定它与 `AGENTS.md` §3.7 的顶层类型认领机制在 `PluginHost` 上不可共存，并据此删除了新增模块 `PluginRuntime` / `PluginPathModules`（915 行）；同步上游后确认**二者可以共存** —— `PluginHost` 既经 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 三条路径，也经 `PluginActionClaimRegistry` 做顶层类型认领，两个模块已恢复并在用。插件系统的通用规范见 `AGENTS.md` §3.7，运行时重构要点见 §4。
+>
 > 文档状态：宿主公共基础设施与动作执行路径已基本完成；交互事件路径保留兼容骨架，轮盘结构路径暂为安全占位。
 >
 > 最后更新：2026-09-17

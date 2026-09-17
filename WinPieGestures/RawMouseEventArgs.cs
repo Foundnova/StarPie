@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using System.Windows;
 
 namespace WinPieGestures;
 
 public class RawMouseEventArgs : EventArgs
 {
-	[CompilerGenerated]
-	private readonly Point _003CPosition_003Ek__BackingField;
-
 	public int Message { get; private set; }
 
 	public string MouseButton { get; private set; }
@@ -23,8 +19,6 @@ public class RawMouseEventArgs : EventArgs
 
 	public RawMouseEventArgs(int message, string mouseButton, uint mouseData, bool isButtonDown, double x, double y)
 	{
-		//IL_0028: Unknown result type (might be due to invalid IL or missing references)
-		//IL_002d: Unknown result type (might be due to invalid IL or missing references)
 		Message = message;
 		MouseButton = mouseButton;
 		MouseData = mouseData;

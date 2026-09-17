@@ -71,7 +71,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
     if ($csprojContent -match '<Version>(?<v>[^<]+)</Version>') {
         $Version = $Matches['v'].Trim()
     } else {
-        $Version = "1.7.4-beta.3"
+        $Version = "1.7.4-beta.4"
     }
 }
 
