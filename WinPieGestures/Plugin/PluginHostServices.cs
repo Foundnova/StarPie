@@ -275,11 +275,16 @@ internal sealed class PluginHostActionInvoker : IHostActionInvoker
 /// </summary>
 internal sealed class PluginEventService : IPluginEvents
 {
+    private readonly PluginInstance _instance;
     private readonly string _pluginId;
     private readonly object _gate = new();
     private readonly List<Subscription> _subscriptions = new();
 
-    public PluginEventService(string pluginId) => _pluginId = pluginId;
+    public PluginEventService(PluginInstance instance)
+    {
+        _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+        _pluginId = instance.PluginId;
+    }
 
     private sealed class Subscription : IDisposable
     {
@@ -315,8 +320,19 @@ internal sealed class PluginEventService : IPluginEvents
 
         Action onChanged = () =>
         {
-            try { handler(I18n.CurrentLanguageCode); }
-            catch (Exception ex) { AppLogger.LogError($"[plugin:{_pluginId}] OnLanguageChanged 回调异常", ex); }
+            if (!_instance.TryAcquireInvocation(
+                    PluginCallKind.InteractionEvent,
+                    out PluginInvocationLease? lease,
+                    out _))
+            {
+                return;
+            }
+
+            using (lease)
+            {
+                try { handler(I18n.CurrentLanguageCode); }
+                catch (Exception ex) { AppLogger.LogError($"[plugin:{_pluginId}] OnLanguageChanged 回调异常", ex); }
+            }
         };
 
         I18n.LanguageChanged += onChanged;

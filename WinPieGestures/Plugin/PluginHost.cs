@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -62,6 +63,10 @@ internal static class PluginHost
     /// 三条 SPP 调用路径的统一运行时入口。动作路径先适配现有实现，交互与轮盘结构路径先建立空接缝。
     /// </summary>
     private static readonly PluginRuntime Runtime = new(Catalog, Find, static () => _enabled);
+    private static readonly ConcurrentDictionary<string, Lazy<Task<PluginStopResult>>> StopOperations =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public static readonly TimeSpan DefaultStopGracePeriod = TimeSpan.FromSeconds(5);
 
     private static bool _initialized;
     private static bool _enabled = true;
@@ -157,33 +162,23 @@ internal static class PluginHost
         }
     }
 
-    /// <summary>宿主退出前的收尾：停用全部插件并落盘健康度。</summary>
+    /// <summary>宿主退出前的收尾。退出路径允许同步等待短宽限期，最终进程退出由操作系统兜底。</summary>
     public static void ShutdownAll()
     {
-        if (!_initialized || !_enabled) return;
+        if (!_initialized) return;
 
-        List<PluginInstance> snapshot;
-        lock (Gate)
+        foreach (PluginInstance instance in ListInstances())
         {
-            snapshot = new List<PluginInstance>(Instances.Values);
-        }
+            if (!instance.IsLoaded) continue;
 
-        foreach (PluginInstance instance in snapshot)
-        {
             try
             {
-                if (!instance.IsLoaded) continue;
-
-                Runtime.NotifyPluginStopping(instance.PluginId);
-                try
-                {
-                    instance.Unload();
-                }
-                finally
-                {
-                    Runtime.NotifyPluginStopped(instance.PluginId);
-                }
-                instance.FlushHealth();
+                _ = DisableAsync(
+                        instance.PluginId,
+                        PluginStopReason.ApplicationExit,
+                        TimeSpan.FromSeconds(2),
+                        CancellationToken.None)
+                    .GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -216,6 +211,36 @@ internal static class PluginHost
     /// 第二步：用户确认后落盘。复制到插件目录并登记为 <b>Disabled</b>。
     /// <para>注意：这里<b>不会加载程序集</b> —— 「安装」与「启用」刻意分成两个动作。</para>
     /// </summary>
+    public static async Task<PluginInstallResult> CommitInstallAsync(
+        PluginScanResult scan,
+        PluginInstallOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        options ??= new PluginInstallOptions();
+        string? pluginId = scan?.Manifest?.Id;
+
+        if (options.OverwriteExisting && !string.IsNullOrWhiteSpace(pluginId) && Find(pluginId) != null)
+        {
+            PluginStopResult stop = await DisableAsync(
+                pluginId,
+                PluginStopReason.Update,
+                DefaultStopGracePeriod,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!stop.IsFullyStopped)
+            {
+                return new PluginInstallResult
+                {
+                    Success = false,
+                    PluginId = pluginId,
+                    Error = $"旧版本尚未完全停止，不能覆盖安装：{stop.Message}",
+                };
+            }
+        }
+
+        return CommitInstall(scan, options);
+    }
+
     public static PluginInstallResult CommitInstall(PluginScanResult scan, PluginInstallOptions options)
     {
         options ??= new PluginInstallOptions();
@@ -364,93 +389,207 @@ internal static class PluginHost
         return true;
     }
 
-    /// <summary>停用插件：撤销贡献点 → 剪断订阅 → Shutdown → 尽力卸载 ALC。</summary>
+    /// <summary>兼容同步调用；新 UI 与管理流程应使用 <see cref="DisableAsync"/>。</summary>
     public static bool Disable(string pluginId, out string error)
     {
-        error = "";
+        PluginStopResult result = DisableAsync(
+                pluginId,
+                PluginStopReason.UserDisabled,
+                DefaultStopGracePeriod,
+                CancellationToken.None)
+            .GetAwaiter().GetResult();
+
+        error = result.IsFullyStopped ? "" : result.Message;
+        return result.IsFullyStopped;
+    }
+
+    public static async Task<PluginStopResult> DisableAsync(
+        string pluginId,
+        PluginStopReason reason,
+        TimeSpan? gracePeriod = null,
+        CancellationToken cancellationToken = default)
+    {
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
         {
-            error = $"插件未安装：{pluginId}";
-            return false;
+            return new PluginStopResult
+            {
+                Status = PluginStopStatus.Failed,
+                PluginId = pluginId ?? "",
+                Message = $"插件未安装：{pluginId}",
+            };
         }
 
+        var lazy = StopOperations.GetOrAdd(
+            pluginId,
+            _ => new Lazy<Task<PluginStopResult>>(
+                () => StopPluginCoreAsync(instance, reason),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+
+        Task<PluginStopResult> stopTask = lazy.Value;
+        TimeSpan wait = gracePeriod ?? DefaultStopGracePeriod;
+
+        if (wait == Timeout.InfiniteTimeSpan)
+        {
+            return await stopTask.ConfigureAwait(false);
+        }
+
+        Task delay = Task.Delay(wait, cancellationToken);
+        Task completed = await Task.WhenAny(stopTask, delay).ConfigureAwait(false);
+        if (ReferenceEquals(completed, stopTask))
+        {
+            return await stopTask.ConfigureAwait(false);
+        }
+
+        string pendingMessage =
+            $"插件「{instance.Entry.Name}」仍有 {instance.ActiveCallCount} 个调用未结束；" +
+            "已拒绝新调用并在后台等待，必要时请重启 StarPie。";
+        instance.MarkStopPending(pendingMessage);
+        instance.FlushHealth();
+
+        return new PluginStopResult
+        {
+            Status = PluginStopStatus.Pending,
+            PluginId = pluginId,
+            Message = pendingMessage,
+            RemainingCalls = instance.ActiveCallCount,
+        };
+    }
+
+    private static async Task<PluginStopResult> StopPluginCoreAsync(
+        PluginInstance instance,
+        PluginStopReason reason)
+    {
+        string pluginId = instance.PluginId;
         try
         {
-            // 先关闭用户启用偏好，使动作路径从这一刻起不再触发惰性加载。
-            instance.Entry.Enabled = false;
-            PluginRegistryStore.UpsertEntry(instance.Entry);
+            bool persistDisabled = reason is not (
+                PluginStopReason.PluginSystemShutdown or
+                PluginStopReason.ApplicationExit);
+            if (persistDisabled)
+            {
+                instance.Entry.Enabled = false;
+                PluginRegistryStore.UpsertEntry(instance.Entry);
+            }
 
-            // 卸载结论是**异步**得出的：同步那一瞬间调用栈往往还没展开，此时下结论多半是错的。
-            // 所以这里只登记回调，等最终结论出来再决定要不要提示用户「重启」。
+            if (!instance.IsLoaded)
+            {
+                Runtime.NotifyPluginStopping(pluginId);
+                Runtime.NotifyPluginStopped(pluginId);
+                NotifyPluginSetChanged();
+                bool requiresRestart = instance.RequiresRestart ||
+                                       instance.State == PluginRuntimeState.RequiresRestart;
+                return new PluginStopResult
+                {
+                    Status = requiresRestart
+                        ? PluginStopStatus.RequiresRestart
+                        : PluginStopStatus.AlreadyStopped,
+                    PluginId = pluginId,
+                    Message = requiresRestart
+                        ? "插件运行时尚未完全释放，需要重启 StarPie。"
+                        : "插件已经处于停止状态。",
+                };
+            }
+
             instance.UnloadVerdictFinalized = collected =>
             {
                 if (collected) return;
-
-                // 回调可能跑在线程池的延迟判定线程上，日志与托盘气泡都必须回到 UI 线程
                 new PluginDispatcherFacade().Post(() =>
                 {
-                    AppLogger.LogWarn(
-                        $"[plugin] {pluginId} 已停用，但插件程序集未能释放（ALC 卸载失败）；" +
-                        "请重启 StarPie 以彻底回收其内存。");
-                    NotifyUser(
-                        "插件已停用，但内存未释放",
-                        $"{pluginId} 的程序集仍被引用，重启 StarPie 后才能彻底回收。");
+                    AppLogger.LogWarn($"[plugin] {pluginId} 已停止，但插件程序集未能释放，需要重启 StarPie。");
+                    NotifyUser("插件需要重启完成释放", $"{pluginId} 的程序集仍被引用，重启 StarPie 后才能彻底回收。");
                 });
             };
 
+            Task drained = instance.BeginStopping();
             Runtime.NotifyPluginStopping(pluginId);
+            await drained.ConfigureAwait(false);
+
             try
             {
-                instance.Unload();
+                await Task.Run(instance.Unload).ConfigureAwait(false);
             }
             finally
             {
                 Runtime.NotifyPluginStopped(pluginId);
             }
-            instance.FlushHealth();
 
+            bool collected = await Task.Run(() => instance.WaitForUnloadVerdict(5000)).ConfigureAwait(false);
+            if (collected) instance.ClearError();
+            instance.FlushHealth();
             NotifyPluginSetChanged();
-            return true;
+
+            return new PluginStopResult
+            {
+                Status = collected ? PluginStopStatus.Stopped : PluginStopStatus.RequiresRestart,
+                PluginId = pluginId,
+                Message = collected
+                    ? $"插件 {pluginId} 已停止。"
+                    : $"插件 {pluginId} 已停止，但旧程序集仍被引用，需要重启 StarPie。",
+            };
         }
         catch (Exception ex)
         {
-            error = ex.Message;
-            AppLogger.LogError($"[plugin] 停用 {pluginId} 失败", ex);
-            return false;
+            AppLogger.LogError($"[plugin] 停用 {pluginId} 失败（原因={reason}）", ex);
+            return new PluginStopResult
+            {
+                Status = PluginStopStatus.Failed,
+                PluginId = pluginId,
+                Message = ex.Message,
+                RemainingCalls = instance.ActiveCallCount,
+            };
+        }
+        finally
+        {
+            StopOperations.TryRemove(pluginId, out _);
         }
     }
 
-    /// <summary>卸载插件（停用 + 删除目录 + 移除登记）。</summary>
+    /// <summary>兼容同步卸载；UI 与管理流程应使用 <see cref="UninstallAsync"/>。</summary>
     public static bool Uninstall(string pluginId, bool removePluginData, out string error)
     {
-        error = "";
+        PluginUninstallResult result = UninstallAsync(pluginId, removePluginData).GetAwaiter().GetResult();
+        error = result.Error;
+        return result.Success;
+    }
 
+    public static async Task<PluginUninstallResult> UninstallAsync(
+        string pluginId,
+        bool removePluginData,
+        CancellationToken cancellationToken = default)
+    {
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
         {
-            error = $"插件未安装：{pluginId}";
-            return false;
+            return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
         }
 
-        Disable(pluginId, out _);
+        PluginStopResult stop = await DisableAsync(
+            pluginId,
+            PluginStopReason.Uninstall,
+            DefaultStopGracePeriod,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!stop.IsFullyStopped)
+        {
+            return new PluginUninstallResult
+            {
+                Success = false,
+                Error = $"插件尚未完全停止，不能删除文件：{stop.Message}",
+            };
+        }
 
         try
         {
-            // 外部路径登记：程序集留在开发者自己的目录里，宿主只拥有「登记」这一行数据。
-            // 卸载必须只摘登记、绝不碰磁盘 —— 那条路径下往往就是开发者的编译输出目录。
             if (instance.IsExternal)
             {
                 PluginRegistryStore.RemoveEntry(pluginId);
-                lock (Gate)
-                {
-                    Instances.Remove(pluginId);
-                }
+                lock (Gate) Instances.Remove(pluginId);
 
                 AppLogger.LogInfo(
                     $"[plugin] 已卸载 {pluginId}（外部路径登记，源文件未删除：{instance.Entry.ExternalPath}）");
                 NotifyPluginSetChanged();
-                return true;
+                return new PluginUninstallResult { Success = true };
             }
 
             string directory = instance.ManagedDirectory;
@@ -462,7 +601,6 @@ internal static class PluginHost
                 }
                 catch (Exception deleteError)
                 {
-                    // 文件被占用（多为 ALC 未卸载干净）：改名挂起，下次启动时清理
                     string pending = Path.Combine(PluginPaths.Root, ".pending-delete-" + Guid.NewGuid().ToString("N"));
                     try
                     {
@@ -472,27 +610,26 @@ internal static class PluginHost
                     }
                     catch
                     {
-                        error = $"删除插件目录失败（文件被占用）：{deleteError.Message}。请重启 StarPie 后重试。";
-                        return false;
+                        return new PluginUninstallResult
+                        {
+                            Success = false,
+                            Error = $"删除插件目录失败（文件被占用）：{deleteError.Message}。请重启 StarPie 后重试。",
+                        };
                     }
                 }
             }
 
             PluginRegistryStore.RemoveEntry(pluginId);
-            lock (Gate)
-            {
-                Instances.Remove(pluginId);
-            }
+            lock (Gate) Instances.Remove(pluginId);
 
             AppLogger.LogInfo($"[plugin] 已卸载 {pluginId}（保留数据={!removePluginData}）");
             NotifyPluginSetChanged();
-            return true;
+            return new PluginUninstallResult { Success = true };
         }
         catch (Exception ex)
         {
-            error = ex.Message;
             AppLogger.LogError($"[plugin] 卸载 {pluginId} 失败", ex);
-            return false;
+            return new PluginUninstallResult { Success = false, Error = ex.Message };
         }
     }
 
@@ -530,20 +667,9 @@ internal static class PluginHost
     public static bool TryGetAction(string fullId, out PluginActionRegistration registration) =>
         Catalog.TryGetAction(fullId, out registration);
 
-    /// <summary>预览文案。失败时返回空串，绝不抛异常。</summary>
-    public static string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters)
-    {
-        try
-        {
-            return Catalog.TryGetAction(fullId, out PluginActionRegistration registration)
-                ? registration.Contribution.Preview(parameters) ?? ""
-                : "";
-        }
-        catch
-        {
-            return "";
-        }
-    }
+    /// <summary>预览文案。插件回调同样经过活动调用租约，失败时返回空串。</summary>
+    public static string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters) =>
+        Runtime.PreviewAction(fullId, parameters);
 
     /// <summary>
     /// 构造一条指向插件动作的 <see cref="ActionItem"/>。
@@ -658,14 +784,30 @@ internal static class PluginHost
         _preferences.DeveloperMode = enabled;
     }
 
-    public static void SetEnabled(bool enabled)
+    public static void SetEnabled(bool enabled) =>
+        SetEnabledAsync(enabled).GetAwaiter().GetResult();
+
+    public static async Task SetEnabledAsync(
+        bool enabled,
+        CancellationToken cancellationToken = default)
     {
         _enabled = enabled;
         _preferences.EnablePluginSystem = enabled;
 
-        if (!enabled)
+        if (enabled) return;
+
+        List<Task<PluginStopResult>> stops = ListInstances()
+            .Where(static instance => instance.IsLoaded)
+            .Select(instance => DisableAsync(
+                instance.PluginId,
+                PluginStopReason.PluginSystemShutdown,
+                DefaultStopGracePeriod,
+                cancellationToken))
+            .ToList();
+
+        if (stops.Count > 0)
         {
-            ShutdownAll();
+            await Task.WhenAll(stops).ConfigureAwait(false);
         }
     }
 
@@ -1012,43 +1154,37 @@ internal static class PluginHost
     /// </summary>
     public static bool InstallCandidate(PluginCandidate candidate, out string error)
     {
-        error = "";
+        PluginInstallResult result = InstallCandidateAsync(candidate).GetAwaiter().GetResult();
+        error = result.Error;
+        return result.Success;
+    }
 
+    public static async Task<PluginInstallResult> InstallCandidateAsync(
+        PluginCandidate candidate,
+        CancellationToken cancellationToken = default)
+    {
         if (candidate == null)
         {
-            error = "候选为空。";
-            return false;
+            return new PluginInstallResult { Success = false, Error = "候选为空。" };
         }
 
         if (!candidate.CanInstall)
         {
-            error = $"当前状态不允许安装：{candidate.StateText}。{candidate.Note}";
-            return false;
+            return new PluginInstallResult
+            {
+                Success = false,
+                Error = $"当前状态不允许安装：{candidate.StateText}。{candidate.Note}",
+            };
         }
 
         PluginScanResult scan = candidate.Scan;
         if (scan.Manifest == null)
         {
-            error = "识别结果里没有清单，无法安装。";
-            return false;
-        }
-
-        string pluginId = scan.Manifest.Id;
-
-        // 覆盖安装必须先让文件解锁。插件是惰性加载的（Preload 默认 false），
-        // 但一旦用户已经用过它的动作，程序集就被加载、文件就被占用，
-        // 此时直接覆盖只会得到一句「文件被占用」——对用户就是「更新失败，原因不明」。
-        // 这里主动停用再装：对用户始终只是「一次点击」。
-        PluginInstance? existing = Find(pluginId);
-        if (existing is { IsLoaded: true })
-        {
-            AppLogger.LogInfo($"[plugin] 覆盖安装 {pluginId} 前先行停用以解除文件占用");
-            Disable(pluginId, out _);
+            return new PluginInstallResult { Success = false, Error = "识别结果里没有清单，无法安装。" };
         }
 
         var options = new PluginInstallOptions
         {
-            // 能走到这个按钮前，用户已经在候选卡片上看过说明并点了确认。
             Acknowledged = true,
             OverwriteExisting = true,
             EnableAfterInstall = true,
@@ -1058,16 +1194,9 @@ internal static class PluginHost
                 : new List<string>(),
         };
 
-        PluginInstallResult result = CommitInstall(scan, options);
-        if (!result.Success)
-        {
-            error = result.Error;
-            ScanCandidates();
-            return false;
-        }
-
+        PluginInstallResult result = await CommitInstallAsync(scan, options, cancellationToken).ConfigureAwait(false);
         ScanCandidates();
-        return true;
+        return result;
     }
 
     /// <summary>重新扫描单个插件（用户点了「刷新」）。</summary>

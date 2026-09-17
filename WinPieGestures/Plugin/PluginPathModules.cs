@@ -70,14 +70,21 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
 {
     private readonly PluginCatalog _catalog;
     private readonly PluginActivationCoordinator _activation;
+    private readonly PluginCallCoordinator _calls;
 
-    public ActionExecutionPathModule(PluginCatalog catalog, PluginActivationCoordinator activation)
+    public ActionExecutionPathModule(
+        PluginCatalog catalog,
+        PluginActivationCoordinator activation,
+        PluginCallCoordinator calls)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _activation = activation ?? throw new ArgumentNullException(nameof(activation));
+        _calls = calls ?? throw new ArgumentNullException(nameof(calls));
     }
 
     public override string PathId => PluginPathIds.ActionExecution;
+
+    public override void OnPluginStopping(string pluginId) => _catalog.RevokeAll(pluginId);
 
     public PluginActionValidation Validate(ActionItem? action)
     {
@@ -100,6 +107,33 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
         {
             AppLogger.LogError("[plugin] 参数校验流程异常（已放行）", ex);
             return new PluginActionValidation();
+        }
+    }
+
+    public string Preview(string fullId, IReadOnlyDictionary<string, string> parameters)
+    {
+        try
+        {
+            if (!_catalog.TryGetAction(fullId, out PluginActionRegistration registration)) return "";
+            PluginInstance? instance = _activation.FindInstance(registration.PluginId);
+            if (instance == null ||
+                !_calls.TryAcquireInvocation(
+                    instance,
+                    PluginCallKind.ActionPreview,
+                    out PluginInvocationLease? lease,
+                    out _))
+            {
+                return "";
+            }
+
+            using (lease)
+            {
+                return registration.Contribution.Preview(parameters) ?? "";
+            }
+        }
+        catch
+        {
+            return "";
         }
     }
 
@@ -147,10 +181,10 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
             };
         }
 
-        return PluginInvoker.Invoke(instance, registration, request.Parameters);
+        return PluginInvoker.Invoke(instance, registration, request.Parameters, _calls);
     }
 
-    private static PluginActionValidation ValidateResolved(
+    private PluginActionValidation ValidateResolved(
         PluginActionRegistration registration,
         IReadOnlyDictionary<string, string> parameters)
     {
@@ -158,15 +192,35 @@ internal sealed class ActionExecutionPathModule : PluginPathModule
             PluginParameterValidator.Validate(registration.Parameters, parameters);
 
         string? pluginMessage = null;
-        try
+        PluginInstance? instance = _activation.FindInstance(registration.PluginId);
+        PluginInvocationLease? lease = null;
+        if (instance == null)
         {
-            string? result = registration.Contribution.Validate(parameters);
-            if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result.Trim();
+            pluginMessage = "插件实例已不存在。";
         }
-        catch (Exception ex)
+        else if (!_calls.TryAcquireInvocation(
+                     instance,
+                     PluginCallKind.ActionValidation,
+                     out lease,
+                     out string leaseError))
         {
-            AppLogger.LogError($"[plugin] 动作 {registration.FullId} 的参数校验抛出异常", ex);
-            pluginMessage = $"插件自身的校验逻辑出错：{ex.GetBaseException().Message}（这是插件的问题，请反馈给插件作者）";
+            pluginMessage = leaseError;
+        }
+        else
+        {
+            using (lease)
+            {
+                try
+                {
+                    string? result = registration.Contribution.Validate(parameters);
+                    if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result.Trim();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.LogError($"[plugin] 动作 {registration.FullId} 的参数校验抛出异常", ex);
+                    pluginMessage = $"插件自身的校验逻辑出错：{ex.GetBaseException().Message}（这是插件的问题，请反馈给插件作者）";
+                }
+            }
         }
 
         return new PluginActionValidation
@@ -194,10 +248,20 @@ internal sealed class PluginInteractionEventEnvelope
 internal sealed class InteractionEventPathModule : PluginPathModule
 {
     private readonly object _gate = new();
+    private readonly PluginActivationCoordinator _activation;
+    private readonly PluginCallCoordinator _calls;
     private readonly Dictionary<string, List<Action<ActionContext>>> _wheelOpeningHandlers =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<Action>> _wheelClosedHandlers =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public InteractionEventPathModule(
+        PluginActivationCoordinator activation,
+        PluginCallCoordinator calls)
+    {
+        _activation = activation ?? throw new ArgumentNullException(nameof(activation));
+        _calls = calls ?? throw new ArgumentNullException(nameof(calls));
+    }
 
     public override string PathId => PluginPathIds.InteractionEvent;
 
@@ -237,30 +301,52 @@ internal sealed class InteractionEventPathModule : PluginPathModule
 
     public void RaiseWheelOpening(ActionContext context)
     {
-        foreach (Action<ActionContext> handler in SnapshotWheelOpeningHandlers())
+        foreach ((string pluginId, Action<ActionContext> handler) in SnapshotWheelOpeningHandlers())
         {
-            try
+            PluginInstance? instance = _activation.FindInstance(pluginId);
+            if (instance == null ||
+                !_calls.TryAcquireInvocation(
+                    instance,
+                    PluginCallKind.InteractionEvent,
+                    out PluginInvocationLease? lease,
+                    out _))
             {
-                handler(context);
+                continue;
             }
-            catch (Exception ex)
+
+            using (lease)
             {
-                AppLogger.LogError("[plugin] OnWheelOpening 回调异常（已拦截）", ex);
+                try { handler(context); }
+                catch (Exception ex)
+                {
+                    AppLogger.LogError($"[plugin:{pluginId}] OnWheelOpening 回调异常（已拦截）", ex);
+                }
             }
         }
     }
 
     public void RaiseWheelClosed()
     {
-        foreach (Action handler in SnapshotWheelClosedHandlers())
+        foreach ((string pluginId, Action handler) in SnapshotWheelClosedHandlers())
         {
-            try
+            PluginInstance? instance = _activation.FindInstance(pluginId);
+            if (instance == null ||
+                !_calls.TryAcquireInvocation(
+                    instance,
+                    PluginCallKind.InteractionEvent,
+                    out PluginInvocationLease? lease,
+                    out _))
             {
-                handler();
+                continue;
             }
-            catch (Exception ex)
+
+            using (lease)
             {
-                AppLogger.LogError("[plugin] OnWheelClosed 回调异常（已拦截）", ex);
+                try { handler(); }
+                catch (Exception ex)
+                {
+                    AppLogger.LogError($"[plugin:{pluginId}] OnWheelClosed 回调异常（已拦截）", ex);
+                }
             }
         }
     }
@@ -303,22 +389,28 @@ internal sealed class InteractionEventPathModule : PluginPathModule
         }
     }
 
-    private Action<ActionContext>[] SnapshotWheelOpeningHandlers()
+    private (string PluginId, Action<ActionContext> Handler)[] SnapshotWheelOpeningHandlers()
     {
         lock (_gate)
         {
-            var handlers = new List<Action<ActionContext>>();
-            foreach (List<Action<ActionContext>> list in _wheelOpeningHandlers.Values) handlers.AddRange(list);
+            var handlers = new List<(string, Action<ActionContext>)>();
+            foreach (KeyValuePair<string, List<Action<ActionContext>>> pair in _wheelOpeningHandlers)
+            {
+                foreach (Action<ActionContext> handler in pair.Value) handlers.Add((pair.Key, handler));
+            }
             return handlers.ToArray();
         }
     }
 
-    private Action[] SnapshotWheelClosedHandlers()
+    private (string PluginId, Action Handler)[] SnapshotWheelClosedHandlers()
     {
         lock (_gate)
         {
-            var handlers = new List<Action>();
-            foreach (List<Action> list in _wheelClosedHandlers.Values) handlers.AddRange(list);
+            var handlers = new List<(string, Action)>();
+            foreach (KeyValuePair<string, List<Action>> pair in _wheelClosedHandlers)
+            {
+                foreach (Action handler in pair.Value) handlers.Add((pair.Key, handler));
+            }
             return handlers.ToArray();
         }
     }

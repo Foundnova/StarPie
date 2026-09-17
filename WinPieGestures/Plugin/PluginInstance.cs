@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using StarPie.Plugin;
 
 namespace WinPieGestures.Plugins;
@@ -21,6 +22,9 @@ internal enum PluginRuntimeState
     /// <summary>已启用且贡献点已生效。</summary>
     Active,
 
+    /// <summary>已关闭新调用入口，正在等待活动调用结束。</summary>
+    Stopping,
+
     /// <summary>运行期出错（尚未熔断）。</summary>
     Faulted,
 
@@ -35,6 +39,40 @@ internal enum PluginRuntimeState
 
     /// <summary>已停用，但 ALC 未能真正卸载，需要重启才能彻底生效。</summary>
     RequiresRestart,
+}
+
+internal enum PluginCallKind
+{
+    ActionValidation,
+    ActionPreview,
+    ActionExecution,
+    InteractionEvent,
+    WheelStructureQuery,
+}
+
+/// <summary>宿主内部的一次插件调用凭证。Dispose 表示插件代码已经真实结束。</summary>
+internal sealed class PluginInvocationLease : IDisposable
+{
+    private PluginInstance? _owner;
+
+    internal PluginInvocationLease(
+        PluginInstance owner,
+        PluginCallKind kind,
+        CancellationToken cancellationToken)
+    {
+        _owner = owner;
+        Kind = kind;
+        CancellationToken = cancellationToken;
+    }
+
+    public PluginCallKind Kind { get; }
+    public CancellationToken CancellationToken { get; }
+
+    public void Dispose()
+    {
+        PluginInstance? owner = Interlocked.Exchange(ref _owner, null);
+        owner?.ReleaseInvocation();
+    }
 }
 
 /// <summary>
@@ -53,6 +91,10 @@ internal sealed class PluginInstance
 {
     private readonly object _gate = new();
     private readonly object _loadGate = new();
+    private bool _acceptingCalls;
+    private int _activeCallCount;
+    private CancellationTokenSource _stoppingCts = new();
+    private TaskCompletionSource<bool>? _callsDrained;
 
     public PluginInstance(string pluginId, PluginRegistryEntry entry, PluginScanResult scan)
     {
@@ -154,6 +196,11 @@ internal sealed class PluginInstance
 
     public bool IsLoaded => _plugin != null;
 
+    public int ActiveCallCount
+    {
+        get { lock (_gate) return _activeCallCount; }
+    }
+
     public PluginActionRegistration[] OwnedActions { get; private set; } = Array.Empty<PluginActionRegistration>();
 
     private void SetState(PluginRuntimeState state)
@@ -162,6 +209,110 @@ internal sealed class PluginInstance
         {
             State = state;
         }
+    }
+
+    internal bool TryAcquireInvocation(
+        PluginCallKind kind,
+        out PluginInvocationLease? lease,
+        out string error)
+    {
+        lock (_gate)
+        {
+            if (!_acceptingCalls || State is PluginRuntimeState.Stopping or PluginRuntimeState.RequiresRestart)
+            {
+                lease = null;
+                error = $"插件「{Entry.Name}」正在停用，已拒绝新的调用。";
+                return false;
+            }
+
+            if (State is not (PluginRuntimeState.Active or PluginRuntimeState.Faulted))
+            {
+                lease = null;
+                error = $"插件「{Entry.Name}」当前状态为 {State}，不能执行调用。";
+                return false;
+            }
+
+            _activeCallCount++;
+            lease = new PluginInvocationLease(this, kind, _stoppingCts.Token);
+            error = "";
+            return true;
+        }
+    }
+
+    internal Task BeginStopping()
+    {
+        CancellationTokenSource cancellation;
+        Task drainTask;
+
+        lock (_gate)
+        {
+            _acceptingCalls = false;
+            if (State != PluginRuntimeState.RequiresRestart)
+            {
+                State = PluginRuntimeState.Stopping;
+            }
+
+            if (_activeCallCount == 0)
+            {
+                drainTask = Task.CompletedTask;
+            }
+            else
+            {
+                _callsDrained ??= new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                drainTask = _callsDrained.Task;
+            }
+
+            cancellation = _stoppingCts;
+        }
+
+        try { cancellation.Cancel(); } catch { }
+        return drainTask;
+    }
+
+    internal void MarkStopPending(string error)
+    {
+        lock (_gate)
+        {
+            _acceptingCalls = false;
+            RequiresRestart = true;
+            LastError = error;
+            State = PluginRuntimeState.RequiresRestart;
+        }
+    }
+
+    internal void ReleaseInvocation()
+    {
+        TaskCompletionSource<bool>? drained = null;
+        lock (_gate)
+        {
+            if (_activeCallCount <= 0) return;
+            _activeCallCount--;
+            if (_activeCallCount == 0)
+            {
+                drained = _callsDrained;
+                _callsDrained = null;
+            }
+        }
+
+        drained?.TrySetResult(true);
+    }
+
+    private void OpenInvocationGate()
+    {
+        CancellationTokenSource previous;
+        lock (_gate)
+        {
+            previous = _stoppingCts;
+            _stoppingCts = new CancellationTokenSource();
+            _callsDrained = null;
+            _activeCallCount = 0;
+            _acceptingCalls = true;
+            RequiresRestart = false;
+            State = PluginRuntimeState.Active;
+        }
+
+        try { previous.Dispose(); } catch { }
     }
 
     // ------------------------------------------------------------------ 加载
@@ -341,7 +492,7 @@ internal sealed class PluginInstance
             };
 
             _session = PluginHost.Catalog.BeginSession(PluginId);
-            _events = new PluginEventService(PluginId);
+            _events = new PluginEventService(this);
             _pluginContext = new PluginContext(
                 metadata, Directory, dataDirectory, _session, Logger, Settings, _events);
 
@@ -394,7 +545,7 @@ internal sealed class PluginInstance
                 h.LastError = null;
             });
 
-            SetState(PluginRuntimeState.Active);
+            OpenInvocationGate();
             return true;
         }
         catch (Exception ex)

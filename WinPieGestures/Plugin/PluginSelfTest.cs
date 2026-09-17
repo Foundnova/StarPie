@@ -207,25 +207,16 @@ internal static class PluginSelfTest
                 Fail("启用与调用", stageError);
             }
 
-            // ---- 5 停用 ----
-            Line("");
-            Line("[5] 停用（撤销贡献点 → 剪断订阅 → Shutdown → 卸载 ALC）");
-            sw.Restart();
-            bool disabled = PluginHost.Disable(install.PluginId, out string disableError);
-            sw.Stop();
-            Line($"  停用结果：{(disabled ? "成功" : "失败")}（{sw.Elapsed.TotalMilliseconds:F1} ms）");
-            if (!disabled) Fail("停用", disableError);
-
-            // 等延迟判定给出最终结论。同步探测常常因为调用栈还没展开而回收不掉，
-            // 不等它就会把「其实已经释放」误报成「需要重启」。
-            instance = PluginHost.Find(install.PluginId);
-            bool unloaded = instance?.WaitForUnloadVerdict(5000) ?? false;
-            Line($"  停用后状态：{instance?.State}");
-            Line($"  需要重启才能释放：{instance?.RequiresRestart}");
-            if (!unloaded)
+            // ---- 5 活动调用租约 + 异步停用 ----
+            string? leaseError = RunInvocationLeaseStopProbe(install.PluginId, Line);
+            if (leaseError != null)
             {
-                Fail("ALC 卸载", "插件程序集未被回收，停用要重启才能真正生效");
+                Fail("活动调用租约", leaseError);
             }
+
+            instance = PluginHost.Find(install.PluginId);
+            Line($"  停用后状态：{instance?.State}");
+            Line($"  活动调用数：{instance?.ActiveCallCount}");
             Line($"  剩余已注册动作：{PluginHost.GetRegisteredActions().Count} 个");
 
             if (PluginHost.GetRegisteredActions().Count != 0)
@@ -242,11 +233,14 @@ internal static class PluginSelfTest
             // ---- 6 卸载 ----
             Line("");
             Line("[6] 卸载（删除目录 + 移除登记）");
-            bool uninstalled = PluginHost.Uninstall(install.PluginId, removePluginData: true, out string uninstallError);
-            Line($"  卸载结果：{(uninstalled ? "成功" : "失败")}");
-            if (!uninstalled)
+            PluginUninstallResult uninstall = PluginHost.UninstallAsync(
+                    install.PluginId,
+                    removePluginData: true)
+                .GetAwaiter().GetResult();
+            Line($"  卸载结果：{(uninstall.Success ? "成功" : "失败")}");
+            if (!uninstall.Success)
             {
-                Fail("卸载", uninstallError);
+                Fail("卸载", uninstall.Error);
             }
             else
             {
@@ -302,7 +296,9 @@ internal static class PluginSelfTest
             if (real != null)
             {
                 // ③ 点「安装」—— 与界面上那个按钮完全同一条路
-                bool installedByCandidate = PluginHost.InstallCandidate(real, out string candidateError);
+                PluginInstallResult candidateInstall = PluginHost.InstallCandidateAsync(real).GetAwaiter().GetResult();
+                bool installedByCandidate = candidateInstall.Success;
+                string candidateError = candidateInstall.Error;
                 if (!installedByCandidate)
                 {
                     Fail("候选安装", candidateError);
@@ -391,10 +387,12 @@ internal static class PluginSelfTest
                     // 顺序和 [5]/[6] 一致，不能省掉「等回收」这一步：插件程序集还挂在
                     // 未卸载的 ALC 上时文件是锁着的，此刻删目录会失败 —— 而失败又只体现在
                     // 一个被吞掉的异常里，表现就是临时目录里一次次堆出残留沙箱。
-                    PluginHost.Disable(real.PluginId!, out _);
+                    _ = PluginHost.DisableAsync(real.PluginId!, PluginStopReason.SelfTest).GetAwaiter().GetResult();
                     PluginHost.Find(real.PluginId!)?.WaitForUnloadVerdict(5000);
 
-                    if (!PluginHost.Uninstall(real.PluginId!, removePluginData: true, out string cleanupError))
+                    PluginUninstallResult cleanup = PluginHost.UninstallAsync(real.PluginId!, removePluginData: true).GetAwaiter().GetResult();
+                    string cleanupError = cleanup.Error;
+                    if (!cleanup.Success)
                     {
                         Fail("候选安装清理", cleanupError);
                     }
@@ -436,7 +434,7 @@ internal static class PluginSelfTest
             {
                 try
                 {
-                    PluginHost.Uninstall(installedPluginId, removePluginData: true, out _);
+                    _ = PluginHost.UninstallAsync(installedPluginId, removePluginData: true).GetAwaiter().GetResult();
                 }
                 catch
                 {
@@ -871,6 +869,124 @@ internal static class PluginSelfTest
         return null;
     }
 
+    private sealed class LeaseProbeContribution : IActionContribution
+    {
+        private readonly TaskCompletionSource<ActionResult> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _entered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _cancelled =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ActionDescriptor Descriptor { get; } = new()
+        {
+            Id = "selftestLeaseProbe",
+            DisplayName = "租约自检",
+            Kind = ActionKind.Background,
+            TimeoutSeconds = 30,
+        };
+
+        public IReadOnlyList<ParameterField> Parameters => Array.Empty<ParameterField>();
+        public Task Entered => _entered.Task;
+        public Task CancellationObserved => _cancelled.Task;
+
+        public string? Validate(IReadOnlyDictionary<string, string> parameters) => null;
+        public string Preview(IReadOnlyDictionary<string, string> parameters) => "租约自检";
+
+        public async Task<ActionResult> ExecuteAsync(
+            PluginActionInput input,
+            CancellationToken cancellationToken)
+        {
+            using CancellationTokenRegistration registration =
+                cancellationToken.Register(() => _cancelled.TrySetResult(true));
+            _entered.TrySetResult(true);
+            return await _completion.Task.ConfigureAwait(false);
+        }
+
+        public void Complete() => _completion.TrySetResult(ActionResult.Ok());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string? RunInvocationLeaseStopProbe(string pluginId, Action<string> line)
+    {
+        line("");
+        line("[5] 活动调用租约与异步停用");
+
+        PluginInstance? instance = PluginHost.Find(pluginId);
+        if (instance == null || !instance.IsLoaded) return "租约测试开始前插件未加载。";
+
+        var probe = new LeaseProbeContribution();
+        var registration = new PluginActionRegistration
+        {
+            PluginId = pluginId,
+            ShortId = "selftestLeaseProbe",
+            FullId = $"{pluginId}.selftestLeaseProbe",
+            Contribution = probe,
+            DisplayName = "租约自检",
+            Kind = ActionKind.Background,
+            TimeoutSeconds = 30,
+        };
+
+        PluginExecuteOutcome queued = PluginInvoker.Invoke(
+            instance,
+            registration,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new PluginCallCoordinator());
+
+        if (!queued.QueuedToBackground || !probe.Entered.Wait(2000))
+        {
+            probe.Complete();
+            return "后台租约探针没有进入插件回调。";
+        }
+
+        line($"  后台动作已进入，活动调用数：{instance.ActiveCallCount}");
+        PluginStopResult pending = PluginHost.DisableAsync(
+                pluginId,
+                PluginStopReason.SelfTest,
+                TimeSpan.FromMilliseconds(150))
+            .GetAwaiter().GetResult();
+
+        line($"  首次停用结果：{pending.Status}，剩余调用：{pending.RemainingCalls}");
+        if (pending.Status != PluginStopStatus.Pending)
+        {
+            probe.Complete();
+            return $"活动调用未结束时停用应返回 Pending，实际为 {pending.Status}。";
+        }
+        if (!probe.CancellationObserved.Wait(2000))
+        {
+            probe.Complete();
+            return "停用没有把取消信号传给插件动作。";
+        }
+        if (instance.ActiveCallCount != 1)
+        {
+            probe.Complete();
+            return $"后台任务未结束时租约计数应为 1，实际为 {instance.ActiveCallCount}。";
+        }
+
+        if (instance.TryAcquireInvocation(
+                PluginCallKind.ActionExecution,
+                out PluginInvocationLease? unexpected,
+                out _))
+        {
+            unexpected?.Dispose();
+            probe.Complete();
+            return "插件进入停止状态后仍能取得新租约。";
+        }
+
+        probe.Complete();
+        PluginStopResult stopped = PluginHost.DisableAsync(
+                pluginId,
+                PluginStopReason.SelfTest,
+                PluginHost.DefaultStopGracePeriod)
+            .GetAwaiter().GetResult();
+
+        line($"  释放探针后停用结果：{stopped.Status}，活动调用数：{instance.ActiveCallCount}");
+        if (!stopped.IsFullyStopped) return $"释放租约后插件仍未停止：{stopped.Message}";
+        if (instance.ActiveCallCount != 0) return "停用完成后活动调用计数不为 0。";
+
+        return null;
+    }
+
     /// <summary>
     /// 模拟“重启后插件已启用但尚未加载”的首次动作调用。探针缺少必填参数，
     /// 因此只验证惰性加载与贡献查询，不会进入插件 ExecuteAsync。
@@ -928,7 +1044,9 @@ internal static class PluginSelfTest
             failure = $"插件虽然被加载，但没有进入预期的参数校验分支：{outcome.Message}";
         }
 
-        bool disabled = PluginHost.Disable(pluginId, out string disableError);
+        PluginStopResult stopResult = PluginHost.DisableAsync(pluginId, PluginStopReason.SelfTest).GetAwaiter().GetResult();
+        bool disabled = stopResult.IsFullyStopped;
+        string disableError = stopResult.Message;
         if (!disabled)
         {
             return failure ?? $"惰性加载探针结束后停用失败：{disableError}";

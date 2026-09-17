@@ -9,10 +9,11 @@
 1. [🌟 项目起源、使命与设计哲学](#1-项目起源使命与设计哲学)
 2. [🏗️ 源码架构与核心模块分工](#2-源码架构与核心模块分工)
 3. [⚙️ 核心技术机制与避坑规范](#3-核心技术机制与避坑规范)
-4. [🔄 代码生成、编译与发布流水线](#4-代码生成编译与发布流水线)
-5. [🎨 UI/UX 与视觉设计规范](#5-uiux-与视觉设计规范)
-6. [📜 版本演进与发布记录](CHANGELOG.md)
-7. [🤝 Agent 接力协作与交付验收闭环](#7-agent-接力协作与交付验收闭环)
+4. [🧩 插件系统架构与开发规范](#4-插件系统架构与开发规范)
+5. [🔄 代码生成、编译与发布流水线](#5-代码生成编译与发布流水线)
+6. [🎨 UI/UX 与视觉设计规范](#6-uiux-与视觉设计规范)
+7. [📜 版本演进与发布记录](CHANGELOG.md)
+8. [🤝 Agent 接力协作与交付验收闭环](#8-agent-接力协作与交付验收闭环)
 
 ---
 
@@ -78,8 +79,10 @@ g:\Users\2 Better\Desktop\design\
 │   │   ├── ClassicRingRenderer.cs     # 经典圆弧与圆角胶囊渲染器
 │   │   ├── CleanSectorsRenderer.cs    # 悬浮圆角矩形渲染器
 │   │   └── GlassmorphismRenderer.cs   # 液态毛玻璃渲染器
-│   └── Plugin/                    # ★ 插件系统宿主实现（详见 3.7）
+│   └── Plugin/                    # ★ 插件系统宿主实现（详见第 4 节）
 │       ├── PluginHost.cs              # 执行/校验/安装的唯一入口接缝
+│       ├── PluginRuntime.cs           # 路径注册、激活、调用与异步停用公共运行时
+│       ├── PluginPathModules.cs       # 动作/交互事件/轮盘结构三条强类型路径模块
 │       ├── PluginCatalog.cs           # 贡献点注册表 + 注册会话（暂存→提交的原子性）
 │       ├── PluginLoadContext.cs       # 可回收 ALC（停用即卸载，需重启比例是硬指标）
 │       ├── PluginInstance.cs          # 单个插件的运行时状态机与加载计量
@@ -120,6 +123,8 @@ g:\Users\2 Better\Desktop\design\
 ├── scratch/                       # 代码反编译基线与代码生成流水线工具
 │   ├── Decompiler/                # Program.cs 流水线生成器工程
 │   └── v152_decompiled/           # 反编译基线源码
+├── docs/
+│   └── plugin-system-architecture.md # 插件宿主、公共基础设施与动作路径架构文档
 ├── AGENTS.md                      # 本架构与继承开发规范
 └── CHANGELOG.md                   # 完整版本演进与发布日志
 ```
@@ -194,14 +199,19 @@ g:\Users\2 Better\Desktop\design\
 - **初始化不得产生系统副作用**：WPF 给 `CheckBox.IsChecked` 赋值时也可能触发 `Checked/Unchecked`。加载自启动状态时必须同时使用 `_isUpdatingUi`、`_isUiInitializing` 与 `_isLoadingAutoStartState` 防护，并比较已加载状态；只有用户实际修改开关时才能调用 `ConfigManager.SetAutoStart()`，严禁打开控制台时创建或删除计划任务。
 - **显式退出模式**：`App.xaml` 必须保持 `ShutdownMode="OnExplicitShutdown"`，关闭最后一个设置窗口不能结束后台 Hook 与托盘进程；只有托盘退出、提权重启或明确的应用退出流程可以调用 `Shutdown()`。
 
-### 3.7 插件系统 (`StarPie.Plugin.Abstractions` + `WinPieGestures/Plugin/`)
+---
+
+## 4. 🧩 插件系统架构与开发规范
+- **详细架构文档**：宿主分层、插件加载与原子注册、`PluginInstance` 包装、活动调用租约、异步停用和动作执行全链路统一维护在 [`docs/plugin-system-architecture.md`](docs/plugin-system-architecture.md)。
 - **三层分界，任何一层都不许越界**：
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
   - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
   - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
 - **统一调用入口与路径模块**：`PluginHost` 仍是主程序唯一接缝，其后由 `PluginRuntime` 登记并分流 `action-execution` / `interaction-event` / `wheel-structure` 路径。路径公共接口只统一生命周期通知与异常隔离，具体请求和结果必须保持强类型；严禁退化成 `Invoke(path, object)` 或中央巨型 `switch`。新增路径应注册新的 `PluginPathModule`，不得复制一套插件状态、停用和卸载逻辑。
-- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。停用必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载，实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
+- **激活机制公用、加载策略归路径所有**：`PluginActivationCoordinator` 只负责查找实例、检查启用/隔离/兼容状态、合并并发加载和执行 `PluginInstance.Load`，绝不擅自修改用户的 `Entry.Enabled` 偏好。动作执行允许对“已启用但未加载”的插件惰性加载；交互事件不得因广播而加载插件；轮盘结构将来只允许按明确 Provider 引用有条件加载并配合缓存回退。用户停用、更新与卸载必须先把 `Entry.Enabled=false` 落盘，再开始撤销与卸载；插件系统总开关和应用退出只停止当前运行时，不得清空插件自身的启用偏好。实例级加载锁内还要复核一次，防止停用与首次调用交错后重新拉起插件。
 - **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
+- **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
+- **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
 - **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
   1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
   2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
@@ -241,13 +251,13 @@ g:\Users\2 Better\Desktop\design\
 
 ---
 
-## 4. 🔄 代码生成、编译与发布流水线
+## 5. 🔄 代码生成、编译与发布流水线
 
-### 4.1 代码构建与修改原则
+### 5.1 代码构建与修改原则
 - **优先直接维护 `WinPieGestures/` 源码**：项目源码已完整解耦，可以直接在 `WinPieGestures` 中进行修改、扩展与调试。
 - **流水线工具 `scratch/Decompiler/Program.cs`**：当需要批量从基线生成或大范围重构时，同步维护 `Program.cs` 并通过 `dotnet run --project scratch/Decompiler` 生成源码。
 
-### 4.2 标准构建与发布命令集
+### 5.2 标准构建与发布命令集
 ```powershell
 # 1. 编译 Release 版本并校验 0 错误
 dotnet build "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release
@@ -266,7 +276,7 @@ dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r w
 powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Lightweight\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Lightweight-win-x64.zip' -Force; Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Standalone-win-x64.zip' -Force"
 ```
 
-### 4.3 版本号同步五要素检查清单 (Version Sync Checklist)
+### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：
 1. `WinPieGestures.csproj`：`<Version>X.Y.Z</Version>`, `<AssemblyVersion>X.Y.Z.0</AssemblyVersion>`, `<FileVersion>X.Y.Z.0</FileVersion>`
 2. `App.xaml.cs`：启动日志中的 `StarPie vX.Y.Z` 回退文本
@@ -276,9 +286,9 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
 
 ---
 
-## 5. 🎨 UI/UX 与视觉设计规范
+## 6. 🎨 UI/UX 与视觉设计规范
 
-### 5.1 界面布局与卡片规范 (Settings Console)
+### 6.1 界面布局与卡片规范 (Settings Console)
 - **四标签页导航**：
   1. 🎨 **外观与形态**：主轮盘/二级轮盘尺寸、内径、外径、倒角、图标大小、文字字号、切削形态（经典圆弧、圆角胶囊、极简扇区、蜂巢六边形）、主题与自定义配色面板；
   2. ⚡ **手势与动作**：触发按键（右键/中键/侧键）、多级轮盘总开关、二级菜单展示样式（外圈子环 / 蜂窝扇）、动作映射列表（支持 `[ ⚙️ 拼装 ]` 与直接录入）；
@@ -288,19 +298,19 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
   - 位于主界面右侧常驻，支持鼠标悬停、扇区高亮动画即时反馈；
   - 顶部配备 `[ 🔘 一级主轮盘配置    🌟 二级级联轮盘配置 ]` 分段切换开关，左侧尺寸与配色面板随之联动。
 
-### 5.2 深色模式高对比度规范
+### 6.2 深色模式高对比度规范
 - 在极夜曜黑（`ObsidianDark`）与钛金深灰（`TitaniumGray`）主题下：
   - 标题、常规文本与开关控件文字的前景颜色必须严格绑定为高亮度白色（`#F8FAFC` / `#FFFFFF`）；
   - 严禁出现与背景色（`#0F172A` / `#18181B`）对比度低于 4.5:1 的灰暗文字。
 
-### 5.3 对话框与子窗口自包含规范
+### 6.3 对话框与子窗口自包含规范
 - 所有弹窗（如 `HotkeyBuilderDialog`、`InputDialog`、`ColorPickerWindow`）：
   - 必须在 `<Window.Resources>` 内置完整的自包含按钮与控件样式；
   - 必须在构造函数中调用 `AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System")`，跟随主程序主题。
 
 ---
 
-### 6. 📜 版本演进与发布记录
+## 7. 📜 版本演进与发布记录
 
 完整的版本发布时间、功能新增、问题修复与架构演进记录统一维护在：
 
@@ -310,7 +320,7 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
 
 ---
 
-## 7. 🤝 Agent 接力协作与交付验收闭环
+## 8. 🤝 Agent 接力协作与交付验收闭环
 
 当新的 AI Agent 会话开始时，请务必执行以下**五步交付闭环**：
 

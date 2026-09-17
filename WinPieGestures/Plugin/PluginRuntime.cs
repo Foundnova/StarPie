@@ -125,6 +125,8 @@ internal enum PluginActivationStatus
     Disabled,
     Quarantined,
     Incompatible,
+    Stopping,
+    RequiresRestart,
     LoadFailed,
 }
 
@@ -154,6 +156,8 @@ internal sealed class PluginActivationCoordinator
         _findInstance = findInstance ?? throw new ArgumentNullException(nameof(findInstance));
         _isPluginSystemEnabled = isPluginSystemEnabled ?? throw new ArgumentNullException(nameof(isPluginSystemEnabled));
     }
+
+    public PluginInstance? FindInstance(string pluginId) => _findInstance(pluginId);
 
     public PluginActivationResult EnsureLoaded(
         string pluginId,
@@ -187,6 +191,22 @@ internal sealed class PluginActivationCoordinator
                 string.IsNullOrWhiteSpace(instance.LastError)
                     ? $"插件「{instance.Entry.Name}」与当前宿主不兼容。"
                     : instance.LastError!);
+        }
+
+        if (instance.State == PluginRuntimeState.Stopping)
+        {
+            return Failure(
+                PluginActivationStatus.Stopping,
+                instance,
+                $"插件「{instance.Entry.Name}」正在停止，暂时不能重新加载。");
+        }
+
+        if (instance.RequiresRestart || instance.State == PluginRuntimeState.RequiresRestart)
+        {
+            return Failure(
+                PluginActivationStatus.RequiresRestart,
+                instance,
+                $"插件「{instance.Entry.Name}」的旧运行时尚未释放，请重启 StarPie 后再启用。");
         }
 
         if (requireEnabled && !instance.Entry.Enabled)
@@ -236,12 +256,55 @@ internal sealed class PluginActivationCoordinator
     };
 }
 
+internal enum PluginStopReason
+{
+    UserDisabled,
+    Reload,
+    Update,
+    Uninstall,
+    PluginSystemShutdown,
+    ApplicationExit,
+    SelfTest,
+}
+
+internal enum PluginStopStatus
+{
+    AlreadyStopped,
+    Stopped,
+    Pending,
+    RequiresRestart,
+    Failed,
+}
+
+internal sealed class PluginStopResult
+{
+    public PluginStopStatus Status { get; init; }
+    public string PluginId { get; init; } = "";
+    public string Message { get; init; } = "";
+    public int RemainingCalls { get; init; }
+
+    public bool IsFullyStopped => Status is PluginStopStatus.AlreadyStopped or PluginStopStatus.Stopped;
+}
+
+internal sealed class PluginUninstallResult
+{
+    public bool Success { get; init; }
+    public string Error { get; init; } = "";
+}
+
 /// <summary>
 /// 三条路径共享的调用协调器。当前先统一异常隔离和诊断入口；后续活动调用租约、取消与超时
 /// 会在这里扩展，而不复制到每一条路径。
 /// </summary>
 internal sealed class PluginCallCoordinator
 {
+    public bool TryAcquireInvocation(
+        PluginInstance instance,
+        PluginCallKind kind,
+        out PluginInvocationLease? lease,
+        out string error) =>
+        instance.TryAcquireInvocation(kind, out lease, out error);
+
     public T Invoke<T>(
         string pathId,
         string operation,
@@ -313,8 +376,8 @@ internal sealed class PluginRuntime
         Func<bool> isPluginSystemEnabled)
     {
         _activation = new PluginActivationCoordinator(findInstance, isPluginSystemEnabled);
-        Actions = new ActionExecutionPathModule(catalog, _activation);
-        Interactions = new InteractionEventPathModule();
+        Actions = new ActionExecutionPathModule(catalog, _activation, _calls);
+        Interactions = new InteractionEventPathModule(_activation, _calls);
         WheelStructures = new WheelStructurePathModule();
 
         _paths.Register(Actions);
@@ -337,6 +400,9 @@ internal sealed class PluginRuntime
         _activation.EnsureLoaded(pluginId, reason, requireEnabled);
 
     public PluginActionValidation ValidateActionParameters(ActionItem? action) => Actions.Validate(action);
+
+    public string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters) =>
+        Actions.Preview(fullId, parameters);
 
     public PluginExecuteOutcome ExecuteAction(ActionItem action) =>
         _calls.Invoke(

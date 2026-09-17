@@ -6014,7 +6014,7 @@ public partial class SettingsWindow : Window
 		SwitchToTab(5);
 	}
 
-	private void FocusReloadPluginBtn_Click(object sender, RoutedEventArgs e)
+	private async void FocusReloadPluginBtn_Click(object sender, RoutedEventArgs e)
 	{
 		ActionItem? item = GetCurrentFocusActionItem();
 		StarPie.Plugin.PluginActionRef? reference = item?.PluginActionRef;
@@ -6032,12 +6032,16 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		// 进程内插件无法原地热替换 —— 已加载的程序集不会被重新读取。
-		// 必须走「停用 → 启用」才会真正把磁盘上的新二进制加载进来。
-		if (!PluginHost.Disable(reference.PluginId, out string disableError))
+		PluginStopResult stop = await PluginHost.DisableAsync(
+			reference.PluginId,
+			PluginStopReason.Reload,
+			PluginHost.DefaultStopGracePeriod);
+
+		if (!stop.IsFullyStopped)
 		{
-			System.Windows.MessageBox.Show(this, $"停用失败：{disableError}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			System.Windows.MessageBox.Show(this,
+				$"旧插件尚未完全停止，不能重新加载：\n\n{stop.Message}",
+				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
@@ -6048,17 +6052,8 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		PluginInstance? reloaded = PluginHost.Find(reference.PluginId);
 		PluginHost.NotifyUser("StarPie 插件", $"{reference.PluginId} 已重新加载。");
-
-		if (reloaded?.RequiresRestart == true)
-		{
-			System.Windows.MessageBox.Show(this,
-				$"{reference.PluginId} 已重新加载，但旧程序集未能立即从内存释放，需要重启 StarPie 才能完全生效。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
-		}
-
-		UpdateFocusEditorUi();
+		RefreshPluginManagerUi();
 	}
 
 	// ==================== 🧩 插件与扩展 ====================
@@ -6198,7 +6193,7 @@ public partial class SettingsWindow : Window
 	}
 
 	/// <summary>点候选卡片上的「安装 / 更新 / 降级安装」。</summary>
-	private void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
+	private async void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not System.Windows.Controls.Button button) return;
 		string? dllPath = button.Tag as string;
@@ -6218,9 +6213,10 @@ public partial class SettingsWindow : Window
 
 		if (!ConfirmCandidateInstall(candidate)) return;
 
-		bool ok = PluginHost.InstallCandidate(candidate, out string error);
+		PluginInstallResult installResult = await PluginHost.InstallCandidateAsync(candidate);
+		string error = installResult.Error;
 
-		if (!ok)
+		if (!installResult.Success)
 		{
 			System.Windows.MessageBox.Show(this,
 				$"安装失败：{error}", "StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -6228,8 +6224,7 @@ public partial class SettingsWindow : Window
 		else if (candidate.State == PluginCandidateState.Update)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"{candidate.DisplayName} 已更新到 {candidate.VersionText} 并已启用。\n\n" +
-				"如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。",
+				$"{candidate.DisplayName} 已完成安全停用、更新到 {candidate.VersionText} 并重新启用。",
 				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
@@ -6392,7 +6387,7 @@ public partial class SettingsWindow : Window
 		return false;
 	}
 
-	private void InstallPluginButton_Click(object sender, RoutedEventArgs e)
+	private async void InstallPluginButton_Click(object sender, RoutedEventArgs e)
 	{
 		if (!EnsurePluginSystemReady()) return;
 
@@ -6434,7 +6429,7 @@ public partial class SettingsWindow : Window
 		// 插件是以 StarPie 的权限在进程内跑代码的，这一步是唯一的知情同意关口。
 		if (!ConfirmPluginInstall(scan)) return;
 
-		PluginInstallResult result = PluginHost.CommitInstall(scan, new PluginInstallOptions
+		PluginInstallResult result = await PluginHost.CommitInstallAsync(scan, new PluginInstallOptions
 		{
 			Acknowledged = true,
 			OverwriteExisting = true,
@@ -6558,27 +6553,34 @@ public partial class SettingsWindow : Window
 	/// Click 只在真实交互时触发，天然规避这类误写。
 	/// </para>
 	/// </summary>
-	private void PluginSystemEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	private async void PluginSystemEnabledCheckBox_Click(object sender, RoutedEventArgs e)
 	{
 		if (PluginSystemEnabledCheckBox == null) return;
 
 		bool desired = PluginSystemEnabledCheckBox.IsChecked == true;
 		int affected = PluginHost.GetRegisteredActions().Count;
-
-		PluginHost.SetEnabled(desired);
-		RefreshPluginManagerUi();
+		PluginSystemEnabledCheckBox.IsEnabled = false;
+		try
+		{
+			await PluginHost.SetEnabledAsync(desired);
+		}
+		finally
+		{
+			PluginSystemEnabledCheckBox.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
 
 		if (!desired && affected > 0)
 		{
 			System.Windows.MessageBox.Show(this,
 				$"插件系统已关闭。\n\n" +
 				$"已经分配到轮盘上的 {affected} 个插件动作会原样保留，但触发时不会执行。\n" +
-				"重新打开开关即可恢复。",
+				"仍在运行的插件任务会收到取消信号并由宿主继续追踪。",
 				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 	}
 
-	private void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	private async void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
 	{
 		if (sender is not System.Windows.Controls.CheckBox { Tag: string pluginId } box ||
 			string.IsNullOrWhiteSpace(pluginId))
@@ -6587,23 +6589,46 @@ public partial class SettingsWindow : Window
 		}
 
 		bool desired = box.IsChecked == true;
-		bool ok = desired
-			? PluginHost.Enable(pluginId, out string error)
-			: PluginHost.Disable(pluginId, out error);
-
-		if (!ok)
+		box.IsEnabled = false;
+		try
 		{
-			System.Windows.MessageBox.Show(this,
-				$"{(desired ? "启用" : "停用")}插件 {pluginId} 失败：\n\n{error}",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
-		}
+			if (desired)
+			{
+				if (!PluginHost.Enable(pluginId, out string enableError))
+				{
+					System.Windows.MessageBox.Show(this, $"启用插件 {pluginId} 失败：\n\n{enableError}",
+						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+			}
+			else
+			{
+				PluginStopResult stop = await PluginHost.DisableAsync(
+					pluginId,
+					PluginStopReason.UserDisabled,
+					PluginHost.DefaultStopGracePeriod);
 
-		RefreshPluginManagerUi();
+				if (stop.Status == PluginStopStatus.Failed)
+				{
+					System.Windows.MessageBox.Show(this, $"停用插件 {pluginId} 失败：\n\n{stop.Message}",
+						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+				else if (!stop.IsFullyStopped)
+				{
+					System.Windows.MessageBox.Show(this, stop.Message,
+						"插件正在后台停止", MessageBoxButton.OK, MessageBoxImage.Information);
+				}
+			}
+		}
+		finally
+		{
+			box.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
 	}
 
-	private void UninstallPluginButton_Click(object sender, RoutedEventArgs e)
+	private async void UninstallPluginButton_Click(object sender, RoutedEventArgs e)
 	{
-		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } ||
+		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } button ||
 			string.IsNullOrWhiteSpace(pluginId))
 		{
 			return;
@@ -6618,13 +6643,21 @@ public partial class SettingsWindow : Window
 
 		if (choice != MessageBoxResult.Yes) return;
 
-		if (!PluginHost.Uninstall(pluginId, removePluginData: true, out string error))
+		button.IsEnabled = false;
+		try
 		{
-			System.Windows.MessageBox.Show(this, $"卸载失败：\n\n{error}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			PluginUninstallResult result = await PluginHost.UninstallAsync(pluginId, removePluginData: true);
+			if (!result.Success)
+			{
+				System.Windows.MessageBox.Show(this, $"卸载失败：\n\n{result.Error}", "StarPie 插件",
+					MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
 		}
-
-		RefreshPluginManagerUi();
+		finally
+		{
+			button.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
 	}
 
 	private void UpdateFocusActionTypeItemsSource(string? currentTag = null)
