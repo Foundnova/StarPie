@@ -561,10 +561,23 @@ internal static class PluginHost
         return result.Success;
     }
 
-    public static async Task<PluginUninstallResult> UninstallAsync(
+    public static Task<PluginUninstallResult> UninstallAsync(
         string pluginId,
         bool removePluginData,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: true, cancellationToken);
+
+    internal static Task<PluginUninstallResult> UninstallForSelfTestAsync(
+        string pluginId,
+        bool removePluginData,
+        CancellationToken cancellationToken = default) =>
+        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: false, cancellationToken);
+
+    private static async Task<PluginUninstallResult> UninstallCoreAsync(
+        string pluginId,
+        bool removePluginData,
+        bool respectBundledGuard,
+        CancellationToken cancellationToken)
     {
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
@@ -572,7 +585,7 @@ internal static class PluginHost
             return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
         }
 
-        if (instance.Entry.Bundled)
+        if (respectBundledGuard && instance.Entry.Bundled)
         {
             return new PluginUninstallResult
             {
@@ -1113,7 +1126,9 @@ internal static class PluginHost
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(file);
+            return PluginScanner.ScanSelectedDll(
+                file,
+                allowReservedIdPrefix: IsFileInsideScanRoot(file));
         }
         catch (Exception ex)
         {
@@ -1125,6 +1140,21 @@ internal static class PluginHost
                 Failure = PluginScanFailure.NotDotNetAssembly,
                 ErrorDetail = ex.Message,
             };
+        }
+    }
+
+    private static bool IsFileInsideScanRoot(string file)
+    {
+        try
+        {
+            string parent = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(Path.GetDirectoryName(file) ?? ""));
+            string scanRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(PluginPaths.ScanRoot));
+            return string.Equals(parent, scanRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1246,6 +1276,7 @@ internal static class PluginHost
             OverwriteExisting = true,
             EnableAfterInstall = true,
             SourceKind = "ScanDirectory",
+            Bundled = PluginPaths.IsReservedPluginId(scan.Manifest.Id),
             AcknowledgedCapabilities = scan.Manifest.Capabilities is { Count: > 0 } capabilities
                 ? new List<string>(capabilities)
                 : new List<string>(),
@@ -1293,7 +1324,9 @@ internal static class PluginHost
                 PluginPaths.Root,
                 string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
 
-            return PluginScanner.ScanInstalledPlugin(directory);
+            return PluginScanner.ScanInstalledPlugin(
+                directory,
+                allowReservedIdPrefix: entry.Bundled);
         }
         catch (Exception ex)
         {
