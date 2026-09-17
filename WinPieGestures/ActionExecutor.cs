@@ -741,7 +741,7 @@ public static class ActionExecutor
 		}
 	}
 
-	public static void ExecuteShellTool(string verb)
+	internal static void ExecuteShellTool(string verb)
 	{
 		if (string.IsNullOrWhiteSpace(verb)) return;
 		AppLogger.LogInfo($"Executing ShellTool verb: '{verb}'");
@@ -1374,11 +1374,11 @@ public static class ActionExecutor
 	}
 
 	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
-	private static void ExecuteCommand(string command, string? terminal)
+	internal static bool ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
 		{
-			return;
+			return false;
 		}
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
 		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
@@ -1415,16 +1415,31 @@ public static class ActionExecutor
 				});
 				break;
 			}
+
+			return true;
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
-			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
+			return false;
 		}
 	}
 
-/// <summary>切换到任务栏第 N 个窗口；参数缺失/非法默认第 1 个。全程后台线程执行（UIA 遍历/前台激活不得阻塞 UI 与钩子线程）。</summary>
-	private static void ExecuteSwitchWindow(string? parameter)
+	/// <summary>
+	/// 切换到任务栏第 N 个窗口；参数缺失/非法时默认第 1 个。
+	/// 全程在后台线程执行 —— UIA 遍历与前台激活都不得阻塞 UI 与钩子线程。
+	/// <para>
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：现在唯一的调用方是
+	/// <c>Plugins.PluginWindowService.ActivateTaskbarSlot</c>（随包动作包「切换窗口」经它过来），
+	/// 宿主界面层不直接调。
+	/// </para>
+	/// <para>
+	/// <b>刻意保持 <c>void</c>、不改成 <c>bool</c></b>：实现体把工作丢给 <c>Task.Run</c> 就返回了，
+	/// 真正的失败（第 N 个槽位不存在）发生在后台线程上，这里根本无从得知。
+	/// 与其编一个不可靠的返回值，不如把语义留空，由调用方如实说明「只表示已受理」。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteSwitchWindow(string? parameter)
 	{
 		int n = 1;
 		if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)
@@ -1766,11 +1781,11 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteSystem(string presetName)
+	internal static bool ExecuteSystem(string presetName)
 	{
 		if (string.IsNullOrEmpty(presetName))
 		{
-			return;
+			return false;
 		}
 		string text = presetName.Trim().ToLowerInvariant();
 
@@ -1780,44 +1795,44 @@ public static class ActionExecutor
 		case "taskswitcher":
 		case "alttabsticky":
 			ExecuteHotkey("Ctrl+Alt+Tab");
-			break;
+			return true;
 		case "alttab":
 		case "switchwindow":
 			ExecuteHotkey("Alt+Tab");
-			break;
+			return true;
 		case "closewindow":
 			ExecuteHotkey("Alt+F4");
-			break;
+			return true;
 		case "minimize":
 			ExecuteHotkey("Win+Down");
-			break;
+			return true;
 		case "maximize":
 			ExecuteHotkey("Win+Up");
-			break;
+			return true;
 		case "snapleft":
 			ExecuteHotkey("Win+Left");
-			break;
+			return true;
 		case "snapright":
 			ExecuteHotkey("Win+Right");
-			break;
+			return true;
 		case "taskview":
 			ExecuteHotkey("Win+Tab");
-			break;
+			return true;
 		case "prevdesktop":
 			ExecuteHotkey("Win+Ctrl+Left");
-			break;
+			return true;
 		case "nextdesktop":
 			ExecuteHotkey("Win+Ctrl+Right");
-			break;
+			return true;
 		case "showdesktop":
 			ExecuteHotkey("Win+D");
-			break;
+			return true;
 		case "fullscreen":
 			ExecuteHotkey("F11");
-			break;
+			return true;
 		case "screenshot":
 			ExecuteHotkey("Win+Shift+S");
-			break;
+			return true;
 		case "taskmanager":
 			if (!TryToggleProcessWindow("taskmgr"))
 			{
@@ -1834,7 +1849,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Ctrl+Shift+Esc");
 				}
 			}
-			break;
+			return true;
 		case "explorer":
 			try
 			{
@@ -1848,7 +1863,7 @@ public static class ActionExecutor
 			{
 				ExecuteHotkey("Win+E");
 			}
-			break;
+			return true;
 		case "opensettings":
 		case "openstarpie":
 		case "starpie":
@@ -1858,7 +1873,7 @@ public static class ActionExecutor
 			{
 				App.ShowSettingsWindow();
 			});
-			break;
+			return true;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -1875,7 +1890,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+I");
 				}
 			}
-			break;
+			return true;
 		case "calculator":
 			AppLogger.LogInfo("Launching System Calculator");
 			try
@@ -1903,13 +1918,13 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+R");
 				}
 			}
-			break;
+			return true;
 		case "rundialog":
 			ExecuteHotkey("Win+R");
-			break;
+			return true;
 		case "windowssearch":
 			ExecuteHotkey("Win+S");
-			break;
+			return true;
 		case "quicksearch":
 		case "quickfinder":
 		case "nativesearch":
@@ -1920,61 +1935,61 @@ public static class ActionExecutor
 			{
 				QuickSearchWindow.ShowOrActivate();
 			});
-			break;
+			return true;
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
-			break;
+			return true;
 		case "lockworkstation":
 		case "锁定屏幕":
 		case "锁屏":
 		case "lock":
 			LockWorkStation();
-			break;
+			return true;
 		case "volumeup":
 			SimulateSingleKey(175);
-			break;
+			return true;
 		case "volumedown":
 			SimulateSingleKey(174);
-			break;
+			return true;
 		case "volumemute":
 			SimulateSingleKey(173);
-			break;
+			return true;
 		case "playpause":
 			SimulateSingleKey(179);
-			break;
+			return true;
 		case "nexttrack":
 			SimulateSingleKey(176);
-			break;
+			return true;
 		case "prevtrack":
 			SimulateSingleKey(177);
-			break;
+			return true;
 		case "stopmedia":
 			SimulateSingleKey(178);
-			break;
+			return true;
 		case "newtab":
 			ExecuteHotkey("Ctrl+T");
-			break;
+			return true;
 		case "closetab":
 			ExecuteHotkey("Ctrl+W");
-			break;
+			return true;
 		case "reopentab":
 			ExecuteHotkey("Ctrl+Shift+T");
-			break;
+			return true;
 		case "refresh":
 			ExecuteHotkey("F5");
-			break;
+			return true;
 		case "hardrefresh":
 			ExecuteHotkey("Ctrl+F5");
-			break;
+			return true;
 		case "zoomin":
 			ExecuteHotkey("Ctrl+Plus");
-			break;
+			return true;
 		case "zoomout":
 			ExecuteHotkey("Ctrl+Minus");
-			break;
+			return true;
 		case "zoomreset":
 			ExecuteHotkey("Ctrl+0");
-			break;
+			return true;
 		case "sleep":
 		case "睡眠":
 		case "休眠":
@@ -1989,7 +2004,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "restart":
 		case "重启":
 		case "reboot":
@@ -2003,7 +2018,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "shutdown":
 		case "关机":
 		case "poweroff":
@@ -2017,7 +2032,9 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
+		default:
+			return false;
 		}
 	}
 
