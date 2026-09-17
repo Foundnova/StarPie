@@ -984,6 +984,34 @@ internal static class PluginSelfTest
                 }
             }
 
+            // ---- 3k 随包插件的登记信息随文件刷新 ----
+            //
+            // 【为什么单独守这一段】
+            // 登记表里的认领清单 / 版本 / 能力集合，全都是**首次安装那一刻的快照**。
+            // 两种常见情形会让快照永久过时：
+            //   · 随包插件升级后新增了认领 —— 新类型永远不生效；
+            //   · 把某个类型从一个包挪到另一个包（拆包）—— 旧包的老快照与新包的新声明
+            //     同时认领同一个类型，触发 RebuildClaimTable 的「多包抢同一类型 → 整对拒绝」，
+            //     **两个包的全部动作一起失效**，而用户唯一能看到的线索是日志里一行 Error。
+            //
+            // 验收标准是两条，缺一不可：
+            //   ① 登记信息必须被来源区那枚 dll 的当前元数据刷新（拆包才交割得掉）；
+            //   ② 刷新**绝不能**碰用户的选择（Enabled / Preload）——
+            //     否则它就变成了「偷偷把用户停用过的包重新启用」，比原来的 bug 更糟。
+            Line("");
+            Line("[3k] 随包插件的登记信息随文件刷新（拆包与升级的前置）");
+
+            if (bundled == null)
+            {
+                Line("  （随包插件未能登记，本段跳过 —— 上面 [3h] 已给出失败原因）");
+            }
+            else
+            {
+                // 只传 ID，不传实例：本方法会按启动顺序重跑 SyncFromDisk，
+                // 帧上不持有任何可能牵涉插件侧对象的引用（与 RunEnableAndInvoke 同一纪律）。
+                RunBundledMetadataRefreshChecks(bundledPluginId, manifest, Line, Fail);
+            }
+
             // 清理现场：走 UninstallCore(respectBundledGuard: false) 而不是用户路径 ——
             // 用户路径上的那道守卫正是本段被测的东西，拿它来收尾就成了用被测对象验证它自己。
             PluginHost.Disable(bundledPluginId, out _);
@@ -1711,6 +1739,138 @@ internal static class PluginSelfTest
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// [3k] 随包插件登记信息刷新的断言体：模拟「老用户带着过时的登记快照升级 / 拆包」。
+    /// <para>
+    /// <b>独立成方法</b>：它按真实启动顺序重跑 <c>AutoInstall → SyncFromDisk → RebuildClaimTable</c>，
+    /// 会就地更新内存实例。与 <see cref="RunTypeClaimChecks"/> 同一纪律 ——
+    /// 帧上不持有任何插件侧类型引用，否则后面「停用 → 等 ALC 回收」的结论永远是「需要重启」，
+    /// 沙箱里那份 dll 也删不掉。
+    /// </para>
+    /// </summary>
+    /// <param name="pluginId">随包插件的 ID（取自它自己的清单，不写死）。</param>
+    /// <param name="manifest">来源区那枚 dll 的真实清单 —— 它就是「文件的事实」。</param>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RunBundledMetadataRefreshChecks(
+        string pluginId,
+        PluginManifest manifest,
+        Action<string> line,
+        Action<string, string> fail)
+    {
+        PluginRegistryEntry? entry = PluginRegistryStore.FindEntry(pluginId);
+        if (entry == null)
+        {
+            fail("登记刷新", $"找不到 {pluginId} 的登记条目，刷新链路无从验证");
+            return;
+        }
+
+        // 制造一份「过时的旧快照」。
+        //
+        // 刻意用一个**此刻不存在的假类型名**，而不是「真实声明里少几项」：
+        // 后者在「登记表恰好没被刷新」时仍可能因为与真实声明部分重合而侥幸通过，
+        // 那就成了用一个必然成立的断言去证明一件没发生的事。
+        const string StaleVersion = "0.0.1-stale";
+        entry.ClaimedTypes = new List<string> { "Stale.Type=staleContribution" };
+        entry.Version = StaleVersion;
+        PluginRegistryStore.UpsertEntry(entry);
+
+        // 先记下用户的选择。刷新**只同步「文件是什么」，不同步「用户怎么选」**，
+        // 下面两个断言守的就是这条线。
+        bool enabledBefore = entry.Enabled;
+        bool preloadBefore = entry.Preload;
+
+        // 按真实启动顺序重跑。三步缺一不可、顺序也不能换 ——
+        // 认领表读的是实例上的登记条目，而实例是 SyncFromDisk 按登记表建立的。
+        PluginHost.AutoInstallBundledPlugins();
+        PluginHost.SyncFromDisk();
+        PluginHost.RebuildClaimTable();
+
+        PluginRegistryEntry? refreshed = PluginRegistryStore.FindEntry(pluginId);
+        if (refreshed == null)
+        {
+            fail("登记刷新", $"重跑启动流程后 {pluginId} 的登记条目消失了");
+            return;
+        }
+
+        List<string> expectedClaims = manifest.ClaimedTypes
+            .Where(claim => !string.IsNullOrWhiteSpace(claim.TypeName)
+                         && !string.IsNullOrWhiteSpace(claim.ContributionId))
+            .Select(claim => claim.ToWire())
+            .ToList();
+
+        var actualClaims = new HashSet<string>(
+            refreshed.ClaimedTypes ?? new List<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        line($"  旧快照（认领 1 项 / v{StaleVersion}）→ 重跑启动流程：" +
+             $"认领 {actualClaims.Count} 项 / v{refreshed.Version}｜启用 {enabledBefore}→{refreshed.Enabled}");
+
+        if (actualClaims.Count != expectedClaims.Count)
+        {
+            fail("登记刷新",
+                $"认领清单没有随文件刷新：文件声明 {expectedClaims.Count} 项，登记表里是 {actualClaims.Count} 项。" +
+                "拆包时这会让新旧两个包同时认领同一个类型，触发「整对拒绝」——两个包的动作一起失效，" +
+                "而用户唯一能看到的线索是日志里一行 Error");
+        }
+        else
+        {
+            foreach (string expected in expectedClaims)
+            {
+                if (!actualClaims.Contains(expected))
+                {
+                    fail("登记刷新",
+                        $"认领清单缺少「{expected}」—— 该类型会掉进 switch 的 default 分支，静默无反应");
+                }
+            }
+        }
+
+        if (!string.Equals(refreshed.Version, manifest.Version, StringComparison.Ordinal))
+        {
+            fail("登记刷新",
+                $"版本号没有刷新：文件是 v{manifest.Version}，登记表里还是 v{refreshed.Version} —— " +
+                "插件页会长期显示一个早已不存在的版本");
+        }
+
+        if (refreshed.Enabled != enabledBefore)
+        {
+            fail("登记刷新",
+                $"刷新登记信息时改动了用户的启用状态（{enabledBefore} → {refreshed.Enabled}）—— " +
+                "「我明明关过它」只能来自这里");
+        }
+
+        if (refreshed.Preload != preloadBefore)
+        {
+            fail("登记刷新",
+                $"刷新登记信息时改动了预加载开关（{preloadBefore} → {refreshed.Preload}）");
+        }
+
+        // 登记表字段刷新了、认领表没重建 —— 用户的动作照样解析不到。
+        // 所以还要把「新声明真的进了认领表」验掉，只比对登记表字段是不够的。
+        int routed = 0;
+        foreach (string wire in refreshed.ClaimedTypes ?? new List<string>())
+        {
+            List<PluginTypeClaim> parsed = PluginTypeClaim.ParseAll(wire, out _);
+            if (parsed.Count != 1) continue;
+
+            if (PluginHost.TryResolveClaimedType(parsed[0].TypeName, out PluginHost.PluginTypeClaimBinding binding)
+                && string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            {
+                routed++;
+            }
+            else
+            {
+                fail("登记刷新",
+                    $"认领表里没有「{parsed[0].TypeName}」（或它指向了别的插件）—— " +
+                    "登记表刷新了但认领表没跟上，配置里的动作会落进 switch 的 default");
+            }
+        }
+
+        if (routed > 0)
+        {
+            line($"  认领表已按新声明重建：{routed} 项全部路由到 {pluginId} ✓");
+        }
     }
 
     /// <summary>

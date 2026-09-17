@@ -441,9 +441,26 @@ internal static class PluginHost
 
         if (existing != null)
         {
-            // 已登记 —— 用户对它的启用/停用选择必须原样保留，一个字都不改。
-            // 唯一要做的是「文件还在不在」。
-            return RestoreBundledPayload(existing, scan);
+            // 已登记的随包插件：**文件才是权威事实来源**。
+            //
+            // 两件事都要做，且顺序不能反 —— 先让登记信息与当前这枚 dll 对齐，
+            // 再判断宿主区的副本还在不在。
+            //
+            // 【为什么必须刷新】从前这里只做「文件补回」，把登记表当成了不可变的事实。
+            // 但登记表里的认领清单、版本号、能力集合全都是**首次安装那一刻的快照**，
+            // 之后随包插件升级、或把某个类型从一个包挪到另一个包（拆包），
+            // 快照就永久过时了。过时的认领清单有两种发作方式：
+            //   · 新增的认领永远不生效（升级后功能静默缺失）；
+            //   · 旧包与新包同时认领同一个类型 —— 触发「多包抢同一类型 → 整对拒绝」，
+            //     两个包的所有动作一起失效，而用户唯一能看到的线索是日志里一行 Error。
+            // 用户对它的 Enabled / Preload 选择照旧一个字都不改，见 RefreshBundledMetadata。
+            bool refreshed = RefreshBundledMetadata(existing, scan);
+
+            // 两个动作互不相干，不能用 || 短路掉任意一个：刷新元数据成功
+            // 不代表宿主区的文件还在。
+            bool restored = RestoreBundledPayload(existing, scan);
+
+            return refreshed || restored;
         }
 
         PluginInstallResult result = CommitInstall(scan, new PluginInstallOptions
@@ -477,6 +494,120 @@ internal static class PluginHost
 
         AppLogger.LogInfo(
             $"[plugin] 已自动安装随包插件 {manifest.Id} v{manifest.Version}（来源：程序目录 {PluginPaths.ScanDirectoryName}\\）");
+        return true;
+    }
+
+    /// <summary>
+    /// 用来源区那枚 <c>.dll</c> 的<b>当前实际元数据</b>，刷新一条已登记随包插件的登记信息。
+    /// <para>
+    /// <b>只同步「文件是什么」，绝不同步「用户怎么选」。</b>
+    /// 刷新的是认领清单 / 能力集合 / 版本 / 名称 / 描述；
+    /// <c>Enabled</c> / <c>Preload</c> / <c>InstallPath</c> / <c>Bundled</c> /
+    /// <c>ExternalPath</c> / 安装与确认时间戳一律不碰。
+    /// </para>
+    /// <para>
+    /// <b>为什么认领清单必须以文件为准</b>：它是「用户配置里的 <c>Type</c> 该由谁执行」的
+    /// 唯一依据（见 <see cref="RebuildClaimTable"/>），而它的正确取值只取决于
+    /// 当前这枚 dll 声明了什么。把安装时的快照当成不可变事实，会让
+    /// 「随包插件升级后新增认领」永远不生效；而在拆包场景下更糟 ——
+    /// 旧包的快照与新包的新声明会同时认领同一个类型，触发「多包抢同一类型 → 整对拒绝」，
+    /// <b>两个包的全部动作一起失效</b>，用户侧毫无线索。
+    /// </para>
+    /// <para>
+    /// <b>不破坏「初始化不加载程序集」</b>：<paramref name="scan"/> 来自
+    /// <see cref="ScanCandidateFile"/>，是纯静态 PE 元数据读取，不执行任何插件代码。
+    /// </para>
+    /// <para>
+    /// <b>只对随包条目生效</b>：用户自己装的插件即使撞了同一个 ID，也不该被程序目录里的一枚
+    /// 同 ID 文件改写 —— 那等于开了一个「往来源区丢个 dll 就能改别人登记信息」的后门。
+    /// </para>
+    /// </summary>
+    /// <returns>登记信息是否真的发生了变化（未变化时不落盘）。</returns>
+    private static bool RefreshBundledMetadata(PluginRegistryEntry existing, PluginScanResult scan)
+    {
+        if (!existing.Bundled) return false;
+        if (!string.IsNullOrWhiteSpace(existing.ExternalPath)) return false;
+        if (scan.Manifest == null) return false;
+
+        PluginManifest manifest = scan.Manifest;
+
+        // 认领清单走 ClaimWire：非随包一律返回空表这条规则在这里同样适用，
+        // 不另开一条判断路径 —— 两处各写一份，迟早会不一致。
+        List<string> claimed = ClaimWire(manifest, bundled: true);
+
+        // 能力集合同步为清单里的当前值。随包插件的能力由发行方决定，
+        // 用户对这一项没有「逐项拒绝」的操作（要么用、要么整体停用整个包），
+        // 所以这里不需要重新征求确认；插件页显示的就是当前事实。
+        List<string> capabilities = manifest.Capabilities is { Count: > 0 }
+            ? new List<string>(manifest.Capabilities)
+            : new List<string>();
+
+        bool changed = false;
+
+        if (!SameStringList(claimed, existing.ClaimedTypes))
+        {
+            existing.ClaimedTypes = claimed;
+            changed = true;
+        }
+
+        if (!SameStringList(capabilities, existing.CapabilitiesAck))
+        {
+            existing.CapabilitiesAck = capabilities;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Version, manifest.Version, StringComparison.Ordinal))
+        {
+            existing.Version = manifest.Version;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Name, manifest.Name, StringComparison.Ordinal))
+        {
+            existing.Name = manifest.Name;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Description, manifest.Description, StringComparison.Ordinal))
+        {
+            existing.Description = manifest.Description;
+            changed = true;
+        }
+
+        if (!changed) return false;
+
+        // 只在真有变化时落盘：这个方法每次启动都会跑到，无条件写会让 registry.json 的
+        // 修改时间每次都变，备份工具与「配置是否被改过」的判断全部失去意义。
+        PluginRegistryStore.UpsertEntry(existing);
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {existing.Id} 的登记信息已按当前文件刷新为 v{existing.Version}，" +
+            $"认领 {existing.ClaimedTypes.Count} 项、能力 [{string.Join(",", existing.CapabilitiesAck)}]" +
+            $"（启用状态保持为 {existing.Enabled}，未受影响）");
+
+        return true;
+    }
+
+    /// <summary>
+    /// 两个字符串列表是否等价（忽略大小写与顺序）。
+    /// <para>
+    /// <b>刻意忽略顺序</b>：这里只想知道「该不该落盘」。清单里换个声明次序不该被当成变化 ——
+    /// 那会让每次调整 csproj 里认领串的书写顺序都触发一次不必要的写盘。
+    /// </para>
+    /// </summary>
+    private static bool SameStringList(List<string>? left, List<string>? right)
+    {
+        int leftCount = left?.Count ?? 0;
+        int rightCount = right?.Count ?? 0;
+        if (leftCount != rightCount) return false;
+        if (leftCount == 0) return true;
+
+        var set = new HashSet<string>(right!, StringComparer.OrdinalIgnoreCase);
+        foreach (string item in left!)
+        {
+            if (!set.Contains(item)) return false;
+        }
+
         return true;
     }
 
