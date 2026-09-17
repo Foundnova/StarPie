@@ -8574,6 +8574,8 @@ public partial class SettingsWindow : Window
 						IsHitTestVisible = false
 					};
 
+					// 这个判空不能删：上面的兜底块是 try { iconElement = new Path { Data = Geometry.Parse(...) } }
+					// catch { } —— 空 catch 吞掉异常时 iconElement 依然是 null。CA1508 报「恒真」是误报。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)
@@ -8626,6 +8628,7 @@ public partial class SettingsWindow : Window
 				}
 				else
 				{
+					// 同上：兜底块的 catch 会吞异常，iconElement 仍可能为 null。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)

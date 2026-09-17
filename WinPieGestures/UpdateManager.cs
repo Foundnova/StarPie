@@ -486,7 +486,7 @@ public class UpdateManager
 					Title = string.IsNullOrWhiteSpace(title) ? tag : title,
 					Body = body,
 					PublishedAt = publishedAt != default ? publishedAt : DateTime.Now,
-					IsPrerelease = isPrerelease || releaseVersion?.IsPrerelease == true,
+					IsPrerelease = isPrerelease || releaseVersion.IsPrerelease,
 					HtmlUrl = htmlUrl,
 					IsNewerVersion = isNewer,
 					StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",

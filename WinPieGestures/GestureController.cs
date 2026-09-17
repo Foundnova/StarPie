@@ -1624,6 +1624,9 @@ public class GestureController : IDisposable
 					_activeProfile.ActiveLayerIndex = nextIdx;
 					_activeProfile.SyncRootPropertiesFromActiveLayer();
 
+					// 这个判空不能删：_radialWindow 由 _uiUpdateSync 保护，且会在 hook 线程的异常路径里
+					// 被置回 null；而本段读它只持有 _mouseReleaseDebounceLock —— 两把锁不互斥，
+					// 字段确实可能在两次读之间变成 null。CA1508 报「rw != null 恒真」是跨线程字段的误报。
 					RadialWindow? rw = _radialWindow;
 					if (rw != null)
 					{
@@ -1682,6 +1685,9 @@ public class GestureController : IDisposable
 					_activeProfile.ActiveLayerIndex = nextIdx;
 					_activeProfile.SyncRootPropertiesFromActiveLayer();
 
+					// 这个判空不能删：_radialWindow 由 _uiUpdateSync 保护，且会在 hook 线程的异常路径里
+					// 被置回 null；而本段读它只持有 _mouseReleaseDebounceLock —— 两把锁不互斥，
+					// 字段确实可能在两次读之间变成 null。CA1508 报「rw != null 恒真」是跨线程字段的误报。
 					RadialWindow? rw = _radialWindow;
 					if (rw != null)
 					{
