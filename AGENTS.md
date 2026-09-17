@@ -119,9 +119,11 @@ g:\Users\2 Better\Desktop\design\
 │   ├── StarPie.Plugin.ToggleTopmost/  # 窗口置顶/取消置顶（认领 ToggleTopmost）
 │   ├── StarPie.Plugin.MoveMonitor/    # 窗口移到下一屏（认领 MoveMonitor）
 │   ├── StarPie.Plugin.WindowOpacity/  # 窗口透明度（认领 WindowOpacity）
-│   └── StarPie.Plugin.SwitchWindow/   # 切换窗口（认领 SwitchWindow）
-│       # 十个动作包一律**一个动作一个包**：拆包粒度就是停用粒度，
-│       # 用户能把「窗口透明度」关掉而继续用「平铺窗口」。
+│   ├── StarPie.Plugin.SwitchWindow/   # 切换窗口（认领 SwitchWindow）
+│   ├── StarPie.Plugin.Ocr/            # 截屏识字（认领 Ocr + 别名 ScreenOcr）
+│   └── StarPie.Plugin.System/         # 系统控制（认领 System）
+│       # 十二个动作包一律**一个动作一个包**：拆包粒度就是停用粒度，
+│       # 用户能把「窗口透明度」关掉而继续用「平铺窗口」，也能单独关掉读屏幕的「截屏识字」。
 │       # **别名必须与主类型同包**（Url / OpenFolder / ScreenOcr 三对）——
 │       # 否则同一个动作在两种写法下由不同插件执行，停用其中一个只失效一半配置。
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
@@ -283,7 +285,7 @@ g:\Users\2 Better\Desktop\design\
   - **`PluginCapabilityDeniedException` 刻意不继承 `PluginContractException`**：后者的语义是「违反注册契约」，宿主会因此把插件整体标记为加载失败并卸载；而「清单里漏了一行能力声明」远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，排查方向会完全跑偏。
   - **必须说清它换来的不是安全**：进程内插件本来就能自己 `Process.Start` / P/Invoke `SetWindowPos`，SDK 拦不住。门禁换到的是「安装确认页上展示的能力真的对应一个后果」—— 漏掉它，那个勾选在运行时没有任何对应物，才是真正骗人的地方。
   - **只能加在新接口上**。`IHostActionInvoker` 的七个方法是既有契约，补门禁会让已发布、未声明该能力的插件突然失败（破坏性变更）。
-  - **新增能力项要一次只加「有强制点的那一项」**。S3a 只加了 `WindowControl`（同时落地了它的门禁），`ScreenCapture` / `InputSimulation` 各自等 `IHostScreenCaptureService` / `IHostSystemService` 落地时再加 —— 提前加会出现「安装确认页展示了这个能力、运行时却没有任何对应物」，正是上面那条要消除的东西。
+  - **新增能力项要一次只加「有强制点的那一项」**。S3a 只加了 `WindowControl`（同时落地了它的门禁），`ScreenCapture` / `InputSimulation` 各自等 `IHostScreenCaptureService`（S4a）/ `IHostSystemService`（S4b）落地时再加（均已落地）—— 提前加会出现「安装确认页展示了这个能力、运行时却没有任何对应物」，正是上面那条要消除的东西。**配套纪律**：确认页能力文案集中在 `PluginCapabilityLabels`，枚举每加一个非空能力位必须同步加文案，自检 `[3j]` 有机器护栏 —— 文案缺失的症状是用户在确认页看到一个勾选项却读不到它意味着什么。
   - **选探针时用「注定无副作用」的调用**：`[3j]` 验门禁一律传空参数（空命令 / 空动词 / 空布局码）。这样即使门禁真的写错了、调用被放行，也只会撞上服务内部的空值短路并返回 `false`，**不会动到自检者自己的窗口或起一个真进程** —— 否则门禁一错，自检就会顺手改掉用户窗口的状态，而那时所有人都在看报错，没人会想到这个附加副作用。
 - **宿主服务面的元数据必须只有一份来源**：`PluginCommandService.Terminals` 是终端清单的**唯一事实来源**（外移后的「运行命令」动作直接读它，不在插件里另抄一份），所以不存在「宿主改了下拉、插件没跟上」的漂移。**每次访问都重取词条、不缓存** —— `I18n` 的当前语言可以在运行时切换，缓存住的话用户切到英文之后下拉里还是中文。
   - 同理 `PluginShellService.Verbs` 取 `ShellToolItem.Id`（`copy_path`）而不是 `Verb`（`Windows.CopyAsPath`）：用户配置里存的是短 ID，而 `Verb` 是执行体 `switch` 里的规范名。**传错这一个字段，动作会静默无效** —— 因为 `ExecuteShellTool` 的 `default` 分支是空的。
