@@ -2091,13 +2091,6 @@ public partial class RadialWindow : Window
 
 	private Geometry CreateSectorGeometry(double startAngleDegrees, double endAngleDegrees, double innerRadius, double outerRadius)
 	{
-		//IL_00d1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00dc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00fc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0107: Unknown result type (might be due to invalid IL or missing references)
-		//IL_010b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0125: Unknown result type (might be due to invalid IL or missing references)
 		double num = startAngleDegrees * (Math.PI / 180.0);
 		double num2 = endAngleDegrees * (Math.PI / 180.0);
 		double num3 = _canvasCenter;

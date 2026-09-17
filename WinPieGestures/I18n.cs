@@ -59,97 +59,17 @@ public static class I18n
 			}
 			return;
 		}
-		if (code != null)
+		// 反编译残留清理：原文是 ILSpy 还原结构化控制流失败后吐出的「长度 + 字符试探 + 跳转表」
+		// （31 处 `IL_xxxx` 标签跳转），这里改回它本来的形状 —— 对受支持的语言代码做精确匹配。
+		// 注意 code 为 null（配置文件里 Language 缺失）时，原实现兜底落到的同样是 ZhCn，
+		// 因此并入 `_` 分支，语义与原来逐条等价。
+		CurrentLanguage = code switch
 		{
-			int length = code.Length;
-			if (length != 2)
-			{
-				if (length != 5)
-				{
-					if (length == 7 && code == "zh-Hant")
-					{
-						goto IL_0169;
-					}
-				}
-				else
-				{
-					switch (code[3])
-					{
-					case 'T':
-						break;
-					case 'H':
-						goto IL_0100;
-					case 'U':
-						goto IL_010f;
-					case 'G':
-						goto IL_011e;
-					case 'J':
-						goto IL_012d;
-					default:
-						goto IL_0175;
-					}
-					if (code == "zh-TW")
-					{
-						goto IL_0169;
-					}
-				}
-			}
-			else
-			{
-				char c = code[0];
-				if (c != 'e')
-				{
-					if (c == 'j' && code == "ja")
-					{
-						goto IL_0171;
-					}
-				}
-				else if (code == "en")
-				{
-					goto IL_016d;
-				}
-			}
-		}
-		goto IL_0175;
-		IL_012d:
-		if (code == "ja-JP")
-		{
-			goto IL_0171;
-		}
-		goto IL_0175;
-		IL_0100:
-		if (code == "zh-HK")
-		{
-			goto IL_0169;
-		}
-		goto IL_0175;
-		IL_010f:
-		if (code == "en-US")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
-		IL_0169:
-		LanguageCode currentLanguage = LanguageCode.ZhTw;
-		goto IL_0177;
-		IL_0175:
-		currentLanguage = LanguageCode.ZhCn;
-		goto IL_0177;
-		IL_0171:
-		currentLanguage = LanguageCode.Ja;
-		goto IL_0177;
-		IL_0177:
-		CurrentLanguage = currentLanguage;
-		return;
-		IL_016d:
-		currentLanguage = LanguageCode.En;
-		goto IL_0177;
-		IL_011e:
-		if (code == "en-GB")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
+			"zh-TW" or "zh-Hant" or "zh-HK" => LanguageCode.ZhTw,
+			"en" or "en-US" or "en-GB" => LanguageCode.En,
+			"ja" or "ja-JP" => LanguageCode.Ja,
+			_ => LanguageCode.ZhCn
+		};
 	}
 
 	public static string T(string key)

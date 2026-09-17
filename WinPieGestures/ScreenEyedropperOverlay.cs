@@ -146,8 +146,6 @@ public partial class ScreenEyedropperOverlay : Window
 
 	private void ScreenEyedropperOverlay_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 	{
-		//IL_0093: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0098: Unknown result type (might be due to invalid IL or missing references)
 		if (GetCursorPos(out var lpPoint))
 		{
 			Color pixelColor = GetPixelColor(lpPoint.X, lpPoint.Y);
@@ -191,8 +189,6 @@ public partial class ScreenEyedropperOverlay : Window
 
 	private void ScreenEyedropperOverlay_KeyDown(object sender, KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0008: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 13)
 		{
 			base.DialogResult = false;

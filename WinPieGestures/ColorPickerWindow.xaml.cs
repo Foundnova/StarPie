@@ -170,7 +170,6 @@ public partial class ColorPickerWindow : Window
 
 	private void SpectrumCanvas_MouseDown(object sender, MouseButtonEventArgs e)
 	{
-		//IL_001d: Unknown result type (might be due to invalid IL or missing references)
 		if (e.LeftButton == MouseButtonState.Pressed)
 		{
 			SpectrumCanvas.CaptureMouse();
@@ -180,7 +179,6 @@ public partial class ColorPickerWindow : Window
 
 	private void SpectrumCanvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
 	{
-		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
 		if (e.LeftButton == MouseButtonState.Pressed && SpectrumCanvas.IsMouseCaptured)
 		{
 			UpdateFromSpectrumMouse(e.GetPosition(SpectrumCanvas));

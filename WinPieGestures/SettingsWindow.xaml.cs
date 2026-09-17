@@ -2651,9 +2651,6 @@ public partial class SettingsWindow : Window
 
 	private void ScheduleAutoSave()
 	{
-		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Expected O, but got Unknown
 		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
@@ -9813,28 +9810,6 @@ public partial class SettingsWindow : Window
 
 	public void ProcessRawMouseButton(string mouseButton, uint mouseData = 0u)
 	{
-		//IL_0077: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0083: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0085: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0096: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013e: Invalid comparison between Unknown and I4
-		//IL_0146: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0148: Unknown result type (might be due to invalid IL or missing references)
-		//IL_014a: Invalid comparison between Unknown and I4
-		//IL_0152: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0154: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0156: Invalid comparison between Unknown and I4
-		//IL_015e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0160: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0162: Invalid comparison between Unknown and I4
 		if ((base.IsVisible || _isRecordingTrigger || _isRecordingProcessTrigger) && ConfigManager.CurrentConfig != null)
 		{
 			string text = mouseButton switch
@@ -9931,67 +9906,6 @@ public partial class SettingsWindow : Window
 
 	private void ProcessRawKeyEvent(GlobalKeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_000a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0011: Invalid comparison between Unknown and I4
-		//IL_0024: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0029: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0082: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0087: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0090: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009b: Invalid comparison between Unknown and I4
-		//IL_00d8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00da: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c0: Invalid comparison between Unknown and I4
-		//IL_009e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Invalid comparison between Unknown and I4
-		//IL_00fd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ff: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00de: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e5: Invalid comparison between Unknown and I4
-		//IL_00c3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ca: Invalid comparison between Unknown and I4
-		//IL_0103: Unknown result type (might be due to invalid IL or missing references)
-		//IL_010a: Invalid comparison between Unknown and I4
-		//IL_00e8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ef: Invalid comparison between Unknown and I4
-		//IL_010d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0114: Invalid comparison between Unknown and I4
-		//IL_01bf: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c6: Invalid comparison between Unknown and I4
-		//IL_01c9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01d0: Invalid comparison between Unknown and I4
-		//IL_01d3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01da: Invalid comparison between Unknown and I4
-		//IL_01dd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01e4: Invalid comparison between Unknown and I4
-		//IL_01e7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ee: Invalid comparison between Unknown and I4
-		//IL_01f1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01f8: Invalid comparison between Unknown and I4
-		//IL_01fb: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0202: Invalid comparison between Unknown and I4
-		//IL_0205: Unknown result type (might be due to invalid IL or missing references)
-		//IL_020c: Invalid comparison between Unknown and I4
-		//IL_0226: Unknown result type (might be due to invalid IL or missing references)
-		//IL_022b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024f: Invalid comparison between Unknown and I4
-		//IL_0257: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0259: Unknown result type (might be due to invalid IL or missing references)
-		//IL_025b: Invalid comparison between Unknown and I4
-		//IL_0263: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0265: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0267: Invalid comparison between Unknown and I4
-		//IL_026f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0271: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0273: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 0)
 		{
 			return;
@@ -14803,8 +14717,6 @@ public partial class SettingsWindow : Window
 
 	private void NewBlacklistProcessTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0007: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 6)
 		{
 			AddBlacklistButton_Click(sender, e);
@@ -16447,7 +16359,6 @@ public partial class SettingsWindow : Window
 
 	private void RenderLiveWheelPreview()
 	{
-		//IL_09d6: Unknown result type (might be due to invalid IL or missing references)
 		if (_isRenderingPreview || LiveWheelPreviewCanvas == null || ConfigManager.CurrentConfig == null)
 		{
 			return;
