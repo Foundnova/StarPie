@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -279,6 +280,68 @@ internal sealed class PluginHostActionInvoker : IHostActionInvoker
 }
 
 /// <summary>
+/// 带能力门禁的宿主服务骨架：能力校验 + 异常包裹，两条纪律的唯一实现。
+/// <para>
+/// 三个服务（命令 / Shell 动词 / 窗口控制）的这两件事逐字相同，差别只有所需的能力标志。
+/// 抽出来不只是为了少写几行 —— 它们是<b>纪律的载体</b>，各写一份的话，
+/// 某天只修了其中两份就会得到一个行为自相矛盾的 SDK：
+/// <list type="bullet">
+/// <item><b>门禁必须先落日志再抛</b>。异常可能被插件自己的 <c>catch</c> 吞掉，
+/// 而日志是排查的第一现场 —— 否则现象只剩「按下去什么都没发生」。</item>
+/// <item><b>异常必须吞在服务内</b>。冒泡到 <c>ActionExecutor.Execute</c> 会命中它的
+/// MessageBox 分支，在无人值守时卡死唯一的动作线程。</item>
+/// </list>
+/// </para>
+/// </summary>
+internal abstract class PluginGatedService
+{
+    private readonly string _pluginId;
+    private readonly PluginCapability _capabilities;
+    private readonly PluginCapability _required;
+    private readonly string _serviceName;
+
+    protected PluginGatedService(
+        string pluginId,
+        PluginCapability capabilities,
+        PluginCapability required,
+        string serviceName)
+    {
+        _pluginId = pluginId;
+        _capabilities = capabilities;
+        _required = required;
+        _serviceName = serviceName;
+    }
+
+    /// <summary>
+    /// 校验清单能力。<b>判据是「包含」而不是「非零」</b>：一个服务将来若要两样能力，
+    /// 写成 <c>!= 0</c> 会变成「有其中任意一样就放行」。
+    /// </summary>
+    protected void RequireCapability()
+    {
+        if ((_capabilities & _required) == _required) return;
+
+        AppLogger.LogError(
+            $"[plugin:{_pluginId}] 调用了 {_serviceName}，但清单未声明 {_required} 能力，调用被拒绝。");
+
+        throw new PluginCapabilityDeniedException(_required, _serviceName, _pluginId);
+    }
+
+    /// <summary>统一包裹：插件经宿主服务触发的任何异常都不允许冒泡出去。</summary>
+    protected bool Guard(string operation, Func<bool> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError($"[plugin:{_pluginId}] {_serviceName}.{operation} 执行失败", ex);
+            return false;
+        }
+    }
+}
+
+/// <summary>
 /// 命令执行服务实现。
 /// <para>
 /// 它是 SDK 里唯一「参数即任意命令」的攻击面，所以是本项目<b>唯一带真实门禁</b>的服务：
@@ -291,15 +354,11 @@ internal sealed class PluginHostActionInvoker : IHostActionInvoker
 /// 而它其实只是不能在运行时干活而已。门禁拦的是<b>产生后果</b>的调用。
 /// </para>
 /// </summary>
-internal sealed class PluginCommandService : IHostCommandService
+internal sealed class PluginCommandService : PluginGatedService, IHostCommandService
 {
-    private readonly string _pluginId;
-    private readonly PluginCapability _capabilities;
-
     public PluginCommandService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.Process, nameof(IHostCommandService))
     {
-        _pluginId = pluginId;
-        _capabilities = capabilities;
     }
 
     /// <summary>
@@ -337,36 +396,10 @@ internal sealed class PluginCommandService : IHostCommandService
 
     public bool Run(string command, string terminal = "cmd")
     {
-        RequireCapability(nameof(IHostCommandService));
+        RequireCapability();
         if (string.IsNullOrWhiteSpace(command)) return false;
 
         return Guard(nameof(Run), () => ActionExecutor.ExecuteCommand(command, terminal ?? "cmd"));
-    }
-
-    private void RequireCapability(string serviceName)
-    {
-        if ((_capabilities & PluginCapability.Process) != 0) return;
-
-        // 先落日志再抛：异常可能被插件自己的 catch 吞掉，而日志是排查的第一现场。
-        AppLogger.LogError(
-            $"[plugin:{_pluginId}] 调用了 {serviceName}，但清单未声明 Process 能力，调用被拒绝。");
-
-        throw new PluginCapabilityDeniedException(PluginCapability.Process, serviceName, _pluginId);
-    }
-
-    private bool Guard(string operation, Func<bool> action)
-    {
-        try
-        {
-            return action();
-        }
-        catch (Exception ex)
-        {
-            // 与 PluginHostActionInvoker 同一条纪律：插件经宿主服务触发的任何异常都不允许
-            // 冒泡到 ActionExecutor.Execute —— 那里会弹 MessageBox 卡住动作线程。
-            AppLogger.LogError($"[plugin:{_pluginId}] 宿主命令服务 {operation} 执行失败", ex);
-            return false;
-        }
     }
 }
 
@@ -378,15 +411,11 @@ internal sealed class PluginCommandService : IHostCommandService
 /// 用同一个判据拦住是合适的粗粒度做法。
 /// </para>
 /// </summary>
-internal sealed class PluginShellService : IHostShellService
+internal sealed class PluginShellService : PluginGatedService, IHostShellService
 {
-    private readonly string _pluginId;
-    private readonly PluginCapability _capabilities;
-
     public PluginShellService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.Process, nameof(IHostShellService))
     {
-        _pluginId = pluginId;
-        _capabilities = capabilities;
     }
 
     /// <summary>
@@ -419,7 +448,7 @@ internal sealed class PluginShellService : IHostShellService
 
     public bool Invoke(string verb)
     {
-        RequireCapability(nameof(IHostShellService));
+        RequireCapability();
         if (string.IsNullOrWhiteSpace(verb)) return false;
 
         // 返回 true 的语义刻意保守：只表示「宿主接受了这次调用」。
@@ -428,28 +457,110 @@ internal sealed class PluginShellService : IHostShellService
         // 与其在这里编一个不可靠的成功/失败判断，不如把语义如实写窄。
         return Guard(nameof(Invoke), () => { ActionExecutor.ExecuteShellTool(verb); return true; });
     }
+}
 
-    private void RequireCapability(string serviceName)
+/// <summary>
+/// 窗口控制服务实现。
+/// <para>
+/// 门禁是 <see cref="PluginCapability.WindowControl"/> 而不是复用的 <c>Process</c>：
+/// 这批方法的后果是「用户正在用的窗口被挪走 / 被改透明 / 被切走」，
+/// 与「启动一个进程」是两类事。共用一个标签会让安装确认页对用户说一句不准确的话。
+/// </para>
+/// <para>
+/// <b>实现一律转发，不在这里重写一行</b>。执行体里有大量已经踩平的坑：
+/// DWM 失焦窗口过滤（<c>DWMWA_CLOAKED</c>、无标题与工具窗口排除）、
+/// 多显示器工作区枚举、任务栏槽位的 UIA 遍历与前台激活的线程约束。
+/// 插件自己写一遍不仅会踩同样的坑，还可能因为与主程序的全局钩子互相干扰而死循环。
+/// </para>
+/// </summary>
+internal sealed class PluginWindowService : PluginGatedService, IHostWindowService
+{
+    public PluginWindowService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.WindowControl, nameof(IHostWindowService))
     {
-        if ((_capabilities & PluginCapability.Process) != 0) return;
-
-        AppLogger.LogError(
-            $"[plugin:{_pluginId}] 调用了 {serviceName}，但清单未声明 Process 能力，调用被拒绝。");
-
-        throw new PluginCapabilityDeniedException(PluginCapability.Process, serviceName, _pluginId);
     }
 
-    private bool Guard(string operation, Func<bool> action)
+    /// <summary>
+    /// 布局清单<b>取自宿主执行体的唯一一份表</b>（<see cref="WindowTiler.LayoutKeys"/> +
+    /// <see cref="WindowTiler.LayoutDisplayName"/>），不在这里另抄。
+    /// <para>
+    /// 每次访问都重新取显示名：界面语言可在运行时切换，缓存住的话切到英文之后下拉还是中文。
+    /// 17 项的重算代价可以忽略 —— 它只在声明期与渲染期被读。
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<WindowLayoutOption> Layouts
     {
-        try
+        get
         {
-            return action();
+            var list = new List<WindowLayoutOption>(WindowTiler.LayoutKeys.Count);
+            foreach (string key in WindowTiler.LayoutKeys)
+            {
+                list.Add(new WindowLayoutOption
+                {
+                    Key = key,
+                    DisplayName = WindowTiler.LayoutDisplayName(key),
+                });
+            }
+            return list;
         }
-        catch (Exception ex)
-        {
-            AppLogger.LogError($"[plugin:{_pluginId}] 宿主 Shell 服务 {operation} 执行失败", ex);
-            return false;
-        }
+    }
+
+    public string CycleToken => WindowTiler.CycleParam;
+
+    public string CycleBackToken => WindowTiler.CycleBackParam;
+
+    public string RestoreToken => WindowTiler.RestoreParam;
+
+    public double OpacityMinPercent => WindowTiler.MinOpacityPercent;
+
+    public double OpacityMaxPercent => WindowTiler.MaxOpacityPercent;
+
+    public bool ApplyLayout(string layoutKey)
+    {
+        RequireCapability();
+        if (string.IsNullOrWhiteSpace(layoutKey)) return false;
+
+        // ExecuteTile 内部已把三个标记与具体布局码分派到各自实现，
+        // 这里不再分一遍 —— 分两处迟早会漏掉一个。
+        return Guard(nameof(ApplyLayout), () => { WindowTiler.ExecuteTile(layoutKey); return true; });
+    }
+
+    public bool ToggleTopmost()
+    {
+        RequireCapability();
+
+        // 传空串 = 切换当前置顶状态。执行体还支持 "1"/"on" 那种「强制置顶」取值，
+        // 但界面上从来只产生「切换」这一种，SDK 也就不为它发明一个参数。
+        return Guard(nameof(ToggleTopmost), () => { WindowTiler.ToggleWindowTopmost(""); return true; });
+    }
+
+    public bool MoveToNextMonitor()
+    {
+        RequireCapability();
+
+        return Guard(nameof(MoveToNextMonitor), () => { WindowTiler.MoveWindowToNextMonitor(); return true; });
+    }
+
+    public bool SetOpacity(string percent)
+    {
+        RequireCapability();
+        if (string.IsNullOrWhiteSpace(percent)) return false;
+
+        // 解析与 1~100 钳制全在执行体里，这里不重复实现 —— 参数保持字符串就是为了
+        // 让插件原样透传，避免同一个规则在两处解析（迟早不一致）。
+        return Guard(nameof(SetOpacity), () => { WindowTiler.SetWindowOpacity(percent); return true; });
+    }
+
+    public bool ActivateTaskbarSlot(int slotIndex)
+    {
+        RequireCapability();
+        if (slotIndex < 1) return false;
+
+        // 执行体内部是 Task.Run + UIA 遍历，本身就异步且不产生失败信号，
+        // 所以返回 true 的语义是「宿主已受理」而不是「窗口已切换」——
+        // 与 PluginShellService.Invoke 同一条纪律，把语义如实写窄。
+        string raw = slotIndex.ToString(CultureInfo.InvariantCulture);
+        return Guard(nameof(ActivateTaskbarSlot), () => { ActionExecutor.ExecuteSwitchWindow(raw); return true; });
     }
 }
 

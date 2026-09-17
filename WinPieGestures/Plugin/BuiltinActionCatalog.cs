@@ -154,33 +154,29 @@ internal static class BuiltinActionCatalog
 			// 「动作所属的包已停用」—— 而他压根没配过那些扇区。
 			// 所以这一个刻意不外移，哪怕它在形状上已经完全符合插件模型。
 			BuiltinActionHotkey.Create(),
+
+			// 【这两个已在路上，暂时仍由内建提供】
+			//   · Ocr    —— 等 IHostScreenCaptureService（S3c）
+			//   · System —— 等 IHostSystemService（S3d）
+			// 各自的服务面补齐后就搬走，届时本表只剩 Hotkey 一项、且是出于上一条理由。
+			// 它们是最后两个还没找到宿主服务形态的动作：System 内含直接触碰 WPF 的
+			// Dispatcher.BeginInvoke，Ocr 的执行体被四处宿主 UI 复用 ——
+			// 都不是「转发一下」就能了事的，所以排在窗口类之后单独处理。
 			BuiltinActionOcr.Create(),
 			BuiltinActionSystem.Create(),
 
-			// 【已被随包动作包认领、不再由内建提供的五个】（原登记项见 git 历史）
-			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）—— 第一批
-			//   Command / ShellTool                                           —— 第二批
+			// 【已被随包动作包认领、不再由内建提供的十个】（原登记项见 git 历史）
+			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）  —— 第一批
+			//   Command / ShellTool                                        —— 第二批
 			//     → plugins\StarPie.Plugin.BasicActions
+			//   Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow —— 第三批
+			//     → plugins\StarPie.Plugin.WindowActions
+			//
 			// 认领表由 PluginHost.RebuildClaimTable 在启动期建立，且<b>内建优先</b>：
-			// 下面这些类型只要还留在这个表里，任何插件对它们的认领都会被拒绝。
+			// 上面这些类型只要还留在这个表里，任何插件对它们的认领都会被拒绝。
 			// 反过来说，把它们从本表删掉就是「交割」本身 —— 两者必须同时发生，
-			// 否则会出现同一个 Type 挂着两条执行路径的双轨制。
-
-			// 窗口类。注意 Tile 一个 Type 承载四种语义（具体布局 / 循环 / 反向循环 / 还原），
-			// 靠 Parameter 的特殊标记区分，动作侧把它们合并成一枚 20 项的下拉 —— 见该文件的说明。
-			// 这五个都等着 IWindowService（S3），在那之前继续由内建提供。
-			BuiltinActionTile.Create(),
-			BuiltinActionToggleTopmost.Create(),
-			BuiltinActionMoveMonitor.Create(),
-			BuiltinActionWindowOpacity.Create(),
-			BuiltinActionSwitchWindow.Create(),
-
-			// 【还剩 8 个】Hotkey / Ocr / System 与上面五个窗口动作。
-			//   · Hotkey   —— 永久留在宿主：它是 Type 默认值 + 空扇区占位类型（理由见上）。
-			//   · Ocr / System 与窗口五个 —— 等 IScreenCaptureService / ISystemService /
-			//     IWindowService 三个宿主服务面补齐后即可外移（S3）。
-			// Text / String 不在这九个顶层类型里，它是给二级子动作与程序化场景用的；
-			// 是否要在界面上暴露成可选动作是另一个决定，不混进这批做。
+			// 否则会出现同一个 Type 挂着两条执行路径的双轨制：内建优先，
+			// 插件里那份代码永远不会被调用，而界面上一切正常。
 		};
 
 		var map = new Dictionary<string, BuiltinActionRegistration>(StringComparer.OrdinalIgnoreCase);

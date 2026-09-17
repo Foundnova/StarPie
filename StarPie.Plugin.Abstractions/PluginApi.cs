@@ -14,12 +14,15 @@ public static class PluginApi
     /// <item>1.1 —— 新增 <see cref="IHostCommandService"/> 与 <see cref="IHostShellService"/>，
     /// 并让 <see cref="PluginCapability.Process"/> 从「安装确认页的标签」变成真实门禁
     /// （未声明该能力的插件调用这两个服务会抛 <see cref="PluginCapabilityDeniedException"/>）。</item>
+    /// <item>1.2 —— 新增 <see cref="IHostWindowService"/>（装配到
+    /// <see cref="IPluginContext.Windows"/>）与 <see cref="PluginCapability.WindowControl"/>，
+    /// 使「平铺 / 置顶 / 透明度 / 移到下一屏 / 切换应用」这五个动作不必再硬编码在宿主里。</item>
     /// </list>
     /// </summary>
-    public const int ApiVersionMinor = 1;
+    public const int ApiVersionMinor = 2;
 
     /// <summary>
-    /// SDK 契约版本字符串，形如 <c>1.1</c>。
+    /// SDK 契约版本字符串，形如 <c>1.2</c>。
     /// <para>
     /// 这里没法用常量插值消掉重复：C# 的常量插值只接受 <c>string</c> 常量，
     /// 而版本号的两个组成部分是 <c>int</c>。所以「这个字符串」与「上面两个数字」
@@ -28,7 +31,7 @@ public static class PluginApi
     /// 漂了以后报错信息里的版本号会和真实契约对不上，排查时先被误导一轮。
     /// </para>
     /// </summary>
-    public const string ApiVersion = "1.1";
+    public const string ApiVersion = "1.2";
 
     /// <summary>本契约程序集的程序集名。宿主的 PluginLoadContext 依赖它做「共享程序集放行」。</summary>
     public const string AbstractionsAssemblyName = "StarPie.Plugin.Abstractions";

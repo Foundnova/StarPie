@@ -35,12 +35,13 @@ internal sealed class PluginContext : IPluginContext
         Icons = new PluginIconRegistry(session, metadata.Id);
         Host = new PluginHostActionInvoker(metadata.Id);
 
-        // 这两个服务带能力门禁：构造时就把清单里的 Capabilities 交给它们，
-        // 未声明 Process 的插件拿到的是一个「调用即拒绝」的对象。
+        // 这三个服务带能力门禁：构造时就把清单里的 Capabilities 交给它们，
+        // 未声明对应能力的插件拿到的是一个「调用即拒绝」的对象。
         // 判定放在服务内部而不是这里 —— 因为「未声明」与「已声明」两种情况下
-        // 服务的元数据（终端清单 / 动词清单）都应当照常可读，只有产生后果的调用该被拦。
+        // 服务的元数据（终端清单 / 动词清单 / 布局清单）都应当照常可读，只有产生后果的调用该被拦。
         Commands = new PluginCommandService(metadata.Id, metadata.Capabilities);
         Shell = new PluginShellService(metadata.Id, metadata.Capabilities);
+        Windows = new PluginWindowService(metadata.Id, metadata.Capabilities);
 
         Info = new PluginHostInfo(metadata.Capabilities);
         Notify = new PluginNotificationService(metadata.Id);
@@ -68,6 +69,8 @@ internal sealed class PluginContext : IPluginContext
     public IHostCommandService Commands { get; }
 
     public IHostShellService Shell { get; }
+
+    public IHostWindowService Windows { get; }
 
     public IHostInfo Info { get; }
 

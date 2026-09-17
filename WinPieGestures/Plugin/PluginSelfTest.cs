@@ -418,6 +418,7 @@ internal static class PluginSelfTest
             string[] migratedTypes =
             {
                 "Launch", "WebUrl", "Url", "Folder", "OpenFolder", "Command", "ShellTool",
+                "Tile", "ToggleTopmost", "MoveMonitor", "WindowOpacity", "SwitchWindow",
             };
 
             foreach (string migratedType in migratedTypes)
@@ -438,11 +439,14 @@ internal static class PluginSelfTest
                     1, "hotkey", "Ctrl+Alt+S", "快捷键"),
 
                 // 【已移出本表】Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
-                //             Command / ShellTool
+                //             Command / ShellTool  → StarPie.Plugin.BasicActions
+                //             Tile / ToggleTopmost / MoveMonitor / WindowOpacity /
+                //             SwitchWindow          → StarPie.Plugin.WindowActions
                 //
-                // 它们不再是内建动作，而是随包插件 StarPie.Plugin.BasicActions 认领的顶层类型。
+                // 它们不再是内建动作，而是随包插件认领的顶层类型。
                 // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，
-                // 不是缺陷。它们的注册 / 参数 / 投影 / 校验改由 [3i] 按认领链路验证，
+                // 不是缺陷。它们的注册 / 参数 / 投影 / 校验改由 [3i] 按认领链路验证
+                // （那段对**每个**被自检的包都跑一遍，所以新包不需要在这里补任何东西），
                 // 并且那里多验一条本表没有的：认领指向的贡献点必须真的存在。
                 ("System", null,
                     new ActionItem { Type = "System", Parameter = "Minimize" },
@@ -453,26 +457,6 @@ internal static class PluginSelfTest
                 ("Ocr", "ScreenOcr",
                     new ActionItem { Type = "Ocr" },
                     0, null, "", ""),
-
-                ("Tile", null,
-                    new ActionItem { Type = "Tile", Parameter = "2L" },
-                    1, "layout", "2L", "平铺方式"),
-
-                ("ToggleTopmost", null,
-                    new ActionItem { Type = "ToggleTopmost", Parameter = "" },
-                    0, null, "", ""),
-
-                ("MoveMonitor", null,
-                    new ActionItem { Type = "MoveMonitor", Parameter = "" },
-                    0, null, "", ""),
-
-                ("WindowOpacity", null,
-                    new ActionItem { Type = "WindowOpacity", Parameter = "80" },
-                    1, "opacity", "80", "透明度"),
-
-                ("SwitchWindow", null,
-                    new ActionItem { Type = "SwitchWindow", Parameter = "1" },
-                    1, "index", "1", "任务栏位置"),
             };
 
             int builtinVerified = 0;
@@ -714,40 +698,69 @@ internal static class PluginSelfTest
                 // default，提示文案会是「无法识别」而不是「必填」）。探针用空白 Parameter，
                 // 于是执行体根本不会被调用 —— 这正是它比旧探针好的地方：
                 // 拿一个**注定不会执行**的动作去验证派发，就不必再找了「真跑也无害」的动作。
-                dispatchNotifications.Clear();
-                ActionExecutor.Execute(new ActionItem
-                {
-                    Type = "Tile",
-                    Name = "自检探针",
-                    Parameter = "   ",
-                });
+                //
+                // 【探针类型从表里挑，不写死】这里原先是写死的 "Tile"，而 S3a 把 Tile 外移之后
+                // 这条断言立刻变成了误报 —— 它报的「掉进 default」其实是**正确行为**
+                // （那一刻认领表还没建，[3h] 才装包）。「任何具体类型名都有保质期」
+                // 这件事已经被动作外移撞过两次，所以判据改成「从内建表里找第一个带必填参数的动作」：
+                // 空白 Parameter 必然触发它的必填拦截，动作不会真的执行。
+                string? builtinProbeType = null;
 
-                if (dispatchNotifications.Count == 0)
+                foreach (BuiltinActionRegistration candidate in BuiltinActionCatalog.SnapshotAll())
+                {
+                    if (candidate.Contribution.Parameters.Any(p => p.Required))
+                    {
+                        builtinProbeType = candidate.Type;
+                        break;
+                    }
+                }
+
+                if (builtinProbeType == null)
                 {
                     Fail("端到端派发",
-                        "内建动作的参数为空时没有任何提示 —— 用户填漏一个必填项，按下去却什么都没有发生");
-                }
-                else if (dispatchNotifications[dispatchNotifications.Count - 1].Message.IndexOf("无法识别", StringComparison.Ordinal) >= 0)
-                {
-                    Fail("端到端派发", "内建动作掉进了 switch 的 default 分支 —— 内建优先这条判据没生效");
+                        "内建动作表里找不到任何带必填参数的动作 —— 本段探针无从构造（内建动作都不带必填项了？）");
                 }
                 else
                 {
-                    Line($"  内建动作校验失败：出声 ✓（{dispatchNotifications.Count} 条提示）");
-                    dispatchChecks++;
+                    dispatchNotifications.Clear();
+                    ActionExecutor.Execute(new ActionItem
+                    {
+                        Type = builtinProbeType,
+                        Name = "自检探针",
+                        Parameter = "   ",
+                    });
+
+                    if (dispatchNotifications.Count == 0)
+                    {
+                        Fail("端到端派发",
+                            "内建动作的参数为空时没有任何提示 —— 用户填漏一个必填项，按下去却什么都没有发生");
+                    }
+                    else if (dispatchNotifications[dispatchNotifications.Count - 1].Message.IndexOf("无法识别", StringComparison.Ordinal) >= 0)
+                    {
+                        Fail("端到端派发",
+                            $"内建动作「{builtinProbeType}」掉进了 switch 的 default 分支 —— 内建优先这条判据没生效");
+                    }
+                    else
+                    {
+                        Line($"  内建动作校验失败：出声 ✓（探针 {builtinProbeType}，{dispatchNotifications.Count} 条提示）");
+                        dispatchChecks++;
+                    }
                 }
 
                 // ③ 已外移的类型，在「认领表里没有它」的时点：必须出声，不能静默。
                 //
                 // 这一条正是外移动作最容易出的岔子。把动作从内建表里删掉、却没把认领建起来，
                 // 用户看到的现象与「这个动作从来没做过」完全一样；而这里能证明宿主至少说了话。
+                //
+                // 探针类型取自 [3f] 那张已外移清单，不另写一个名字 —— 用哪一个都行：
+                // 此处只需要它「此刻无人认领」（认领要等 [3h] 把随包插件装上）。
+                // 留空参数是有意的：万一将来前提被破坏、它真的被认领了，空参数也会被
+                // Validate 拦在动作体之前，探针依然无害。
                 dispatchNotifications.Clear();
                 ActionExecutor.Execute(new ActionItem
                 {
-                    Type = "Command",
+                    Type = migratedTypes[0],
                     Name = "自检探针",
-                    Parameter = "echo 不应被执行",
-                    CommandTerminal = "cmd_hidden",
                 });
 
                 if (dispatchNotifications.Count == 0)
@@ -1030,22 +1043,23 @@ internal static class PluginSelfTest
 
             // ---- 3j 宿主服务面与能力门禁 ----
             //
-            // 这一段验的是「插件干活时真正碰到的那两层宿主接口」，与具体插件无关，
+            // 这一段验的是「插件干活时真正碰到的那几层宿主接口」，与具体插件无关，
             // 所以刻意放在随包插件清理之后 —— 它不需要任何插件在场，也不加载程序集。
             //
             // 守的是一处**设计意图**，而不是某个具体实现：
             // 「安装确认页上展示的能力，真的对应一个后果」。
             //
             // 必须在这里说清的是：门禁换来的**不是安全**。进程内插件本来就能自己
-            // Process.Start，SDK 拦不住 —— 它拦的只是「让宿主替你干活」这条路径。
+            // Process.Start / P/Invoke SetWindowPos，SDK 拦不住 ——
+            // 它拦的只是「让宿主替你干活」这条路径。
             // 用户看到「本插件需要「进程」能力」与「它其实什么都能干」之间的矛盾，
             // 是进程内插件模型的固有代价；摊开写在这里，免得后来者以为这里守住了什么。
             //
             // 反过来，这条门禁要是漏了，插件清单里的能力声明就成了一句空话：
-            // 安装页照旧弹一个「需要「进程」能力」的确认框，用户点了同意，
+            // 安装页照旧弹一个「需要「窗口控制」能力」的确认框，用户点了同意，
             // 而这个勾选在运行时没有任何对应物 —— 那才是真正骗人的地方。
             Line("");
-            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词）");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制）");
 
             // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
             //
@@ -1062,12 +1076,13 @@ internal static class PluginSelfTest
             const string gateProbePluginId = "starpie.selftest.gate";
             var deniedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.None);
             var deniedShellService = new PluginShellService(gateProbePluginId, PluginCapability.None);
+            var deniedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.None);
 
-            // ② 未声明 Process：必须拒绝。
+            // ② 未声明所需能力：必须拒绝。
             //
-            // 探针传的是空命令 / 空动词 —— 但这一点都不影响结论：
+            // 探针一律传<b>空参数</b>（空命令 / 空动词 / 空布局码）—— 这一点都不影响结论：
             // 门禁是 RequireCapability 的第一件事，排在「空值短路」之前，
-            // 所以被拒绝时命令根本没被分析过。更重要的是，它证明门禁确实在 Guard **之外** ——
+            // 所以被拒绝时参数根本没被分析过。更重要的是，它证明门禁确实在 Guard **之外** ——
             // 若挪进 Guard 里，异常会被吞掉、转成一个 false 返回值，
             // 用户看到的是「命令没执行」，而不是「本插件缺少「进程」能力」。
             (bool commandDenied, string commandGateDetail) =
@@ -1092,6 +1107,23 @@ internal static class PluginSelfTest
             else
             {
                 Fail("能力门禁", $"未声明 Process 的插件调用 Shell.Invoke 没有被正确拒绝：{shellGateDetail}");
+            }
+
+            // 窗口服务用空布局码做探针还有一层额外好处：万一门禁真的漏了，
+            // 空值短路会让它返回 false —— 探针<b>不会动到自检者自己的窗口</b>。
+            // 换成 ToggleTopmost / SetOpacity 之类，门禁一旦写错就会当场改掉用户窗口的状态，
+            // 而那时自检已经在报错了，没人会想到这个额外的副作用。
+            (bool windowDenied, string windowGateDetail) =
+                ProbeCapabilityGate(() => deniedWindowService.ApplyLayout(""), PluginCapability.WindowControl);
+
+            if (windowDenied)
+            {
+                Line($"  Windows.ApplyLayout：{windowGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 WindowControl 的插件调用 Windows.ApplyLayout 没有被正确拒绝：{windowGateDetail}");
             }
 
             // ③ 声明了 Process：同一个调用必须放行。
@@ -1121,6 +1153,66 @@ internal static class PluginSelfTest
             catch (Exception gateError)
             {
                 Fail("能力门禁", $"已声明 Process 的调用抛出异常：{gateError}");
+            }
+
+            // ③b 同一个基类，三个服务必须各认自己的能力。
+            //
+            // 守的是「required 传错」：三个服务的门禁现在是同一段代码，
+            // 复制粘贴时把 WindowControl 写成 Process（或反过来）不会有任何编译错误，
+            // 而后果是「只声明了进程的插件可以任意动用户的窗口」或「合法插件全被拒」。
+            // <b>上面那些断言对这个错误照样全绿</b> —— 因为它们只验了 Process 那一对。
+            var mismatchedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.Process);
+            var mismatchedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.WindowControl);
+
+            try
+            {
+                // 空布局码：真被放行时也只会走到空值短路并返回 false，不动任何窗口。
+                bool leaked = mismatchedWindowService.ApplyLayout("");
+
+                Fail("能力门禁",
+                    $"只声明 Process 的插件调用了窗口服务却没被拒绝（返回 {leaked}）—— " +
+                    "服务认错了能力标志，安装确认页上的「窗口控制」标签形同虚设");
+            }
+            catch (PluginCapabilityDeniedException)
+            {
+                Line("  跨能力：只声明 Process 调用窗口服务仍被拒绝 ✓（各服务认自己的能力）");
+            }
+
+            try
+            {
+                mismatchedCommandService.Run("");
+                Fail("能力门禁", "只声明 WindowControl 的插件调用命令服务却没被拒绝 —— 服务认错了能力标志");
+            }
+            catch (PluginCapabilityDeniedException)
+            {
+                Line("  跨能力：只声明 WindowControl 调用命令服务仍被拒绝 ✓");
+            }
+
+            // ③c 窗口服务声明了对应能力：同样必须放行。
+            var allowedWindowService = new PluginWindowService(
+                gateProbePluginId, PluginCapability.WindowControl);
+
+            try
+            {
+                bool emptyLayoutResult = allowedWindowService.ApplyLayout("   ");
+
+                if (emptyLayoutResult)
+                {
+                    Fail("能力门禁", "空布局码竟然报告应用成功 —— 空值短路失效，用户会以为窗口被排过了");
+                }
+                else
+                {
+                    Line("  已声明 WindowControl：放行 ✓（空布局码由空值短路拦下，未真的动窗口）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁",
+                    $"已声明 WindowControl 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 WindowControl 的调用抛出异常：{gateError}");
             }
 
             // ④ 元数据不受门禁约束，这是刻意的。
@@ -1173,6 +1265,41 @@ internal static class PluginSelfTest
                 else
                 {
                     Line($"  Shell 动词清单：{shellVerbs.Count} 项，含 copy_path ✓");
+                }
+
+                // 窗口布局清单：它是「平铺窗口」动作生成下拉的<b>唯一来源</b>，
+                // 所以必须与宿主执行体那份表逐项同源（SequenceEqual 连顺序都比 ——
+                // 顺序即下拉顺序）。插件另抄一份的后果是宿主加布局之后，
+                // 「新布局在下拉里选不到」或「选了不生效」，两种都是静默失效。
+                IReadOnlyList<WindowLayoutOption> layouts = deniedWindowService.Layouts;
+
+                if (layouts.Any(l => string.IsNullOrWhiteSpace(l.Key) || string.IsNullOrWhiteSpace(l.DisplayName)))
+                {
+                    Fail("宿主服务面", "窗口布局清单里有空键或空显示名 —— 下拉里会出现一个没有文字的选项");
+                }
+                else if (!layouts.Select(l => l.Key).SequenceEqual(WindowTiler.LayoutKeys, StringComparer.OrdinalIgnoreCase))
+                {
+                    Fail("宿主服务面",
+                        $"窗口布局清单（{layouts.Count} 项）与 WindowTiler.LayoutKeys（{WindowTiler.LayoutKeys.Count} 项）" +
+                        "不一致 —— 两者已经漂了，用户会遇到「新布局选不到」或「选了不生效」");
+                }
+                else if (!string.Equals(deniedWindowService.CycleToken, WindowTiler.CycleParam, StringComparison.Ordinal)
+                    || !string.Equals(deniedWindowService.CycleBackToken, WindowTiler.CycleBackParam, StringComparison.Ordinal)
+                    || !string.Equals(deniedWindowService.RestoreToken, WindowTiler.RestoreParam, StringComparison.Ordinal))
+                {
+                    Fail("宿主服务面",
+                        "三个布局标记与 WindowTiler 的常量对不上 —— " +
+                        "「循环切换 / 循环返回 / 还原」选下去会静默无效（执行体的 switch 认的是宿主那两个常量）");
+                }
+                else if (deniedWindowService.OpacityMinPercent >= deniedWindowService.OpacityMaxPercent)
+                {
+                    Fail("宿主服务面",
+                        "透明度范围不合法（下界不小于上界）—— 插件据它生成的参数声明会把所有值都判成非法");
+                }
+                else
+                {
+                    Line($"  窗口布局清单：{layouts.Count} 项，与 WindowTiler.LayoutKeys 逐项同源 ✓" +
+                        $"（透明度 {deniedWindowService.OpacityMinPercent}~{deniedWindowService.OpacityMaxPercent}）");
                 }
             }
             catch (PluginCapabilityDeniedException deniedMeta)
@@ -2090,7 +2217,14 @@ internal static class PluginSelfTest
     /// 消息里要给出修复动作（去清单里补一行，而不是「权限不足」四个字）。
     /// </para>
     /// </summary>
-    private static (bool Denied, string Detail) ProbeCapabilityGate(Func<bool> call)
+    /// <param name="expected">
+    /// 这次调用<b>应当</b>被拦在哪一项能力上。默认 <c>Process</c>（命令 / Shell 两个服务）——
+    /// 窗口服务是 <c>WindowControl</c>。归因错了说明服务的 required 传错了，
+    /// 而那会让安装确认页上另一项能力的标签变成空话。
+    /// </param>
+    private static (bool Denied, string Detail) ProbeCapabilityGate(
+        Func<bool> call,
+        PluginCapability expected = PluginCapability.Process)
     {
         try
         {
@@ -2099,9 +2233,9 @@ internal static class PluginSelfTest
         }
         catch (PluginCapabilityDeniedException denied)
         {
-            if (denied.Capability != PluginCapability.Process)
+            if (denied.Capability != expected)
             {
-                return (false, $"拒绝时归因的能力是 {denied.Capability}，应为 Process");
+                return (false, $"拒绝时归因的能力是 {denied.Capability}，应为 {expected}");
             }
 
             if (!denied.Message.Contains("capabilities", StringComparison.OrdinalIgnoreCase))

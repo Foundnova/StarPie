@@ -52,6 +52,13 @@ public interface IPluginContext
     /// </summary>
     IHostShellService Shell { get; }
 
+    /// <summary>
+    /// 窗口控制（平铺 / 置顶 / 透明度 / 搬到下一屏 / 激活任务栏槽位）。
+    /// 执行面需要 <see cref="PluginCapability.WindowControl"/> 能力；
+    /// 元数据面（<see cref="IHostWindowService.Layouts"/> 等）始终可读，理由见该接口。
+    /// </summary>
+    IHostWindowService Windows { get; }
+
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 

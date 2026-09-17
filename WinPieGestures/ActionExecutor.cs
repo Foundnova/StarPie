@@ -1646,8 +1646,14 @@ public static class ActionExecutor
 	/// 切换到任务栏第 N 个窗口；参数缺失/非法时默认第 1 个。
 	/// 全程在后台线程执行 —— UIA 遍历与前台激活都不得阻塞 UI 与钩子线程。
 	/// <para>
-	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：内建动作「切换应用」的实现
-	/// （<c>Plugins.BuiltinActions.BuiltinActionSwitchWindow</c>）现在也走这条路。
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：现在唯一的调用方是
+	/// <c>Plugins.PluginWindowService.ActivateTaskbarSlot</c>（随包动作包「切换窗口」经它过来），
+	/// 宿主界面层不直接调。
+	/// </para>
+	/// <para>
+	/// <b>刻意保持 <c>void</c>、不改成 <c>bool</c></b>：实现体把工作丢给 <c>Task.Run</c> 就返回了，
+	/// 真正的失败（第 N 个槽位不存在）发生在后台线程上，这里根本无从得知。
+	/// 与其编一个不可靠的返回值，不如把语义留空，由调用方如实说明「只表示已受理」。
 	/// </para>
 	/// </summary>
 	internal static void ExecuteSwitchWindow(string? parameter)

@@ -4,6 +4,44 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-17（S3a：窗口类动作外移，新增第二个随包动作包）
+
+把「平铺窗口 / 窗口置顶 / 窗口透明度 / 移到下一屏 / 切换应用」五个动作搬进一枚新的随包 `.dll`，并为此新增宿主服务面 `IHostWindowService` 与能力项 `WindowControl`。这是动作全面外移的第一批 —— 与 S1、S2 不同的是，这批动作此前**在宿主里有一整套手写参数面板**，外移后参数声明与面板并存。
+
+### 🌟 核心改进与新增功能
+
+1. **新增随包动作包 `StarPie.Plugin.WindowActions`（认领 5 个顶层类型）**
+   - `tile`（平铺窗口）、`toggleTopmost`（窗口置顶）、`moveMonitor`（移到下一屏）、`windowOpacity`（窗口透明度）、`switchWindow`（切换应用），分别认领顶层类型 `Tile` / `ToggleTopmost` / `MoveMonitor` / `WindowOpacity` / `SwitchWindow`。
+   - 认领表从 7 项变成 12 项。宿主侧 `BuiltinActionCatalog` 同步删掉这五条登记，五个 `BuiltinAction*.cs` 整文件删除 —— 与 S2 同一条纪律：「加认领声明」与「删内建登记」是一次交割。
+
+2. **新增 `IHostWindowService`（装配在 `IPluginContext.Windows`）+ `PluginCapability.WindowControl`**
+   - 元数据面：`Layouts`（布局清单，**唯一来源**）、`CycleToken` / `CycleBackToken` / `RestoreToken`（三个操作标记）、`OpacityMinPercent` / `OpacityMaxPercent`。
+   - 执行面：`ApplyLayout` / `ToggleTopmost` / `MoveToNextMonitor` / `SetOpacity` / `ActivateTaskbarSlot`，未声明 `WindowControl` 时抛 `PluginCapabilityDeniedException`。
+   - **`WindowControl` 刻意与既有的 `Ui` 分开，不合并**：`Ui` 的语义是「打开自己的窗口 / 弹窗」，拿它表示「移动别人的窗口」会让安装确认页对用户说假话 —— 用户看到「界面」两个字想到的是弹个对话框，实际后果却是他正在用的窗口被挪走。新值取 `1 << 8` 而非插进枚举中间，避免改动后续所有成员的位值。
+
+3. **参数范围的唯一来源收敛到宿主**
+   - `WindowTiler` 的透明度钳制值提升为 `OpacityMin` / `OpacityMax` 常量，插件通过 `OpacityMinPercent` / `OpacityMaxPercent` 读取，`ParameterField` 的 `Min` / `Max` 由它生成。
+   - 布局清单同理：插件从 `Layouts` 现取，不在插件里另抄一份。**抄一份的后果是「宿主加了新布局、插件下拉里没有」，或反过来「插件里能选、宿主执行体不认」—— 两种都是静默失效。**
+
+### 🔧 重构
+
+- **抽出 `PluginGatedService` 基类**：第三个带门禁的服务到来时消除三重重复 —— 能力判定、拒绝时的统一日志（先落日志再抛，因为异常可能被插件自己的 `catch` 吞掉，日志是排查的第一现场）、以及不让异常冒泡到 `ActionExecutor.Execute` 的统一包裹，现在都只有一份实现。
+- **`SetOpacity` 的参数刻意是字符串而不是 `int`**：解析与钳制规则只存在于宿主执行体一处，SDK 不复制第二份。若声明成 `int`，插件就不得不先解析一遍，同一个规则于是有了两个实现 —— 迟早不一致。
+
+### 🧪 自检
+
+- `[3f]` 的「已外移类型」写死断言扩到 12 项；`builtinCases` 缩到 3 项（`System` / `Ocr` / 无参数动作）。
+- `[3g]` 的校验失败探针改为**从内建动作表现取**一个必填项动作，不再写死 `Type="Tile"` —— 写死的探针会被下一次外移动作击穿，而失败信息会指向「内建优先没生效」这个完全错误的方向。
+- `[3j]` 补 `WindowControl` 门禁断言（拒绝 / 放行 / 元数据可读三态），`ProbeCapabilityGate` 参数化到「按能力断言」，不再只认 `Process`。
+- **每个随包包都要各跑一次自检**：`[3h]`~`[3k]` 围绕传入的那一枚 dll 展开，只跑一个包会让另一个包的认领链路完全失去覆盖 —— 而那条链路的失效表现是最难查的「动作找得到归属、却永远执行不了」。
+
+### ⚙️ 构建
+
+- 随包插件的复制目标从「单枚 dll」改为**显式列举 + 缺失即报错**：来源区约定是「扁平，只放 `.dll`」，一旦某个包忘了挂进构建管线，原先的写法会安静地少拷一枚，症状是「配置里配好的窗口动作，触发时提示找不到提供方」。
+- 拷贝动作**刻意不做「整个目录一扫全拷」** —— 那会把 `StarPie.Plugin.Abstractions.dll` 一并塞进来源区，而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
+
+---
+
 ## [未发布] - 2026-09-17（S3-0：随包插件的登记信息随文件刷新）
 
 把动作继续外移、并把随包动作包拆开之前必须先补的一个地基问题：**随包插件的认领清单、版本与能力集合此前是「首次安装那一刻的快照」，之后永不更新**。

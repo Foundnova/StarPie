@@ -280,3 +280,101 @@ public interface IHostShellService
     /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.Process"/>。</exception>
     bool Invoke(string verb);
 }
+
+/// <summary>一项平铺布局。</summary>
+public sealed class WindowLayoutOption
+{
+    /// <summary>布局码，如 <c>2L</c>（左半屏）、<c>4G</c>（四宫格）。写入动作参数的就是这个值。</summary>
+    public string Key { get; init; } = "";
+
+    /// <summary>显示名（宿主已按当前语言本地化）。</summary>
+    public string DisplayName { get; init; } = "";
+}
+
+/// <summary>
+/// 宿主已验证的窗口控制能力：操作<b>其它程序</b>的前台窗口 ——
+/// 平铺、置顶、改透明度、搬到下一块显示器、激活任务栏上的第 N 个应用。
+/// <para>
+/// 需要 <see cref="PluginCapability.WindowControl"/>，否则执行面抛
+/// <see cref="PluginCapabilityDeniedException"/>。
+/// </para>
+/// <para>
+/// <b>元数据面（<see cref="Layouts"/> 与三个标记）刻意不受门禁约束</b>：
+/// 插件的 <c>Parameters</c> 是<b>属性</b>，注册期就会被读取，在那里抛异常
+/// 会让一个「忘了声明能力」的插件在注册阶段整个崩掉 —— 而它其实只是不能在运行时干活。
+/// 这与 <see cref="IHostCommandService.Terminals"/> / <see cref="IHostShellService.Verbs"/>
+/// 是同一条理由。门禁拦的是<b>产生后果</b>的调用。
+/// </para>
+/// <para>
+/// <b>同样不构成沙箱</b>：进程内插件随时可以自己 P/Invoke <c>SetWindowPos</c>。
+/// 这道门换到的是「安装确认页上的『窗口控制』标签真的对应一个后果」。
+/// </para>
+/// <para>
+/// <b>线程约束</b>：应只在 <see cref="ActionKind.Sequential"/> 类动作里调用。
+/// </para>
+/// </summary>
+public interface IHostWindowService
+{
+    /// <summary>
+    /// 可选布局清单。<b>这是布局表的唯一来源</b>——插件请直接用它生成下拉，
+    /// 不要在插件里另抄一份：抄一份的后果是「宿主加了新布局，插件下拉里没有」，
+    /// 或反过来「插件里能选，宿主执行体不认」，两种都是静默失效。
+    /// </summary>
+    IReadOnlyList<WindowLayoutOption> Layouts { get; }
+
+    /// <summary>循环切换到下一个布局的标记，作为 <see cref="ApplyLayout"/> 的参数使用。</summary>
+    string CycleToken { get; }
+
+    /// <summary>反向循环的标记。</summary>
+    string CycleBackToken { get; }
+
+    /// <summary>还原所有窗口到平铺前状态的标记。</summary>
+    string RestoreToken { get; }
+
+    /// <summary>
+    /// 透明度的合法下界（百分比）。<b>用它声明动作参数的 <c>Min</c></b>，
+    /// 不要在插件里另写一个数字：范围只该有一处定义 ——
+    /// 宿主把上界从 100 调到 90 之后，插件里那份写死的范围会继续把 95 判成合法，
+    /// 并把这个过时的范围展示给用户。
+    /// </summary>
+    double OpacityMinPercent { get; }
+
+    /// <summary>透明度的合法上界（百分比，100 = 完全不透明）。</summary>
+    double OpacityMaxPercent { get; }
+
+    /// <summary>
+    /// 应用一次平铺。<paramref name="layoutKey"/> 既可以是 <see cref="Layouts"/> 里的布局码，
+    /// 也可以是上面三个标记之一 —— 它们是「对布局的操作」，不是「一种布局」，
+    /// 但最终都由同一个执行体分派。
+    /// </summary>
+    /// <returns>是否成功发起。</returns>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
+    bool ApplyLayout(string layoutKey);
+
+    /// <summary>切换前台窗口的「始终置顶」状态。</summary>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
+    bool ToggleTopmost();
+
+    /// <summary>把前台窗口移到下一块显示器。</summary>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
+    bool MoveToNextMonitor();
+
+    /// <summary>
+    /// 设置前台窗口的不透明度。
+    /// <para>
+    /// 参数是<b>字符串</b>而不是 <c>int</c>：解析与钳制规则（1~100，非法值如何处理）
+    /// 只存在于宿主执行体一处，SDK 不复制第二份。插件的参数本来就是字符串，
+    /// 原样透传即可；若在这里声明成 <c>int</c>，插件就不得不先解析一遍，
+    /// 于是同一个规则有了两个实现 —— 迟早不一致。
+    /// </para>
+    /// </summary>
+    /// <param name="percent">1~100 的百分比字面量，例如 <c>"80"</c>。</param>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
+    bool SetOpacity(string percent);
+
+    /// <summary>
+    /// 激活任务栏上第 <paramref name="slotIndex"/> 个应用（从 1 开始，从左往右数）。
+    /// </summary>
+    /// <exception cref="PluginCapabilityDeniedException">清单未声明 <see cref="PluginCapability.WindowControl"/>。</exception>
+    bool ActivateTaskbarSlot(int slotIndex);
+}
