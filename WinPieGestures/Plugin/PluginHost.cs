@@ -393,6 +393,7 @@ internal static class PluginHost
         if (!PluginPaths.ScanRootExists) return 0;
 
         int acted = 0;
+        var stats = new BundledScanStats();
 
         try
         {
@@ -400,15 +401,19 @@ internal static class PluginHost
             string[] files = Directory.GetFiles(PluginPaths.ScanRoot, "*.dll", SearchOption.TopDirectoryOnly);
             Array.Sort(files, StringComparer.OrdinalIgnoreCase);
 
+            stats.SourceFileCount = files.Length;
+
             foreach (string file in files)
             {
                 try
                 {
-                    if (EnsureBundledPlugin(file)) acted++;
+                    if (EnsureBundledPlugin(file, stats)) acted++;
                 }
                 catch (Exception ex)
                 {
                     // 一枚坏文件绝不能拖垮启动 —— 这条路径跑在最早期，抛出去就是整个程序起不来。
+                    // 同时也算一次「没认出来」：清理逻辑会因此整体让路（见 PruneUndistributedBundledPlugins）。
+                    stats.UnrecognizedFiles++;
                     AppLogger.LogWarn($"[plugin] 随包插件 {Path.GetFileName(file)} 处理失败（已跳过）：{ex.Message}");
                 }
             }
@@ -416,13 +421,37 @@ internal static class PluginHost
         catch (Exception ex)
         {
             AppLogger.LogError("[plugin] 扫描随包插件目录失败", ex);
+
+            // 扫描本身失败 ⇒「来源区里现在有什么」这个事实本轮是不完整的。
+            // 据此清理会误删用户正常用着的包，所以直接返回，宁可不清理。
+            return acted;
         }
+
+        // 反过来的一半：来源区里**没有**的随包插件，判定为已停止分发并清理。
+        // 顺序放在这里是有意的 —— 必须在 SyncFromDisk（按登记表建实例）之前跑完，
+        // 否则被清理的包会在本次启动里先被建成实例、认领表也跟着读到它。
+        PruneUndistributedBundledPlugins(stats);
 
         return acted;
     }
 
+    /// <summary>
+    /// 本轮扫描来源区的统计。用途只有一个：给「已停止分发的随包插件」清理提供判据与守卫。
+    /// </summary>
+    private sealed class BundledScanStats
+    {
+        /// <summary>本轮在来源区里成功识别到的插件 ID。</summary>
+        public HashSet<string> SeenIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>来源区顶层 <c>*.dll</c> 的枚数。</summary>
+        public int SourceFileCount { get; set; }
+
+        /// <summary>其中没能认出来的枚数（含处理过程中抛异常的）。</summary>
+        public int UnrecognizedFiles { get; set; }
+    }
+
     /// <summary>处理随包目录里的一枚 <c>.dll</c>；返回是否真的动了登记表或磁盘。</summary>
-    private static bool EnsureBundledPlugin(string file)
+    private static bool EnsureBundledPlugin(string file, BundledScanStats stats)
     {
         PluginScanResult scan = ScanCandidateFile(file);
 
@@ -430,6 +459,7 @@ internal static class PluginHost
         {
             // 认不出来就装不上。这里必须出声：它不会出现在候选列表里（那需要扫描目录这一侧
             // 的完整分类），用户既装不上也不知道为什么，只能靠日志。
+            stats.UnrecognizedFiles++;
             AppLogger.LogWarn(
                 $"[plugin] 随包目录里的 {Path.GetFileName(file)} 无法识别，已跳过：{scan.DescribeFailure()}。" +
                 "随包插件装不上是打包问题，需要重新打包。");
@@ -437,6 +467,10 @@ internal static class PluginHost
         }
 
         PluginManifest manifest = scan.Manifest;
+
+        // 记的是「来源区里有这枚 dll」，与它最终装没装上无关 ——
+        // 清理的判据是「程序目录还在不在分发它」，装失败是另一个问题（上面那条警告负责）。
+        stats.SeenIds.Add(manifest.Id);
         PluginRegistryEntry? existing = PluginRegistryStore.FindEntry(manifest.Id);
 
         if (existing != null)
@@ -643,6 +677,166 @@ internal static class PluginHost
             $"[plugin] 随包插件 {existing.Id} 的宿主区文件缺失，已从程序目录补回" +
             $"（启用状态保持为 {existing.Enabled}，不因补文件而改变）");
         return true;
+    }
+
+    /// <summary>
+    /// 清理<b>已不再随程序分发</b>的随包插件：登记表里标着 <c>Bundled</c>，
+    /// 但本轮在来源区里已经找不到对应的 <c>.dll</c>。
+    /// <para>
+    /// <b>为什么必须有这一步</b>：拆包的必经动作是「把某个类型从一个包挪到另一个包」，
+    /// 也就是让旧包名从来源区消失。而清理之前，旧包的登记条目会原地留下，连同它的
+    /// <see cref="PluginRegistryEntry.ClaimedTypes"/> 快照一起 —— 于是旧包与新包同时认领
+    /// 同一个类型，<see cref="RebuildClaimTable"/> 判「多包抢同一类型 → 整对拒绝」，
+    /// <b>两个包的全部动作一起失效</b>，用户侧唯一的线索是日志里一行 Error。
+    /// 它还更隐蔽的一面是：旧包在宿主区的安装副本仍在，插件列表里那一行也照旧存在，
+    /// 用户完全看不出问题出在哪。这个状态叫「幽灵包」。
+    /// </para>
+    /// <para>
+    /// 与 <see cref="RefreshBundledMetadata"/> 是互补的两半，别把其中一个当成另一个的替代：
+    /// 那个负责「来源区里<b>还有</b>这枚 dll、但它的内容变了」，
+    /// 这里负责「来源区里<b>已经没有</b>这枚 dll 了」。
+    /// </para>
+    /// <para>
+    /// <b>不破坏 R1</b>：判据只用到本轮扫描已经拿到的 ID，不额外读一枚文件、不加载任何程序集。
+    /// </para>
+    /// </summary>
+    /// <returns>被清理的插件数量。</returns>
+    private static int PruneUndistributedBundledPlugins(BundledScanStats stats)
+    {
+        // 三条保守守卫，缺任何一条都可能把用户正常用着的随包插件清掉。
+        // 而「清理」在这里是**不可逆**的：来源区里那枚 dll 本来就已经不在了，没得补。
+        // 所以判据不完整时一律让路 —— 最坏的结果是留下一个幽灵包（日志里有警告），
+        // 而不是误删一个用户正在用的包。
+        if (!PluginPaths.ScanRootExists) return 0;
+
+        if (stats.SourceFileCount == 0)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] 程序目录的 {PluginPaths.ScanDirectoryName}\\ 存在但一枚 dll 都没有，" +
+                "本次跳过「已停止分发的随包插件」清理。若这是有意为之，请重新安装 StarPie。");
+            return 0;
+        }
+
+        if (stats.UnrecognizedFiles > 0)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] 来源区有 {stats.UnrecognizedFiles} 枚文件无法识别，本轮数据不完整，" +
+                "跳过「已停止分发的随包插件」清理以免误删。");
+            return 0;
+        }
+
+        List<PluginRegistryEntry> vanished;
+
+        try
+        {
+            vanished = PluginRegistryStore.SnapshotEntries()
+                .Where(entry => entry.Bundled && !stats.SeenIds.Contains(entry.Id))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 读取登记表失败，跳过「已停止分发的随包插件」清理", ex);
+            return 0;
+        }
+
+        int pruned = 0;
+
+        foreach (PluginRegistryEntry entry in vanished)
+        {
+            try
+            {
+                if (RemoveUndistributedBundled(entry)) pruned++;
+            }
+            catch (Exception ex)
+            {
+                // 一次清理失败绝不能让插件系统初始化失败（那等于整个程序起不来）。
+                AppLogger.LogWarn($"[plugin] 清理已停止分发的随包插件 {entry.Id} 失败（已跳过）：{ex.Message}");
+            }
+        }
+
+        return pruned;
+    }
+
+    /// <summary>
+    /// 抹掉一个「已停止分发」的随包插件的登记与安装副本。
+    /// <para>
+    /// <b>顺序要紧</b>：先删磁盘、后摘登记。反过来的话，一旦删目录失败，
+    /// 登记条目却已经没了，这个包就同时丧失了「被清理」与「被重建」两种可能 ——
+    /// 只剩宿主区里一堆没人认领的文件。
+    /// </para>
+    /// <para>
+    /// <b>插件私有数据保留</b>：「程序不再分发它」不等于「用户的数据该丢」。
+    /// 它将来若重新出现在来源区里，数据还在原地。
+    /// </para>
+    /// </summary>
+    private static bool RemoveUndistributedBundled(PluginRegistryEntry entry)
+    {
+        string directory = Path.Combine(
+            PluginPaths.Root,
+            string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
+
+        // 外部路径登记不归我们管。随包插件理论上不会走那条路，但 registry.json 是
+        // 用户能手改的纯文本，所以不做假设 —— 外部路径下往往就是开发者的编译输出目录。
+        bool external = !string.IsNullOrWhiteSpace(entry.ExternalPath);
+        if (!external) DeletePayloadKeepData(directory);
+
+        // 关键的一行：登记条目一去掉，它的认领快照也随之消失，
+        // 从此不可能再和新包抢同一个类型。
+        PluginRegistryStore.RemoveEntry(entry.Id);
+
+        lock (Gate)
+        {
+            // 正常时序下这里是空的（清理跑在 SyncFromDisk 之前）。留着是为了
+            // 兼容其它调用点：实例表里若还挂着一个已被清理的包，它会成为永远卸不掉的孤儿。
+            Instances.Remove(entry.Id);
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {entry.Id}「{entry.Name}」已不在程序目录的 " +
+            $"{PluginPaths.ScanDirectoryName}\\ 里，判定为已停止分发，" +
+            "已清理登记条目与宿主区安装副本（插件私有数据保留）");
+
+        return true;
+    }
+
+    /// <summary>
+    /// 删除宿主区安装目录里的程序集，但<b>保留</b> <c>data\</c> 子目录。
+    /// <para>
+    /// 单个文件删不掉（被占用、权限不足）只记警告并继续 —— 走到这里时插件还没被加载，
+    /// 正常不该出现占用；真出现了也不值得为它挂起整个目录，
+    /// 那会连 <c>data\</c> 一起带走。残留的裸 dll 不会被 <see cref="SyncFromDisk"/> 重新发现
+    /// （它只认带 <c>plugin.json</c> 的目录），登记条目也已摘掉，所以它是无害的。
+    /// </para>
+    /// </summary>
+    private static void DeletePayloadKeepData(string directory)
+    {
+        if (!Directory.Exists(directory)) return;
+
+        foreach (string file in Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogWarn($"[plugin] 删除随包安装副本 {file} 失败（已跳过）：{ex.Message}");
+            }
+        }
+
+        foreach (string sub in Directory.GetDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            if (string.Equals(Path.GetFileName(sub), "data", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                Directory.Delete(sub, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogWarn($"[plugin] 删除随包安装子目录 {sub} 失败（已跳过）：{ex.Message}");
+            }
+        }
     }
 
     // ------------------------------------------------------------------ 顶层类型认领

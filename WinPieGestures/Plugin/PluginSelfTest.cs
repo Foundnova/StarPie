@@ -1025,6 +1025,28 @@ internal static class PluginSelfTest
                 RunBundledMetadataRefreshChecks(bundledPluginId, manifest, Line, Fail);
             }
 
+            // ---- 3m 来源区不再分发即清理 ----
+            //
+            // 【为什么单独守这一段】
+            // 拆包的必经动作是「把某个类型从一个包挪到另一个包」，也就是让旧包名从来源区消失。
+            // 清理逻辑缺失时，旧包的登记条目会原地留下，连同它的认领快照 ——
+            // 于是旧包与新包同时认领同一个类型，RebuildClaimTable 判
+            // 「多包抢同一类型 → 整对拒绝」，**两个包的全部动作一起失效**，
+            // 而用户唯一能看到的线索是日志里一行 Error。
+            //
+            // 与 [3k] 是互补的两半，别把其中一个当成另一个的替代：
+            //   [3k] 守「来源区里**还有**这枚 dll、但它的内容变了」；
+            //   [3m] 守「来源区里**已经没有**这枚 dll 了」。
+            //
+            // 另一半同样要紧：**判据不完整时必须让路**。清理是不可逆的
+            // （来源区那枚 dll 本来就已经不在了，没得补），所以三种情况下不清理：
+            // 来源区不存在 / 来源区一枚 dll 都没有 / 有文件读不出来。
+            // 这一段的 ② ③ 两条断言就是这两条守卫，它们比「幽灵包被清掉」更重要 ——
+            // 误删一个用户正在用的官方包，比留下一个幽灵包糟得多。
+            Line("");
+            Line("[3m] 来源区不再分发即清理（拆包的第二个前置）");
+            RunBundledPruneChecks(Line, Fail);
+
             // 清理现场：走 UninstallCore(respectBundledGuard: false) 而不是用户路径 ——
             // 用户路径上的那道守卫正是本段被测的东西，拿它来收尾就成了用被测对象验证它自己。
             PluginHost.Disable(bundledPluginId, out _);
@@ -1997,6 +2019,175 @@ internal static class PluginSelfTest
         if (routed > 0)
         {
             line($"  认领表已按新声明重建：{routed} 项全部路由到 {pluginId} ✓");
+        }
+    }
+
+    /// <summary>
+    /// [3m] 「来源区不再分发即清理」的断言体。
+    /// <para>
+    /// <b>独立成方法</b>：它重跑启动期的「装 → 清 → 建实例 → 建认领表」，
+    /// 与 <see cref="RunBundledMetadataRefreshChecks"/> 同一纪律 —— 帧上不持有任何
+    /// 插件侧类型引用，否则后面「停用 → 等 ALC 回收」的结论永远是「需要重启」。
+    /// </para>
+    /// <para>
+    /// 它刻意<b>不依赖真实的随包插件</b>：被测的是「一条 <c>Bundled</c> 登记与来源区对不上时
+    /// 会不会被清掉」，自造一个幽灵包条目就够，而且比拿真包去测干净 ——
+    /// 真包一旦被误清，后面几段的现场全毁，症状还会出现在毫不相干的地方。
+    /// </para>
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RunBundledPruneChecks(Action<string> line, Action<string, string> fail)
+    {
+        const string ghostId = "selftest.ghost.bundled";
+        const string ghostDirectoryName = "selftest-ghost-install";
+
+        string scanRoot = PluginPaths.ScanRoot;
+        string ghostDirectory = Path.Combine(PluginPaths.Root, ghostDirectoryName);
+
+        // ① 造一个幽灵包：登记表里标着随包、宿主区有安装副本，
+        //    而来源区里根本没有这枚 dll —— 这正是拆包之后旧包留下的现场。
+        PluginRegistryStore.UpsertEntry(new PluginRegistryEntry
+        {
+            Id = ghostId,
+            Name = "自检用幽灵包",
+            Version = "0.0.1",
+            InstallPath = ghostDirectoryName,
+            Bundled = true,
+            Enabled = true,
+            ClaimedTypes = new List<string> { "Ghost.Probe=ghostProbe" },
+        });
+
+        Directory.CreateDirectory(Path.Combine(ghostDirectory, "data"));
+        File.WriteAllText(Path.Combine(ghostDirectory, "Ghost.dll"), "not a real assembly");
+        File.WriteAllText(Path.Combine(ghostDirectory, "data", "settings.json"), "{}");
+
+        List<string> bundledBefore = PluginRegistryStore.SnapshotEntries()
+            .Where(entry => entry.Bundled)
+            .Select(entry => entry.Id)
+            .ToList();
+
+        try
+        {
+            // ② 守卫一：来源区一枚 dll 都没有时**必须让路**。
+            //    清理在这里是不可逆的，判据不完整就宁可不做 —— 代价只是留下一个幽灵包。
+            string[] sourceFiles = Directory.GetFiles(scanRoot, "*.dll", SearchOption.TopDirectoryOnly);
+            string stash = Path.Combine(PluginPaths.Root, "selftest-source-stash");
+            Directory.CreateDirectory(stash);
+
+            try
+            {
+                foreach (string file in sourceFiles)
+                {
+                    File.Move(file, Path.Combine(stash, Path.GetFileName(file)));
+                }
+
+                PluginHost.AutoInstallBundledPlugins();
+            }
+            finally
+            {
+                foreach (string file in Directory.GetFiles(stash, "*.dll", SearchOption.TopDirectoryOnly))
+                {
+                    File.Move(file, Path.Combine(scanRoot, Path.GetFileName(file)));
+                }
+
+                Directory.Delete(stash, recursive: true);
+            }
+
+            if (PluginRegistryStore.FindEntry(ghostId) == null)
+            {
+                fail("来源区清理",
+                    "来源区里一枚 dll 都没有时仍然清理了随包插件 —— 判据不完整时必须让路，" +
+                    "那条清理是不可逆的（来源区那枚 dll 本来就已经不在了，没得补）");
+            }
+
+            // ③ 守卫二：来源区里有一枚读不出来的文件时，同样必须让路。
+            //    它守的是「别拿一份不完整的清单去删东西」—— 读不出来的那枚很可能就是某个官方包。
+            string brokenFile = Path.Combine(scanRoot, "selftest-broken-probe.dll");
+            File.WriteAllText(brokenFile, "this is not a PE file");
+
+            try
+            {
+                PluginHost.AutoInstallBundledPlugins();
+            }
+            finally
+            {
+                try { File.Delete(brokenFile); }
+                catch { /* 现场清理失败不该让自检失败 */ }
+            }
+
+            if (PluginRegistryStore.FindEntry(ghostId) == null)
+            {
+                fail("来源区清理",
+                    "来源区里有无法识别的文件时仍然清理了随包插件 —— 那时清单是不完整的，" +
+                    "很可能把某个官方包误判成「已停止分发」并删掉");
+            }
+
+            // ④ 判据完整时的真实清理。
+            PluginHost.AutoInstallBundledPlugins();
+
+            List<string> bundledAfter = PluginRegistryStore.SnapshotEntries()
+                .Where(entry => entry.Bundled)
+                .Select(entry => entry.Id)
+                .ToList();
+
+            line($"  幽灵包 {ghostId}：随包条目 {bundledBefore.Count} 个 → {bundledAfter.Count} 个");
+
+            if (PluginRegistryStore.FindEntry(ghostId) != null)
+            {
+                fail("来源区清理",
+                    $"来源区已不再分发 {ghostId}，它的登记条目却还在 —— 它会带着过时的认领快照" +
+                    "继续和新包抢同一个类型，认领表判「整对拒绝」后，两个包的动作一起失效");
+            }
+
+            // 反向核对：清理**只能**动该动的，别的随包条目一个都不能少。
+            // 这条与上一条同等重要 —— 误删一个用户正在用的官方包同样不可逆。
+            foreach (string id in bundledBefore)
+            {
+                if (string.Equals(id, ghostId, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!bundledAfter.Any(x => string.Equals(x, id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    fail("来源区清理",
+                        $"来源区里明明还有 {id}，它的登记条目却被清理了 —— 用户那个包会凭空消失");
+                }
+            }
+
+            // 宿主区的安装副本必须一起走：只摘登记的话，插件列表里那一行照旧存在，
+            // 用户完全看不出问题出在哪（这正是「幽灵包」难查的原因）。
+            if (File.Exists(Path.Combine(ghostDirectory, "Ghost.dll")))
+            {
+                fail("来源区清理", "幽灵包的宿主区安装副本没有被删除 —— 插件列表里那一行会照旧存在");
+            }
+
+            // 但私有数据要留：「程序不再分发它」不等于「用户的数据该丢」。
+            if (!File.Exists(Path.Combine(ghostDirectory, "data", "settings.json")))
+            {
+                fail("来源区清理",
+                    "清理时把插件私有数据一起删了 —— 它将来若重新出现在来源区里，数据本该还在原地");
+            }
+
+            // 认领表是在 [3k] 里按当时的登记表建的，那时幽灵包还不存在 ——
+            // 先重建一次，下面这条断言才有判别力（否则它只是在验证一件本来就没发生过的事）。
+            PluginHost.RebuildClaimTable();
+
+            if (PluginHost.SnapshotClaims()
+                .Any(binding => string.Equals(binding.PluginId, ghostId, StringComparison.OrdinalIgnoreCase)))
+            {
+                fail("来源区清理", "被清理的幽灵包仍在认领表里 —— 它依然会和新包抢同一个类型");
+            }
+        }
+        finally
+        {
+            try
+            {
+                PluginRegistryStore.RemoveEntry(ghostId);
+                if (Directory.Exists(ghostDirectory)) Directory.Delete(ghostDirectory, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                // 现场清理失败必须出声：否则脏现场留给下一段，症状会出现在毫不相干的地方。
+                line($"  [WARN] [3m] 现场未清理干净：{ex.Message}");
+            }
         }
     }
 
