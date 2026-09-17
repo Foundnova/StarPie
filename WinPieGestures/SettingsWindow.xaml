@@ -630,6 +630,12 @@
               <TextBlock Name="NavTab5Text" Text="插件与扩展" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
+          <RadioButton Name="NavTab5" Style="{StaticResource NavTabRadioButtonStyle}" GroupName="SidebarTabs" Tag="5" Checked="NavTab_Checked" ToolTip="{Binding Text, ElementName=NavTab5Text}">
+            <StackPanel Orientation="Horizontal">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type RadioButton}}}" Margin="0,0,14,0" Data="M20.5,11H19V7C19,5.89 18.1,5 17,5H13V3.5A2.5,2.5 0 0,0 10.5,1A2.5,2.5 0 0,0 8,3.5V5H4A2,2 0 0,0 2,7V10.8H3.5C5,10.8 6.2,12 6.2,13.5C6.2,15 5,16.2 3.5,16.2H2V20A2,2 0 0,0 4,22H7.8V20.5C7.8,19 9,17.8 10.5,17.8C12,17.8 13.2,19 13.2,20.5V22H17A2,2 0 0,0 19,20V16H20.5A2.5,2.5 0 0,0 23,13.5A2.5,2.5 0 0,0 20.5,11Z" />
+              <TextBlock Name="NavTab5Text" Text="插件与扩展" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
         </StackPanel>
         <StackPanel Grid.Row="2" VerticalAlignment="Bottom" Margin="0,10,0,0">
           <!-- 侧边栏主题切换器 (展开态: 4段胶囊分段按钮) -->
@@ -2888,6 +2894,15 @@
                     <!-- 模块 2：触发动作类型选择与参数配置 -->
                     <Border Name="FocusActionTypeAndParamsBorder" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                       <StackPanel>
+                        <!--
+                          动作失效警示条：当前槽位绑定的动作此刻不可用时出现（最常见的是
+                          提供它的随包动作包被停用）。红色、常驻 —— 用户「先配好动作、
+                          再去停用包」是很常见的路径，回到编辑器必须一眼看到后果，
+                          而不是等到按下扇区才知道没反应。
+                        -->
+                        <Border Name="FocusActionUnavailableBanner" Background="#1ADF2626" BorderBrush="#DC2626" BorderThickness="1" CornerRadius="6" Padding="10,7" Margin="0,0,0,10" Visibility="Collapsed">
+                          <TextBlock Name="FocusActionUnavailableText" FontSize="11.5" Foreground="#DC2626" TextWrapping="Wrap" />
+                        </Border>
                         <Grid Margin="0,0,0,10">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

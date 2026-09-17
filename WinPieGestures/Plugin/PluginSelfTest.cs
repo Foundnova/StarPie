@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -101,42 +101,6 @@ internal static class PluginSelfTest
             Line($"  初始化耗时：{sw.Elapsed.TotalMilliseconds:F1} ms");
             Line($"  已登记插件：{PluginHost.InstalledCount} 个");
 
-            IReadOnlyList<string> supportedPaths = PluginHost.GetSupportedPathIds();
-            Line($"  已登记调用路径：{string.Join(", ", supportedPaths)}");
-            foreach (string requiredPath in new[]
-                     {
-                         PluginPathIds.ActionExecution,
-                         PluginPathIds.InteractionEvent,
-                         PluginPathIds.WheelStructure,
-                     })
-            {
-                if (!supportedPaths.Contains(requiredPath, StringComparer.OrdinalIgnoreCase))
-                {
-                    Fail("调用路径架构", $"宿主未登记协议路径：{requiredPath}");
-                }
-            }
-
-            // 空置路径必须可以安全调用，不应因为尚无贡献实现而影响主程序。
-            int eventReceivers = PluginHost.PublishInteractionEvent(new PluginInteractionEventEnvelope
-            {
-                EventType = "selftest.runtime.ready",
-                SessionId = 0,
-                Sequence = 0,
-                Context = new ActionContext(),
-            });
-            if (eventReceivers != 0)
-            {
-                Fail("交互路径占位", $"尚未开放统一交互贡献时应返回 0，实际为 {eventReceivers}。");
-            }
-
-            PluginWheelStructureSnapshot emptyStructure = PluginHost.QueryWheelStructureAsync(
-                    new PluginWheelStructureRequest { ProviderId = "selftest.none" })
-                .AsTask().GetAwaiter().GetResult();
-            if (emptyStructure.IsAvailable)
-            {
-                Fail("轮盘结构路径占位", "尚未开放结构提供者时应返回空快照。");
-            }
-
             // ---- 1 静态识别 ----
             Line("");
             Line("[1] 静态识别（不加载程序集）");
@@ -201,22 +165,31 @@ internal static class PluginSelfTest
             // 刻意放进独立方法：这两步会拿到 PluginActionRegistration，而它的 Contribution
             // 指向插件程序集里的类型实例。这些引用若留在 Run 的栈帧上，第 5 步卸载时插件的
             // ALC 就回收不掉 —— 自检会把自己测挂，报告里出现假的「需要重启才能释放」。
-            string? stageError = RunEnableAndInvoke(install.PluginId, Line, out ActionItem? lazyLoadProbe, skipInvoke);
+            string? stageError = RunEnableAndInvoke(install.PluginId, Line, skipInvoke);
             if (stageError != null)
             {
                 Fail("启用与调用", stageError);
             }
 
-            // ---- 5 活动调用租约 + 异步停用 ----
-            string? leaseError = RunInvocationLeaseStopProbe(install.PluginId, Line);
-            if (leaseError != null)
-            {
-                Fail("活动调用租约", leaseError);
-            }
+            // ---- 5 停用 ----
+            Line("");
+            Line("[5] 停用（撤销贡献点 → 剪断订阅 → Shutdown → 卸载 ALC）");
+            sw.Restart();
+            bool disabled = PluginHost.Disable(install.PluginId, out string disableError);
+            sw.Stop();
+            Line($"  停用结果：{(disabled ? "成功" : "失败")}（{sw.Elapsed.TotalMilliseconds:F1} ms）");
+            if (!disabled) Fail("停用", disableError);
 
+            // 等延迟判定给出最终结论。同步探测常常因为调用栈还没展开而回收不掉，
+            // 不等它就会把「其实已经释放」误报成「需要重启」。
             instance = PluginHost.Find(install.PluginId);
+            bool unloaded = instance?.WaitForUnloadVerdict(5000) ?? false;
             Line($"  停用后状态：{instance?.State}");
-            Line($"  活动调用数：{instance?.ActiveCallCount}");
+            Line($"  需要重启才能释放：{instance?.RequiresRestart}");
+            if (!unloaded)
+            {
+                Fail("ALC 卸载", "插件程序集未被回收，停用要重启才能真正生效");
+            }
             Line($"  剩余已注册动作：{PluginHost.GetRegisteredActions().Count} 个");
 
             if (PluginHost.GetRegisteredActions().Count != 0)
@@ -224,23 +197,14 @@ internal static class PluginSelfTest
                 Fail("贡献点撤销", "停用后仍有动作残留在注册表里");
             }
 
-            string? lazyLoadError = RunLazyLoadProbe(install.PluginId, lazyLoadProbe, Line);
-            if (lazyLoadError != null)
-            {
-                Fail("首次惰性调用", lazyLoadError);
-            }
-
             // ---- 6 卸载 ----
             Line("");
             Line("[6] 卸载（删除目录 + 移除登记）");
-            PluginUninstallResult uninstall = PluginHost.UninstallAsync(
-                    install.PluginId,
-                    removePluginData: true)
-                .GetAwaiter().GetResult();
-            Line($"  卸载结果：{(uninstall.Success ? "成功" : "失败")}");
-            if (!uninstall.Success)
+            bool uninstalled = PluginHost.Uninstall(install.PluginId, removePluginData: true, out string uninstallError);
+            Line($"  卸载结果：{(uninstalled ? "成功" : "失败")}");
+            if (!uninstalled)
             {
-                Fail("卸载", uninstall.Error);
+                Fail("卸载", uninstallError);
             }
             else
             {
@@ -296,9 +260,7 @@ internal static class PluginSelfTest
             if (real != null)
             {
                 // ③ 点「安装」—— 与界面上那个按钮完全同一条路
-                PluginInstallResult candidateInstall = PluginHost.InstallCandidateAsync(real).GetAwaiter().GetResult();
-                bool installedByCandidate = candidateInstall.Success;
-                string candidateError = candidateInstall.Error;
+                bool installedByCandidate = PluginHost.InstallCandidate(real, out string candidateError);
                 if (!installedByCandidate)
                 {
                     Fail("候选安装", candidateError);
@@ -382,17 +344,32 @@ internal static class PluginSelfTest
                         Fail("ID 重复", "两行候选必须各自显示自己的文件名，否则用户看不出该删哪一个");
                     }
 
+                    // ⑤.5 重启等价态 —— 「已启用但尚未加载」这条路径
+                    //
+                    // 每次重启后插件都处在这个状态：SyncFromDisk 按登记表把实例造出来，
+                    // 但只要没开预加载，程序集就不会被加载，贡献点目录里自然也没有它。
+                    // 修复前这条路径上会同时出两种错，都属于「看起来像用户配置丢了」：
+                    //   ① 界面上把用户配好的动作标成「已失效」—— 用户什么都没做；
+                    //   ② 按下动作回一句「插件动作未注册……可能已被禁用或卸载」—— 与事实不符。
+                    //
+                    // 探针体独立成方法的原因见它的文档注释：本段要停用插件并等 ALC 回收结论，
+                    // 而它持有的 PluginActionRegistration 绝不能留在 Run 的帧上。
+                    string? restartError = RunRestartEquivalenceProbe(installed, real.PluginId!, Line);
+
+                    if (restartError != null)
+                    {
+                        Fail("重启等价态", restartError);
+                    }
+
                     // ⑥ 收拾干净：停用 → 等 ALC 回收结论 → 卸载 → 删掉扫描目录
                     //
                     // 顺序和 [5]/[6] 一致，不能省掉「等回收」这一步：插件程序集还挂在
                     // 未卸载的 ALC 上时文件是锁着的，此刻删目录会失败 —— 而失败又只体现在
                     // 一个被吞掉的异常里，表现就是临时目录里一次次堆出残留沙箱。
-                    _ = PluginHost.DisableAsync(real.PluginId!, PluginStopReason.SelfTest).GetAwaiter().GetResult();
+                    PluginHost.Disable(real.PluginId!, out _);
                     PluginHost.Find(real.PluginId!)?.WaitForUnloadVerdict(5000);
 
-                    PluginUninstallResult cleanup = PluginHost.UninstallAsync(real.PluginId!, removePluginData: true).GetAwaiter().GetResult();
-                    string cleanupError = cleanup.Error;
-                    if (!cleanup.Success)
+                    if (!PluginHost.Uninstall(real.PluginId!, removePluginData: true, out string cleanupError))
                     {
                         Fail("候选安装清理", cleanupError);
                     }
@@ -411,6 +388,1111 @@ internal static class PluginSelfTest
                 {
                     Fail("扫描目录", "扫描目录不存在时被重新创建了 —— 程序装在只读位置会直接变成权限错误");
                 }
+            }
+
+            // ---- 3f 内建动作批量接缝 ----
+            //
+            // 仍留在内建动作表里的那些动作，只验「注册 / 别名 / 投影 / 校验」四件事，
+            // 刻意不做真实执行 ——
+            // 它们一旦真跑就会去按热键、拉起程序、打开浏览器、弹出资源管理器，
+            // 在自检进程里全是实打实的副作用。这正是 --skip-invoke 的用意：
+            // 把「接缝连通性」与「动作真实效果」分成两件事，前者每次都验，
+            // 后者由用户在真机上自己确认。
+            //
+            // 【为什么改成数据驱动】
+            // 下面这份断言表原先是手写的，动作每外移一个就得有人记得删一行。
+            // 忘了删的表现是自检报「某动作不在内建动作表里」—— 而那恰恰是**预期行为**。
+            // 「预期的事被报成缺陷」比不报更坏：它会训练人忽略这条消息。
+            // 所以下面直接遍历 BuiltinActionCatalog.SnapshotAll()，不再手抄清单；
+            // 真正属于设计意图的东西（哪些类型**不该**留在表里）另起一个写死的断言，
+            // 因为那是「我们决定它不在」，无法从快照里推导出来。
+            Line("");
+            Line("[3f] 内建动作批量接缝（注册 / 别名 / 投影 / 校验）");
+
+            // 【交割不变量】被随包动作包认领的顶层类型，必须已经不在内建动作表里。
+            //
+            // 加认领声明与删内建登记是一次「交割」，必须同时发生：
+            // 只加认领不删登记，同一个 Type 就挂着两条执行路径，而 ClassifyAction
+            // 让内建优先 —— 结果是插件里那份代码永远不会被调用，改了也看不出效果。
+            // 这个清单必须写死：它表达的是设计意图，不是当前实现状态的快照。
+            string[] migratedTypes =
+            {
+                "Launch", "WebUrl", "Url", "Folder", "OpenFolder", "Command", "ShellTool",
+                "Tile", "ToggleTopmost", "MoveMonitor", "WindowOpacity", "SwitchWindow",
+                "Ocr", "ScreenOcr", "System",
+            };
+
+            foreach (string migratedType in migratedTypes)
+            {
+                if (BuiltinActionCatalog.TryGet(migratedType, out BuiltinActionRegistration stillBuiltin))
+                {
+                    Fail("内建动作注册",
+                        $"「{migratedType}」既已被随包动作包认领、又还留在内建动作表里（{stillBuiltin.FullId}）—— " +
+                        "同一个类型挂着两条执行路径，且内建优先，插件里那份代码永远不会被调用。" +
+                        "外移动作时「加认领声明」与「删 BuiltinActionCatalog 里的登记」必须同时完成");
+                }
+            }
+
+            var builtinCases = new (string Type, string? Alias, ActionItem Probe, int Fields, string? Key, string Expect, string EmptyLabel)[]
+            {
+                ("Hotkey", null,
+                    new ActionItem { Type = "Hotkey", Parameter = "Ctrl+Alt+S" },
+                    1, "hotkey", "Ctrl+Alt+S", "快捷键"),
+
+                // 【已移出本表】以下十二个类型现在各自是一个**单动作包**：
+                //   Launch / WebUrl（别名 Url）/ Folder（别名 OpenFolder）/
+                //   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
+                //   WindowOpacity / SwitchWindow / Ocr（别名 ScreenOcr）/ System
+                // 包名一律 StarPie.Plugin.<类型名>，认领串只有自己那一项
+                // （别名与主类型同包）。拆包粒度就是停用粒度。
+                //
+                // 它们不再是内建动作，而是随包插件认领的顶层类型。
+                // 留在上面只会以「不在内建动作表里」失败 —— 而那个失败恰恰是**预期行为**，
+                // 不是缺陷。它们的注册 / 参数 / 投影 / 校验改由 [3i] 按认领链路验证
+                // （那段对**每个**被自检的包都跑一遍，所以新包不需要在这里补任何东西），
+                // 并且那里多验两条本表没有的：认领指向的贡献点必须真的存在，
+                // 以及「宿主表仍是插件下拉的唯一数据源」。
+            };
+
+            // 内建动作表<b>只剩 Hotkey 一项</b>，而且它的存在理由是「占位类型必须永远可解析」，
+            // 不是「还没轮到」。这条断言的意义在于：将来若有人往 Build() 里再加一项，
+            // 这里会立刻红，逼他说清那一项凭什么不能外移。
+            if (BuiltinActionCatalog.SnapshotAll().Count != 1)
+            {
+                Fail("内建动作注册",
+                    $"内建动作表里有 {BuiltinActionCatalog.SnapshotAll().Count} 项，应为 1 项（只剩 Hotkey）—— " +
+                    "新增内建动作前请先回答：它为什么不能是一个随包动作包？");
+            }
+
+            int builtinVerified = 0;
+
+            foreach (var (caseType, caseAlias, caseProbe, caseFields, caseKey, caseExpect, caseEmptyLabel) in builtinCases)
+            {
+                if (!BuiltinActionCatalog.TryGet(caseType, out BuiltinActionRegistration caseReg))
+                {
+                    Fail("内建动作注册", $"「{caseType}」不在内建动作表里 —— 用户配好的该动作会落回旧路径");
+                    continue;
+                }
+
+                string caseLabel = $"{caseType}｜{caseReg.FullId}";
+
+                // 别名是这里最该盯的一处：丢了不会有任何报错，只会让老配置里的动作静默失效 ——
+                // 用户看到的是「这个扇区按下去没反应」，而原因藏在两个字符串不相等上。
+                if (caseAlias != null)
+                {
+                    if (!BuiltinActionCatalog.TryGet(caseAlias, out BuiltinActionRegistration byAlias)
+                        || !string.Equals(byAlias.FullId, caseReg.FullId, StringComparison.Ordinal))
+                    {
+                        Fail("内建动作别名", $"别名「{caseAlias}」没能解析回 {caseReg.FullId} —— 老配置里的该写法会失效");
+                    }
+                    else
+                    {
+                        caseLabel += $"（别名 {caseAlias} ✓）";
+                    }
+                }
+
+                if (caseReg.Contribution.Parameters.Count != caseFields)
+                {
+                    Fail("内建动作参数", $"{caseType} 应声明 {caseFields} 个参数，实际 {caseReg.Contribution.Parameters.Count} 个");
+                    continue;
+                }
+
+                if (caseKey == null)
+                {
+                    // 无参数动作到此为止。
+                    builtinVerified++;
+                    Line($"  {caseLabel}｜参数 0 项（无需参数）");
+                    continue;
+                }
+
+                // 【原先这里有两条「选项数 = 宿主表项数」的断言：System 对预设表、Tile 对布局表】
+                //
+                // 它们现在已经搬到了 [3i] 的认领链路上（见 RunTypeClaimChecks 里的第 ⑥ 条）。
+                // 搬家不是整理，是修一个已经发生的失效：Tile 在 S4c 就外移了，System 在 S4b 外移，
+                // 而断言一直留在这个循环里 —— 循环再也走不到它们，于是它们成了**不会执行**的死代码。
+                // 守卫失效是静默的：既没有编译错误，也没有自检红字，只有「以后加布局码没人再核对」。
+                // 留在本表里只会重复一次同样的结局。
+
+                // 必填项漏标，统一表单就会放行空值，等于把静默失效的门重新打开。
+                if (!caseReg.Contribution.Parameters.Any(f => f.Key == caseKey && f.Required))
+                {
+                    Fail("内建动作参数", $"{caseType} 的 {caseKey} 必须标为必填");
+                }
+
+                Dictionary<string, string> projectedTestCase = caseReg.ProjectParameters(caseProbe);
+                string projectedValue = projectedTestCase.GetValueOrDefault(caseKey) ?? "";
+
+                if (!string.Equals(projectedValue, caseExpect, StringComparison.Ordinal))
+                {
+                    Fail("内建动作参数投影", $"{caseType} 的 {caseKey} 没有正确投影（得到 '{projectedValue}'）—— 用户配的值送不到执行体");
+                }
+
+                string? emptyVerdict = caseReg.Contribution.Validate(
+                    new Dictionary<string, string> { [caseKey] = "   " });
+
+                if (emptyVerdict == null)
+                {
+                    Fail("内建动作校验", $"{caseType} 的{caseEmptyLabel}为空时没有被拦下 —— 静默失效又回来了");
+                }
+
+                if (caseReg.Contribution.Validate(projectedTestCase) != null)
+                {
+                    Fail("内建动作校验", $"{caseType} 的合法参数被误判为不合法");
+                }
+
+                // 顺带说明：布尔字段「不变文化字面量」那条约定（投影成 "true" 而不是 "True"）
+                // 原先挂在 Launch 上验证。Launch 外移之后，那条断言搬去了 [3i]，
+                // 并且改成对整个宿主字段白名单核对 —— 覆盖面比只盯一个 Launch 更宽。
+
+                builtinVerified++;
+                Line($"  {caseLabel}｜参数 {caseFields} 项｜投影「{projectedValue}」✓｜必填 ✓｜空值拦截 ✓");
+            }
+
+            if (builtinVerified == builtinCases.Length)
+            {
+                Line($"  全部 {builtinVerified} 个动作：注册 ✓｜别名 ✓｜投影 ✓｜必填 ✓｜空值拦截 ✓");
+            }
+
+            // ---- 3g 端到端派发 ----
+            //
+            // 上面两段验的是「接缝本身好不好使」，但都直接调了接缝方法，绕过了
+            // Execute() 开头那段判据 —— 而用户按下扇区走的恰恰是 Execute()。
+            // 万一那段判据写错了位置（比如挪到 switch 之后），上面照样全绿，
+            // 真机上却依然在走老路径 —— 典型的「测试说没问题、用户说没反应」。
+            //
+            // 【为什么不再用「跑一个动作看产物」的写法】
+            // 这一段原先的探针是 Type="Command" + 一条 echo 命令，靠它产出的文件证明
+            // 「被接走了」。Command 外移成插件动作之后这个探针不再成立；更要紧的是，
+            // 「真跑也无害」的候选动作已经一个不剩 —— 剩下那八个内建动作，每一个真跑
+            // 都会去按热键、抓屏 OCR、或是改用户窗口的平铺与透明度，副作用都不小。
+            //
+            // 所以拆成两层，各自解决一个问题：
+            //   一、判据层：直接断言 ClassifyAction 对每一类 Type 的归属。它就是 Execute
+            //       分派的本体（那边写的是 switch (ClassifyAction(...))），于是「顺序错了」
+            //       这件事在这里就能钉死，不必真跑一个动作再反推它走了哪条路。
+            //   二、端到端层：照旧走真的 Execute()，但改观测「它有没有出声」——
+            //       静默失效的判据从来不是「产物没出来」，而是「什么都没告诉用户」。
+            //       这一层顺带覆盖了 switch 的 default 分支（从前那里是一条 break）。
+            Line("");
+            Line("[3g] 端到端派发（Execute → ClassifyAction → 各分支）");
+
+            // 一、判据层。
+            //
+            // 遍历快照而不是手抄清单（理由同 [3f]）：内建表里现有几个、叫什么，它自己最清楚。
+            foreach (BuiltinActionRegistration builtinReg in BuiltinActionCatalog.SnapshotAll())
+            {
+                if (ActionExecutor.ClassifyAction(builtinReg.Type) != ActionExecutor.ActionDispatchKind.Builtin)
+                {
+                    Fail("派发判据",
+                        $"内建动作「{builtinReg.Type}」（{builtinReg.FullId}）的归属不是 Builtin —— " +
+                        "有别的分支抢在它前面，用户配好的这个动作不会执行到内建实现");
+                }
+
+                // 别名也要归到同一条路。别名解析靠 BuiltinActionCatalog.TryGet，
+                // 而 ClassifyAction 的第一个判断就是它 —— 这里顺带把这条依赖钉住。
+                foreach (string alias in builtinReg.Aliases)
+                {
+                    if (ActionExecutor.ClassifyAction(alias) != ActionExecutor.ActionDispatchKind.Builtin)
+                    {
+                        Fail("派发判据", $"内建动作别名「{alias}」（{builtinReg.FullId}）的归属不是 Builtin");
+                    }
+                }
+            }
+
+            // 已外移的类型绝不能还是 Builtin。
+            //
+            // 这里只断言「不是 Builtin」而不写死 SpecialCase：此刻认领表是不是空的，
+            // 取决于运行到这里的时机（[2] 装的是社区插件，它认领不了顶层类型，
+            // 所以正常情况下此刻表是空的）。把「非内建」和「已认领」两件事混在一条断言里，
+            // 会让它变脆 —— 而脆的断言最后都会被人删掉。
+            foreach (string migratedType in migratedTypes)
+            {
+                if (ActionExecutor.ClassifyAction(migratedType) == ActionExecutor.ActionDispatchKind.Builtin)
+                {
+                    Fail("派发判据",
+                        $"已外移的「{migratedType}」仍被判为内建动作 —— " +
+                        "它一定还留在 BuiltinActionCatalog 里（见 [3f] 的交割不变量）");
+                }
+            }
+
+            // switch 兜底那三类例外，以及谁都认不出来的类型，必须落在 SpecialCase。
+            // 前三个是契约；最后那个是 default 分支的入口，它决定「配置写错时会不会出声」。
+            foreach (string specialType in new[] { "Text", "String", "TileRestore", "Plugin", "这个类型不存在" })
+            {
+                if (ActionExecutor.ClassifyAction(specialType) != ActionExecutor.ActionDispatchKind.SpecialCase)
+                {
+                    Fail("派发判据", $"「{specialType}」应落在 switch 兜底，实际归属不是 SpecialCase");
+                }
+            }
+
+            if (ActionExecutor.ClassifyAction("   ") != ActionExecutor.ActionDispatchKind.SpecialCase
+                || ActionExecutor.ClassifyAction(null) != ActionExecutor.ActionDispatchKind.SpecialCase)
+            {
+                Fail("派发判据", "空白 / 空 Type 应落在 switch 兜底，由 default 分支出声报错");
+            }
+
+            // 二、端到端层：真的调 Execute()，只观测「有没有出声」。
+            //
+            // 没有通知汇时 NotifyUser 会静默降级为写日志（那正是它在无界面进程里的正确行为），
+            // 所以这里挂一个汇来接收。挂上之后**务必在 finally 里摘掉** ——
+            // 它是全局静态的，留着会让后面所有段落的提示都流进这个已经不再读的列表，
+            // 表面无异常、实际把后续观测悄悄吞掉。
+            var dispatchNotifications = new List<(string Title, string Message)>();
+            Action<string, string> dispatchSink = (title, message) => dispatchNotifications.Add((title, message));
+
+            int dispatchChecks = 0;
+
+            try
+            {
+                PluginNotificationHub.Sink = dispatchSink;
+
+                // ① 认不出来的 Type：必须出声。
+                //
+                // 从前这里是一条 break —— 用户按下去什么都不会发生，也没有任何提示。
+                // 这条断言守的就是那次修复：判据可以兜底，但兜底绝不能是静默。
+                dispatchNotifications.Clear();
+                ActionExecutor.Execute(new ActionItem
+                {
+                    Type = "自检用的未知类型",
+                    Name = "自检探针",
+                });
+
+                if (dispatchNotifications.Count == 0)
+                {
+                    Fail("端到端派发",
+                        "未知 Type 经 Execute() 之后没有任何提示 —— 用户看到的是「按下去没反应」，与配置错误无关");
+                }
+                else
+                {
+                    string unknownMessage = dispatchNotifications[dispatchNotifications.Count - 1].Message;
+
+                    if (unknownMessage.IndexOf("无法识别", StringComparison.Ordinal) < 0)
+                    {
+                        Fail("端到端派发", $"未知 Type 的提示里没说清是类型不认识，实际文案：{unknownMessage}");
+                    }
+                    else
+                    {
+                        Line($"  未知 Type：出声 ✓（{dispatchNotifications.Count} 条提示）");
+                        dispatchChecks++;
+                    }
+                }
+
+                // ② 内建动作的参数校验失败：必须出声，且必须是「先校验、再执行」。
+                //
+                // 这一条同时验证了判据层之外的东西：内建分支确实被接走了（没接走的话它会掉进
+                // default，提示文案会是「无法识别」而不是「必填」）。探针用空白 Parameter，
+                // 于是执行体根本不会被调用 —— 这正是它比旧探针好的地方：
+                // 拿一个**注定不会执行**的动作去验证派发，就不必再找了「真跑也无害」的动作。
+                //
+                // 【探针类型从表里挑，不写死】这里原先是写死的 "Tile"，而 S3a 把 Tile 外移之后
+                // 这条断言立刻变成了误报 —— 它报的「掉进 default」其实是**正确行为**
+                // （那一刻认领表还没建，[3h] 才装包）。「任何具体类型名都有保质期」
+                // 这件事已经被动作外移撞过两次，所以判据改成「从内建表里找第一个带必填参数的动作」：
+                // 空白 Parameter 必然触发它的必填拦截，动作不会真的执行。
+                string? builtinProbeType = null;
+
+                foreach (BuiltinActionRegistration candidate in BuiltinActionCatalog.SnapshotAll())
+                {
+                    if (candidate.Contribution.Parameters.Any(p => p.Required))
+                    {
+                        builtinProbeType = candidate.Type;
+                        break;
+                    }
+                }
+
+                if (builtinProbeType == null)
+                {
+                    Fail("端到端派发",
+                        "内建动作表里找不到任何带必填参数的动作 —— 本段探针无从构造（内建动作都不带必填项了？）");
+                }
+                else
+                {
+                    dispatchNotifications.Clear();
+                    ActionExecutor.Execute(new ActionItem
+                    {
+                        Type = builtinProbeType,
+                        Name = "自检探针",
+                        Parameter = "   ",
+                    });
+
+                    if (dispatchNotifications.Count == 0)
+                    {
+                        Fail("端到端派发",
+                            "内建动作的参数为空时没有任何提示 —— 用户填漏一个必填项，按下去却什么都没有发生");
+                    }
+                    else if (dispatchNotifications[dispatchNotifications.Count - 1].Message.IndexOf("无法识别", StringComparison.Ordinal) >= 0)
+                    {
+                        Fail("端到端派发",
+                            $"内建动作「{builtinProbeType}」掉进了 switch 的 default 分支 —— 内建优先这条判据没生效");
+                    }
+                    else
+                    {
+                        Line($"  内建动作校验失败：出声 ✓（探针 {builtinProbeType}，{dispatchNotifications.Count} 条提示）");
+                        dispatchChecks++;
+                    }
+                }
+
+                // ③ 已外移的类型，在「认领表里没有它」的时点：必须出声，不能静默。
+                //
+                // 这一条正是外移动作最容易出的岔子。把动作从内建表里删掉、却没把认领建起来，
+                // 用户看到的现象与「这个动作从来没做过」完全一样；而这里能证明宿主至少说了话。
+                //
+                // 探针类型取自 [3f] 那张已外移清单，不另写一个名字 —— 用哪一个都行：
+                // 此处只需要它「此刻无人认领」（认领要等 [3h] 把随包插件装上）。
+                // 留空参数是有意的：万一将来前提被破坏、它真的被认领了，空参数也会被
+                // Validate 拦在动作体之前，探针依然无害。
+                dispatchNotifications.Clear();
+                ActionExecutor.Execute(new ActionItem
+                {
+                    Type = migratedTypes[0],
+                    Name = "自检探针",
+                });
+
+                if (dispatchNotifications.Count == 0)
+                {
+                    Fail("端到端派发",
+                        "已外移的类型在无人认领时静默无事 —— 用户完全无从判断是配置错了、还是动作包没装");
+                }
+                else
+                {
+                    string unclaimedMessage = dispatchNotifications[dispatchNotifications.Count - 1].Message;
+                    Line($"  已外移类型无人认领：出声 ✓（{unclaimedMessage}）");
+                    dispatchChecks++;
+                }
+            }
+            catch (Exception dispatchError)
+            {
+                Fail("端到端派发", $"Execute 抛出异常：{dispatchError}");
+            }
+            finally
+            {
+                // 摘掉汇：它是全局的，留在那里会污染后面所有段落的观测。
+                PluginNotificationHub.Sink = null;
+
+                if (dispatchChecks == 3)
+                {
+                    Line("  三条端到端断言全部通过：判据正确，且三条异常路径都会出声");
+                }
+            }
+
+            // ---- 3h 随包分发的插件 ----
+            //
+            // 随包插件与用户自己装的插件，差别全在那三条规则上：首启自动装并启用、
+            // 用户停用后绝不被偷偷启用、不可卸载只可停用。
+            // 第二条是这一段最要紧的 —— 它是「我明明关过它」这类投诉的唯一来源，
+            // 而且这种错在开发机上永远不会自己暴露（开发者不会去停用自己的插件）。
+            Line("");
+            Line("[3h] 随包分发的插件（自动安装 / 尊重停用 / 不可卸载）");
+
+            // 被测插件的 ID 一律取自它自己的清单，不写死样例插件的 ID。
+            // 写死的后果是：拿随包动作包（或任何别的插件）跑这段自检时，
+            // 它会报「随包插件没有被自动装上」—— 而那与事实毫无关系，
+            // 排查的人会先去怀疑打包，白白绕一圈。
+            string bundledPluginId = manifest.Id;
+
+            if (!Directory.Exists(sandboxScanRoot))
+            {
+                Directory.CreateDirectory(sandboxScanRoot);
+            }
+            File.Copy(dllPath, Path.Combine(sandboxScanRoot, candidateFileName), overwrite: true);
+
+            int bundledFirst = PluginHost.AutoInstallBundledPlugins();
+            PluginInstance? bundled = PluginHost.Find(bundledPluginId);
+
+            if (bundled == null)
+            {
+                Fail("随包安装", "程序目录 plugin\\ 里的插件没有被自动装上 —— 用户打开会发现轮盘里是空的");
+            }
+            else
+            {
+                Line($"  首次启动：随包装入 {bundledFirst} 个｜随包标记={bundled.Entry.Bundled}｜" +
+                    $"登记启用={bundled.Entry.Enabled}｜程序集已加载={bundled.IsLoaded}");
+
+                if (!bundled.Entry.Bundled)
+                {
+                    Fail("随包安装", "自动装上来的插件没被标记为随包 —— 不可卸载与文件补回都依赖这个标记");
+                }
+
+                if (!bundled.Entry.Enabled)
+                {
+                    Fail("随包安装", "随包插件应默认启用，否则用户一打开就发现自带动作是缺的");
+                }
+
+                // 自动安装不许顺带加载程序集：它跑在启动最早期，这里加载会让启动开销
+                // 随随包插件数量线性增长（R1 红线）。
+                if (bundled.IsLoaded)
+                {
+                    Fail("随包安装", "自动安装过程中加载了程序集 —— 启动开销会随随包插件数量线性增长");
+                }
+
+                int bundledAgain = PluginHost.AutoInstallBundledPlugins();
+                Line($"  重复启动：再装入 {bundledAgain} 个（应为 0，幂等）");
+                if (bundledAgain != 0)
+                {
+                    Fail("随包安装", $"重复自动安装应无事可做，实际又处理了 {bundledAgain} 个");
+                }
+
+                // 用户停用之后，启动流程绝不能把它重新启用。
+                PluginHost.Disable(bundledPluginId, out _);
+                bundled.WaitForUnloadVerdict(5000);
+                int bundledAfterDisable = PluginHost.AutoInstallBundledPlugins();
+
+                Line($"  用户停用后再启动：再装入 {bundledAfterDisable} 个｜登记启用={bundled.Entry.Enabled}");
+
+                if (bundled.Entry.Enabled || bundledAfterDisable != 0)
+                {
+                    Fail("随包安装",
+                        "用户停用过的随包插件被启动流程重新启用了 —— 「我明明关过它」只能来自这里");
+                }
+
+                // 宿主区文件被删：应当补回，且「停用」这个选择不受影响。
+                string managedDirectory = bundled.ManagedDirectory;
+                if (Directory.Exists(managedDirectory)) Directory.Delete(managedDirectory, recursive: true);
+
+                int bundledRestored = PluginHost.AutoInstallBundledPlugins();
+                bool payloadBack = Directory.Exists(managedDirectory)
+                    && Directory.GetFiles(managedDirectory, "*.dll", SearchOption.TopDirectoryOnly).Length > 0;
+
+                Line($"  宿主区文件被删后再启动：补回 {bundledRestored} 个｜文件已回={payloadBack}｜" +
+                    $"登记启用={bundled.Entry.Enabled}");
+
+                if (!payloadBack)
+                {
+                    Fail("随包安装", "随包插件的宿主区文件被删后没有补回 —— 它会一直显示成「加载失败」");
+                }
+
+                if (bundled.Entry.Enabled)
+                {
+                    Fail("随包安装", "补文件把用户「停用」的选择改掉了 —— 补文件不是让它复活的理由");
+                }
+
+                // 不可卸载：必须拒绝，并且说清「改用停用」。
+                bool bundledUninstalled = PluginHost.Uninstall(bundledPluginId, removePluginData: true, out string bundledUninstallError);
+                Line($"  卸载随包插件的结论：{bundledUninstallError}");
+
+                if (bundledUninstalled)
+                {
+                    Fail("随包安装", "随包插件被卸载掉了 —— 它下次启动还会回来，等于骗用户白点一下");
+                }
+                else if (bundledUninstallError.IndexOf("停用", StringComparison.Ordinal) < 0)
+                {
+                    Fail("随包安装", $"拒绝卸载时必须告诉用户该改用什么，实际文案：{bundledUninstallError}");
+                }
+            }
+
+            // ---- 3i 顶层类型认领 ----
+            //
+            // 这一段验的是「随包动作包接管用户配置里的顶层 Type」这条主干：
+            // Launch / WebUrl / Folder / Command / ShellTool 从内建动作表里搬走、改由插件执行，
+            // 而用户配置一个字都不用改（Type 字符串仍是老样子）。
+            //
+            // 特意跑在这里而不是 [3c]：认领只对**随包**插件生效，而 [2] 走的是社区安装路径
+            // （Bundled=false），那时候认领表本来就该是空的。上面 [3h] 刚把这个插件
+            // 按随包方式装上，那正是本段唯一成立的时点。
+            //
+            // 这条链路上有四处「错了也不报错」的坑，全部在这里钉死：
+            //   ① 清单声明了认领，认领表却没建起来 —— 动作会掉进 switch 的 default 分支；
+            //   ② 认领指向一个不存在的贡献点 —— 按下去只得到一句「插件没提供这个动作」；
+            //   ③ 被认领的动作同时出现在「🔌 插件」子下拉里 —— 用户会在两处配到同一个动作，
+            //      而两处的持久化形态互不兼容；
+            //   ④ 宿主字段白名单与投影器漂移 —— 用户配的路径 / 网址送不进插件，且毫无提示。
+            Line("");
+            Line("[3i] 顶层类型认领（随包动作包接管用户配置里的顶层 Type）");
+
+            if (manifest.ClaimedTypes == null || manifest.ClaimedTypes.Count == 0)
+            {
+                Line("  本插件的清单未声明顶层类型认领（StarPiePluginTypeClaims），跳过。");
+                Line("  这不是缺陷：社区插件本来就不允许认领顶层类型，只能走 Type=\"Plugin\" + 引用。");
+            }
+            else if (bundled == null)
+            {
+                Fail("类型认领", "插件未能作为随包插件登记，认领链路无从验证");
+            }
+            else
+            {
+                // 断言体独立成方法且禁止内联 —— 与 RunEnableAndInvoke / RunRestartEquivalenceProbe
+                // 同一个理由，而且这里是硬需求：它会拿到 PluginActionRegistration
+                // （指向插件程序集里的类型实例）。
+                RunTypeClaimChecks(manifest, Line, Fail);
+
+                // ⑧ 认领建起来之后，判据要把这些类型送到 ClaimedType 这条路上去。
+                //
+                // [3g] 里断言的是「它们不是 Builtin」；这里补上另一半：认领生效之后，
+                // Execute() 必须真的把它们交给插件，而不是继续掉进 switch 的 default。
+                // 两段合起来才闭环 —— 只看 [3g] 的话，「从内建删了、认领也没建」同样能过。
+                int claimRouted = 0;
+                foreach (PluginTypeClaim claimed in manifest.ClaimedTypes)
+                {
+                    if (ActionExecutor.ClassifyAction(claimed.TypeName) == ActionExecutor.ActionDispatchKind.ClaimedType)
+                    {
+                        claimRouted++;
+                    }
+                    else
+                    {
+                        Fail("类型认领",
+                            $"已认领的「{claimed.TypeName}」经 Execute() 的判据仍然不是 ClaimedType —— " +
+                            "用户配好的这个动作不会走到插件实现");
+                    }
+                }
+
+                // 反向核对：认领表里不能有任何一项同时还是内建动作。
+                // RebuildClaimTable 里有一条「内建优先」的拒绝规则，这条断言就是它的守卫 ——
+                // 规则被删掉不会有任何编译错误，只会让同一个 Type 悄悄挂上两条路。
+                foreach (PluginHost.PluginTypeClaimBinding claimBinding in PluginHost.SnapshotClaims())
+                {
+                    if (BuiltinActionCatalog.TryGet(claimBinding.TypeName, out BuiltinActionRegistration claimedAlsoBuiltin))
+                    {
+                        Fail("类型认领",
+                            $"「{claimBinding.TypeName}」既在认领表里、又还在内建动作表里" +
+                            $"（{claimedAlsoBuiltin.FullId}）—— 内建优先的拒绝规则没生效");
+                    }
+                }
+
+                Line($"  认领判据：{claimRouted}/{manifest.ClaimedTypes.Count} 项经 Execute() 判据路由到插件 ✓");
+
+                // ⑦ 停用该随包插件之后：认领仍在（只有这样才能对用户说出「包被停用了」），
+                // 但可用性判断必须为 false，并给出可操作的文案 —— 绝不静默什么都不做。
+                //
+                // 这一段刻意留在 Run 的帧上执行：上面刚把插件程序集拉起来，而 ALC 的回收结论
+                // 对「谁还持着插件侧对象」极其敏感。停用与等待必须发生在不再持有任何
+                // 插件类型引用的帧上，否则结论永远是「需要重启」，沙箱里那份 dll 也永远删不掉
+                // （实测：每跑一次自检都在 %TEMP% 里留下一坨删不掉的 .pending-delete 残留）。
+                PluginHost.Disable(bundledPluginId, out _);
+                bool claimUnloaded = bundled.WaitForUnloadVerdict(5000);
+
+                string probeTypeName = manifest.ClaimedTypes[0].TypeName;
+                bool stillClaimed = PluginHost.TryResolveClaimedType(probeTypeName, out _);
+                bool available = PluginHost.IsClaimedTypeAvailable(probeTypeName, out string unavailableReason);
+
+                Line($"  停用后：程序集已释放={claimUnloaded}｜认领仍在={stillClaimed}｜可用={available}");
+                Line($"  给用户的提示：{unavailableReason}");
+
+                if (!stillClaimed)
+                {
+                    Fail("类型认领",
+                        "插件被停用后认领从表里消失了 —— 用户只会看到「无法识别的动作类型」，猜不到是动作包被停了");
+                }
+                else if (available)
+                {
+                    Fail("类型认领", "插件已停用，可用性判断却仍为 true —— 执行会走进插件的失败路径，而不是给出提示");
+                }
+                else if (unavailableReason.IndexOf("停用", StringComparison.Ordinal) < 0)
+                {
+                    Fail("类型认领", $"不可用提示里没有告诉用户「去启用它」，实际文案：{unavailableReason}");
+                }
+            }
+
+            // ---- 3k 随包插件的登记信息随文件刷新 ----
+            //
+            // 【为什么单独守这一段】
+            // 登记表里的认领清单 / 版本 / 能力集合，全都是**首次安装那一刻的快照**。
+            // 两种常见情形会让快照永久过时：
+            //   · 随包插件升级后新增了认领 —— 新类型永远不生效；
+            //   · 把某个类型从一个包挪到另一个包（拆包）—— 旧包的老快照与新包的新声明
+            //     同时认领同一个类型，触发 RebuildClaimTable 的「多包抢同一类型 → 整对拒绝」，
+            //     **两个包的全部动作一起失效**，而用户唯一能看到的线索是日志里一行 Error。
+            //
+            // 验收标准是两条，缺一不可：
+            //   ① 登记信息必须被来源区那枚 dll 的当前元数据刷新（拆包才交割得掉）；
+            //   ② 刷新**绝不能**碰用户的选择（Enabled / Preload）——
+            //     否则它就变成了「偷偷把用户停用过的包重新启用」，比原来的 bug 更糟。
+            Line("");
+            Line("[3k] 随包插件的登记信息随文件刷新（拆包与升级的前置）");
+
+            if (bundled == null)
+            {
+                Line("  （随包插件未能登记，本段跳过 —— 上面 [3h] 已给出失败原因）");
+            }
+            else
+            {
+                // 只传 ID，不传实例：本方法会按启动顺序重跑 SyncFromDisk，
+                // 帧上不持有任何可能牵涉插件侧对象的引用（与 RunEnableAndInvoke 同一纪律）。
+                RunBundledMetadataRefreshChecks(bundledPluginId, manifest, Line, Fail);
+            }
+
+            // ---- 3m 来源区不再分发即清理 ----
+            //
+            // 【为什么单独守这一段】
+            // 拆包的必经动作是「把某个类型从一个包挪到另一个包」，也就是让旧包名从来源区消失。
+            // 清理逻辑缺失时，旧包的登记条目会原地留下，连同它的认领快照 ——
+            // 于是旧包与新包同时认领同一个类型，RebuildClaimTable 判
+            // 「多包抢同一类型 → 整对拒绝」，**两个包的全部动作一起失效**，
+            // 而用户唯一能看到的线索是日志里一行 Error。
+            //
+            // 与 [3k] 是互补的两半，别把其中一个当成另一个的替代：
+            //   [3k] 守「来源区里**还有**这枚 dll、但它的内容变了」；
+            //   [3m] 守「来源区里**已经没有**这枚 dll 了」。
+            //
+            // 另一半同样要紧：**判据不完整时必须让路**。清理是不可逆的
+            // （来源区那枚 dll 本来就已经不在了，没得补），所以三种情况下不清理：
+            // 来源区不存在 / 来源区一枚 dll 都没有 / 有文件读不出来。
+            // 这一段的 ② ③ 两条断言就是这两条守卫，它们比「幽灵包被清掉」更重要 ——
+            // 误删一个用户正在用的官方包，比留下一个幽灵包糟得多。
+            Line("");
+            Line("[3m] 来源区不再分发即清理（拆包的第二个前置）");
+            RunBundledPruneChecks(Line, Fail);
+
+            // 清理现场：走 UninstallCore(respectBundledGuard: false) 而不是用户路径 ——
+            // 用户路径上的那道守卫正是本段被测的东西，拿它来收尾就成了用被测对象验证它自己。
+            PluginHost.Disable(bundledPluginId, out _);
+            PluginHost.Find(bundledPluginId)?.WaitForUnloadVerdict(5000);
+
+            if (!PluginHost.UninstallCore(bundledPluginId, removePluginData: true,
+                    respectBundledGuard: false, out string bundledCleanupError))
+            {
+                Fail("随包安装清理", bundledCleanupError);
+            }
+
+            if (Directory.Exists(sandboxScanRoot))
+            {
+                Directory.Delete(sandboxScanRoot, recursive: true);
+            }
+
+            // ---- 3j 宿主服务面与能力门禁 ----
+            //
+            // 这一段验的是「插件干活时真正碰到的那几层宿主接口」，与具体插件无关，
+            // 所以刻意放在随包插件清理之后 —— 它不需要任何插件在场，也不加载程序集。
+            //
+            // 守的是一处**设计意图**，而不是某个具体实现：
+            // 「安装确认页上展示的能力，真的对应一个后果」。
+            //
+            // 必须在这里说清的是：门禁换来的**不是安全**。进程内插件本来就能自己
+            // Process.Start / P/Invoke SetWindowPos，SDK 拦不住 ——
+            // 它拦的只是「让宿主替你干活」这条路径。
+            // 用户看到「本插件需要「进程」能力」与「它其实什么都能干」之间的矛盾，
+            // 是进程内插件模型的固有代价；摊开写在这里，免得后来者以为这里守住了什么。
+            //
+            // 反过来，这条门禁要是漏了，插件清单里的能力声明就成了一句空话：
+            // 安装页照旧弹一个「需要「窗口控制」能力」的确认框，用户点了同意，
+            // 而这个勾选在运行时没有任何对应物 —— 那才是真正骗人的地方。
+            Line("");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取 / 系统功能）");
+
+            // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
+            //
+            // 后者会让宿主把插件整体标记为加载失败并卸载 —— 而「清单里漏了一行能力声明」
+            // 远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，
+            // 排查方向会完全跑偏。
+            if (typeof(PluginContractException).IsAssignableFrom(typeof(PluginCapabilityDeniedException)))
+            {
+                Fail("能力门禁",
+                    "PluginCapabilityDeniedException 继承了 PluginContractException —— " +
+                    "漏写一行能力声明会让整个插件被卸载，而用户看到的提示是「插件坏了」");
+            }
+
+            const string gateProbePluginId = "starpie.selftest.gate";
+            var deniedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.None);
+            var deniedShellService = new PluginShellService(gateProbePluginId, PluginCapability.None);
+            var deniedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.None);
+            var deniedCaptureService = new PluginScreenCaptureService(gateProbePluginId, PluginCapability.None);
+            var deniedSystemService = new PluginSystemService(gateProbePluginId, PluginCapability.None);
+
+            // ② 未声明所需能力：必须拒绝。
+            //
+            // 探针一律传<b>空参数</b>（空命令 / 空动词 / 空布局码）—— 这一点都不影响结论：
+            // 门禁是 RequireCapability 的第一件事，排在「空值短路」之前，
+            // 所以被拒绝时参数根本没被分析过。更重要的是，它证明门禁确实在 Guard **之外** ——
+            // 若挪进 Guard 里，异常会被吞掉、转成一个 false 返回值，
+            // 用户看到的是「命令没执行」，而不是「本插件缺少「进程」能力」。
+            (bool commandDenied, string commandGateDetail) =
+                ProbeCapabilityGate(() => deniedCommandService.Run(""));
+
+            if (commandDenied)
+            {
+                Line($"  Commands.Run：{commandGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁", $"未声明 Process 的插件调用 Commands.Run 没有被正确拒绝：{commandGateDetail}");
+            }
+
+            (bool shellDenied, string shellGateDetail) =
+                ProbeCapabilityGate(() => deniedShellService.Invoke(""));
+
+            if (shellDenied)
+            {
+                Line($"  Shell.Invoke：{shellGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁", $"未声明 Process 的插件调用 Shell.Invoke 没有被正确拒绝：{shellGateDetail}");
+            }
+
+            // 窗口服务用空布局码做探针还有一层额外好处：万一门禁真的漏了，
+            // 空值短路会让它返回 false —— 探针<b>不会动到自检者自己的窗口</b>。
+            // 换成 ToggleTopmost / SetOpacity 之类，门禁一旦写错就会当场改掉用户窗口的状态，
+            // 而那时自检已经在报错了，没人会想到这个额外的副作用。
+            (bool windowDenied, string windowGateDetail) =
+                ProbeCapabilityGate(() => deniedWindowService.ApplyLayout(""), PluginCapability.WindowControl);
+
+            if (windowDenied)
+            {
+                Line($"  Windows.ApplyLayout：{windowGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 WindowControl 的插件调用 Windows.ApplyLayout 没有被正确拒绝：{windowGateDetail}");
+            }
+
+            // 截屏服务<b>只断言拒绝路径</b>，刻意不断言「声明后放行」，也不做跨能力交叉断言。
+            //
+            // 它是这一批里唯一没有「可以传空值短路的参数」的服务：一旦门禁真的漏了，
+            // 探针会当场弹出全屏框选界面，把自检者正在做的事打断 ——
+            // 而那时自检已经在报错了，没人会想到这个额外的副作用。
+            // 「放行」那一半的正确性由真实使用保证（OcrPlugin 的清单声明了 ScreenCapture，
+            // 且 [3i] 会逐项验证它的认领链路）。
+            (bool captureDenied, string captureGateDetail) =
+                ProbeVoidCapabilityGate(
+                    () => deniedCaptureService.CaptureAndRecognize(),
+                    PluginCapability.ScreenCapture);
+
+            if (captureDenied)
+            {
+                Line($"  ScreenCapture.CaptureAndRecognize：{captureGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 ScreenCapture 的插件调用 ScreenCapture.CaptureAndRecognize 没有被正确拒绝：{captureGateDetail}");
+            }
+
+            // 系统功能服务的三段断言挪到 ③d（与窗口服务那三条并排，读起来才成体系）。
+            // ③ 声明了 Process：同一个调用必须放行。
+            //
+            // 少了这一半，把门禁写成「永远拒绝」也能通过上面两条 ——
+            // 而那会让所有正常插件都废掉，且现象与「插件坏了」一模一样。
+            var allowedCommandService = new PluginCommandService(
+                gateProbePluginId, PluginCapability.Process | PluginCapability.FileSystem);
+
+            try
+            {
+                bool emptyCommandResult = allowedCommandService.Run("   ");
+
+                if (emptyCommandResult)
+                {
+                    Fail("能力门禁", "空命令竟然报告执行成功 —— 空值短路失效，用户会以为命令跑过了");
+                }
+                else
+                {
+                    Line("  已声明 Process：放行 ✓（空命令由空值短路拦下，未真的起进程）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁", $"已声明 Process 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 Process 的调用抛出异常：{gateError}");
+            }
+
+            // ③b 同一个基类，三个服务必须各认自己的能力。
+            //
+            // 守的是「required 传错」：三个服务的门禁现在是同一段代码，
+            // 复制粘贴时把 WindowControl 写成 Process（或反过来）不会有任何编译错误，
+            // 而后果是「只声明了进程的插件可以任意动用户的窗口」或「合法插件全被拒」。
+            // <b>上面那些断言对这个错误照样全绿</b> —— 因为它们只验了 Process 那一对。
+            var mismatchedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.Process);
+            var mismatchedCommandService = new PluginCommandService(gateProbePluginId, PluginCapability.WindowControl);
+
+            try
+            {
+                // 空布局码：真被放行时也只会走到空值短路并返回 false，不动任何窗口。
+                bool leaked = mismatchedWindowService.ApplyLayout("");
+
+                Fail("能力门禁",
+                    $"只声明 Process 的插件调用了窗口服务却没被拒绝（返回 {leaked}）—— " +
+                    "服务认错了能力标志，安装确认页上的「窗口控制」标签形同虚设");
+            }
+            catch (PluginCapabilityDeniedException)
+            {
+                Line("  跨能力：只声明 Process 调用窗口服务仍被拒绝 ✓（各服务认自己的能力）");
+            }
+
+            try
+            {
+                mismatchedCommandService.Run("");
+                Fail("能力门禁", "只声明 WindowControl 的插件调用命令服务却没被拒绝 —— 服务认错了能力标志");
+            }
+            catch (PluginCapabilityDeniedException)
+            {
+                Line("  跨能力：只声明 WindowControl 调用命令服务仍被拒绝 ✓");
+            }
+
+            // ③c 窗口服务声明了对应能力：同样必须放行。
+            var allowedWindowService = new PluginWindowService(
+                gateProbePluginId, PluginCapability.WindowControl);
+
+            try
+            {
+                bool emptyLayoutResult = allowedWindowService.ApplyLayout("   ");
+
+                if (emptyLayoutResult)
+                {
+                    Fail("能力门禁", "空布局码竟然报告应用成功 —— 空值短路失效，用户会以为窗口被排过了");
+                }
+                else
+                {
+                    Line("  已声明 WindowControl：放行 ✓（空布局码由空值短路拦下，未真的动窗口）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁",
+                    $"已声明 WindowControl 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 WindowControl 的调用抛出异常：{gateError}");
+            }
+
+            // ③d 系统功能服务：三段都验，一个不漏。
+            //
+            // 它与前三个服务有一处不同，也是这一段存在的理由：门禁认的是
+            // <b>InputSimulation 而不是 Process</b>。系统控制这个包里两者都会发生
+            // （最小化 = 合成按键，关机 = 起进程），所以「认错能力」在这里的后果最具体 ——
+            // 若哪天有人把 required 改成 Process，一个只声明了「进程」的插件
+            // 就能往用户正在打字的窗口里按键，而安装确认页上那句「模拟输入」变成空话。
+            //
+            // 三段探针一律传<b>空键</b>：门禁排在空值短路之前，所以拒绝路径照样被验到；
+            // 而万一门禁真漏了，空值短路会让它返回 false —— 不起进程、不按键。
+            (bool systemDenied, string systemGateDetail) =
+                ProbeCapabilityGate(() => deniedSystemService.RunPreset(""), PluginCapability.InputSimulation);
+
+            if (systemDenied)
+            {
+                Line($"  System.RunPreset：{systemGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 InputSimulation 的插件调用 System.RunPreset 没有被正确拒绝：{systemGateDetail}");
+            }
+
+            // 「只声明 Process 也不行」——把上面那句「门禁认的不是 Process」变成机器可验的。
+            var processOnlySystemService = new PluginSystemService(
+                gateProbePluginId, PluginCapability.Process);
+
+            (bool processOnlyDenied, string processOnlyDetail) =
+                ProbeCapabilityGate(() => processOnlySystemService.RunPreset(""), PluginCapability.InputSimulation);
+
+            if (processOnlyDenied)
+            {
+                Line($"  跨能力：只声明 Process 调用系统服务仍被拒绝 ✓（{processOnlyDetail}）");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    "只声明了 Process 的插件调用 System.RunPreset 竟然被放行 —— " +
+                    "两种能力在系统控制里都会发生，但后果不同：前者是多一个后台进程，" +
+                    $"后者是往用户正在打字的窗口里按键。{processOnlyDetail}");
+            }
+
+            // 反过来：声明了 InputSimulation 就必须放行，否则「门禁写成永远拒绝」也能过上面两条。
+            var allowedSystemService = new PluginSystemService(
+                gateProbePluginId, PluginCapability.InputSimulation);
+
+            try
+            {
+                bool emptyPresetResult = allowedSystemService.RunPreset("   ");
+
+                if (emptyPresetResult)
+                {
+                    Fail("能力门禁",
+                        "空预设键竟然报告「已匹配到预设」—— 空值短路失效，用户会以为系统功能执行过了");
+                }
+                else
+                {
+                    Line("  已声明 InputSimulation：放行 ✓（空键由空值短路拦下，未起进程、未按键）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁",
+                    $"已声明 InputSimulation 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 InputSimulation 的调用抛出异常：{gateError}");
+            }
+
+            // 预设清单未声明能力也必须可读 —— 它要供注册期的 Parameters 使用。
+            // 顺带钉住「宿主表是唯一数据源」：插件下拉的选项数只能等于这张表的项数
+            // （另一处同源断言在 [3i] 的认领链路上，按被认领的类型逐个核对）。
+            int unprivilegedPresetCount = deniedSystemService.Presets.Count;
+            int hostPresetCount = SlotViewModel.SystemPresetList.Count;
+
+            if (unprivilegedPresetCount != hostPresetCount)
+            {
+                Fail("宿主服务面",
+                    $"未声明能力的插件读到的预设清单是 {unprivilegedPresetCount} 项，宿主表是 {hostPresetCount} 项 —— " +
+                    "两者必须是同一份数据");
+            }
+            else
+            {
+                Line($"  预设清单：{unprivilegedPresetCount} 项（未声明能力也能读，因为它不产生后果）✓");
+            }
+
+            // ⑤ 每一个能力位都必须在安装确认页上有一句人话。
+            //
+            // 这条护栏是被两处真实遗漏逼出来的：WindowControl（S4c）与 ScreenCapture（S4a）
+            // 各自独立成项的理由，写的都是「安装确认页上必须让用户看见后果」——
+            // 而确认页那份清单当初是内联在 SettingsWindow 里的一个 if 串，
+            // 没人记得回去补，于是这两项能力至今没在用户眼前出现过一行字。
+            //
+            // 能力位的全部意义就是「让用户在安装前看见后果」。一个查不到文案的能力位，
+            // 既骗用户（什么都没说）也骗审核者（以为已经说过了）。所以这里逐个成员核对，
+            // 而不是抽查几个常见的 —— 漏掉的恰好总是新加的那一个。
+            string[] labeledCapabilities = PluginCapabilityLabels.All
+                .Select(entry => entry.Capability.ToString())
+                .ToArray();
+
+            foreach (PluginCapability capability in Enum.GetValues<PluginCapability>())
+            {
+                if (capability == PluginCapability.None) continue;
+
+                if (!labeledCapabilities.Contains(capability.ToString(), StringComparer.Ordinal))
+                {
+                    Fail("能力文案",
+                        $"能力位「{capability}」在安装确认页上没有对应文案（PluginCapabilityLabels.All）—— " +
+                        "用户勾选确认时看不到这项能力的后果，而这个能力位存在的全部理由就是要让他看见");
+                }
+            }
+
+            foreach ((PluginCapability capability, string label) in PluginCapabilityLabels.All)
+            {
+                if (string.IsNullOrWhiteSpace(label))
+                {
+                    Fail("能力文案", $"能力位「{capability}」的确认页文案是空的 —— 确认框里会出现一行空白");
+                }
+
+                // 反向核对：表里挂着一个枚举里已经没有的位，通常意味着能力位被改名后这里没跟上。
+                if (!Enum.IsDefined(capability))
+                {
+                    Fail("能力文案", $"确认页文案表里的「{capability}」已不是 PluginCapability 的成员 —— 能力位改过名？");
+                }
+            }
+
+            Line($"  能力文案：{PluginCapabilityLabels.All.Length} 项，覆盖枚举里全部非空能力位 ✓");
+
+            // 两组服务面逐一验完之后，报一次确认页的实际渲染结果。
+            // 这一段是给「自检通过但用户看不到」这种情况准备的：断言只看表，这里看拼出来的文本。
+            string sampleLabels = PluginCapabilityLabels.Describe(
+                PluginCapability.Process | PluginCapability.InputSimulation | PluginCapability.ScreenCapture);
+
+            Line($"  确认页示例（进程+模拟输入+截屏）：{sampleLabels.Replace("\n", "｜")}");
+
+            // ④ 元数据不受门禁约束，这是刻意的。
+            //
+            // 插件的 Parameters 是属性，声明期（注册前）就要读这两份清单。
+            // 在那里抛异常，一个「忘了声明能力」的插件会在注册阶段整个崩掉 ——
+            // 而它其实只是不能在运行时干活而已。门禁拦的是**产生后果**的调用。
+            try
+            {
+                IReadOnlyList<CommandTerminalOption> terminals = deniedCommandService.Terminals;
+                IReadOnlyList<ShellVerbOption> shellVerbs = deniedShellService.Verbs;
+
+                if (terminals.Count == 0)
+                {
+                    Fail("宿主服务面", "终端清单为空 —— 「运行命令」动作的终端下拉会是空的，用户选不了终端");
+                }
+                else if (!terminals.Any(t => string.Equals(t.Id, "cmd", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Fail("宿主服务面", "终端清单里没有 \"cmd\" —— 动作的默认值在界面上选不中任何一项");
+                }
+                else if (terminals.Any(t => string.IsNullOrWhiteSpace(t.DisplayName)))
+                {
+                    Fail("宿主服务面", "终端清单里有显示名为空的项 —— 下拉里会出现一个没有文字的选项");
+                }
+                else if (terminals.Select(t => t.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != terminals.Count)
+                {
+                    Fail("宿主服务面", "终端清单里有重复的标识 —— 下拉选中项会错位到另一个终端上");
+                }
+                else
+                {
+                    Line($"  终端清单：{terminals.Count} 项，含 cmd ✓（未声明能力也能读，因为它不产生后果）");
+                }
+
+                // Shell 动词：用户配置里存的是短 ID（copy_path），不是 Verb（Windows.CopyAsPath）。
+                // 清单漏项不会有任何报错 —— 只会让那个动作在挑选器里找不到对应项。
+                if (shellVerbs.Count == 0)
+                {
+                    Fail("宿主服务面", "Shell 动词清单为空 —— 该动作的下拉会是空的");
+                }
+                else if (!shellVerbs.Any(v => string.Equals(v.Id, "copy_path", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Fail("宿主服务面",
+                        "Shell 动词清单里没有 \"copy_path\" —— 用户配置里存的就是这个短 ID，" +
+                        "少了它老配置在挑选器里找不到对应项（注意：清单要的是 Id，不是 Verb）");
+                }
+                else if (shellVerbs.Select(v => v.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != shellVerbs.Count)
+                {
+                    Fail("宿主服务面", "Shell 动词清单里有重复的标识 —— 选中项会错位");
+                }
+                else
+                {
+                    Line($"  Shell 动词清单：{shellVerbs.Count} 项，含 copy_path ✓");
+                }
+
+                // 窗口布局清单：它是「平铺窗口」动作生成下拉的<b>唯一来源</b>，
+                // 所以必须与宿主执行体那份表逐项同源（SequenceEqual 连顺序都比 ——
+                // 顺序即下拉顺序）。插件另抄一份的后果是宿主加布局之后，
+                // 「新布局在下拉里选不到」或「选了不生效」，两种都是静默失效。
+                IReadOnlyList<WindowLayoutOption> layouts = deniedWindowService.Layouts;
+
+                if (layouts.Any(l => string.IsNullOrWhiteSpace(l.Key) || string.IsNullOrWhiteSpace(l.DisplayName)))
+                {
+                    Fail("宿主服务面", "窗口布局清单里有空键或空显示名 —— 下拉里会出现一个没有文字的选项");
+                }
+                else if (!layouts.Select(l => l.Key).SequenceEqual(WindowTiler.LayoutKeys, StringComparer.OrdinalIgnoreCase))
+                {
+                    Fail("宿主服务面",
+                        $"窗口布局清单（{layouts.Count} 项）与 WindowTiler.LayoutKeys（{WindowTiler.LayoutKeys.Count} 项）" +
+                        "不一致 —— 两者已经漂了，用户会遇到「新布局选不到」或「选了不生效」");
+                }
+                else if (!string.Equals(deniedWindowService.CycleToken, WindowTiler.CycleParam, StringComparison.Ordinal)
+                    || !string.Equals(deniedWindowService.CycleBackToken, WindowTiler.CycleBackParam, StringComparison.Ordinal)
+                    || !string.Equals(deniedWindowService.RestoreToken, WindowTiler.RestoreParam, StringComparison.Ordinal))
+                {
+                    Fail("宿主服务面",
+                        "三个布局标记与 WindowTiler 的常量对不上 —— " +
+                        "「循环切换 / 循环返回 / 还原」选下去会静默无效（执行体的 switch 认的是宿主那两个常量）");
+                }
+                else if (deniedWindowService.OpacityMinPercent >= deniedWindowService.OpacityMaxPercent)
+                {
+                    Fail("宿主服务面",
+                        "透明度范围不合法（下界不小于上界）—— 插件据它生成的参数声明会把所有值都判成非法");
+                }
+                else
+                {
+                    Line($"  窗口布局清单：{layouts.Count} 项，与 WindowTiler.LayoutKeys 逐项同源 ✓" +
+                        $"（透明度 {deniedWindowService.OpacityMinPercent}~{deniedWindowService.OpacityMaxPercent}）");
+                }
+            }
+            catch (PluginCapabilityDeniedException deniedMeta)
+            {
+                Fail("宿主服务面",
+                    $"读元数据（终端 / 动词清单）被能力门禁拦下了（{deniedMeta.ServiceName}）—— " +
+                    "插件的 Parameters 是声明期就要读它的，这会让忘了声明的插件在注册阶段整个崩掉");
+            }
+
+            // ⑤ SDK 契约版本号的内部一致性。
+            //
+            // ApiVersion 是个手写常量：C# 的常量插值只对 string 常量成立，
+            // 这两个组成部分是 int，所以拼不出来（CS0133）。这处重复只能靠断言守。
+            // 漏改的表现极其隐蔽：插件按 ApiVersion 做兼容判断，而它和真实版本号对不上。
+            string expectedApiVersion = $"{PluginApi.ApiVersionMajor}.{PluginApi.ApiVersionMinor}";
+
+            if (!string.Equals(PluginApi.ApiVersion, expectedApiVersion, StringComparison.Ordinal))
+            {
+                Fail("SDK 契约",
+                    $"ApiVersion（{PluginApi.ApiVersion}）与主次版本号（{expectedApiVersion}）不一致 —— " +
+                    "两者手写在两处，改了其中一个却忘了另一个");
+            }
+            else
+            {
+                Line($"  SDK 契约版本：{PluginApi.ApiVersion} ✓（与主次版本号一致）");
             }
 
             // ---- 7 环境还原性检查 ----
@@ -434,7 +1516,7 @@ internal static class PluginSelfTest
             {
                 try
                 {
-                    _ = PluginHost.UninstallAsync(installedPluginId, removePluginData: true).GetAwaiter().GetResult();
+                    PluginHost.Uninstall(installedPluginId, removePluginData: true, out _);
                 }
                 catch
                 {
@@ -443,13 +1525,36 @@ internal static class PluginSelfTest
 
             // 删掉整个沙箱。删不掉要如实说 —— 静默吞掉的话，临时目录会一次次堆出残留，
             // 而下次排查「磁盘怎么满了」时没人会想到是自检干的。
+            //
+            // 删之前先催 GC 并重试：ALC 的卸载是异步的，卸载判定跑完不代表 CLR 已经放开
+            // 文件句柄。不催的话这条删除几乎必然失败，每跑一次自检就在 %TEMP% 里
+            // 留下一坨 .pending-delete 残留（实测连续几次自检就攒下了好几个）。
             try
             {
-                Directory.Delete(sandboxRoot, recursive: true);
+                const int attempts = 5;
+
+                for (int attempt = 1; attempt <= attempts; attempt++)
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+
+                    try
+                    {
+                        Directory.Delete(sandboxRoot, recursive: true);
+                        break;
+                    }
+                    catch (Exception) when (attempt < attempts)
+                    {
+                        System.Threading.Thread.Sleep(200);
+                    }
+                }
             }
             catch (Exception cleanupError)
             {
                 Line($"  [WARN] 沙箱未能删除（{cleanupError.Message}）：{sandboxRoot}");
+                Line("         残留里只有 .pending-delete 目录，不影响正确性；但请顺手清掉，");
+                Line("         否则 %TEMP% 会随每次自检一点点堆起来。");
             }
         }
 
@@ -471,13 +1576,8 @@ internal static class PluginSelfTest
     /// </summary>
     /// <returns>失败原因；<c>null</c> 表示两个阶段都通过。</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static string? RunEnableAndInvoke(
-        string pluginId,
-        Action<string> line,
-        out ActionItem? lazyLoadProbe,
-        bool skipInvoke = false)
+    private static string? RunEnableAndInvoke(string pluginId, Action<string> line, bool skipInvoke = false)
     {
-        lazyLoadProbe = null;
         // ---- 3 启用 ----
         line("");
         line("[3] 启用（加载 → 实例化 → Initialize → 提交贡献点）");
@@ -499,21 +1599,6 @@ internal static class PluginSelfTest
             line($"    · {action.FullId} | {action.DisplayName} | {action.Kind} | 参数 {action.Parameters.Count} 项");
         }
         if (actions.Count == 0) return "插件启用成功但一个动作都没注册";
-
-        // 为重启后的首次惰性调用准备一条无副作用负例：移除声明为必填的参数，
-        // 让执行管线在加载并解析贡献后停在参数校验，不会真正调用插件动作。
-        PluginActionRegistration? lazyCandidate = actions.FirstOrDefault(action =>
-            action.Parameters.Any(field => field.Required && field.Type != ParameterFieldType.Bool));
-        if (lazyCandidate != null)
-        {
-            ActionItem? candidateItem = PluginHost.CreateActionItem(
-                lazyCandidate.FullId,
-                CollectDefaults(lazyCandidate.Parameters));
-            ParameterField requiredField = lazyCandidate.Parameters.First(
-                field => field.Required && field.Type != ParameterFieldType.Bool);
-            candidateItem?.ExtensionData?.Remove(requiredField.Key);
-            lazyLoadProbe = candidateItem;
-        }
 
         // 词条命中率单独成段。显示名有字面文案兜底，所以「词条没接上」在界面上
         // 与「接上了」长得一模一样 —— 必须在这里显式暴露，否则插件作者要等到
@@ -653,7 +1738,7 @@ internal static class PluginSelfTest
                 ActionItem? probeItem = PluginHost.CreateActionItem(candidate.FullId, baseline);
                 if (probeItem != null)
                 {
-                    PluginActionValidation unified =
+                    PluginHost.PluginActionValidation unified =
                         PluginHost.ValidateActionParameters(probeItem);
 
                     line($"    ④ 走统一入口校验同一份输入 → {(unified.IsValid ? "通过" : "不通过")}");
@@ -869,202 +1954,763 @@ internal static class PluginSelfTest
         return null;
     }
 
-    private sealed class LeaseProbeContribution : IActionContribution
-    {
-        private readonly TaskCompletionSource<ActionResult> _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<bool> _entered =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<bool> _cancelled =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public ActionDescriptor Descriptor { get; } = new()
-        {
-            Id = "selftestLeaseProbe",
-            DisplayName = "租约自检",
-            Kind = ActionKind.Background,
-            TimeoutSeconds = 30,
-        };
-
-        public IReadOnlyList<ParameterField> Parameters => Array.Empty<ParameterField>();
-        public Task Entered => _entered.Task;
-        public Task CancellationObserved => _cancelled.Task;
-
-        public string? Validate(IReadOnlyDictionary<string, string> parameters) => null;
-        public string Preview(IReadOnlyDictionary<string, string> parameters) => "租约自检";
-
-        public async Task<ActionResult> ExecuteAsync(
-            PluginActionInput input,
-            CancellationToken cancellationToken)
-        {
-            using CancellationTokenRegistration registration =
-                cancellationToken.Register(() => _cancelled.TrySetResult(true));
-            _entered.TrySetResult(true);
-            return await _completion.Task.ConfigureAwait(false);
-        }
-
-        public void Complete() => _completion.TrySetResult(ActionResult.Ok());
-    }
-
+    /// <summary>
+    /// [3d] ⑤.5「重启等价态」的探针体：插件已启用、但程序集尚未惰性加载。
+    /// <para>
+    /// <b>必须独立成方法并禁止内联</b>：本方法会持有 <see cref="PluginActionRegistration"/>
+    /// （它指向插件程序集里的类型实例），而它内部要停用插件并等 ALC 回收结论。
+    /// 这些引用若留在调用方（<c>Run</c>）的栈帧上，结论必然变成「需要重启」，
+    /// 沙箱里那份 dll 也就永远删不掉 ——
+    /// 实测表现就是每跑一次自检都在 %TEMP% 里留下一坨 <c>.pending-delete</c> 残留。
+    /// </para>
+    /// </summary>
+    /// <returns>失败原因；<c>null</c> 表示本段通过。</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static string? RunInvocationLeaseStopProbe(string pluginId, Action<string> line)
+    private static string? RunRestartEquivalenceProbe(
+        PluginInstance? installed,
+        string pluginId,
+        Action<string> line)
     {
-        line("");
-        line("[5] 活动调用租约与异步停用");
+        PluginActionRegistration? restartTarget = installed?.OwnedActions.FirstOrDefault();
 
-        PluginInstance? instance = PluginHost.Find(pluginId);
-        if (instance == null || !instance.IsLoaded) return "租约测试开始前插件未加载。";
-
-        var probe = new LeaseProbeContribution();
-        var registration = new PluginActionRegistration
+        if (restartTarget == null)
         {
-            PluginId = pluginId,
-            ShortId = "selftestLeaseProbe",
-            FullId = $"{pluginId}.selftestLeaseProbe",
-            Contribution = probe,
-            DisplayName = "租约自检",
-            Kind = ActionKind.Background,
-            TimeoutSeconds = 30,
+            return "插件没有注册任何动作，无法验证「已启用但尚未加载」这条路径";
+        }
+
+        // 先把「用户配好的那个动作」照原样造出来 —— 停用会清空 OwnedActions。
+        var restartProbe = new ActionItem
+        {
+            Type = PluginActionBinding.TypeName,
+            Name = restartTarget.DisplayName,
+            PluginActionRef = new PluginActionRef
+            {
+                PluginId = pluginId,
+                ContributionId = restartTarget.ShortId,
+            },
+            ExtensionData = CollectDefaults(restartTarget.Parameters),
         };
 
-        PluginExecuteOutcome queued = PluginInvoker.Invoke(
-            instance,
-            registration,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            new PluginCallCoordinator());
+        string restartFullId = restartTarget.FullId;
 
-        if (!queued.QueuedToBackground || !probe.Entered.Wait(2000))
+        // 模拟重启：停用（连带卸载程序集）→ 只把登记态改回「已启用」→ 与磁盘对账。
+        // 全程不调 Enable，程序集因此保持未加载 —— 这正是真实重启后的状态。
+        PluginHost.Disable(pluginId, out _);
+        installed!.WaitForUnloadVerdict(5000);
+        PluginRegistryStore.SetEnabled(pluginId, true);
+        PluginHost.SyncFromDisk();
+
+        bool loadedAfterRestart = installed.IsLoaded;
+        line($"  重启等价态：程序集已加载={loadedAfterRestart}，" +
+            $"登记启用={installed.Entry.Enabled}，目录内动作={PluginHost.Catalog.SnapshotActionIds().Count} 个");
+
+        if (loadedAfterRestart)
         {
-            probe.Complete();
-            return "后台租约探针没有进入插件回调。";
+            return "模拟方式失效：本该未加载的程序集却已加载，本段前提不成立";
         }
 
-        line($"  后台动作已进入，活动调用数：{instance.ActiveCallCount}");
-        PluginStopResult pending = PluginHost.DisableAsync(
-                pluginId,
-                PluginStopReason.SelfTest,
-                TimeSpan.FromMilliseconds(150))
-            .GetAwaiter().GetResult();
-
-        line($"  首次停用结果：{pending.Status}，剩余调用：{pending.RemainingCalls}");
-        if (pending.Status != PluginStopStatus.Pending)
+        if (!installed.Entry.Enabled)
         {
-            probe.Complete();
-            return $"活动调用未结束时停用应返回 Pending，实际为 {pending.Status}。";
-        }
-        if (!probe.CancellationObserved.Wait(2000))
-        {
-            probe.Complete();
-            return "停用没有把取消信号传给插件动作。";
-        }
-        if (instance.ActiveCallCount != 1)
-        {
-            probe.Complete();
-            return $"后台任务未结束时租约计数应为 1，实际为 {instance.ActiveCallCount}。";
+            return "模拟方式失效：登记态未回到「已启用」，本段前提不成立";
         }
 
-        if (instance.TryAcquireInvocation(
-                PluginCallKind.ActionExecution,
-                out PluginInvocationLease? unexpected,
-                out _))
+        if (PluginActionBinding.IsReferenceBroken(restartProbe))
         {
-            unexpected?.Dispose();
-            probe.Complete();
-            return "插件进入停止状态后仍能取得新租约。";
+            return "仅仅因为「尚未惰性加载」，用户配好的动作就被判成「已失效」。" +
+                   "用户什么都没做，界面上却显示配置丢了 —— " +
+                   "必须区分「插件没了」与「插件还没加载」这两种完全不同的情况";
         }
 
-        probe.Complete();
-        PluginStopResult stopped = PluginHost.DisableAsync(
-                pluginId,
-                PluginStopReason.SelfTest,
-                PluginHost.DefaultStopGracePeriod)
-            .GetAwaiter().GetResult();
+        PluginExecuteOutcome restartOutcome = PluginHost.ExecutePluginAction(restartProbe);
+        bool recovered = PluginHost.TryGetAction(restartFullId, out _);
 
-        line($"  释放探针后停用结果：{stopped.Status}，活动调用数：{instance.ActiveCallCount}");
-        if (!stopped.IsFullyStopped) return $"释放租约后插件仍未停止：{stopped.Message}";
-        if (instance.ActiveCallCount != 0) return "停用完成后活动调用计数不为 0。";
+        line($"  重启后按下动作：Handled={restartOutcome.Handled}，Success={restartOutcome.Success}，" +
+            $"惰性加载后目录内动作={PluginHost.Catalog.SnapshotActionIds().Count} 个");
+
+        if (!recovered)
+        {
+            return $"按下动作后插件仍未被拉起、贡献点仍不在目录里：{restartFullId}。" +
+                   $"执行结论：{restartOutcome.Message}";
+        }
 
         return null;
     }
 
     /// <summary>
-    /// 模拟“重启后插件已启用但尚未加载”的首次动作调用。探针缺少必填参数，
-    /// 因此只验证惰性加载与贡献查询，不会进入插件 ExecuteAsync。
+    /// [3k] 随包插件登记信息刷新的断言体：模拟「老用户带着过时的登记快照升级 / 拆包」。
+    /// <para>
+    /// <b>独立成方法</b>：它按真实启动顺序重跑 <c>AutoInstall → SyncFromDisk → RebuildClaimTable</c>，
+    /// 会就地更新内存实例。与 <see cref="RunTypeClaimChecks"/> 同一纪律 ——
+    /// 帧上不持有任何插件侧类型引用，否则后面「停用 → 等 ALC 回收」的结论永远是「需要重启」，
+    /// 沙箱里那份 dll 也删不掉。
+    /// </para>
+    /// </summary>
+    /// <param name="pluginId">随包插件的 ID（取自它自己的清单，不写死）。</param>
+    /// <param name="manifest">来源区那枚 dll 的真实清单 —— 它就是「文件的事实」。</param>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RunBundledMetadataRefreshChecks(
+        string pluginId,
+        PluginManifest manifest,
+        Action<string> line,
+        Action<string, string> fail)
+    {
+        PluginRegistryEntry? entry = PluginRegistryStore.FindEntry(pluginId);
+        if (entry == null)
+        {
+            fail("登记刷新", $"找不到 {pluginId} 的登记条目，刷新链路无从验证");
+            return;
+        }
+
+        // 制造一份「过时的旧快照」。
+        //
+        // 刻意用一个**此刻不存在的假类型名**，而不是「真实声明里少几项」：
+        // 后者在「登记表恰好没被刷新」时仍可能因为与真实声明部分重合而侥幸通过，
+        // 那就成了用一个必然成立的断言去证明一件没发生的事。
+        const string StaleVersion = "0.0.1-stale";
+        entry.ClaimedTypes = new List<string> { "Stale.Type=staleContribution" };
+        entry.Version = StaleVersion;
+        PluginRegistryStore.UpsertEntry(entry);
+
+        // 先记下用户的选择。刷新**只同步「文件是什么」，不同步「用户怎么选」**，
+        // 下面两个断言守的就是这条线。
+        bool enabledBefore = entry.Enabled;
+        bool preloadBefore = entry.Preload;
+
+        // 按真实启动顺序重跑。三步缺一不可、顺序也不能换 ——
+        // 认领表读的是实例上的登记条目，而实例是 SyncFromDisk 按登记表建立的。
+        PluginHost.AutoInstallBundledPlugins();
+        PluginHost.SyncFromDisk();
+        PluginHost.RebuildClaimTable();
+
+        PluginRegistryEntry? refreshed = PluginRegistryStore.FindEntry(pluginId);
+        if (refreshed == null)
+        {
+            fail("登记刷新", $"重跑启动流程后 {pluginId} 的登记条目消失了");
+            return;
+        }
+
+        List<string> expectedClaims = manifest.ClaimedTypes
+            .Where(claim => !string.IsNullOrWhiteSpace(claim.TypeName)
+                         && !string.IsNullOrWhiteSpace(claim.ContributionId))
+            .Select(claim => claim.ToWire())
+            .ToList();
+
+        var actualClaims = new HashSet<string>(
+            refreshed.ClaimedTypes ?? new List<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        line($"  旧快照（认领 1 项 / v{StaleVersion}）→ 重跑启动流程：" +
+             $"认领 {actualClaims.Count} 项 / v{refreshed.Version}｜启用 {enabledBefore}→{refreshed.Enabled}");
+
+        if (actualClaims.Count != expectedClaims.Count)
+        {
+            fail("登记刷新",
+                $"认领清单没有随文件刷新：文件声明 {expectedClaims.Count} 项，登记表里是 {actualClaims.Count} 项。" +
+                "拆包时这会让新旧两个包同时认领同一个类型，触发「整对拒绝」——两个包的动作一起失效，" +
+                "而用户唯一能看到的线索是日志里一行 Error");
+        }
+        else
+        {
+            foreach (string expected in expectedClaims)
+            {
+                if (!actualClaims.Contains(expected))
+                {
+                    fail("登记刷新",
+                        $"认领清单缺少「{expected}」—— 该类型会掉进 switch 的 default 分支，静默无反应");
+                }
+            }
+        }
+
+        if (!string.Equals(refreshed.Version, manifest.Version, StringComparison.Ordinal))
+        {
+            fail("登记刷新",
+                $"版本号没有刷新：文件是 v{manifest.Version}，登记表里还是 v{refreshed.Version} —— " +
+                "插件页会长期显示一个早已不存在的版本");
+        }
+
+        if (refreshed.Enabled != enabledBefore)
+        {
+            fail("登记刷新",
+                $"刷新登记信息时改动了用户的启用状态（{enabledBefore} → {refreshed.Enabled}）—— " +
+                "「我明明关过它」只能来自这里");
+        }
+
+        if (refreshed.Preload != preloadBefore)
+        {
+            fail("登记刷新",
+                $"刷新登记信息时改动了预加载开关（{preloadBefore} → {refreshed.Preload}）");
+        }
+
+        // 登记表字段刷新了、认领表没重建 —— 用户的动作照样解析不到。
+        // 所以还要把「新声明真的进了认领表」验掉，只比对登记表字段是不够的。
+        int routed = 0;
+        foreach (string wire in refreshed.ClaimedTypes ?? new List<string>())
+        {
+            List<PluginTypeClaim> parsed = PluginTypeClaim.ParseAll(wire, out _);
+            if (parsed.Count != 1) continue;
+
+            if (PluginHost.TryResolveClaimedType(parsed[0].TypeName, out PluginHost.PluginTypeClaimBinding binding)
+                && string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            {
+                routed++;
+            }
+            else
+            {
+                fail("登记刷新",
+                    $"认领表里没有「{parsed[0].TypeName}」（或它指向了别的插件）—— " +
+                    "登记表刷新了但认领表没跟上，配置里的动作会落进 switch 的 default");
+            }
+        }
+
+        if (routed > 0)
+        {
+            line($"  认领表已按新声明重建：{routed} 项全部路由到 {pluginId} ✓");
+        }
+    }
+
+    /// <summary>
+    /// [3m] 「来源区不再分发即清理」的断言体。
+    /// <para>
+    /// <b>独立成方法</b>：它重跑启动期的「装 → 清 → 建实例 → 建认领表」，
+    /// 与 <see cref="RunBundledMetadataRefreshChecks"/> 同一纪律 —— 帧上不持有任何
+    /// 插件侧类型引用，否则后面「停用 → 等 ALC 回收」的结论永远是「需要重启」。
+    /// </para>
+    /// <para>
+    /// 它刻意<b>不依赖真实的随包插件</b>：被测的是「一条 <c>Bundled</c> 登记与来源区对不上时
+    /// 会不会被清掉」，自造一个幽灵包条目就够，而且比拿真包去测干净 ——
+    /// 真包一旦被误清，后面几段的现场全毁，症状还会出现在毫不相干的地方。
+    /// </para>
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static string? RunLazyLoadProbe(string pluginId, ActionItem? probe, Action<string> line)
+    private static void RunBundledPruneChecks(Action<string> line, Action<string, string> fail)
     {
-        line("");
-        line("[5b] 重启后首次惰性调用（已启用、未加载、Catalog 为空）");
+        const string ghostId = "selftest.ghost.bundled";
+        const string ghostDirectoryName = "selftest-ghost-install";
 
-        if (probe == null)
+        string scanRoot = PluginPaths.ScanRoot;
+        string ghostDirectory = Path.Combine(PluginPaths.Root, ghostDirectoryName);
+
+        // ① 造一个幽灵包：登记表里标着随包、宿主区有安装副本，
+        //    而来源区里根本没有这枚 dll —— 这正是拆包之后旧包留下的现场。
+        PluginRegistryStore.UpsertEntry(new PluginRegistryEntry
         {
-            line("  插件没有带必填字段的动作，无法构造零副作用探针，跳过。");
-            return null;
+            Id = ghostId,
+            Name = "自检用幽灵包",
+            Version = "0.0.1",
+            InstallPath = ghostDirectoryName,
+            Bundled = true,
+            Enabled = true,
+            ClaimedTypes = new List<string> { "Ghost.Probe=ghostProbe" },
+        });
+
+        Directory.CreateDirectory(Path.Combine(ghostDirectory, "data"));
+        File.WriteAllText(Path.Combine(ghostDirectory, "Ghost.dll"), "not a real assembly");
+        File.WriteAllText(Path.Combine(ghostDirectory, "data", "settings.json"), "{}");
+
+        List<string> bundledBefore = PluginRegistryStore.SnapshotEntries()
+            .Where(entry => entry.Bundled)
+            .Select(entry => entry.Id)
+            .ToList();
+
+        try
+        {
+            // ② 守卫一：来源区一枚 dll 都没有时**必须让路**。
+            //    清理在这里是不可逆的，判据不完整就宁可不做 —— 代价只是留下一个幽灵包。
+            string[] sourceFiles = Directory.GetFiles(scanRoot, "*.dll", SearchOption.TopDirectoryOnly);
+            string stash = Path.Combine(PluginPaths.Root, "selftest-source-stash");
+            Directory.CreateDirectory(stash);
+
+            try
+            {
+                foreach (string file in sourceFiles)
+                {
+                    File.Move(file, Path.Combine(stash, Path.GetFileName(file)));
+                }
+
+                PluginHost.AutoInstallBundledPlugins();
+            }
+            finally
+            {
+                foreach (string file in Directory.GetFiles(stash, "*.dll", SearchOption.TopDirectoryOnly))
+                {
+                    File.Move(file, Path.Combine(scanRoot, Path.GetFileName(file)));
+                }
+
+                Directory.Delete(stash, recursive: true);
+            }
+
+            if (PluginRegistryStore.FindEntry(ghostId) == null)
+            {
+                fail("来源区清理",
+                    "来源区里一枚 dll 都没有时仍然清理了随包插件 —— 判据不完整时必须让路，" +
+                    "那条清理是不可逆的（来源区那枚 dll 本来就已经不在了，没得补）");
+            }
+
+            // ③ 守卫二：来源区里有一枚读不出来的文件时，同样必须让路。
+            //    它守的是「别拿一份不完整的清单去删东西」—— 读不出来的那枚很可能就是某个官方包。
+            string brokenFile = Path.Combine(scanRoot, "selftest-broken-probe.dll");
+            File.WriteAllText(brokenFile, "this is not a PE file");
+
+            try
+            {
+                PluginHost.AutoInstallBundledPlugins();
+            }
+            finally
+            {
+                try { File.Delete(brokenFile); }
+                catch { /* 现场清理失败不该让自检失败 */ }
+            }
+
+            if (PluginRegistryStore.FindEntry(ghostId) == null)
+            {
+                fail("来源区清理",
+                    "来源区里有无法识别的文件时仍然清理了随包插件 —— 那时清单是不完整的，" +
+                    "很可能把某个官方包误判成「已停止分发」并删掉");
+            }
+
+            // ④ 判据完整时的真实清理。
+            PluginHost.AutoInstallBundledPlugins();
+
+            List<string> bundledAfter = PluginRegistryStore.SnapshotEntries()
+                .Where(entry => entry.Bundled)
+                .Select(entry => entry.Id)
+                .ToList();
+
+            line($"  幽灵包 {ghostId}：随包条目 {bundledBefore.Count} 个 → {bundledAfter.Count} 个");
+
+            if (PluginRegistryStore.FindEntry(ghostId) != null)
+            {
+                fail("来源区清理",
+                    $"来源区已不再分发 {ghostId}，它的登记条目却还在 —— 它会带着过时的认领快照" +
+                    "继续和新包抢同一个类型，认领表判「整对拒绝」后，两个包的动作一起失效");
+            }
+
+            // 反向核对：清理**只能**动该动的，别的随包条目一个都不能少。
+            // 这条与上一条同等重要 —— 误删一个用户正在用的官方包同样不可逆。
+            foreach (string id in bundledBefore)
+            {
+                if (string.Equals(id, ghostId, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!bundledAfter.Any(x => string.Equals(x, id, StringComparison.OrdinalIgnoreCase)))
+                {
+                    fail("来源区清理",
+                        $"来源区里明明还有 {id}，它的登记条目却被清理了 —— 用户那个包会凭空消失");
+                }
+            }
+
+            // 宿主区的安装副本必须一起走：只摘登记的话，插件列表里那一行照旧存在，
+            // 用户完全看不出问题出在哪（这正是「幽灵包」难查的原因）。
+            if (File.Exists(Path.Combine(ghostDirectory, "Ghost.dll")))
+            {
+                fail("来源区清理", "幽灵包的宿主区安装副本没有被删除 —— 插件列表里那一行会照旧存在");
+            }
+
+            // 但私有数据要留：「程序不再分发它」不等于「用户的数据该丢」。
+            if (!File.Exists(Path.Combine(ghostDirectory, "data", "settings.json")))
+            {
+                fail("来源区清理",
+                    "清理时把插件私有数据一起删了 —— 它将来若重新出现在来源区里，数据本该还在原地");
+            }
+
+            // 认领表是在 [3k] 里按当时的登记表建的，那时幽灵包还不存在 ——
+            // 先重建一次，下面这条断言才有判别力（否则它只是在验证一件本来就没发生过的事）。
+            PluginHost.RebuildClaimTable();
+
+            if (PluginHost.SnapshotClaims()
+                .Any(binding => string.Equals(binding.PluginId, ghostId, StringComparison.OrdinalIgnoreCase)))
+            {
+                fail("来源区清理", "被清理的幽灵包仍在认领表里 —— 它依然会和新包抢同一个类型");
+            }
+        }
+        finally
+        {
+            try
+            {
+                PluginRegistryStore.RemoveEntry(ghostId);
+                if (Directory.Exists(ghostDirectory)) Directory.Delete(ghostDirectory, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                // 现场清理失败必须出声：否则脏现场留给下一段，症状会出现在毫不相干的地方。
+                line($"  [WARN] [3m] 现场未清理干净：{ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// [3i] 顶层类型认领的断言体（随包动作包接管用户配置里的顶层 Type）。
+    /// <para>
+    /// <b>必须独立成方法并禁止内联</b>：本方法会持有 <see cref="PluginActionRegistration"/>
+    /// 与 <see cref="PluginExecuteOutcome"/> 之外的插件侧对象。只有让这些引用随本方法的
+    /// 栈帧一起消失，后续「停用 → 等 ALC 回收结论」才可能为真 —— 而删沙箱就发生在
+    /// <c>Run</c> 内部，结论为假就必然留下删不掉的残留。
+    /// </para>
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RunTypeClaimChecks(
+        PluginManifest manifest,
+        Action<string> line,
+        Action<string, string> fail)
+    {
+        // ① 占位类型必须永远可解析。
+        //
+        // 未配置的新扇区 Type 是 "Hotkey"（见 WheelLayer.EnsureLayers）；它一旦被外移，
+        // 用户停用该动作包之后，所有空扇区的触发都会变成一句「包已停用」。
+        if (!BuiltinActionCatalog.TryGet("Hotkey", out _))
+        {
+            fail("类型认领", "Hotkey 不在内建动作表里 —— 未配置扇区的占位类型会变成不可解析（停用动作包后更明显）");
         }
 
-        PluginInstance? instance = PluginHost.Find(pluginId);
-        if (instance == null) return "停用后找不到插件实例。";
-        if (instance.IsLoaded) return "探针开始前插件仍处于加载状态，无法模拟重启现场。";
-        if (PluginHost.GetRegisteredActions().Count != 0) return "探针开始前 Catalog 仍有动作残留。";
-
-        PluginExecuteOutcome disabledOutcome = PluginHost.ExecutePluginAction(probe);
-        line($"  禁用状态调用：处理={disabledOutcome.Handled} 成功={disabledOutcome.Success} 信息={disabledOutcome.Message}");
-        if (instance.IsLoaded) return "用户已禁用插件却被动作路径自动加载。";
-        if (disabledOutcome.Success || string.IsNullOrWhiteSpace(disabledOutcome.Message) ||
-            !disabledOutcome.Message.Contains("未启用", StringComparison.Ordinal))
+        // ② 保留类型名 "Plugin" 不可被认领：它对应的是另一套持久化形态，
+        // 被认领等于两条截然不同的执行路径挤在同一个 Type 上。
+        if (PluginHost.TryResolveClaimedType(PluginApi.ActionTypeName, out _))
         {
-            return $"禁用插件的动作没有被明确拒绝：{disabledOutcome.Message}";
+            fail("类型认领", $"保留类型名 {PluginApi.ActionTypeName} 被认领了 —— 两条执行路径会挤在同一个 Type 上");
         }
 
-        instance.Entry.Enabled = true;
-        PluginRegistryStore.UpsertEntry(instance.Entry);
-
-        PluginExecuteOutcome outcome = PluginHost.ExecutePluginAction(probe);
-        bool loadedByAction = instance.IsLoaded;
-
-        line($"  调用结果：处理={outcome.Handled} 成功={outcome.Success} 信息={outcome.Message}");
-        line($"  动作触发加载：{loadedByAction}");
-
-        string? failure = null;
-        if (!outcome.Handled)
+        // ③ 内建优先：还留在内建动作表里的类型，认领会被宿主静默拒绝。
+        // 让这个冲突在这里显形，而不是等用户发现「动作行为怎么还是旧的」。
+        foreach (PluginTypeClaim declared in manifest.ClaimedTypes)
         {
-            failure = "有效插件动作引用没有被动作路径处理。";
-        }
-        else if (!loadedByAction)
-        {
-            failure = "动作路径没有先加载已启用插件。";
-        }
-        else if (outcome.Success)
-        {
-            failure = "缺少必填参数的探针被执行成功，参数校验未在插件调用前生效。";
-        }
-        else if (string.IsNullOrWhiteSpace(outcome.Message) || !outcome.Message.Contains("参数不合法", StringComparison.Ordinal))
-        {
-            failure = $"插件虽然被加载，但没有进入预期的参数校验分支：{outcome.Message}";
+            if (BuiltinActionCatalog.TryGet(declared.TypeName, out BuiltinActionRegistration stillBuiltin))
+            {
+                fail("类型认领",
+                    $"清单认领的 \"{declared.TypeName}\" 仍由内建动作 {stillBuiltin.FullId} 提供 —— " +
+                    "认领会被宿主拒绝，动作行为退回旧路径（双轨制）");
+            }
         }
 
-        PluginStopResult stopResult = PluginHost.DisableAsync(pluginId, PluginStopReason.SelfTest).GetAwaiter().GetResult();
-        bool disabled = stopResult.IsFullyStopped;
-        string disableError = stopResult.Message;
-        if (!disabled)
+        // 认领表本身是纯字符串（读一次登记表就有），但「贡献点存不存在」得插件真的加载起来
+        // 才问得出来。这里显式启用，把后面几条断言的前提摆清楚。
+        if (!PluginHost.Enable(manifest.Id, out string claimEnableError))
         {
-            return failure ?? $"惰性加载探针结束后停用失败：{disableError}";
+            fail("类型认领", $"启用随包插件失败，认领链路无从验证：{claimEnableError}");
+            return;
         }
 
-        bool unloaded = PluginHost.Find(pluginId)?.WaitForUnloadVerdict(5000) ?? false;
-        if (!unloaded)
+        List<PluginHost.PluginTypeClaimBinding> claims = PluginHost.SnapshotClaims();
+
+        line($"  认领表：{claims.Count} 项" +
+            (claims.Count > 0
+                ? $"（{string.Join("、", claims.Select(c => $"{c.TypeName}→{c.FullId}"))}）"
+                : ""));
+
+        // ④ 清单里声明的每一条都必须真的生效，且指向的贡献点必须真的存在。
+        foreach (PluginTypeClaim declared in manifest.ClaimedTypes)
         {
-            return failure ?? "惰性加载探针结束后 ALC 未被回收。";
+            int claimIndex = claims.FindIndex(
+                c => string.Equals(c.TypeName, declared.TypeName, StringComparison.OrdinalIgnoreCase));
+
+            if (claimIndex < 0)
+            {
+                fail("类型认领",
+                    $"清单认领的 \"{declared.TypeName}\" 没有进入认领表 —— " +
+                    "配置里所有该类型的动作都会掉进「无法识别的动作类型」，用户的配置等于丢了");
+                continue;
+            }
+
+            PluginHost.PluginTypeClaimBinding binding = claims[claimIndex];
+            string expectedFullId = $"{manifest.Id}.{declared.ContributionId}";
+
+            if (!string.Equals(binding.FullId, expectedFullId, StringComparison.Ordinal))
+            {
+                fail("类型认领",
+                    $"\"{declared.TypeName}\" 认领到了 {binding.FullId}，清单声明的是 {expectedFullId}");
+                continue;
+            }
+
+            // 认领表是纯字符串，不校验的话一个拼错的短 ID 会被原样接受，
+            // 直到用户按下去才暴露 —— 而那时看到的是「插件没提供这个动作」，
+            // 与真正的原因（清单写错了）隔着好几层。
+            if (!PluginHost.TryGetAction(expectedFullId, out PluginActionRegistration claimedAction))
+            {
+                fail("类型认领",
+                    $"认领指向的贡献点 {expectedFullId} 并不存在（插件已加载）—— " +
+                    "按下去只会得到一句「插件没提供这个动作」");
+                continue;
+            }
+
+            // 被认领的动作必须从「🔌 插件」子下拉里消失。否则同一个动作在两处都能选中，
+            // 而两处写出的配置形态互不兼容（Type="Launch" vs Type="Plugin" + 引用）。
+            bool inSubDropdown = PluginActionBinding.BuildPluginActionItems()
+                .Any(o => string.Equals(o.FullId, expectedFullId, StringComparison.Ordinal));
+            bool excluded = PluginHost.IsClaimedContribution(expectedFullId);
+
+            if (!excluded || inSubDropdown)
+            {
+                fail("类型认领",
+                    $"{expectedFullId} 仍出现在「插件」子下拉里（IsClaimedContribution={excluded}）—— " +
+                    "同一个动作会在两处配到，写出两套互不兼容的配置");
+                continue;
+            }
+
+            line($"  {declared.TypeName} → {claimedAction.FullId}｜{claimedAction.DisplayName}｜" +
+                $"参数 {claimedAction.Parameters.Count} 项｜已排除出子下拉 ✓");
+
+            // ⑥ 宿主表仍是插件下拉的唯一数据源。
+            //
+            // 这两个动作的参数选项都由宿主的表**即时生成**，插件不另抄一份。
+            // 抄一份的后果是宿主加了布局码 / 系统功能之后插件下拉里没有它 ——
+            // 没有报错、没有异常，用户只知道「这个新选项选不到」。
+            //
+            // 【为什么是这一层而不是 [3f]】这两条断言原先住在 [3f] 的内建动作循环里，
+            // 而 Tile（S4c）与 System（S4b）相继改成认领类型之后，那个循环再也走不到它们：
+            // 断言还在源码里，却永远不会执行 —— 守卫静默失效，编译与自检都不出声。
+            // 挪到认领链路上之后，它跟着「类型被谁认领」走，不再依赖某个循环恰好覆盖到它。
+            int? expectedOptionCount = declared.TypeName switch
+            {
+                // Tile 的选项 = 全部布局码 + 循环 / 反向循环 / 还原三个特殊标记。
+                "Tile" => WindowTiler.LayoutKeys.Count + 3,
+
+                // System 的选项 = 宿主那张有序预设表，一项不多一项不少。
+                "System" => SlotViewModel.SystemPresetList.Count,
+
+                _ => null,
+            };
+
+            if (expectedOptionCount is int expected)
+            {
+                int optionCount = claimedAction.Parameters.Count > 0
+                    ? claimedAction.Parameters[0].Options?.Count ?? 0
+                    : -1;
+
+                if (optionCount != expected)
+                {
+                    fail("类型认领",
+                        $"{declared.TypeName} 的参数选项数（{optionCount}）与宿主表（{expected}）不一致 —— " +
+                        "宿主表已不再是插件下拉的唯一数据源");
+                }
+                else
+                {
+                    // 断言只在失败时出声会让「守卫还在不在」变得不可知 ——
+                    // 自检报告里看得见的结论，才是下次改动时能对照的东西。
+                    line($"    · 选项数 {optionCount} 项，与宿主表逐项同源 ✓");
+                }
+            }
+
+            // ⑦ 参数键健全性：键是插件与宿主之间的隐形契约，拼错不会有任何报错。
+            //
+            // 两类真实风险：
+            // · 重复键 —— 编辑器把两份用户输入写进同一个 ExtensionData 槽位，
+            //   后写的覆盖先写的，界面上看不出任何异样。
+            // · 大小写漂移 —— 宿主投影器对裸字段是**精确匹配**（"Parameter" ≠ "parameter"），
+            //   手敲一个差一个大小写的键名，插件永远读到空值。
+            //   「preset 险情」就是这一族：老配置的值住在裸字段 Parameter 里，
+            //   键名写错一格，迁移过来的老配置就全部静默失联。
+            var declaredKeys = new List<string>();
+            foreach (ParameterField parameter in claimedAction.Parameters)
+            {
+                if (declaredKeys.Contains(parameter.Key, StringComparer.Ordinal))
+                {
+                    fail("类型认领",
+                        $"{expectedFullId} 声明了重复的参数键 \"{parameter.Key}\" —— " +
+                        "两份输入会写进同一个存储槽位，后写的静默覆盖先写的");
+                }
+
+                string? hostField = HostActionFields.All.FirstOrDefault(f =>
+                    string.Equals(f, parameter.Key, StringComparison.OrdinalIgnoreCase));
+
+                if (hostField != null && hostField != parameter.Key)
+                {
+                    fail("类型认领",
+                        $"{expectedFullId} 的参数键 \"{parameter.Key}\" 与宿主裸字段 \"{hostField}\" 只差大小写 —— " +
+                        "投影是精确匹配，这个键永远读不到宿主投影出来的值");
+                }
+
+                declaredKeys.Add(parameter.Key);
+            }
         }
 
-        if (PluginHost.GetRegisteredActions().Count != 0)
+        // ⑤ 宿主字段白名单与投影器不能漂移。
+        // 这两处任一处改了名字，用户配的路径 / 网址就送不进插件，
+        // 症状却只是「动作没反应」—— 要一路翻到投影器才会发现。
+        var fieldProbe = new ActionItem
         {
-            return failure ?? "惰性加载探针停用后仍有动作残留。";
+            Parameter = "p",
+            Arguments = "a",
+            CommandTerminal = "t",
+            BrowserChoice = "b",
+            BrowserPath = "bp",
+            RunAsStandardUser = true,
+        };
+
+        Dictionary<string, string> fieldProjection = ActionParameterProjection.Project(fieldProbe);
+
+        foreach (string fieldKey in HostActionFields.All)
+        {
+            if (!ActionParameterProjection.CanProject(fieldKey))
+            {
+                fail("参数投影", $"宿主字段「{fieldKey}」无法被投影 —— 用户配的值送不进插件");
+            }
+            else if (!fieldProjection.ContainsKey(fieldKey))
+            {
+                fail("参数投影", $"宿主字段「{fieldKey}」在有值时没有被投影出来");
+            }
         }
 
-        line("  首次调用已完成加载并命中参数校验，随后再次成功停用。");
-        return failure;
+        // 布尔字段只认小写字面量：投影成 "True" 之类的写法在别的区域设置下
+        // 会静默退回默认值 —— 而这里退回的是「以普通用户身份运行」，即降权失效。
+        string runAs = fieldProjection.GetValueOrDefault(nameof(ActionItem.RunAsStandardUser)) ?? "";
+        if (!string.Equals(runAs, "true", StringComparison.Ordinal))
+        {
+            fail("参数投影", $"RunAsStandardUser 应投影为 \"true\"，实际 '{runAs}'");
+        }
+
+        line($"  宿主字段投影：{HostActionFields.All.Length} 个字段全部可投影 ✓（布尔为小写字面量 ✓）");
+
+        // ⑥ 认领类型的动作必须真的被派发到该插件。
+        //
+        // 这里刻意挑「参数不全、会被宿主校验拦下」的一条来派发：整条链路
+        // （解析认领 → 找到实例 → 查贡献点 → 投影参数 → 校验）全部走一遍，
+        // 但绝不会调用插件的 ExecuteAsync —— 自检不能顺手启动一个程序。
+        // 若本包全部认领动作在空参数下都合法，就如实说明并跳过，不制造假通过。
+        ActionItem? dispatchProbeAction = null;
+        PluginHost.PluginTypeClaimBinding dispatchProbeClaim = default;
+
+        foreach (PluginHost.PluginTypeClaimBinding claim in claims)
+        {
+            var probe = new ActionItem { Type = claim.TypeName, Name = "自检用" };
+
+            PluginHost.PluginActionValidation probeVerdict = PluginHost.ValidateActionParameters(
+                claim.FullId, ActionParameterProjection.Project(probe));
+
+            if (!probeVerdict.IsValid)
+            {
+                dispatchProbeClaim = claim;
+                dispatchProbeAction = probe;
+                break;
+            }
+        }
+
+        if (dispatchProbeAction == null)
+        {
+            line("  派发链路：本包全部认领动作在空参数下都合法，为免真实副作用跳过派发探针。");
+            return;
+        }
+
+        PluginExecuteOutcome claimOutcome =
+            PluginHost.ExecuteClaimedAction(dispatchProbeAction, dispatchProbeClaim);
+
+        line($"  派发链路：Type='{dispatchProbeAction.Type}' → Handled={claimOutcome.Handled}，" +
+            $"Success={claimOutcome.Success}｜{claimOutcome.Message}");
+
+        // 被校验拦下 ⇒ Handled=true（确实被认领链路接走了）+ Success=false。
+        // Handled=false 意味着它又掉回了「谁都不认识」—— 那正是本段要防的静默失效。
+        if (!claimOutcome.Handled)
+        {
+            fail("类型认领派发",
+                $"认领类型 {dispatchProbeAction.Type} 没有被执行器接走（Handled=false）—— " +
+                "动作触发时不会有任何反应，也没有任何提示");
+        }
+        else if (claimOutcome.Success)
+        {
+            fail("类型认领派发",
+                $"空参数的 {dispatchProbeAction.Type} 竟然报告成功 —— " +
+                "必填参数没有被拦下，用户的空动作会被当成合法配置执行");
+        }
+    }
+
+    /// <summary>
+    /// 跑一次「应当被能力门禁拒绝」的调用，把结论压成一行可读文本。
+    /// <para>
+    /// 三种结果必须分得清，否则这条断言等于没写：
+    /// <list type="number">
+    /// <item>抛了 <see cref="PluginCapabilityDeniedException"/> —— 门禁生效，再看它拦得够不够清楚；</item>
+    /// <item>抛了别的异常 —— 门禁没生效，是别的东西炸了；</item>
+    /// <item>正常返回 —— 门禁根本不存在。</item>
+    /// </list>
+    /// 只判「有没有抛异常」会把后两种混在一起，而它们的修法完全不同。
+    /// </para>
+    /// <para>
+    /// 「拦得清楚」的三条判据：能力必须是 <see cref="PluginCapability.Process"/>（不是别的）、
+    /// 异常类型不能是 <see cref="PluginContractException"/>（那会让插件被整体卸载）、
+    /// 消息里要给出修复动作（去清单里补一行，而不是「权限不足」四个字）。
+    /// </para>
+    /// </summary>
+    /// <param name="expected">
+    /// 这次调用<b>应当</b>被拦在哪一项能力上。默认 <c>Process</c>（命令 / Shell 两个服务）——
+    /// 窗口服务是 <c>WindowControl</c>。归因错了说明服务的 required 传错了，
+    /// 而那会让安装确认页上另一项能力的标签变成空话。
+    /// </param>
+    private static (bool Denied, string Detail) ProbeCapabilityGate(
+        Func<bool> call,
+        PluginCapability expected = PluginCapability.Process)
+    {
+        try
+        {
+            bool accepted = call();
+            return (false, $"调用被直接放行（返回 {accepted}）—— 门禁不存在");
+        }
+        catch (Exception ex)
+        {
+            return ClassifyGateOutcome(ex, expected);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="ProbeCapabilityGate(Func{bool}, PluginCapability)"/> 的姊妹版，
+    /// 供<b>返回 void</b> 的宿主服务使用（目前只有 <c>ScreenCapture.CaptureAndRecognize</c>）。
+    /// <para>
+    /// 刻意做成<b>另一个名字</b>而不是同名重载。C# 里 <c>() =&gt; M()</c> 这种语句表达式 lambda
+    /// 既能转成 <c>Func&lt;bool&gt;</c>（M 返回 bool 时）也能转成 <c>Action</c>（丢弃返回值），
+    /// 于是同名重载会让上面三处 <c>Run</c> / <c>Invoke</c> / <c>ApplyLayout</c> 的探针
+    /// 落进「谁更匹配」的规则里 —— 那是一个编译器说了算、读代码的人看不出来的选择。
+    /// 名字分开，读一眼就知道哪条探针没有返回值可看。
+    /// </para>
+    /// <para>
+    /// 也不能图省事把它包成 <c>() =&gt; { call(); return false; }</c> 塞进上面那个：
+    /// 门禁真缺失时打印出来的会是「调用被直接放行（返回 False）」——
+    /// 一个凭空捏造的 <c>false</c> 混进结论里，而这条断言的整个意义就是分清
+    /// 「门禁不存在」和「门禁在，但它放行了」。
+    /// </para>
+    /// </summary>
+    private static (bool Denied, string Detail) ProbeVoidCapabilityGate(
+        Action call,
+        PluginCapability expected)
+    {
+        try
+        {
+            call();
+            return (false, "调用被直接放行（void 方法正常返回）—— 门禁不存在");
+        }
+        catch (Exception ex)
+        {
+            return ClassifyGateOutcome(ex, expected);
+        }
+    }
+
+    /// <summary>
+    /// 把「应当被拒绝」的调用<b>实际抛出的异常</b>压成一行可读结论。
+    /// <para>
+    /// 两个探针共用这一段的理由是「拦得清楚」的三条判据与「谁去调用它」无关：
+    /// 能力必须正好是 <paramref name="expected"/>、异常类型不能是
+    /// <see cref="PluginContractException"/>、消息里要给出修复动作。
+    /// </para>
+    /// <para>
+    /// 归因错了说明服务的 required 传错了，而那会让安装确认页上另一项能力的标签变成空话：
+    /// 用户勾的是「窗口控制」，运行时拦的却是「进程」。
+    /// </para>
+    /// </summary>
+    private static (bool Denied, string Detail) ClassifyGateOutcome(
+        Exception ex,
+        PluginCapability expected)
+    {
+        if (ex is PluginCapabilityDeniedException denied)
+        {
+            if (denied.Capability != expected)
+            {
+                return (false, $"拒绝时归因的能力是 {denied.Capability}，应为 {expected}");
+            }
+
+            if (!denied.Message.Contains("capabilities", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, $"拒绝消息里没说清该怎么修（未提到清单里的 capabilities 数组）：{denied.Message}");
+            }
+
+            return (true, $"已拒绝（{denied.ServiceName} / {denied.Capability}）");
+        }
+
+        return (false, $"抛出的不是 PluginCapabilityDeniedException，而是 {ex.GetType().Name}：{ex.Message}");
     }
 
     /// <summary>

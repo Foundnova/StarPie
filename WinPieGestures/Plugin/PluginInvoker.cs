@@ -50,24 +50,9 @@ internal static class PluginInvoker
     public static PluginExecuteOutcome Invoke(
         PluginInstance instance,
         PluginActionRegistration registration,
-        IReadOnlyDictionary<string, string> parameters,
-        PluginCallCoordinator calls)
+        IReadOnlyDictionary<string, string> parameters)
     {
         if (instance == null || registration == null) return PluginExecuteOutcome.NotHandled;
-
-        if (!calls.TryAcquireInvocation(
-                instance,
-                PluginCallKind.ActionExecution,
-                out PluginInvocationLease? lease,
-                out string leaseError))
-        {
-            return new PluginExecuteOutcome
-            {
-                Handled = true,
-                Success = false,
-                Message = leaseError,
-            };
-        }
 
         int timeoutSeconds = registration.TimeoutSeconds > 0
             ? registration.TimeoutSeconds
@@ -87,13 +72,12 @@ internal static class PluginInvoker
         }
         catch (Exception ex)
         {
-            lease!.Dispose();
             return Fail(instance, registration, $"构造调用上下文失败：{ex.Message}", 0);
         }
 
         return registration.Kind == ActionKind.Background
-            ? InvokeInBackground(instance, registration, input, timeoutSeconds, lease!)
-            : InvokeSequential(instance, registration, input, timeoutSeconds, lease!);
+            ? InvokeInBackground(instance, registration, input, timeoutSeconds)
+            : InvokeSequential(instance, registration, input, timeoutSeconds);
     }
 
     // ------------------------------------------------------------------ 串行类
@@ -102,19 +86,17 @@ internal static class PluginInvoker
         PluginInstance instance,
         PluginActionRegistration registration,
         PluginActionInput input,
-        int timeoutSeconds,
-        PluginInvocationLease lease)
+        int timeoutSeconds)
     {
         var stopwatch = Stopwatch.StartNew();
-        PluginInvocationLease? ownedLease = lease;
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-            timeoutCts.Token,
-            lease.CancellationToken);
+
+        // 动作线程没有 SynchronizationContext，插件的 await 续体会回到线程池，
+        // 因此在这里 Wait 不会造成死锁。
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
 
         try
         {
-            Task<ActionResult>? task = registration.Contribution.ExecuteAsync(input, linkedCts.Token);
+            Task<ActionResult>? task = registration.Contribution.ExecuteAsync(input, cts.Token);
             if (task == null)
             {
                 stopwatch.Stop();
@@ -124,17 +106,11 @@ internal static class PluginInvoker
             if (!task.Wait(TimeSpan.FromSeconds(timeoutSeconds + TimeoutGraceMs / 1000.0)))
             {
                 stopwatch.Stop();
-                ObserveTimedOutTask(task, ownedLease, instance, registration);
-                ownedLease = null;
-                if (lease.CancellationToken.IsCancellationRequested)
-                {
-                    return CancelledByStop(registration);
-                }
-
                 return Fail(
                     instance,
                     registration,
-                    $"执行超时（{timeoutSeconds}s）。已取消等待；宿主会继续追踪任务，直到插件代码真实结束。",
+                    $"执行超时（{timeoutSeconds}s）。已放弃等待，但插件的同步阻塞代码无法被强制终止 —— " +
+                    "如果该插件反复超时，建议停用它并反馈给作者。",
                     stopwatch.Elapsed.TotalMilliseconds);
             }
 
@@ -146,144 +122,73 @@ internal static class PluginInvoker
         {
             stopwatch.Stop();
             Exception inner = aggregate.GetBaseException();
-            if (inner is OperationCanceledException && lease.CancellationToken.IsCancellationRequested)
-            {
-                return CancelledByStop(registration);
-            }
             return Fail(instance, registration, DescribeException(inner), stopwatch.Elapsed.TotalMilliseconds, inner);
-        }
-        catch (OperationCanceledException) when (lease.CancellationToken.IsCancellationRequested)
-        {
-            stopwatch.Stop();
-            return CancelledByStop(registration);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             return Fail(instance, registration, DescribeException(ex), stopwatch.Elapsed.TotalMilliseconds, ex);
         }
-        finally
-        {
-            ownedLease?.Dispose();
-        }
-    }
-
-    private static void ObserveTimedOutTask(
-        Task<ActionResult> task,
-        PluginInvocationLease lease,
-        PluginInstance instance,
-        PluginActionRegistration registration)
-    {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await task.ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                instance.Logger.Warn(
-                    $"[{registration.FullId}] 超时后的任务最终结束：{ex.GetBaseException().Message}");
-            }
-            finally
-            {
-                lease.Dispose();
-            }
-        });
     }
 
     // ------------------------------------------------------------------ 后台类
 
+    /// <summary>
+    /// 后台类动作：<b>不占用动作线程</b>，直接扔给线程池。
+    /// <para>
+    /// 代价是调用方拿不到结果 —— 这是刻意的取舍：动作线程一旦被网络或长计算占住，
+    /// 整个轮盘的下一次呼出都会被卡住，那个代价远大于「这一个动作的成败晚几秒写进日志」。
+    /// </para>
+    /// </summary>
     private static PluginExecuteOutcome InvokeInBackground(
         PluginInstance instance,
         PluginActionRegistration registration,
         PluginActionInput input,
-        int timeoutSeconds,
-        PluginInvocationLease lease)
+        int timeoutSeconds)
     {
         string pluginId = instance.PluginId;
         IActionContribution contribution = registration.Contribution;
 
-        try
+        _ = Task.Run(async () =>
         {
-            _ = Task.Run(async () =>
+            var stopwatch = Stopwatch.StartNew();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+
+            try
             {
-                using (lease)
-                using (var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
-                using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                           timeoutCts.Token,
-                           lease.CancellationToken))
+                Task<ActionResult> task = contribution.ExecuteAsync(input, cts.Token);
+
+                Task completed = await Task.WhenAny(
+                    task,
+                    Task.Delay(TimeSpan.FromSeconds(timeoutSeconds + TimeoutGraceMs), cts.Token)).ConfigureAwait(false);
+
+                stopwatch.Stop();
+
+                if (!ReferenceEquals(completed, task))
                 {
-                    var stopwatch = Stopwatch.StartNew();
-
-                    try
-                    {
-                        Task<ActionResult>? task = contribution.ExecuteAsync(input, linkedCts.Token);
-                        if (task == null)
-                        {
-                            stopwatch.Stop();
-                            ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds,
-                                "ExecuteAsync 返回了 null。");
-                            return;
-                        }
-
-                        Task completed = await Task.WhenAny(
-                            task,
-                            Task.Delay(TimeSpan.FromSeconds(timeoutSeconds + TimeoutGraceMs / 1000.0)))
-                            .ConfigureAwait(false);
-
-                        if (!ReferenceEquals(completed, task))
-                        {
-                            stopwatch.Stop();
-                            if (lease.CancellationToken.IsCancellationRequested)
-                            {
-                                instance.Logger.Info($"[{registration.FullId}] 插件停用后任务仍未结束，继续持有租约等待。");
-                            }
-                            else
-                            {
-                                instance.Logger.Warn($"[{registration.FullId}] 后台执行超时（{timeoutSeconds}s），继续等待真实任务结束。");
-                                ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, "后台执行超时");
-                            }
-
-                            try { await task.ConfigureAwait(false); }
-                            catch (Exception ex)
-                            {
-                                instance.Logger.Warn($"[{registration.FullId}] 超时后的后台任务最终结束：{ex.GetBaseException().Message}");
-                            }
-                            return;
-                        }
-
-                        ActionResult result = await task.ConfigureAwait(false);
-                        stopwatch.Stop();
-                        ApplyOutcome(
-                            instance, registration, result.Success, stopwatch.Elapsed.TotalMilliseconds,
-                            result.Success ? null : result.Message);
-                    }
-                    catch (OperationCanceledException) when (lease.CancellationToken.IsCancellationRequested)
-                    {
-                        stopwatch.Stop();
-                        instance.Logger.Info($"[{registration.FullId}] 因插件停用而取消，不计入插件故障。");
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        stopwatch.Stop();
-                        instance.Logger.Warn($"[{registration.FullId}] 后台执行被取消（超时）。");
-                        ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, "后台执行被取消");
-                    }
-                    catch (Exception ex)
-                    {
-                        stopwatch.Stop();
-                        instance.Logger.Error($"[{registration.FullId}] 后台执行抛出异常", ex);
-                        ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, DescribeException(ex));
-                    }
+                    instance.Logger.Warn($"[{registration.FullId}] 后台执行超时（{timeoutSeconds}s）。");
+                    ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, "后台执行超时");
+                    return;
                 }
-            });
-        }
-        catch (Exception ex)
-        {
-            lease.Dispose();
-            return Fail(instance, registration, $"提交后台任务失败：{ex.Message}", 0, ex);
-        }
+
+                ActionResult result = await task.ConfigureAwait(false);
+                ApplyOutcome(
+                    instance, registration, result.Success, stopwatch.Elapsed.TotalMilliseconds,
+                    result.Success ? null : result.Message);
+            }
+            catch (OperationCanceledException)
+            {
+                stopwatch.Stop();
+                instance.Logger.Warn($"[{registration.FullId}] 后台执行被取消（超时）。");
+                ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, "后台执行被取消");
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                instance.Logger.Error($"[{registration.FullId}] 后台执行抛出异常", ex);
+                ApplyOutcome(instance, registration, false, stopwatch.Elapsed.TotalMilliseconds, DescribeException(ex));
+            }
+        });
 
         return new PluginExecuteOutcome
         {
@@ -295,13 +200,6 @@ internal static class PluginInvoker
     }
 
     // ------------------------------------------------------------------ 结果处理
-
-    private static PluginExecuteOutcome CancelledByStop(PluginActionRegistration registration) => new()
-    {
-        Handled = true,
-        Success = false,
-        Message = $"{registration.DisplayName} 因插件正在停用而取消。",
-    };
 
     private static PluginExecuteOutcome Interpret(
         PluginInstance instance,

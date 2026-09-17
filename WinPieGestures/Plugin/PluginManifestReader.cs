@@ -65,11 +65,13 @@ internal static class PluginManifestReader
         SimpleVersion.TryParse(HostVersion, out SimpleVersion v) ? v : new SimpleVersion();
 
     /// <summary>读取并校验一份清单文件。</summary>
+    /// <param name="allowReservedIdPrefix">见 <see cref="Validate"/> 的同名参数。</param>
     public static bool TryLoad(
         string manifestPath,
         out PluginManifest manifest,
         out PluginScanFailure failure,
-        out string error)
+        out string error,
+        bool allowReservedIdPrefix = false)
     {
         manifest = new PluginManifest();
         failure = PluginScanFailure.ManifestInvalid;
@@ -97,17 +99,37 @@ internal static class PluginManifestReader
             return false;
         }
 
-        return Validate(manifest, out failure, out error);
+        return Validate(manifest, out failure, out error, allowReservedIdPrefix);
     }
 
     /// <summary>
     /// 按规范校验清单。顺序刻意从「最基础」到「最兼容」，
     /// 保证用户拿到的是<b>第一个真正的问题</b>，而不是一串无关报错。
     /// </summary>
+    /// <param name="allowReservedIdPrefix">
+    /// 放行保留 ID 前缀（<c>starpie.*</c> 等）。
+    /// <para>
+    /// <see cref="PluginApi.ReservedIdPrefixes"/> 管的是「<b>社区</b>不得占用官方与系统命名空间」，
+    /// 所以这个开关的判据是「这份清单有没有正当理由用官方命名空间」，有两种情况都算：
+    /// </para>
+    /// <list type="number">
+    /// <item><b>来自随程序分发的只读来源区</b>（<c>&lt;程序目录&gt;\plugin\</c>）——
+    /// 官方包用 <c>starpie.*</c> 命名，用的就是这个保留命名空间的本意。拒掉它是规则的假阳性。</item>
+    /// <item><b>装载一枚已登记的插件</b>（<see cref="PluginScanner.ScanInstalledPlugin"/>）——
+    /// ID 在它进入系统的那一刻（扫描 / 导入）已经查过一次，装载时再查一次只会制造矛盾：
+    /// 同一枚随包 dll 会「装得上、永远起不来」，而报错还指着 ID 说事，与真实原因毫无关系。
+    /// 边界查一次，系统内部不复查。</item>
+    /// </list>
+    /// <para>
+    /// 这不构成安全边界：往来源区放文件需要对安装目录的写权限；而真正决定「能不能认领顶层类型」
+    /// 的是登记表里的 <c>Bundled</c> 标记，那只由宿主自己写，插件的任何声明都影响不了它。
+    /// </para>
+    /// </param>
     public static bool Validate(
         PluginManifest manifest,
         out PluginScanFailure failure,
-        out string error)
+        out string error,
+        bool allowReservedIdPrefix = false)
     {
         failure = PluginScanFailure.ManifestInvalid;
         error = "";
@@ -133,7 +155,7 @@ internal static class PluginManifestReader
             error = $"id=\"{manifest.Id}\" 不是合法的反向域名格式（全小写，至少两级，如 com.example.mytool）。";
             return false;
         }
-        if (PluginPaths.IsReservedPluginId(manifest.Id))
+        if (!allowReservedIdPrefix && PluginPaths.IsReservedPluginId(manifest.Id))
         {
             failure = PluginScanFailure.ReservedIdPrefix;
             error = $"id=\"{manifest.Id}\" 占用了保留前缀（{string.Join(" / ", PluginApi.ReservedIdPrefixes)}）。";
@@ -287,8 +309,20 @@ internal static class PluginManifestReader
         string? license,
         IReadOnlyList<string> capabilities,
         string targetFramework,
-        string? entryType)
+        string? entryType,
+        string? typeClaims = null)
     {
+        List<PluginTypeClaim> claims = PluginTypeClaim.ParseAll(typeClaims, out List<string> malformed);
+
+        if (malformed.Count > 0)
+        {
+            // 半残的认领串绝不能静默接受：被丢掉的段意味着某个动作类型没人认领，
+            // 用户看到的是「这个动作按下去没反应」，而日志里一个字都没有。
+            AppLogger.LogWarn(
+                $"[plugin] {pluginId} 的 {PluginApi.TypeClaimsMetadataKey} 里有 {malformed.Count} 段无法解析，已丢弃：" +
+                $"{string.Join(" | ", malformed)}。正确写法形如 \"Command=command;Hotkey=hotkey\"。");
+        }
+
         return new PluginManifest
         {
             SchemaVersion = PluginApi.ManifestSchemaVersion,
@@ -307,6 +341,7 @@ internal static class PluginManifestReader
             Platform = "win-x64",
             EntryType = entryType,
             Capabilities = new List<string>(capabilities),
+            ClaimedTypes = claims,
             Contributions = new PluginContributions { Actions = true },
         };
     }

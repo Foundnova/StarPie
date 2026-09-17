@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,6 +32,21 @@ internal sealed class PluginInstallOptions
     /// <para>用途只有一个：日后排查「这个插件是怎么进来的」。不做任何逻辑分支。</para>
     /// </summary>
     public string SourceKind { get; set; } = "UserSelectedFile";
+
+    /// <summary>
+    /// 本次安装的是<b>随主程序分发的插件</b>。
+    /// <para>
+    /// 这一类与用户自己装的插件有三处行为差异，都在登记表里用这个标记驱动：
+    /// 首启自动安装并启用（不必用户逐个点安装）、不可卸载（只可停用）、
+    /// 被从宿主区删掉后会在下次启动时补回来。
+    /// </para>
+    /// <para>
+    /// 刻意不复用 <see cref="SourceKind"/> 来判分支：那个字段的注释写明「不做任何逻辑分支」，
+    /// 只用于事后排查。要分支就单独立一个字段，免得日后有人往 Source 里加个新取值
+    /// 就悄悄改变了安装语义。
+    /// </para>
+    /// </summary>
+    public bool Bundled { get; set; }
 }
 
 internal sealed class PluginInstallResult
@@ -58,15 +72,6 @@ internal static class PluginHost
 
     private static readonly object Gate = new();
     private static readonly Dictionary<string, PluginInstance> Instances = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// 三条 SPP 调用路径的统一运行时入口。动作路径先适配现有实现，交互与轮盘结构路径先建立空接缝。
-    /// </summary>
-    private static readonly PluginRuntime Runtime = new(Catalog, Find, static () => _enabled);
-    private static readonly ConcurrentDictionary<string, Lazy<Task<PluginStopResult>>> StopOperations =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    public static readonly TimeSpan DefaultStopGracePeriod = TimeSpan.FromSeconds(5);
 
     private static bool _initialized;
     private static bool _enabled = true;
@@ -138,11 +143,21 @@ internal static class PluginHost
 
             CheckSafeMode();
 
+            // 随包分发的插件：先装进来，再让 SyncFromDisk 按登记表建立实例。
+            // 顺序不能反 —— 反了的话这次装上的插件要等下次启动才出现在列表里。
+            int bundledInstalled = AutoInstallBundledPlugins();
+
             int discovered = SyncFromDisk();
+
+            // 认领表必须在 SyncFromDisk 之后建：它读的是实例上的登记条目，
+            // 而实例是 SyncFromDisk 按登记表建立的。顺序反了这个表就是空的，
+            // 表现是「随包动作包明明装上了，配置里的 Command 却没人认领」。
+            RebuildClaimTable();
+
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
-                $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
+                $"（本次扫描新发现 {discovered} 个，随包装入 {bundledInstalled} 个），安全模式={_safeModeActive}");
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -162,23 +177,24 @@ internal static class PluginHost
         }
     }
 
-    /// <summary>宿主退出前的收尾。退出路径允许同步等待短宽限期，最终进程退出由操作系统兜底。</summary>
+    /// <summary>宿主退出前的收尾：停用全部插件并落盘健康度。</summary>
     public static void ShutdownAll()
     {
-        if (!_initialized) return;
+        if (!_initialized || !_enabled) return;
 
-        foreach (PluginInstance instance in ListInstances())
+        List<PluginInstance> snapshot;
+        lock (Gate)
         {
-            if (!instance.IsLoaded) continue;
+            snapshot = new List<PluginInstance>(Instances.Values);
+        }
 
+        foreach (PluginInstance instance in snapshot)
+        {
             try
             {
-                _ = DisableAsync(
-                        instance.PluginId,
-                        PluginStopReason.ApplicationExit,
-                        TimeSpan.FromSeconds(2),
-                        CancellationToken.None)
-                    .GetAwaiter().GetResult();
+                if (!instance.IsLoaded) continue;
+                instance.Unload();
+                instance.FlushHealth();
             }
             catch (Exception ex)
             {
@@ -197,7 +213,10 @@ internal static class PluginHost
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(dllPath);
+            // 与候选扫描走同一条来源区判定。少了这一步会自相矛盾：同一枚随包 dll
+            // 放在来源区能被自动装上，手工选中它却被告知「占用了保留前缀」——
+            // 用户拿到的是两条互相打架的结论，而两条都出自同一个宿主。
+            return PluginScanner.ScanSelectedDll(dllPath, allowReservedIdPrefix: IsInOfficialSourceDirectory(dllPath));
         }
         catch (Exception ex)
         {
@@ -211,36 +230,6 @@ internal static class PluginHost
     /// 第二步：用户确认后落盘。复制到插件目录并登记为 <b>Disabled</b>。
     /// <para>注意：这里<b>不会加载程序集</b> —— 「安装」与「启用」刻意分成两个动作。</para>
     /// </summary>
-    public static async Task<PluginInstallResult> CommitInstallAsync(
-        PluginScanResult scan,
-        PluginInstallOptions options,
-        CancellationToken cancellationToken = default)
-    {
-        options ??= new PluginInstallOptions();
-        string? pluginId = scan?.Manifest?.Id;
-
-        if (options.OverwriteExisting && !string.IsNullOrWhiteSpace(pluginId) && Find(pluginId) != null)
-        {
-            PluginStopResult stop = await DisableAsync(
-                pluginId,
-                PluginStopReason.Update,
-                DefaultStopGracePeriod,
-                cancellationToken).ConfigureAwait(false);
-
-            if (!stop.IsFullyStopped)
-            {
-                return new PluginInstallResult
-                {
-                    Success = false,
-                    PluginId = pluginId,
-                    Error = $"旧版本尚未完全停止，不能覆盖安装：{stop.Message}",
-                };
-            }
-        }
-
-        return CommitInstall(scan, options);
-    }
-
     public static PluginInstallResult CommitInstall(PluginScanResult scan, PluginInstallOptions options)
     {
         options ??= new PluginInstallOptions();
@@ -322,6 +311,8 @@ internal static class PluginHost
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
+                    Bundled = options.Bundled,
+                    ClaimedTypes = ClaimWire(manifest, options.Bundled),
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
 
@@ -337,6 +328,10 @@ internal static class PluginHost
                 AppLogger.LogInfo(
                     $"[plugin] 已安装 {manifest.Id} v{manifest.Version}{source}，" +
                     $"SHA256={scan.Sha256Short}，签名={scan.IsSigned}，能力={string.Join(",", entry.CapabilitiesAck)}");
+
+                // 新装的插件可能带来认领（目前只有随包插件能成功认领，这里照常重算一次，
+                // 免得将来放宽这条规则时漏掉这个入口）。
+                RebuildClaimTable();
 
                 bool enabled = false;
                 if (options.EnableAfterInstall)
@@ -363,233 +358,964 @@ internal static class PluginHost
         }
     }
 
+    // ------------------------------------------------------------------ 随包分发的插件
+
+    /// <summary>
+    /// 把「随主程序分发」的插件装进来 —— 也就是程序目录下只读扫描目录里的那些 <c>.dll</c>。
+    /// <para>
+    /// 与用户在插件页手动点「安装」的区别只有一处：这些<b>不等用户点</b>。
+    /// 它们随发行包一起来，属于「打开就该有」的东西；要求用户先点十几次安装，
+    /// 才让轮盘里出现本来自带的动作，是把打包方的分内事推给了用户。
+    /// </para>
+    /// <para>
+    /// <b>三条规则</b>：
+    /// <list type="number">
+    /// <item>登记表里<b>没有</b>这个 ID：自动安装并启用。</item>
+    /// <item>登记表里<b>已有</b>这个 ID（无论当前是启用还是停用）：一律不动。
+    /// 用户停用过的插件绝不能在下次启动时被偷偷启用 —— 那是这一类设计最容易犯、
+    /// 也最让人恼火的错（「我明明关过它」）。</item>
+    /// <item>登记表里有、但宿主区的文件没了：补回来，并<b>保留原来的启用状态</b>。
+    /// 随包插件不可卸载只可停用，文件不见了属于「坏了」，不是「卸载了」。</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// 必须在 <see cref="SyncFromDisk"/> <b>之前</b>调用：安装往登记表里写条目，
+    /// 而实例是 SyncFromDisk 按登记表建立的 —— 顺序反过来，这次装上的插件得等下次启动才露面。
+    /// </para>
+    /// <para>
+    /// 全程不加载任何程序集、不执行任何插件代码（识别只读静态元数据）。
+    /// 因此「程序目录下没有插件」的用户，启动开销与接入插件系统之前完全一致（R1 红线）。
+    /// </para>
+    /// </summary>
+    /// <returns>本次新装或补回的插件数量。</returns>
+    public static int AutoInstallBundledPlugins()
+    {
+        if (!PluginPaths.ScanRootExists) return 0;
+
+        int acted = 0;
+        var stats = new BundledScanStats();
+
+        try
+        {
+            // 与 ScanCandidates 同样的约定：扁平，只认顶层 *.dll，不递归子目录。
+            string[] files = Directory.GetFiles(PluginPaths.ScanRoot, "*.dll", SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+            stats.SourceFileCount = files.Length;
+
+            foreach (string file in files)
+            {
+                try
+                {
+                    if (EnsureBundledPlugin(file, stats)) acted++;
+                }
+                catch (Exception ex)
+                {
+                    // 一枚坏文件绝不能拖垮启动 —— 这条路径跑在最早期，抛出去就是整个程序起不来。
+                    // 同时也算一次「没认出来」：清理逻辑会因此整体让路（见 PruneUndistributedBundledPlugins）。
+                    stats.UnrecognizedFiles++;
+                    AppLogger.LogWarn($"[plugin] 随包插件 {Path.GetFileName(file)} 处理失败（已跳过）：{ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 扫描随包插件目录失败", ex);
+
+            // 扫描本身失败 ⇒「来源区里现在有什么」这个事实本轮是不完整的。
+            // 据此清理会误删用户正常用着的包，所以直接返回，宁可不清理。
+            return acted;
+        }
+
+        // 反过来的一半：来源区里**没有**的随包插件，判定为已停止分发并清理。
+        // 顺序放在这里是有意的 —— 必须在 SyncFromDisk（按登记表建实例）之前跑完，
+        // 否则被清理的包会在本次启动里先被建成实例、认领表也跟着读到它。
+        PruneUndistributedBundledPlugins(stats);
+
+        return acted;
+    }
+
+    /// <summary>
+    /// 本轮扫描来源区的统计。用途只有一个：给「已停止分发的随包插件」清理提供判据与守卫。
+    /// </summary>
+    private sealed class BundledScanStats
+    {
+        /// <summary>本轮在来源区里成功识别到的插件 ID。</summary>
+        public HashSet<string> SeenIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>来源区顶层 <c>*.dll</c> 的枚数。</summary>
+        public int SourceFileCount { get; set; }
+
+        /// <summary>其中没能认出来的枚数（含处理过程中抛异常的）。</summary>
+        public int UnrecognizedFiles { get; set; }
+    }
+
+    /// <summary>处理随包目录里的一枚 <c>.dll</c>；返回是否真的动了登记表或磁盘。</summary>
+    private static bool EnsureBundledPlugin(string file, BundledScanStats stats)
+    {
+        PluginScanResult scan = ScanCandidateFile(file);
+
+        if (!scan.Accepted || scan.Manifest == null)
+        {
+            // 认不出来就装不上。这里必须出声：它不会出现在候选列表里（那需要扫描目录这一侧
+            // 的完整分类），用户既装不上也不知道为什么，只能靠日志。
+            stats.UnrecognizedFiles++;
+            AppLogger.LogWarn(
+                $"[plugin] 随包目录里的 {Path.GetFileName(file)} 无法识别，已跳过：{scan.DescribeFailure()}。" +
+                "随包插件装不上是打包问题，需要重新打包。");
+            return false;
+        }
+
+        PluginManifest manifest = scan.Manifest;
+
+        // 记的是「来源区里有这枚 dll」，与它最终装没装上无关 ——
+        // 清理的判据是「程序目录还在不在分发它」，装失败是另一个问题（上面那条警告负责）。
+        stats.SeenIds.Add(manifest.Id);
+        PluginRegistryEntry? existing = PluginRegistryStore.FindEntry(manifest.Id);
+
+        if (existing != null)
+        {
+            // 已登记的随包插件：**文件才是权威事实来源**。
+            //
+            // 两件事都要做，且顺序不能反 —— 先让登记信息与当前这枚 dll 对齐，
+            // 再判断宿主区的副本还在不在。
+            //
+            // 【为什么必须刷新】从前这里只做「文件补回」，把登记表当成了不可变的事实。
+            // 但登记表里的认领清单、版本号、能力集合全都是**首次安装那一刻的快照**，
+            // 之后随包插件升级、或把某个类型从一个包挪到另一个包（拆包），
+            // 快照就永久过时了。过时的认领清单有两种发作方式：
+            //   · 新增的认领永远不生效（升级后功能静默缺失）；
+            //   · 旧包与新包同时认领同一个类型 —— 触发「多包抢同一类型 → 整对拒绝」，
+            //     两个包的所有动作一起失效，而用户唯一能看到的线索是日志里一行 Error。
+            // 用户对它的 Enabled / Preload 选择照旧一个字都不改，见 RefreshBundledMetadata。
+            bool refreshed = RefreshBundledMetadata(existing, scan);
+
+            // 两个动作互不相干，不能用 || 短路掉任意一个：刷新元数据成功
+            // 不代表宿主区的文件还在。
+            bool restored = RestoreBundledPayload(existing, scan);
+
+            return refreshed || restored;
+        }
+
+        PluginInstallResult result = CommitInstall(scan, new PluginInstallOptions
+        {
+            Acknowledged = true,        // 随包插件没有「用户确认」这一步可言
+            OverwriteExisting = false,
+            EnableAfterInstall = false, // 见下方注释：不能走 Enable，它会立刻加载程序集
+            SourceKind = "Bundled",
+            Bundled = true,
+            AcknowledgedCapabilities = manifest.Capabilities is { Count: > 0 } capabilities
+                ? new List<string>(capabilities)
+                : new List<string>(),
+        });
+
+        if (!result.Success)
+        {
+            AppLogger.LogWarn($"[plugin] 随包插件 {manifest.Id} 自动安装失败：{result.Error}");
+            return false;
+        }
+
+        // 「已启用」只写登记态，**刻意不调用 Enable** —— Enable 会同步加载程序集，
+        // 而 Initialize 阶段的契约是「不加载任何程序集」（R1 内存与启动红线）。
+        // 程序集交由首次执行、或界面枚举贡献点时按需拉起；那条路径由自检 [3d] 的
+        // 「重启等价态」段守着，不是假设。
+        PluginRegistryStore.SetEnabled(manifest.Id, true);
+        PluginInstance? installed = Find(manifest.Id);
+        if (installed != null)
+        {
+            installed.Entry.Enabled = true;   // 与 SetEnabled 双写：不假设登记表存的是同一份引用
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 已自动安装随包插件 {manifest.Id} v{manifest.Version}（来源：程序目录 {PluginPaths.ScanDirectoryName}\\）");
+        return true;
+    }
+
+    /// <summary>
+    /// 用来源区那枚 <c>.dll</c> 的<b>当前实际元数据</b>，刷新一条已登记随包插件的登记信息。
+    /// <para>
+    /// <b>只同步「文件是什么」，绝不同步「用户怎么选」。</b>
+    /// 刷新的是认领清单 / 能力集合 / 版本 / 名称 / 描述；
+    /// <c>Enabled</c> / <c>Preload</c> / <c>InstallPath</c> / <c>Bundled</c> /
+    /// <c>ExternalPath</c> / 安装与确认时间戳一律不碰。
+    /// </para>
+    /// <para>
+    /// <b>为什么认领清单必须以文件为准</b>：它是「用户配置里的 <c>Type</c> 该由谁执行」的
+    /// 唯一依据（见 <see cref="RebuildClaimTable"/>），而它的正确取值只取决于
+    /// 当前这枚 dll 声明了什么。把安装时的快照当成不可变事实，会让
+    /// 「随包插件升级后新增认领」永远不生效；而在拆包场景下更糟 ——
+    /// 旧包的快照与新包的新声明会同时认领同一个类型，触发「多包抢同一类型 → 整对拒绝」，
+    /// <b>两个包的全部动作一起失效</b>，用户侧毫无线索。
+    /// </para>
+    /// <para>
+    /// <b>不破坏「初始化不加载程序集」</b>：<paramref name="scan"/> 来自
+    /// <see cref="ScanCandidateFile"/>，是纯静态 PE 元数据读取，不执行任何插件代码。
+    /// </para>
+    /// <para>
+    /// <b>只对随包条目生效</b>：用户自己装的插件即使撞了同一个 ID，也不该被程序目录里的一枚
+    /// 同 ID 文件改写 —— 那等于开了一个「往来源区丢个 dll 就能改别人登记信息」的后门。
+    /// </para>
+    /// </summary>
+    /// <returns>登记信息是否真的发生了变化（未变化时不落盘）。</returns>
+    private static bool RefreshBundledMetadata(PluginRegistryEntry existing, PluginScanResult scan)
+    {
+        if (!existing.Bundled) return false;
+        if (!string.IsNullOrWhiteSpace(existing.ExternalPath)) return false;
+        if (scan.Manifest == null) return false;
+
+        PluginManifest manifest = scan.Manifest;
+
+        // 认领清单走 ClaimWire：非随包一律返回空表这条规则在这里同样适用，
+        // 不另开一条判断路径 —— 两处各写一份，迟早会不一致。
+        List<string> claimed = ClaimWire(manifest, bundled: true);
+
+        // 能力集合同步为清单里的当前值。随包插件的能力由发行方决定，
+        // 用户对这一项没有「逐项拒绝」的操作（要么用、要么整体停用整个包），
+        // 所以这里不需要重新征求确认；插件页显示的就是当前事实。
+        List<string> capabilities = manifest.Capabilities is { Count: > 0 }
+            ? new List<string>(manifest.Capabilities)
+            : new List<string>();
+
+        bool changed = false;
+
+        if (!SameStringList(claimed, existing.ClaimedTypes))
+        {
+            existing.ClaimedTypes = claimed;
+            changed = true;
+        }
+
+        if (!SameStringList(capabilities, existing.CapabilitiesAck))
+        {
+            existing.CapabilitiesAck = capabilities;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Version, manifest.Version, StringComparison.Ordinal))
+        {
+            existing.Version = manifest.Version;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Name, manifest.Name, StringComparison.Ordinal))
+        {
+            existing.Name = manifest.Name;
+            changed = true;
+        }
+
+        if (!string.Equals(existing.Description, manifest.Description, StringComparison.Ordinal))
+        {
+            existing.Description = manifest.Description;
+            changed = true;
+        }
+
+        if (!changed) return false;
+
+        // 只在真有变化时落盘：这个方法每次启动都会跑到，无条件写会让 registry.json 的
+        // 修改时间每次都变，备份工具与「配置是否被改过」的判断全部失去意义。
+        PluginRegistryStore.UpsertEntry(existing);
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {existing.Id} 的登记信息已按当前文件刷新为 v{existing.Version}，" +
+            $"认领 {existing.ClaimedTypes.Count} 项、能力 [{string.Join(",", existing.CapabilitiesAck)}]" +
+            $"（启用状态保持为 {existing.Enabled}，未受影响）");
+
+        return true;
+    }
+
+    /// <summary>
+    /// 两个字符串列表是否等价（忽略大小写与顺序）。
+    /// <para>
+    /// <b>刻意忽略顺序</b>：这里只想知道「该不该落盘」。清单里换个声明次序不该被当成变化 ——
+    /// 那会让每次调整 csproj 里认领串的书写顺序都触发一次不必要的写盘。
+    /// </para>
+    /// </summary>
+    private static bool SameStringList(List<string>? left, List<string>? right)
+    {
+        int leftCount = left?.Count ?? 0;
+        int rightCount = right?.Count ?? 0;
+        if (leftCount != rightCount) return false;
+        if (leftCount == 0) return true;
+
+        var set = new HashSet<string>(right!, StringComparer.OrdinalIgnoreCase);
+        foreach (string item in left!)
+        {
+            if (!set.Contains(item)) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 随包插件的文件补回：登记表里已有条目，但宿主区的程序集不在了。
+    /// <para>
+    /// <b>绝不改动 <c>Enabled</c></b> —— 用户停用过就是停用，补文件不是让它复活的理由。
+    /// 只对「本来就标记为随包」的条目生效：用户自己装的插件被他删掉是他的自由，
+    /// 宿主没有义务（也不该）把它变回来。
+    /// </para>
+    /// </summary>
+    private static bool RestoreBundledPayload(PluginRegistryEntry existing, PluginScanResult scan)
+    {
+        if (!existing.Bundled) return false;
+        if (!string.IsNullOrWhiteSpace(existing.ExternalPath)) return false;
+
+        string directory = Path.Combine(
+            PluginPaths.Root,
+            string.IsNullOrWhiteSpace(existing.InstallPath) ? existing.Id : existing.InstallPath);
+
+        bool payloadMissing = !Directory.Exists(directory)
+            || Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly).Length == 0;
+
+        if (!payloadMissing) return false;
+
+        if (!CopyPayload(scan, directory, overwrite: true, out string error))
+        {
+            AppLogger.LogWarn($"[plugin] 随包插件 {existing.Id} 的文件补回失败：{error}");
+            return false;
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {existing.Id} 的宿主区文件缺失，已从程序目录补回" +
+            $"（启用状态保持为 {existing.Enabled}，不因补文件而改变）");
+        return true;
+    }
+
+    /// <summary>
+    /// 清理<b>已不再随程序分发</b>的随包插件：登记表里标着 <c>Bundled</c>，
+    /// 但本轮在来源区里已经找不到对应的 <c>.dll</c>。
+    /// <para>
+    /// <b>为什么必须有这一步</b>：拆包的必经动作是「把某个类型从一个包挪到另一个包」，
+    /// 也就是让旧包名从来源区消失。而清理之前，旧包的登记条目会原地留下，连同它的
+    /// <see cref="PluginRegistryEntry.ClaimedTypes"/> 快照一起 —— 于是旧包与新包同时认领
+    /// 同一个类型，<see cref="RebuildClaimTable"/> 判「多包抢同一类型 → 整对拒绝」，
+    /// <b>两个包的全部动作一起失效</b>，用户侧唯一的线索是日志里一行 Error。
+    /// 它还更隐蔽的一面是：旧包在宿主区的安装副本仍在，插件列表里那一行也照旧存在，
+    /// 用户完全看不出问题出在哪。这个状态叫「幽灵包」。
+    /// </para>
+    /// <para>
+    /// 与 <see cref="RefreshBundledMetadata"/> 是互补的两半，别把其中一个当成另一个的替代：
+    /// 那个负责「来源区里<b>还有</b>这枚 dll、但它的内容变了」，
+    /// 这里负责「来源区里<b>已经没有</b>这枚 dll 了」。
+    /// </para>
+    /// <para>
+    /// <b>不破坏 R1</b>：判据只用到本轮扫描已经拿到的 ID，不额外读一枚文件、不加载任何程序集。
+    /// </para>
+    /// </summary>
+    /// <returns>被清理的插件数量。</returns>
+    private static int PruneUndistributedBundledPlugins(BundledScanStats stats)
+    {
+        // 三条保守守卫，缺任何一条都可能把用户正常用着的随包插件清掉。
+        // 而「清理」在这里是**不可逆**的：来源区里那枚 dll 本来就已经不在了，没得补。
+        // 所以判据不完整时一律让路 —— 最坏的结果是留下一个幽灵包（日志里有警告），
+        // 而不是误删一个用户正在用的包。
+        if (!PluginPaths.ScanRootExists) return 0;
+
+        if (stats.SourceFileCount == 0)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] 程序目录的 {PluginPaths.ScanDirectoryName}\\ 存在但一枚 dll 都没有，" +
+                "本次跳过「已停止分发的随包插件」清理。若这是有意为之，请重新安装 StarPie。");
+            return 0;
+        }
+
+        if (stats.UnrecognizedFiles > 0)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] 来源区有 {stats.UnrecognizedFiles} 枚文件无法识别，本轮数据不完整，" +
+                "跳过「已停止分发的随包插件」清理以免误删。");
+            return 0;
+        }
+
+        List<PluginRegistryEntry> vanished;
+
+        try
+        {
+            vanished = PluginRegistryStore.SnapshotEntries()
+                .Where(entry => entry.Bundled && !stats.SeenIds.Contains(entry.Id))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("[plugin] 读取登记表失败，跳过「已停止分发的随包插件」清理", ex);
+            return 0;
+        }
+
+        int pruned = 0;
+
+        foreach (PluginRegistryEntry entry in vanished)
+        {
+            try
+            {
+                if (RemoveUndistributedBundled(entry)) pruned++;
+            }
+            catch (Exception ex)
+            {
+                // 一次清理失败绝不能让插件系统初始化失败（那等于整个程序起不来）。
+                AppLogger.LogWarn($"[plugin] 清理已停止分发的随包插件 {entry.Id} 失败（已跳过）：{ex.Message}");
+            }
+        }
+
+        return pruned;
+    }
+
+    /// <summary>
+    /// 抹掉一个「已停止分发」的随包插件的登记与安装副本。
+    /// <para>
+    /// <b>顺序要紧</b>：先删磁盘、后摘登记。反过来的话，一旦删目录失败，
+    /// 登记条目却已经没了，这个包就同时丧失了「被清理」与「被重建」两种可能 ——
+    /// 只剩宿主区里一堆没人认领的文件。
+    /// </para>
+    /// <para>
+    /// <b>插件私有数据保留</b>：「程序不再分发它」不等于「用户的数据该丢」。
+    /// 它将来若重新出现在来源区里，数据还在原地。
+    /// </para>
+    /// </summary>
+    private static bool RemoveUndistributedBundled(PluginRegistryEntry entry)
+    {
+        string directory = Path.Combine(
+            PluginPaths.Root,
+            string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
+
+        // 外部路径登记不归我们管。随包插件理论上不会走那条路，但 registry.json 是
+        // 用户能手改的纯文本，所以不做假设 —— 外部路径下往往就是开发者的编译输出目录。
+        bool external = !string.IsNullOrWhiteSpace(entry.ExternalPath);
+        if (!external) DeletePayloadKeepData(directory);
+
+        // 关键的一行：登记条目一去掉，它的认领快照也随之消失，
+        // 从此不可能再和新包抢同一个类型。
+        PluginRegistryStore.RemoveEntry(entry.Id);
+
+        lock (Gate)
+        {
+            // 正常时序下这里是空的（清理跑在 SyncFromDisk 之前）。留着是为了
+            // 兼容其它调用点：实例表里若还挂着一个已被清理的包，它会成为永远卸不掉的孤儿。
+            Instances.Remove(entry.Id);
+        }
+
+        AppLogger.LogInfo(
+            $"[plugin] 随包插件 {entry.Id}「{entry.Name}」已不在程序目录的 " +
+            $"{PluginPaths.ScanDirectoryName}\\ 里，判定为已停止分发，" +
+            "已清理登记条目与宿主区安装副本（插件私有数据保留）");
+
+        return true;
+    }
+
+    /// <summary>
+    /// 删除宿主区安装目录里的程序集，但<b>保留</b> <c>data\</c> 子目录。
+    /// <para>
+    /// 单个文件删不掉（被占用、权限不足）只记警告并继续 —— 走到这里时插件还没被加载，
+    /// 正常不该出现占用；真出现了也不值得为它挂起整个目录，
+    /// 那会连 <c>data\</c> 一起带走。残留的裸 dll 不会被 <see cref="SyncFromDisk"/> 重新发现
+    /// （它只认带 <c>plugin.json</c> 的目录），登记条目也已摘掉，所以它是无害的。
+    /// </para>
+    /// </summary>
+    private static void DeletePayloadKeepData(string directory)
+    {
+        if (!Directory.Exists(directory)) return;
+
+        foreach (string file in Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogWarn($"[plugin] 删除随包安装副本 {file} 失败（已跳过）：{ex.Message}");
+            }
+        }
+
+        foreach (string sub in Directory.GetDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            if (string.Equals(Path.GetFileName(sub), "data", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                Directory.Delete(sub, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogWarn($"[plugin] 删除随包安装子目录 {sub} 失败（已跳过）：{ex.Message}");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ 顶层类型认领
+
+    /// <summary>
+    /// 一条已生效的认领：用户配置里 <c>Type="Launch"</c> 这个字符串由哪个插件的哪个贡献点负责。
+    /// </summary>
+    public readonly struct PluginTypeClaimBinding
+    {
+        /// <summary><see cref="ActionItem.Type"/> 的取值，如 <c>Launch</c>。</summary>
+        public string TypeName { get; init; }
+
+        /// <summary>认领它的插件 ID。</summary>
+        public string PluginId { get; init; }
+
+        /// <summary>认领它的贡献点全 ID，形如 <c>starpie.builtin.basicactions.launch</c>。</summary>
+        public string FullId { get; init; }
+    }
+
+    private static readonly object ClaimGate = new();
+
+    private static Dictionary<string, PluginTypeClaimBinding> s_claimedTypes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 重建顶层类型认领表。<b>幂等</b>，登记表或启用状态变动后随时可重跑。
+    /// <para>
+    /// <b>全程不加载任何程序集</b> —— 认领来自登记表里持久化的那一份字符串（见
+    /// <see cref="PluginRegistryEntry.ClaimedTypes"/>），读取就是一次反序列化。
+    /// 这是「轮盘首次触发不产生几百毫秒停顿」这条要求的前提：宿主必须在启动最早期、
+    /// 一个插件都还没加载时，就知道配置里引用到的类型该由哪个插件负责。
+    /// </para>
+    /// </summary>
+    public static void RebuildClaimTable()
+    {
+        var table = new Dictionary<string, PluginTypeClaimBinding>(StringComparer.OrdinalIgnoreCase);
+        var wanted = new List<WantedClaim>();
+        var rejected = new List<string>();
+
+        List<PluginRegistryEntry> entries;
+        lock (Gate)
+        {
+            entries = new List<PluginRegistryEntry>(Instances.Count);
+            foreach (PluginInstance instance in Instances.Values) entries.Add(instance.Entry);
+        }
+
+        foreach (PluginRegistryEntry entry in entries)
+        {
+            if (entry.ClaimedTypes == null || entry.ClaimedTypes.Count == 0) continue;
+
+            // 双保险：写入时已经拦过一次（ClaimWire），这里再拦一次是因为 registry.json
+            // 是用户能手改的纯文本文件，不能把「只有随包插件能认领」这条规则只押在写入路径上。
+            if (!entry.Bundled)
+            {
+                rejected.Add(
+                    $"插件 {entry.Id} 声明了 {entry.ClaimedTypes.Count} 项顶层类型认领，" +
+                    "但它不是随包插件 —— 整条拒绝");
+                continue;
+            }
+
+            foreach (string wire in entry.ClaimedTypes)
+            {
+                List<PluginTypeClaim> parsed = PluginTypeClaim.ParseAll(wire, out List<string> malformed);
+                if (parsed.Count != 1 || malformed.Count > 0)
+                {
+                    rejected.Add($"插件 {entry.Id} 的认领项 \"{wire}\" 格式非法，已跳过");
+                    continue;
+                }
+
+                PluginTypeClaim claim = parsed[0];
+
+                // "Plugin" 是社区插件动作的保留类型名，认领它会把两条完全不同的执行路径
+                // 挤到同一个 Type 上。
+                if (string.Equals(claim.TypeName, PluginApi.ActionTypeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    rejected.Add($"插件 {entry.Id} 试图认领保留类型名 \"{PluginApi.ActionTypeName}\"，已拒绝");
+                    continue;
+                }
+
+                // 内建动作优先：还留在 BuiltinActionCatalog 里的类型不许被认领。
+                // 否则同一个 Type 会同时挂着两条执行路径，哪条生效取决于调用顺序 ——
+                // 这正是整个改造要消除的「双轨制」本身。
+                if (BuiltinActionCatalog.TryGet(claim.TypeName, out BuiltinActionRegistration stillBuiltin))
+                {
+                    rejected.Add(
+                        $"插件 {entry.Id} 认领的 \"{claim.TypeName}\" 仍由内建动作 {stillBuiltin.FullId} 提供，" +
+                        "认领已拒绝");
+                    continue;
+                }
+
+                wanted.Add(new WantedClaim(claim.TypeName, entry.Id, $"{entry.Id}.{claim.ContributionId}"));
+            }
+        }
+
+        // 裁决阶段刻意与收集阶段分开：两个插件抢同一个类型时，先来的赢得毫无道理，
+        // 而后来的盖掉先来的更糟 —— 那是静默劫持。整对拒绝 + 一条 Error，
+        // 让这个错误在日志里一眼可见（它一定是打包错误，不是用户操作）。
+        foreach (IGrouping<string, WantedClaim> group in wanted.GroupBy(w => w.TypeName, StringComparer.OrdinalIgnoreCase))
+        {
+            List<WantedClaim> items = group.ToList();
+
+            if (items.Count > 1)
+            {
+                rejected.Add(
+                    $"类型 \"{group.Key}\" 被多个插件同时认领" +
+                    $"（{string.Join("、", items.Select(i => i.PluginId))}），已全部拒绝 —— " +
+                    "这属于打包错误，请只保留一个提供方");
+                continue;
+            }
+
+            WantedClaim item = items[0];
+            table[item.TypeName] = new PluginTypeClaimBinding
+            {
+                TypeName = item.TypeName,
+                PluginId = item.PluginId,
+                FullId = item.FullId,
+            };
+        }
+
+        lock (ClaimGate)
+        {
+            s_claimedTypes = table;
+        }
+
+        foreach (string message in rejected)
+        {
+            AppLogger.LogError($"[plugin] 顶层类型认领被拒绝：{message}");
+        }
+
+        if (table.Count > 0)
+        {
+            AppLogger.LogInfo(
+                $"[plugin] 顶层类型认领表已建立（{table.Count} 项）：" +
+                string.Join("、", table.Values.Select(b => $"{b.TypeName}→{b.PluginId}")));
+        }
+    }
+
+    private readonly struct WantedClaim
+    {
+        public WantedClaim(string typeName, string pluginId, string fullId)
+        {
+            TypeName = typeName;
+            PluginId = pluginId;
+            FullId = fullId;
+        }
+
+        public string TypeName { get; }
+        public string PluginId { get; }
+        public string FullId { get; }
+    }
+
+    /// <summary>
+    /// 查某个 <c>ActionItem.Type</c> 是否被随包插件认领。
+    /// <para>
+    /// <b>认领与可用是两件事</b>：插件被停用时这里照样返回 true（登记表里认领还在），
+    /// 于是调用方能把「动作所属的包被停用了」这句话说给用户听，
+    /// 而不是让这个扇区落进 switch 的无匹配分支、无声无息地什么都不做。
+    /// 可用性判断见 <see cref="IsClaimedTypeAvailable"/>。
+    /// </para>
+    /// </summary>
+    public static bool TryResolveClaimedType(string? type, out PluginTypeClaimBinding binding)
+    {
+        binding = default;
+        if (string.IsNullOrWhiteSpace(type)) return false;
+
+        Dictionary<string, PluginTypeClaimBinding> table;
+        lock (ClaimGate)
+        {
+            table = s_claimedTypes;
+        }
+
+        return table.TryGetValue(type!.Trim(), out binding);
+    }
+
+    /// <summary>当前生效的全部认领（界面与自检用）。</summary>
+    public static List<PluginTypeClaimBinding> SnapshotClaims()
+    {
+        lock (ClaimGate)
+        {
+            return new List<PluginTypeClaimBinding>(s_claimedTypes.Values);
+        }
+    }
+
+    /// <summary>某个插件认领的类型名（界面与自检用）；它没认领任何类型时返回空表。</summary>
+    public static List<string> ClaimedTypeNamesOf(string pluginId)
+    {
+        var names = new List<string>();
+        if (string.IsNullOrWhiteSpace(pluginId)) return names;
+
+        foreach (PluginTypeClaimBinding binding in SnapshotClaims())
+        {
+            if (string.Equals(binding.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+            {
+                names.Add(binding.TypeName);
+            }
+        }
+
+        return names;
+    }
+
+    /// <summary>
+    /// 这个贡献点是不是「被认领的顶层类型」。
+    /// <para>
+    /// 用途只有一个：把它从插件动作子下拉里<b>排除掉</b>。被认领的动作已经出现在
+    /// 「动作类型」主下拉里（用它们自己的 Type 名），如果同时也列进「🔌 插件」子下拉，
+    /// 用户会在两个地方看到同一个动作，而它们的持久化形态完全不同
+    /// （一个是 <c>Type="Launch"</c>，另一个是 <c>Type="Plugin"</c> + 引用）——
+    /// 换个地方配同一个动作会写出两套不兼容的配置。
+    /// </para>
+    /// </summary>
+    public static bool IsClaimedContribution(string? fullId)
+    {
+        if (string.IsNullOrWhiteSpace(fullId)) return false;
+
+        foreach (PluginTypeClaimBinding binding in SnapshotClaims())
+        {
+            if (string.Equals(binding.FullId, fullId, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 认领某个类型的插件此刻<b>能不能干活</b>。不能时返回 false，并给出给用户看的原因。
+    /// <para>
+    /// 三种不可用：插件没登记、被用户停用、因连续出错被自动隔离。
+    /// 返回的 <paramref name="reason"/> 会原样显示给用户 —— 所以它必须说清「该怎么办」，
+    /// 而不是「不可用」三个字。
+    /// </para>
+    /// </summary>
+    public static bool IsClaimedTypeAvailable(string? type, out string reason)
+    {
+        reason = "";
+
+        if (!TryResolveClaimedType(type, out PluginTypeClaimBinding binding))
+        {
+            return true; // 不是认领类型，不归这里管
+        }
+
+        PluginInstance? instance = Find(binding.PluginId);
+        if (instance == null)
+        {
+            reason = $"该动作由随包插件「{binding.PluginId}」提供，但宿主里找不到它的登记记录。" +
+                     "请重启 StarPie；若仍不行，说明插件文件已损坏。";
+            return false;
+        }
+
+        if (!instance.Entry.Enabled)
+        {
+            reason = $"该动作属于内置动作包「{instance.Entry.Name}」，它当前已被停用。" +
+                     "到「设置 → 插件」重新启用即可恢复。";
+            return false;
+        }
+
+        if (instance.State == PluginRuntimeState.Quarantined)
+        {
+            reason = $"内置动作包「{instance.Entry.Name}」因连续出错被自动停用，已跳过本次执行。";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 把清单里的认领声明转成登记表用的线格式。
+    /// <para>
+    /// <b>非随包插件一律返回空表。</b> 认领顶层类型等于接管用户配置里的一整类动作 ——
+    /// 用户配好的启动项、网址、文件夹扇区会整体改由这个插件执行。
+    /// 这个权力只给随主程序一起分发、与宿主同一个构建产出的插件。
+    /// 不在这里拦的话，任何第三方插件都能声明自己认领 <c>"Launch"</c>。
+    /// </para>
+    /// </summary>
+    private static List<string> ClaimWire(PluginManifest manifest, bool bundled)
+    {
+        if (manifest.ClaimedTypes == null || manifest.ClaimedTypes.Count == 0)
+        {
+            return new List<string>();
+        }
+
+        if (!bundled)
+        {
+            AppLogger.LogWarn(
+                $"[plugin] {manifest.Id} 声明了 {manifest.ClaimedTypes.Count} 项顶层类型认领，" +
+                "但它不是随包插件，认领已忽略。");
+            return new List<string>();
+        }
+
+        return manifest.ClaimedTypes
+            .Where(claim => !string.IsNullOrWhiteSpace(claim.TypeName)
+                         && !string.IsNullOrWhiteSpace(claim.ContributionId))
+            .Select(claim => claim.ToWire())
+            .ToList();
+    }
+
     // ------------------------------------------------------------------ 启用 / 停用
 
-    /// <summary>用户显式启用插件：运行时加载成功后再持久化 Enabled 偏好。</summary>
+    /// <summary>启用插件：加载 → 实例化 → Initialize → 贡献点提交。</summary>
     public static bool Enable(string pluginId, out string error)
     {
         error = "";
 
-        PluginActivationResult activation = Runtime.EnsurePluginLoaded(
-            pluginId,
-            PluginActivationReason.ManualEnable,
-            requireEnabled: false);
-
-        if (!activation.IsReady)
+        if (!_enabled)
         {
-            error = activation.Error;
+            error = "插件系统已在设置中关闭。";
             return false;
         }
 
-        PluginInstance instance = activation.Instance!;
-        instance.Entry.Enabled = true;
-        PluginRegistryStore.UpsertEntry(instance.Entry);
+        PluginInstance? instance = Find(pluginId);
+        if (instance == null)
+        {
+            error = $"插件未安装：{pluginId}";
+            return false;
+        }
+
+        if (instance.IsLoaded)
+        {
+            return true;
+        }
+
+        lock (Gate)
+        {
+            if (!instance.Load(out string failure))
+            {
+                error = failure;
+                return false;
+            }
+
+            instance.Entry.Enabled = true;
+            PluginRegistryStore.UpsertEntry(instance.Entry);
+
+            // 启用的插件需要重新注册它的事件订阅（Load 里已经通过 Events 服务登记，无需额外动作）
+            foreach (PluginActionRegistration action in instance.OwnedActions)
+            {
+                // 占位：注册 token 由 PluginContext 内部持有，这里只做日志
+                _ = action;
+            }
+        }
 
         NotifyPluginSetChanged();
         return true;
     }
 
-    /// <summary>兼容同步调用；新 UI 与管理流程应使用 <see cref="DisableAsync"/>。</summary>
-    public static bool Disable(string pluginId, out string error)
+    /// <summary>
+    /// 把「已启用但尚未加载」的插件全部拉起来。幂等，重复调用是廉价的空转。
+    /// <para>
+    /// <b>为什么需要它</b>：贡献点目录只在插件加载后才被填充，而插件默认是惰性加载的 ——
+    /// 于是「已启用、但本次会话还没被用到过」的插件，它的动作在界面上根本列不出来。
+    /// 用户打开设置看到的是「动作下拉是空的」，而他的配置明明还引用着那些动作。
+    /// </para>
+    /// <para>
+    /// 调用时机是「界面即将枚举贡献点」的那一刻，也就是真正需要目录非空的时候。
+    /// 这是<b>同步</b>加载，而调用方通常是 UI 线程：插件多、或某个插件初始化慢时会有可感停顿。
+    /// 随主程序分发的插件都是小程序集，可以接受；将来接入体积大的第三方插件时，
+    /// 这里应改成后台加载 + 加载完成后通知界面重建列表。
+    /// </para>
+    /// </summary>
+    public static void EnsureEnabledPluginsLoaded()
     {
-        PluginStopResult result = DisableAsync(
-                pluginId,
-                PluginStopReason.UserDisabled,
-                DefaultStopGracePeriod,
-                CancellationToken.None)
-            .GetAwaiter().GetResult();
+        if (!_initialized || !_enabled || _safeModeActive) return;
 
-        error = result.IsFullyStopped ? "" : result.Message;
-        return result.IsFullyStopped;
+        List<PluginInstance> targets = ListInstances()
+            .Where(instance => instance.Entry.Enabled && !instance.IsLoaded)
+            .ToList();
+
+        foreach (PluginInstance instance in targets)
+        {
+            try
+            {
+                if (!instance.Load(out string failure))
+                {
+                    AppLogger.LogWarn($"[plugin] 按需加载 {instance.PluginId} 失败：{failure}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError($"[plugin] 按需加载 {instance.PluginId} 异常", ex);
+            }
+        }
     }
 
-    public static async Task<PluginStopResult> DisableAsync(
-        string pluginId,
-        PluginStopReason reason,
-        TimeSpan? gracePeriod = null,
-        CancellationToken cancellationToken = default)
+    /// <summary>停用插件：撤销贡献点 → 剪断订阅 → Shutdown → 尽力卸载 ALC。</summary>
+    public static bool Disable(string pluginId, out string error)
     {
+        error = "";
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
         {
-            return new PluginStopResult
-            {
-                Status = PluginStopStatus.Failed,
-                PluginId = pluginId ?? "",
-                Message = $"插件未安装：{pluginId}",
-            };
+            error = $"插件未安装：{pluginId}";
+            return false;
         }
 
-        var lazy = StopOperations.GetOrAdd(
-            pluginId,
-            _ => new Lazy<Task<PluginStopResult>>(
-                () => StopPluginCoreAsync(instance, reason),
-                LazyThreadSafetyMode.ExecutionAndPublication));
-
-        Task<PluginStopResult> stopTask = lazy.Value;
-        TimeSpan wait = gracePeriod ?? DefaultStopGracePeriod;
-
-        if (wait == Timeout.InfiniteTimeSpan)
-        {
-            return await stopTask.ConfigureAwait(false);
-        }
-
-        Task delay = Task.Delay(wait, cancellationToken);
-        Task completed = await Task.WhenAny(stopTask, delay).ConfigureAwait(false);
-        if (ReferenceEquals(completed, stopTask))
-        {
-            return await stopTask.ConfigureAwait(false);
-        }
-
-        string pendingMessage =
-            $"插件「{instance.Entry.Name}」仍有 {instance.ActiveCallCount} 个调用未结束；" +
-            "已拒绝新调用并在后台等待，必要时请重启 StarPie。";
-        instance.MarkStopPending(pendingMessage);
-        instance.FlushHealth();
-
-        return new PluginStopResult
-        {
-            Status = PluginStopStatus.Pending,
-            PluginId = pluginId,
-            Message = pendingMessage,
-            RemainingCalls = instance.ActiveCallCount,
-        };
-    }
-
-    private static async Task<PluginStopResult> StopPluginCoreAsync(
-        PluginInstance instance,
-        PluginStopReason reason)
-    {
-        string pluginId = instance.PluginId;
         try
         {
-            bool persistDisabled = reason is not (
-                PluginStopReason.PluginSystemShutdown or
-                PluginStopReason.ApplicationExit);
-            if (persistDisabled)
-            {
-                instance.Entry.Enabled = false;
-                PluginRegistryStore.UpsertEntry(instance.Entry);
-            }
-
-            if (!instance.IsLoaded)
-            {
-                Runtime.NotifyPluginStopping(pluginId);
-                Runtime.NotifyPluginStopped(pluginId);
-                NotifyPluginSetChanged();
-                bool requiresRestart = instance.RequiresRestart ||
-                                       instance.State == PluginRuntimeState.RequiresRestart;
-                return new PluginStopResult
-                {
-                    Status = requiresRestart
-                        ? PluginStopStatus.RequiresRestart
-                        : PluginStopStatus.AlreadyStopped,
-                    PluginId = pluginId,
-                    Message = requiresRestart
-                        ? "插件运行时尚未完全释放，需要重启 StarPie。"
-                        : "插件已经处于停止状态。",
-                };
-            }
-
+            // 卸载结论是**异步**得出的：同步那一瞬间调用栈往往还没展开，此时下结论多半是错的。
+            // 所以这里只登记回调，等最终结论出来再决定要不要提示用户「重启」。
             instance.UnloadVerdictFinalized = collected =>
             {
                 if (collected) return;
+
+                // 回调可能跑在线程池的延迟判定线程上，日志与托盘气泡都必须回到 UI 线程
                 new PluginDispatcherFacade().Post(() =>
                 {
-                    AppLogger.LogWarn($"[plugin] {pluginId} 已停止，但插件程序集未能释放，需要重启 StarPie。");
-                    NotifyUser("插件需要重启完成释放", $"{pluginId} 的程序集仍被引用，重启 StarPie 后才能彻底回收。");
+                    AppLogger.LogWarn(
+                        $"[plugin] {pluginId} 已停用，但插件程序集未能释放（ALC 卸载失败）；" +
+                        "请重启 StarPie 以彻底回收其内存。");
+                    NotifyUser(
+                        "插件已停用，但内存未释放",
+                        $"{pluginId} 的程序集仍被引用，重启 StarPie 后才能彻底回收。");
                 });
             };
 
-            Task drained = instance.BeginStopping();
-            Runtime.NotifyPluginStopping(pluginId);
-            await drained.ConfigureAwait(false);
-
-            try
-            {
-                await Task.Run(instance.Unload).ConfigureAwait(false);
-            }
-            finally
-            {
-                Runtime.NotifyPluginStopped(pluginId);
-            }
-
-            bool collected = await Task.Run(() => instance.WaitForUnloadVerdict(5000)).ConfigureAwait(false);
-            if (collected) instance.ClearError();
+            instance.Unload();
             instance.FlushHealth();
-            NotifyPluginSetChanged();
 
-            return new PluginStopResult
-            {
-                Status = collected ? PluginStopStatus.Stopped : PluginStopStatus.RequiresRestart,
-                PluginId = pluginId,
-                Message = collected
-                    ? $"插件 {pluginId} 已停止。"
-                    : $"插件 {pluginId} 已停止，但旧程序集仍被引用，需要重启 StarPie。",
-            };
+            instance.Entry.Enabled = false;
+            PluginRegistryStore.UpsertEntry(instance.Entry);
+
+            NotifyPluginSetChanged();
+            return true;
         }
         catch (Exception ex)
         {
-            AppLogger.LogError($"[plugin] 停用 {pluginId} 失败（原因={reason}）", ex);
-            return new PluginStopResult
-            {
-                Status = PluginStopStatus.Failed,
-                PluginId = pluginId,
-                Message = ex.Message,
-                RemainingCalls = instance.ActiveCallCount,
-            };
-        }
-        finally
-        {
-            StopOperations.TryRemove(pluginId, out _);
+            error = ex.Message;
+            AppLogger.LogError($"[plugin] 停用 {pluginId} 失败", ex);
+            return false;
         }
     }
 
-    /// <summary>兼容同步卸载；UI 与管理流程应使用 <see cref="UninstallAsync"/>。</summary>
-    public static bool Uninstall(string pluginId, bool removePluginData, out string error)
-    {
-        PluginUninstallResult result = UninstallAsync(pluginId, removePluginData).GetAwaiter().GetResult();
-        error = result.Error;
-        return result.Success;
-    }
+    /// <summary>卸载插件（停用 + 删除目录 + 移除登记）。随包插件会被拒绝，见下方守卫。</summary>
+    public static bool Uninstall(string pluginId, bool removePluginData, out string error) =>
+        UninstallCore(pluginId, removePluginData, respectBundledGuard: true, out error);
 
-    public static async Task<PluginUninstallResult> UninstallAsync(
-        string pluginId,
-        bool removePluginData,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 卸载的实际实现。
+    /// <para>
+    /// <paramref name="respectBundledGuard"/> 为 <c>false</c> 时无视「随包插件不可卸载」这条规则。
+    /// 目前只有自检会用到 —— 它必须把现场收拾干净，而收拾现场恰恰<b>不能</b>走用户路径，
+    /// 因为那条路径上的守卫正是被测对象。用户界面永远只走 <see cref="Uninstall"/>。
+    /// </para>
+    /// </summary>
+    internal static bool UninstallCore(string pluginId, bool removePluginData, bool respectBundledGuard, out string error)
     {
+        error = "";
+
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
         {
-            return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
+            error = $"插件未安装：{pluginId}";
+            return false;
         }
 
-        PluginStopResult stop = await DisableAsync(
-            pluginId,
-            PluginStopReason.Uninstall,
-            DefaultStopGracePeriod,
-            cancellationToken).ConfigureAwait(false);
-
-        if (!stop.IsFullyStopped)
+        // 随包插件不可卸载。它的文件随发行包一起来，卸载只会让它下次启动又出现 ——
+        // 给一个「点了没用」的按钮，比诚实地说明原因糟糕得多。
+        // 用户真正想要的（别让它挡路）用「停用」就能达成：动作从可选列表消失，配置仍保留。
+        if (respectBundledGuard && instance.Entry.Bundled)
         {
-            return new PluginUninstallResult
-            {
-                Success = false,
-                Error = $"插件尚未完全停止，不能删除文件：{stop.Message}",
-            };
+            error = $"「{instance.Entry.Name}」随 StarPie 一起分发，不能卸载。"
+                  + "如果不想用它，请改用「停用」—— 停用后它的动作会从可选列表里消失，已有配置也不会丢。";
+            return false;
         }
+
+        Disable(pluginId, out _);
 
         try
         {
+            // 外部路径登记：程序集留在开发者自己的目录里，宿主只拥有「登记」这一行数据。
+            // 卸载必须只摘登记、绝不碰磁盘 —— 那条路径下往往就是开发者的编译输出目录。
             if (instance.IsExternal)
             {
                 PluginRegistryStore.RemoveEntry(pluginId);
-                lock (Gate) Instances.Remove(pluginId);
+                lock (Gate)
+                {
+                    Instances.Remove(pluginId);
+                }
 
                 AppLogger.LogInfo(
                     $"[plugin] 已卸载 {pluginId}（外部路径登记，源文件未删除：{instance.Entry.ExternalPath}）");
                 NotifyPluginSetChanged();
-                return new PluginUninstallResult { Success = true };
+                return true;
             }
 
             string directory = instance.ManagedDirectory;
@@ -601,6 +1327,7 @@ internal static class PluginHost
                 }
                 catch (Exception deleteError)
                 {
+                    // 文件被占用（多为 ALC 未卸载干净）：改名挂起，下次启动时清理
                     string pending = Path.Combine(PluginPaths.Root, ".pending-delete-" + Guid.NewGuid().ToString("N"));
                     try
                     {
@@ -610,39 +1337,307 @@ internal static class PluginHost
                     }
                     catch
                     {
-                        return new PluginUninstallResult
-                        {
-                            Success = false,
-                            Error = $"删除插件目录失败（文件被占用）：{deleteError.Message}。请重启 StarPie 后重试。",
-                        };
+                        error = $"删除插件目录失败（文件被占用）：{deleteError.Message}。请重启 StarPie 后重试。";
+                        return false;
                     }
                 }
             }
 
             PluginRegistryStore.RemoveEntry(pluginId);
-            lock (Gate) Instances.Remove(pluginId);
+            lock (Gate)
+            {
+                Instances.Remove(pluginId);
+            }
 
             AppLogger.LogInfo($"[plugin] 已卸载 {pluginId}（保留数据={!removePluginData}）");
             NotifyPluginSetChanged();
-            return new PluginUninstallResult { Success = true };
+            return true;
         }
         catch (Exception ex)
         {
+            error = ex.Message;
             AppLogger.LogError($"[plugin] 卸载 {pluginId} 失败", ex);
-            return new PluginUninstallResult { Success = false, Error = ex.Message };
+            return false;
         }
     }
 
     // ------------------------------------------------------------------ 参数校验接缝
 
-    /// <summary>保存动作与执行前共用的参数校验入口；设置页校验不会触发惰性加载。</summary>
-    public static PluginActionValidation ValidateActionParameters(ActionItem? action) =>
-        Runtime.ValidateActionParameters(action);
+    private static readonly IReadOnlyDictionary<string, string> EmptyParameters =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 插件动作的参数校验结果。
+    /// <para>
+    /// 刻意把「宿主发现的声明违规」与「插件自己给的说法」分成两份：
+    /// 前者能精确对应到某个字段，可以就地标红；后者只是一句话，只能整体展示。
+    /// 混成一个字符串会丢掉字段定位能力。
+    /// </para>
+    /// </summary>
+    public sealed class PluginActionValidation
+    {
+        /// <summary>违反 <see cref="ParameterField"/> 声明约束的字段。</summary>
+        public List<PluginParameterIssue> DeclaredIssues { get; init; } = new();
+
+        /// <summary><see cref="IActionContribution.Validate"/> 返回的原因。</summary>
+        public string? PluginMessage { get; init; }
+
+        public bool IsValid => DeclaredIssues.Count == 0 && string.IsNullOrEmpty(PluginMessage);
+
+        /// <summary>压成一句给用户看的中文。</summary>
+        public string? Describe()
+        {
+            if (DeclaredIssues.Count > 0) return DeclaredIssues[0].ToString();
+            return string.IsNullOrEmpty(PluginMessage) ? null : PluginMessage;
+        }
+    }
+
+    /// <summary>
+    /// <b>插件动作参数校验的唯一入口。</b>
+    /// <para>
+    /// <see cref="IActionContribution.Validate"/> 的注释写着「宿主会在<b>保存动作</b>与<b>执行前</b>各调用一次」，
+    /// 但如果两条路径各写一遍，它们迟早会分叉 —— 用户就会遇到
+    /// 「保存时一切正常、触发时却说参数不合法」这种最令人困惑的状态。
+    /// 因此两处都走这里，顺序固定为：先宿主底线（声明的约束），再插件自定义。
+    /// </para>
+    /// <para>
+    /// 本方法<b>保证不抛异常</b>。
+    /// </para>
+    /// </summary>
+    public static PluginActionValidation ValidateActionParameters(ActionItem? action)
+    {
+        if (action?.PluginActionRef == null || !action.PluginActionRef.IsValid)
+        {
+            return new PluginActionValidation();
+        }
+
+        // 社区插件动作的参数来源固定是 ExtensionData。
+        // 认领了顶层类型的随包插件不走这里 —— 它的参数由宿主的字段投影器给出，
+        // 由 ExecuteClaimedAction 直接调下面那个按全 ID 校验的重载。
+        return ValidateActionParameters(action.PluginActionRef.FullId, action.ExtensionData ?? EmptyParameters);
+    }
+
+    /// <summary>
+    /// 按<b>贡献点全 ID + 一份参数</b>校验。
+    /// <para>
+    /// 存在这个重载是为了让两条执行路径（社区插件动作 / 认领类型）共用同一段校验，
+    /// 而不是各自组装一遍。参数从哪来是调用方的事，怎么判合不合规是这里的事。
+    /// </para>
+    /// <para>本方法<b>保证不抛异常</b>。</para>
+    /// </summary>
+    public static PluginActionValidation ValidateActionParameters(
+        string fullId,
+        IReadOnlyDictionary<string, string> parameters)
+    {
+        try
+        {
+            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
+            {
+                // 贡献点已不在目录里时不做参数校验。
+                // 真正的问题是「这个动作已经不可用」，此时报参数错误会把用户引向完全错误的方向。
+                return new PluginActionValidation();
+            }
+
+            IReadOnlyDictionary<string, string> actual = parameters ?? EmptyParameters;
+
+            // ① 宿主底线：只认 ParameterField 声明的约束，不依赖插件是否记得自查。
+            List<PluginParameterIssue> declaredIssues =
+                PluginParameterValidator.Validate(registration.Parameters, actual);
+
+            // ② 插件自定义：处理声明表达不了的规则（例如「起止时间不能相同」）。
+            string? pluginMessage = null;
+            try
+            {
+                string? result = registration.Contribution.Validate(actual);
+                if (!string.IsNullOrWhiteSpace(result)) pluginMessage = result!.Trim();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError($"[plugin] 动作 {registration.FullId} 的参数校验抛出异常", ex);
+                pluginMessage = $"插件自身的校验逻辑出错：{ex.GetBaseException().Message}（这是插件的问题，请反馈给插件作者）";
+            }
+
+            return new PluginActionValidation
+            {
+                DeclaredIssues = declaredIssues,
+                PluginMessage = pluginMessage,
+            };
+        }
+        catch (Exception ex)
+        {
+            // 校验器自己坏掉时放行。宁可让插件在执行里自行拒绝，
+            // 也不要因为宿主这一环出错就让用户的手势彻底点不动。
+            AppLogger.LogError("[plugin] 参数校验流程异常（已放行）", ex);
+            return new PluginActionValidation();
+        }
+    }
 
     // ------------------------------------------------------------------ 执行接缝
 
-    /// <summary>主程序唯一的插件动作入口，具体行为由动作路径模块负责。</summary>
-    public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
+    /// <summary>
+    /// <b>主程序唯一的调用入口。</b><see cref="ActionExecutor"/> 在 <c>switch</c> 未命中时调用它。
+    /// <para>
+    /// 这个方法<b>保证不抛异常</b>，并且绝不把插件异常冒泡给 <see cref="ActionExecutor.Execute"/> ——
+    /// 因为那里的 <c>catch</c> 会弹 <c>MessageBox</c>，在无人值守时会把动作线程卡死。
+    /// </para>
+    /// </summary>
+    public static PluginExecuteOutcome ExecutePluginAction(ActionItem action)
+    {
+        if (action?.PluginActionRef == null || !action.PluginActionRef.IsValid)
+        {
+            return PluginExecuteOutcome.NotHandled;
+        }
+
+        PluginActionRef reference = action.PluginActionRef;
+
+        // 社区插件动作的参数一律来自 ExtensionData：键由插件自己起语义化名字，
+        // 宿主一个都不知道，也不该知道。
+        Dictionary<string, string> parameters = action.ExtensionData != null
+            ? new Dictionary<string, string>(action.ExtensionData, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        return ExecuteRegisteredAction(reference.PluginId, reference.FullId, action.Name, parameters);
+    }
+
+    /// <summary>
+    /// <b>认领了顶层类型的随包插件</b>的执行入口。
+    /// <para>
+    /// 与 <see cref="ExecutePluginAction"/> 只差一件事：参数从哪来。
+    /// 认领类型的动作在用户配置里仍然是 <c>Type="Launch"</c> 这种老形态，参数散在
+    /// <see cref="ActionItem"/> 的裸字段上，所以走宿主的字段投影器现读现装
+    /// （见 <see cref="ActionParameterProjection"/>）。除此之外，找实例 → 必要时拉起 →
+    /// 查目录 → 校验 → 调用，与社区插件动作是<b>同一条</b>链路。
+    /// </para>
+    /// </summary>
+    public static PluginExecuteOutcome ExecuteClaimedAction(ActionItem action, PluginTypeClaimBinding binding)
+    {
+        if (action == null) return PluginExecuteOutcome.NotHandled;
+
+        string displayName = string.IsNullOrWhiteSpace(action.Name) ? binding.TypeName : action.Name;
+
+        return ExecuteRegisteredAction(
+            binding.PluginId,
+            binding.FullId,
+            displayName,
+            ActionParameterProjection.Project(action));
+    }
+
+    /// <summary>
+    /// 插件贡献点的统一执行链路，两条入口（社区插件 / 认领类型）共用。
+    /// <para>
+    /// 这个方法<b>保证不抛异常</b>，并且绝不把插件异常冒泡给 <see cref="ActionExecutor.Execute"/> ——
+    /// 因为那里的 <c>catch</c> 会弹 <c>MessageBox</c>，在无人值守时会把动作线程卡死。
+    /// </para>
+    /// </summary>
+    private static PluginExecuteOutcome ExecuteRegisteredAction(
+        string pluginId,
+        string fullId,
+        string displayName,
+        Dictionary<string, string> parameters)
+    {
+        try
+        {
+            // 【顺序至关重要】必须先找到实例、必要时把它拉起来，再去查贡献点目录。
+            // 反过来的话会得出一个**错误归因**的结论：目录里查不到 ≠「插件没了」，
+            // 也可能是「插件已启用、只是还没被惰性加载」—— 而惰性加载恰恰是本设计
+            // 为了守住内存红线（R1）刻意做的。
+            // 曾经这里的顺序是反的，于是每次重启后用户配好的插件动作都会拿到一句
+            // 「插件可能已被禁用或卸载」，而插件其实好好的 —— 100% 复现的假故障。
+            PluginInstance? instance = Find(pluginId);
+
+            if (instance == null)
+            {
+                return new PluginExecuteOutcome
+                {
+                    Handled = true,
+                    Success = false,
+                    Message = $"插件「{pluginId}」未安装。",
+                };
+            }
+
+            if (!instance.IsLoaded)
+            {
+                if (!instance.Entry.Enabled)
+                {
+                    return new PluginExecuteOutcome
+                    {
+                        Handled = true,
+                        Success = false,
+                        Message = $"插件「{instance.Entry.Name}」当前未启用，请在「插件」页启用后再试。",
+                    };
+                }
+
+                // 惰性加载：Enabled 但尚未加载（内存红线的代价就是首次调用要额外等一次加载）
+                AppLogger.LogInfo($"[plugin] 首次引用触发惰性加载：{pluginId}");
+                if (!Enable(pluginId, out string loadError))
+                {
+                    return new PluginExecuteOutcome
+                    {
+                        Handled = true,
+                        Success = false,
+                        Message = $"插件「{instance.Entry.Name}」加载失败：{loadError}",
+                    };
+                }
+            }
+
+            if (!Catalog.TryGetAction(fullId, out PluginActionRegistration registration))
+            {
+                // 走到这里的含义是确定的：插件要么本来就在跑、要么刚被拉起来，
+                // 而它确实没有提供这个贡献点 —— 只有这种情形才配得上「动作没了」的结论。
+                return new PluginExecuteOutcome
+                {
+                    Handled = true,
+                    Success = false,
+                    Message = $"插件「{instance.Entry.Name}」没有提供动作「{displayName}」（{fullId}）。" +
+                              "插件版本可能已变化，请重新编辑该槽位。",
+                };
+            }
+
+            if (instance.State == PluginRuntimeState.Quarantined)
+            {
+                return new PluginExecuteOutcome
+                {
+                    Handled = true,
+                    Success = false,
+                    Message = $"插件「{instance.Entry.Name}」因连续出错已被自动禁用，已跳过本次执行。",
+                };
+            }
+
+            // 参数校验：与设置面板共用同一个入口。
+            // 这样「保存时通过」与「执行时通过」永远是同一个判断，
+            // 不会出现用户填好参数、存下了、触发却说不合法的情况。
+            PluginActionValidation validation = ValidateActionParameters(fullId, parameters);
+            if (!validation.IsValid)
+            {
+                return new PluginExecuteOutcome
+                {
+                    Handled = true,
+                    Success = false,
+                    Message = $"{registration.DisplayName} 参数不合法：{validation.Describe()}",
+                };
+            }
+
+            // 交给插件的是参数的一份拷贝：即使它在 ExecuteAsync 里改写字典，
+            // 也污染不到用户正在编辑的配置对象。
+            // （上游两处已经各建了一份字典，这里再拷一次是刻意的 —— 它让「拷贝」这件事
+            //   只依赖本方法的入参，将来多一个入口也不会漏。）
+            return PluginInvoker.Invoke(
+                instance,
+                registration,
+                new Dictionary<string, string>(parameters, StringComparer.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            // 最外层兜底：这里无论如何都不能抛出去
+            AppLogger.LogError("[plugin] 执行插件动作时发生未预期异常（已拦截）", ex);
+            return new PluginExecuteOutcome
+            {
+                Handled = true,
+                Success = false,
+                Message = "插件动作执行时发生内部错误，详情见日志。",
+            };
+        }
+    }
 
     // ------------------------------------------------------------------ 界面数据
 
@@ -667,9 +1662,49 @@ internal static class PluginHost
     public static bool TryGetAction(string fullId, out PluginActionRegistration registration) =>
         Catalog.TryGetAction(fullId, out registration);
 
-    /// <summary>预览文案。插件回调同样经过活动调用租约，失败时返回空串。</summary>
-    public static string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters) =>
-        Runtime.PreviewAction(fullId, parameters);
+    /// <summary>
+    /// 某个引用<b>本来就应该可用吗</b> —— 用来把「已失效」与「只是还没加载」分开。
+    /// <para>
+    /// 这两个状态在界面上必须表现不同，因为成因差别很大：
+    /// <list type="bullet">
+    /// <item><b>已失效</b>：插件被停用 / 卸载 / 因连续出错被自动隔离，或插件升级后去掉了那个贡献点。
+    /// 用户需要知道「你配的东西不在了」。</item>
+    /// <item><b>还没加载</b>：插件已启用，只是惰性加载尚未发生。<b>这是本设计的正常中间态</b> ——
+    /// 每次重启后所有插件都处在这个状态。此时判它失效，就是在冤枉用户。</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// 所以判据必须分层：先问「贡献点的作者还在不在」（登记表），再问「目录里有没有」（贡献点目录）。
+    /// 单看目录是不行的 —— 目录在插件未加载时本来就是空的。
+    /// </para>
+    /// </summary>
+    public static bool IsContributionExpected(string pluginId, string fullId)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(fullId)) return false;
+
+        PluginInstance? instance = Find(pluginId);
+        if (instance == null) return false;                                 // 插件不在了
+        if (!instance.Entry.Enabled) return false;                          // 被用户停用
+        if (instance.State == PluginRuntimeState.Quarantined) return false; // 连续出错被自动隔离
+        if (!instance.IsLoaded) return true;                                // 已启用但未加载：不能断言失效
+
+        return Catalog.TryGetAction(fullId, out _);                         // 正在跑：以目录为准
+    }
+
+    /// <summary>预览文案。失败时返回空串，绝不抛异常。</summary>
+    public static string PreviewAction(string fullId, IReadOnlyDictionary<string, string> parameters)
+    {
+        try
+        {
+            return Catalog.TryGetAction(fullId, out PluginActionRegistration registration)
+                ? registration.Contribution.Preview(parameters) ?? ""
+                : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
 
     /// <summary>
     /// 构造一条指向插件动作的 <see cref="ActionItem"/>。
@@ -784,78 +1819,127 @@ internal static class PluginHost
         _preferences.DeveloperMode = enabled;
     }
 
-    public static void SetEnabled(bool enabled) =>
-        SetEnabledAsync(enabled).GetAwaiter().GetResult();
-
-    public static async Task SetEnabledAsync(
-        bool enabled,
-        CancellationToken cancellationToken = default)
+    public static void SetEnabled(bool enabled)
     {
         _enabled = enabled;
         _preferences.EnablePluginSystem = enabled;
 
-        if (enabled) return;
-
-        List<Task<PluginStopResult>> stops = ListInstances()
-            .Where(static instance => instance.IsLoaded)
-            .Select(instance => DisableAsync(
-                instance.PluginId,
-                PluginStopReason.PluginSystemShutdown,
-                DefaultStopGracePeriod,
-                cancellationToken))
-            .ToList();
-
-        if (stops.Count > 0)
+        if (!enabled)
         {
-            await Task.WhenAll(stops).ConfigureAwait(false);
+            ShutdownAll();
         }
     }
 
-    // ------------------------------------------------------------------ 统一路径入口
+    // ------------------------------------------------------------------ 轮盘事件广播
 
-    /// <summary>宿主当前登记的 SPP 路径，用于自检与后续清单兼容判断。</summary>
-    public static IReadOnlyList<string> GetSupportedPathIds() => Runtime.SupportedPathIds;
+    private static readonly Dictionary<string, List<Action<ActionContext>>> WheelOpeningHandlers = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, List<Action>> WheelClosedHandlers = new(StringComparer.OrdinalIgnoreCase);
 
-    // 旧版 Opening / Closed 接口暂时作为统一交互路径的兼容适配层。
-    public static IDisposable RegisterWheelOpening(string pluginId, Action<ActionContext> handler) =>
-        Runtime.RegisterWheelOpening(pluginId, handler);
+    public static IDisposable RegisterWheelOpening(string pluginId, Action<ActionContext> handler)
+    {
+        lock (Gate)
+        {
+            if (!WheelOpeningHandlers.TryGetValue(pluginId, out List<Action<ActionContext>>? list))
+            {
+                list = new List<Action<ActionContext>>();
+                WheelOpeningHandlers[pluginId] = list;
+            }
+            list.Add(handler);
+        }
 
-    public static IDisposable RegisterWheelClosed(string pluginId, Action handler) =>
-        Runtime.RegisterWheelClosed(pluginId, handler);
+        return new RegistrationToken(() =>
+        {
+            lock (Gate)
+            {
+                if (WheelOpeningHandlers.TryGetValue(pluginId, out List<Action<ActionContext>>? list))
+                {
+                    list.Remove(handler);
+                }
+            }
+        });
+    }
+
+    public static IDisposable RegisterWheelClosed(string pluginId, Action handler)
+    {
+        lock (Gate)
+        {
+            if (!WheelClosedHandlers.TryGetValue(pluginId, out List<Action>? list))
+            {
+                list = new List<Action>();
+                WheelClosedHandlers[pluginId] = list;
+            }
+            list.Add(handler);
+        }
+
+        return new RegistrationToken(() =>
+        {
+            lock (Gate)
+            {
+                if (WheelClosedHandlers.TryGetValue(pluginId, out List<Action>? list))
+                {
+                    list.Remove(handler);
+                }
+            }
+        });
+    }
 
     /// <summary>
-    /// 广播「轮盘即将呈现」。当前沿用旧同步回调；正式的有界事件队列将在交互路径阶段实现。
+    /// 广播「轮盘即将呈现」。
+    /// <para>
+    /// <b>必须由 UI 线程调用</b>（调用点应使用 <c>Dispatcher.BeginInvoke</c> 投递），
+    /// 因为轮盘的呈现路径直接挂在鼠标钩子之后，插件代码绝不允许出现在那条路径上（红线 R2）。
+    /// </para>
     /// </summary>
     public static void RaiseWheelOpening(ActionContext context)
     {
         if (!_enabled) return;
-        Runtime.RaiseWheelOpening(context);
+
+        List<Action<ActionContext>> handlers = new();
+        lock (Gate)
+        {
+            foreach (List<Action<ActionContext>> list in WheelOpeningHandlers.Values)
+            {
+                handlers.AddRange(list);
+            }
+        }
+
+        foreach (Action<ActionContext> handler in handlers)
+        {
+            try
+            {
+                handler(context);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("[plugin] OnWheelOpening 回调异常（已拦截）", ex);
+            }
+        }
     }
 
     public static void RaiseWheelClosed()
     {
         if (!_enabled) return;
-        Runtime.RaiseWheelClosed();
-    }
 
-    /// <summary>
-    /// 统一交互事件入口。当前尚未开放统一事件贡献，调用安全返回 0（没有订阅者接收）。
-    /// </summary>
-    public static int PublishInteractionEvent(PluginInteractionEventEnvelope interactionEvent)
-    {
-        if (!_enabled) return 0;
-        return Runtime.PublishInteractionEvent(interactionEvent);
-    }
+        List<Action> handlers = new();
+        lock (Gate)
+        {
+            foreach (List<Action> list in WheelClosedHandlers.Values)
+            {
+                handlers.AddRange(list);
+            }
+        }
 
-    /// <summary>
-    /// 统一轮盘结构入口。当前尚未开放结构提供者，调用安全返回空快照。
-    /// </summary>
-    public static ValueTask<PluginWheelStructureSnapshot> QueryWheelStructureAsync(
-        PluginWheelStructureRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (!_enabled) return ValueTask.FromResult(PluginWheelStructureSnapshot.Empty);
-        return Runtime.QueryWheelStructureAsync(request, cancellationToken);
+        foreach (Action handler in handlers)
+        {
+            try
+            {
+                handler();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.LogError("[plugin] OnWheelClosed 回调异常（已拦截）", ex);
+            }
+        }
     }
 
     // ------------------------------------------------------------------ 磁盘同步
@@ -1056,7 +2140,7 @@ internal static class PluginHost
     {
         try
         {
-            return PluginScanner.ScanSelectedDll(file);
+            return PluginScanner.ScanSelectedDll(file, allowReservedIdPrefix: IsInOfficialSourceDirectory(file));
         }
         catch (Exception ex)
         {
@@ -1068,6 +2152,56 @@ internal static class PluginHost
                 Failure = PluginScanFailure.NotDotNetAssembly,
                 ErrorDetail = ex.Message,
             };
+        }
+    }
+
+    /// <summary>
+    /// 这枚文件是不是躺在<b>随程序分发的只读来源区</b>里（<c>&lt;程序目录&gt;\plugin\</c>）。
+    /// <para>
+    /// 用途只有一个：让来自来源区的清单放行保留 ID 前缀（官方包用 <c>starpie.*</c> 命名，
+    /// 这正是保留命名空间的用途）。用户自己挑的 dll、以及开发者登记的外部路径一律为 false，
+    /// 于是社区插件照旧拿不到官方命名空间。
+    /// </para>
+    /// <para>
+    /// 判定同时接受「当前生效的来源区」（<see cref="PluginPaths.ScanRoot"/>）与
+    /// 「主程序目录下的 <c>plugin\</c>」—— 前者是为了让自检的沙箱能真实模拟来源区，
+    /// 后者是规则的本义。两者在正常运行时是同一个目录。
+    /// </para>
+    /// </summary>
+    private static bool IsInOfficialSourceDirectory(string file)
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(Path.GetFullPath(file));
+            if (string.IsNullOrEmpty(directory)) return false;
+
+            directory = Path.TrimEndingDirectorySeparator(directory);
+
+            // 两个候选，任一命中即可：
+            //
+            //   ① 当前生效的来源区（PluginPaths.ScanRoot）。自检会把根目录钉到临时沙箱，
+            //      那时沙箱里的 plugin\ 正是「我们正在模拟的那个来源区」，必须算 ——
+            //      否则随包安装这条路径在自检里根本跑不起来。
+            //   ② 主程序目录下的 plugin\。这是规则的本义。用 BaseDirectory 而不是 ScanRoot，
+            //      是因为即便根目录被重定向，真实程序目录里的那一份仍然是随包分发的那一份；
+            //      用户跑 --plugin-selftest 时指的通常也正是它。
+            if (PluginPaths.ScanRootExists
+                && string.Equals(
+                    directory,
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(PluginPaths.ScanRoot)),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string programSourceRoot = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, PluginPaths.ScanDirectoryName)));
+
+            return string.Equals(directory, programSourceRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1154,37 +2288,43 @@ internal static class PluginHost
     /// </summary>
     public static bool InstallCandidate(PluginCandidate candidate, out string error)
     {
-        PluginInstallResult result = InstallCandidateAsync(candidate).GetAwaiter().GetResult();
-        error = result.Error;
-        return result.Success;
-    }
+        error = "";
 
-    public static async Task<PluginInstallResult> InstallCandidateAsync(
-        PluginCandidate candidate,
-        CancellationToken cancellationToken = default)
-    {
         if (candidate == null)
         {
-            return new PluginInstallResult { Success = false, Error = "候选为空。" };
+            error = "候选为空。";
+            return false;
         }
 
         if (!candidate.CanInstall)
         {
-            return new PluginInstallResult
-            {
-                Success = false,
-                Error = $"当前状态不允许安装：{candidate.StateText}。{candidate.Note}",
-            };
+            error = $"当前状态不允许安装：{candidate.StateText}。{candidate.Note}";
+            return false;
         }
 
         PluginScanResult scan = candidate.Scan;
         if (scan.Manifest == null)
         {
-            return new PluginInstallResult { Success = false, Error = "识别结果里没有清单，无法安装。" };
+            error = "识别结果里没有清单，无法安装。";
+            return false;
+        }
+
+        string pluginId = scan.Manifest.Id;
+
+        // 覆盖安装必须先让文件解锁。插件是惰性加载的（Preload 默认 false），
+        // 但一旦用户已经用过它的动作，程序集就被加载、文件就被占用，
+        // 此时直接覆盖只会得到一句「文件被占用」——对用户就是「更新失败，原因不明」。
+        // 这里主动停用再装：对用户始终只是「一次点击」。
+        PluginInstance? existing = Find(pluginId);
+        if (existing is { IsLoaded: true })
+        {
+            AppLogger.LogInfo($"[plugin] 覆盖安装 {pluginId} 前先行停用以解除文件占用");
+            Disable(pluginId, out _);
         }
 
         var options = new PluginInstallOptions
         {
+            // 能走到这个按钮前，用户已经在候选卡片上看过说明并点了确认。
             Acknowledged = true,
             OverwriteExisting = true,
             EnableAfterInstall = true,
@@ -1194,9 +2334,16 @@ internal static class PluginHost
                 : new List<string>(),
         };
 
-        PluginInstallResult result = await CommitInstallAsync(scan, options, cancellationToken).ConfigureAwait(false);
+        PluginInstallResult result = CommitInstall(scan, options);
+        if (!result.Success)
+        {
+            error = result.Error;
+            ScanCandidates();
+            return false;
+        }
+
         ScanCandidates();
-        return result;
+        return true;
     }
 
     /// <summary>重新扫描单个插件（用户点了「刷新」）。</summary>
@@ -1236,7 +2383,10 @@ internal static class PluginHost
                 PluginPaths.Root,
                 string.IsNullOrWhiteSpace(entry.InstallPath) ? entry.Id : entry.InstallPath);
 
-            return PluginScanner.ScanInstalledPlugin(directory);
+            // 已登记的插件：保留前缀在它进入系统那一刻就查过了，这里不再复查。
+            // 「扫描时放行、装载时拒绝」会让随包插件装得上却永远起不来，
+            // 而错误信息指着 ID 说事，与真实原因毫无关系。
+            return PluginScanner.ScanInstalledPlugin(directory, allowReservedIdPrefix: true);
         }
         catch (Exception ex)
         {
@@ -1370,13 +2520,9 @@ internal static class PluginHost
 
                     try
                     {
-                        PluginActivationResult activation = Runtime.EnsurePluginLoaded(
-                            instance.PluginId,
-                            PluginActivationReason.StartupPreload,
-                            requireEnabled: true);
-                        if (!activation.IsReady)
+                        if (!instance.Load(out string failure))
                         {
-                            AppLogger.LogWarn($"[plugin] 预加载 {instance.PluginId} 失败：{activation.Error}");
+                            AppLogger.LogWarn($"[plugin] 预加载 {instance.PluginId} 失败：{failure}");
                         }
                     }
                     catch (Exception ex)
@@ -1394,8 +2540,16 @@ internal static class PluginHost
         }
     }
 
+    /// <summary>
+    /// 登记表或启用状态变了。所有变更路径（安装 / 启用 / 停用 / 卸载）都汇聚到这里，
+    /// 于是「变更之后要重算什么」只有这一处需要维护。
+    /// </summary>
     private static void NotifyPluginSetChanged()
     {
+        // 认领表必须跟着登记表走：卸载一个随包动作包之后，它认领的那些 Type
+        // 若还留在表里，宿主会继续按「已停用」去解释它们 —— 而插件其实已经不存在了。
+        RebuildClaimTable();
+
         try
         {
             ConfigManager.MarkConfigurationChanged();
