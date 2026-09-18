@@ -12,7 +12,7 @@ internal sealed class PluginTypeClaimBinding
     public string FullId => $"{PluginId}.{ContributionId}";
 }
 
-/// <summary>官方随包插件的旧动作类型兼容路由表。</summary>
+/// <summary>官方在线插件的旧动作类型兼容路由表。</summary>
 internal static class PluginActionClaimRegistry
 {
     private static readonly object Gate = new();
@@ -23,7 +23,7 @@ internal static class PluginActionClaimRegistry
     {
         var candidates = new Dictionary<string, List<PluginTypeClaimBinding>>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (PluginRegistryEntry entry in entries.Where(entry => entry.Bundled))
+        foreach (PluginRegistryEntry entry in entries.Where(entry => entry.Official))
         {
             foreach (string wire in entry.ClaimedTypes ?? new List<string>())
             {
@@ -68,7 +68,7 @@ internal static class PluginActionClaimRegistry
                 continue;
             }
 
-            AppLogger.LogError($"[plugin] 顶层类型 {type} 被多个随包插件认领：{string.Join(", ", bindings.Select(x => x.PluginId))}；全部拒绝。");
+            AppLogger.LogError($"[plugin] 顶层类型 {type} 被多个官方插件认领：{string.Join(", ", bindings.Select(x => x.PluginId))}；全部拒绝。");
         }
 
         lock (Gate) _claims = next;

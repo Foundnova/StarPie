@@ -34,8 +34,8 @@ internal sealed class PluginInstallOptions
     /// </summary>
     public string SourceKind { get; set; } = "UserSelectedFile";
 
-    /// <summary>是否为随主程序分发的官方插件。</summary>
-    public bool Bundled { get; set; }
+    /// <summary>是否来自官方在线模块 catalog；允许使用 starpie.* 命名空间与顶层类型认领。</summary>
+    public bool Official { get; set; }
 }
 
 internal sealed class PluginInstallResult
@@ -141,12 +141,16 @@ internal static class PluginHost
 
             CheckSafeMode();
 
-            int bundledChanged = BundledPluginLifecycle.Synchronize(ScanCandidateFile, CommitInstall);
             int discovered = SyncFromDisk();
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
-                $"（本次扫描新发现 {discovered} 个，随包同步 {bundledChanged} 项），安全模式={_safeModeActive}");
+                $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
+
+            if (!_safeModeActive && !HeadlessMode)
+            {
+                ScheduleOfficialPluginSync();
+            }
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -326,9 +330,9 @@ internal static class PluginHost
                     AckedAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                     AckedHostVersion = PluginManifestReader.HostVersion,
                     Source = options.DeveloperExternalPath ? "DeveloperPath" : options.SourceKind,
-                    Bundled = options.Bundled,
-                    ClaimedTypes = options.Bundled
-                        ? BundledPluginLifecycle.BuildClaimWire(manifest)
+                    Official = options.Official,
+                    ClaimedTypes = options.Official
+                        ? BuildClaimWire(manifest)
                         : new List<string>(),
                     InstalledAt = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
                 };
@@ -565,33 +569,23 @@ internal static class PluginHost
         string pluginId,
         bool removePluginData,
         CancellationToken cancellationToken = default) =>
-        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: true, cancellationToken);
+        UninstallCoreAsync(pluginId, removePluginData, cancellationToken);
 
     internal static Task<PluginUninstallResult> UninstallForSelfTestAsync(
         string pluginId,
         bool removePluginData,
         CancellationToken cancellationToken = default) =>
-        UninstallCoreAsync(pluginId, removePluginData, respectBundledGuard: false, cancellationToken);
+        UninstallCoreAsync(pluginId, removePluginData, cancellationToken);
 
     private static async Task<PluginUninstallResult> UninstallCoreAsync(
         string pluginId,
         bool removePluginData,
-        bool respectBundledGuard,
         CancellationToken cancellationToken)
     {
         PluginInstance? instance = Find(pluginId);
         if (instance == null)
         {
             return new PluginUninstallResult { Success = false, Error = $"插件未安装：{pluginId}" };
-        }
-
-        if (respectBundledGuard && instance.Entry.Bundled)
-        {
-            return new PluginUninstallResult
-            {
-                Success = false,
-                Error = $"「{instance.Entry.Name}」随 StarPie 一起分发，不能卸载；如不需要请停用。",
-            };
         }
         PluginStopResult stop = await DisableAsync(
             pluginId,
@@ -1270,13 +1264,21 @@ internal static class PluginHost
             return new PluginInstallResult { Success = false, Error = "识别结果里没有清单，无法安装。" };
         }
 
+        if (PluginPaths.IsReservedPluginId(scan.Manifest.Id))
+        {
+            return new PluginInstallResult
+            {
+                Success = false,
+                Error = "官方模块只能通过官方在线目录下载和安装。",
+            };
+        }
+
         var options = new PluginInstallOptions
         {
             Acknowledged = true,
             OverwriteExisting = true,
             EnableAfterInstall = true,
             SourceKind = "ScanDirectory",
-            Bundled = PluginPaths.IsReservedPluginId(scan.Manifest.Id),
             AcknowledgedCapabilities = scan.Manifest.Capabilities is { Count: > 0 } capabilities
                 ? new List<string>(capabilities)
                 : new List<string>(),
@@ -1326,7 +1328,7 @@ internal static class PluginHost
 
             return PluginScanner.ScanInstalledPlugin(
                 directory,
-                allowReservedIdPrefix: entry.Bundled);
+                allowReservedIdPrefix: entry.Official);
         }
         catch (Exception ex)
         {
@@ -1443,6 +1445,31 @@ internal static class PluginHost
         }
     }
 
+    /// <summary>启动后台官方模块同步，不阻塞首帧，也不运行在鼠标手势热路径。</summary>
+    private static void ScheduleOfficialPluginSync()
+    {
+        try
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+                try
+                {
+                    OfficialPluginSyncResult result = await OfficialPluginClient.SyncInstalledModulesAsync().ConfigureAwait(false);
+                    AppLogger.LogInfo($"[plugin] 官方模块同步完成：新增/更新 {result.InstalledOrUpdated}，已是最新 {result.AlreadyCurrent}，失败 {result.Failed}");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.LogWarn($"[plugin] 官方模块同步失败：{ex.Message}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogWarn($"[plugin] 调度官方模块同步失败：{ex.Message}");
+        }
+    }
+
     /// <summary>启动后台预加载（仅 Preload=true 的已启用插件），不阻塞首帧。</summary>
     private static void SchedulePreload()
     {
@@ -1483,6 +1510,13 @@ internal static class PluginHost
             AppLogger.LogError("[plugin] 调度预加载失败", ex);
         }
     }
+
+    private static List<string> BuildClaimWire(PluginManifest manifest) =>
+        manifest.ClaimedTypes
+            .Where(claim => !string.IsNullOrWhiteSpace(claim.TypeName)
+                         && !string.IsNullOrWhiteSpace(claim.ContributionId))
+            .Select(claim => claim.ToWire())
+            .ToList();
 
     private static void NotifyPluginSetChanged()
     {

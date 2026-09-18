@@ -196,7 +196,7 @@ public class UpdateManager
 		{
 			Timeout = TimeSpan.FromSeconds(15)
 		};
-		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.4-beta.4"));
+		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.8.0-beta.1"));
 	}
 
 	public bool IsCurrentInstallationStandalone()

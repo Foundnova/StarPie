@@ -1046,17 +1046,17 @@ public static class I18n
 		};
 		dictionary["PluginsPageSubheader"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "把插件 .dll 放进程序目录的 plugin 文件夹，或手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。",
-			[LanguageCode.ZhTw] = "把外掛 .dll 放進程式目錄的 plugin 資料夾，或手動選擇 .dll 安裝。外掛以 StarPie 目前權限在行程內執行，請只安裝你信任的來源。",
-			[LanguageCode.En] = "Drop a plugin .dll into the \"plugin\" folder next to the program, or install one manually. Plugins run in-process with StarPie's own privileges, so only install sources you trust.",
-			[LanguageCode.Ja] = "プラグインの .dll をプログラムフォルダー内の plugin フォルダーに置くか、手動で .dll を選択してインストールします。プラグインは StarPie と同じ権限でプロセス内実行されるため、信頼できる提供元のみインストールしてください。"
+			[LanguageCode.ZhCn] = "官方插件从 StarPie-Official-Plugins 下载并校验；社区插件仍可手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。",
+			[LanguageCode.ZhTw] = "官方外掛從 StarPie-Official-Plugins 下載並校驗；社群外掛仍可手動選擇 .dll 安裝。外掛以 StarPie 目前權限在行程內執行，請只安裝你信任的來源。",
+			[LanguageCode.En] = "Official plugins are downloaded and verified from StarPie-Official-Plugins; community plugins can still be installed manually. Plugins run in-process with StarPie's own privileges, so only install sources you trust.",
+			[LanguageCode.Ja] = "公式プラグインは StarPie-Official-Plugins からダウンロードして検証します。コミュニティプラグインは引き続き .dll を手動で選択できます。プラグインは StarPie と同じ権限で実行されるため、信頼できる提供元のみインストールしてください。"
 		};
 		dictionary["PluginsInstallButton"] = new Dictionary<LanguageCode, string>
 		{
-			[LanguageCode.ZhCn] = "➕ 安装插件 (.dll)...",
-			[LanguageCode.ZhTw] = "➕ 安裝外掛 (.dll)...",
-			[LanguageCode.En] = "➕ Install Plugin (.dll)...",
-			[LanguageCode.Ja] = "➕ プラグインをインストール (.dll)..."
+			[LanguageCode.ZhCn] = "➕ 手动安装社区插件 (.dll)...",
+			[LanguageCode.ZhTw] = "➕ 手動安裝社群外掛 (.dll)...",
+			[LanguageCode.En] = "➕ Install Community Plugin (.dll)...",
+			[LanguageCode.Ja] = "➕ コミュニティプラグインを手動インストール (.dll)..."
 		};
 		dictionary["PluginsRescanButton"] = new Dictionary<LanguageCode, string>
 		{

@@ -41,6 +41,9 @@ public partial class SettingsWindow : Window
 
 	private bool _isSidebarCollapsed = false;
 
+	private OfficialPluginCatalog? _officialPluginCatalog;
+	private bool _officialPluginsLoading;
+
 	/// <summary>设置控制台当前已生效的界面缩放比例，用于按倍率换算窗口尺寸增量。</summary>
 	private double _appliedSettingsUiScale = 1.0;
 
@@ -6482,6 +6485,63 @@ public partial class SettingsWindow : Window
 	/// 是否先与磁盘对账。进入页面时为 true —— 用户可能刚在资源管理器里拷入或删除了插件目录；
 	/// 页面内操作（启用/停用/卸载）之后为 false，那些操作自身已经把状态同步过了。
 	/// </param>
+	private async void RefreshOfficialPluginsButton_Click(object sender, RoutedEventArgs e)
+	{
+		await RefreshOfficialPluginsAsync();
+	}
+
+	private async Task RefreshOfficialPluginsAsync()
+	{
+		if (_officialPluginsLoading) return;
+		_officialPluginsLoading = true;
+		if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = false;
+		if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = "正在从 GitHub 获取官方插件目录…";
+
+		try
+		{
+			_officialPluginCatalog = await OfficialPluginClient.FetchCatalogAsync();
+			RenderOfficialPluginItems();
+			if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = $"目录 {_officialPluginCatalog.CatalogVersion} · {_officialPluginCatalog.Modules.Count} 个模块 · 来源 StarPie-Official-Plugins";
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"[plugin] 刷新官方插件目录失败：{ex.Message}");
+			if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = "官方插件目录暂时不可用：" + ex.Message;
+		}
+		finally
+		{
+			_officialPluginsLoading = false;
+			if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = true;
+		}
+	}
+
+	private void RenderOfficialPluginItems()
+	{
+		if (OfficialPluginItemsControl == null || _officialPluginCatalog == null) return;
+		var installed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+		foreach (PluginInstance instance in PluginHost.ListInstances()) installed[instance.PluginId] = instance.Entry.Version;
+		OfficialPluginItemsControl.ItemsSource = _officialPluginCatalog.Modules.OrderBy(module => module.Name, StringComparer.CurrentCultureIgnoreCase).Select(module => new OfficialPluginListItem(module, installed.TryGetValue(module.Id, out string? version) ? version : null)).ToList();
+	}
+
+	private async void InstallOfficialPluginButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button { Tag: OfficialPluginModule module } button) return;
+		if (!EnsurePluginSystemReady()) return;
+		button.IsEnabled = false;
+		try
+		{
+			OfficialPluginInstallResult result = await OfficialPluginClient.InstallAsync(module);
+			if (!result.Success) System.Windows.MessageBox.Show(this, $"官方插件 {module.Name} 安装失败：\n\n{result.Error}", "StarPie 官方插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+			else System.Windows.MessageBox.Show(this, $"官方插件 {module.Name} v{module.Version} 已下载、校验并启用。", "StarPie 官方插件", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+		finally
+		{
+			button.IsEnabled = true;
+			RefreshPluginManagerUi();
+			RenderOfficialPluginItems();
+		}
+	}
+
 	private void RefreshPluginManagerUi(bool resyncFromDisk = false)
 	{
 		if (PluginListBox == null) return;
@@ -6554,6 +6614,15 @@ public partial class SettingsWindow : Window
 			{
 				PluginsSafeModeText.Text = I18n.T("PluginsSafeModeWarning");
 			}
+		}
+
+		if (_officialPluginCatalog == null && !_officialPluginsLoading)
+		{
+			_ = RefreshOfficialPluginsAsync();
+		}
+		else
+		{
+			RenderOfficialPluginItems();
 		}
 
 		RefreshPluginCandidatesUi();

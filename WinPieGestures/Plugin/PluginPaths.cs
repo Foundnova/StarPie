@@ -23,7 +23,7 @@ namespace WinPieGestures.Plugins;
 /// </list>
 /// <para>
 /// 便携模式只改变<b>可写宿主区</b>的落点（挪到程序目录下的 <c>plugin-data</c>），
-/// 不影响 <see cref="ScanRoot"/> —— 只读来源区永远固定在程序目录。
+/// 不影响 <see cref="ScanRoot"/> —— 社区插件候选区永远固定在程序目录。
 /// </para>
 /// </summary>
 internal static class PluginPaths

@@ -160,7 +160,7 @@ internal static class BuiltinActionCatalog
 			//   Launch / WebUrl（含别名 Url）/ Folder（含别名 OpenFolder）/
 			//   Command / ShellTool / Tile / ToggleTopmost / MoveMonitor /
 			//   WindowOpacity / SwitchWindow / Ocr（含别名 ScreenOcr）/ System
-			//     → plugins\StarPie.Plugin.<类型名> —— 十二个**单动作包**
+			//     → 官方在线模块 catalog —— 十二个**单动作包**
 			//     每个包只认领自己那一个类型（别名与主类型同包），
 			//     拆包粒度就是停用粒度：用户能把「窗口透明度」关掉而继续用「平铺窗口」，
 			//     也能单独关掉那个会读屏幕的「截屏识字」。
