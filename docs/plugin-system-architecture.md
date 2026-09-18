@@ -417,13 +417,13 @@ sequenceDiagram
 
 ---
 
-## 8.1 随包动作包、类型认领与宿主能力
+## 8.1 官方在线模块、类型认领与宿主能力
 
 ### 内建动作的最终分工
 
 `Hotkey` 是唯一保留在 `BuiltinActionCatalog` 的内建动作。它也是未配置槽位的占位类型，不能外移；否则用户停用某个动作包后，空槽位也会变成“动作不可用”。
 
-其余 12 个原内建动作以 `plugins/StarPie.Plugin.*` 下的单动作包随发行版构建：
+其余 12 个原内建动作以 `StarPie-Official-Plugins` 仓库中的单动作模块独立发布，并由主程序从官方 catalog 下载：
 
 ```text
 Launch / WebUrl / Folder / Command / ShellTool
@@ -431,52 +431,48 @@ Tile / ToggleTopmost / MoveMonitor / WindowOpacity / SwitchWindow
 Ocr / System
 ```
 
-单动作包的拆分粒度就是用户可以停用的粒度。插件工程只依赖 `StarPie.Plugin.Abstractions`，并以 `Private=false` 引用它；主工程只将产物复制到来源区，不引用插件类型。
+单动作包的拆分粒度就是用户可以停用的粒度。插件工程只依赖 `StarPie.Plugin.Abstractions`，并以 `Private=false` 引用它；主工程不引用插件类型，也不再构建或随发行包复制官方模块 DLL。
 
 ### 顶层类型认领（Type Claim）
 
-旧配置以 `ActionItem.Type` 保存动作身份，例如 `Launch`、`Url` 或 `Tile`。为了不迁移用户配置，随包动作包通过程序集静态元数据声明：
+旧配置以 `ActionItem.Type` 保存动作身份，例如 `Launch`、`Url` 或 `Tile`。为了保留旧动作类型的持久化形态，官方在线模块通过程序集静态元数据声明：
 
 ```text
 StarPiePluginTypeClaims = "Launch=launch"
 ```
 
-`PluginActionClaimRegistry` 只读取登记表中的随包认领快照，将顶层类型解析为 `PluginId + ContributionId`。它不加载 DLL、不执行插件代码，也不承担参数校验或调度。
+`PluginActionClaimRegistry` 只读取登记表中的官方模块认领快照，将顶层类型解析为 `PluginId + ContributionId`。它不加载 DLL、不执行插件代码，也不承担参数校验或调度。
 
 动作派发顺序是固定契约：
 
 ```text
 ActionExecutor
   1. BuiltinActionCatalog（Hotkey）
-  2. PluginActionClaimRegistry（旧 Type → 随包插件贡献点）
+  2. PluginActionClaimRegistry（旧 Type → 官方在线模块贡献点）
   3. 历史 switch / Type="Plugin" 兜底
 ```
 
 认领规则：
 
-- 只有登记为 `Bundled` 的插件可以认领顶层类型；
+- 只有登记为 `Official` 的官方在线模块可以认领顶层类型；
 - 不能认领 `Plugin` 或仍在内建目录中的类型；
-- 多个随包插件争抢同一类型时整组拒绝，绝不采用后写覆盖；
+- 多个官方模块争抢同一类型时整组拒绝，绝不采用后写覆盖；
 - 已认领贡献点不显示在普通“插件动作”子下拉中，避免同一功能出现两种互不兼容的持久化形态；
 - 认领动作的旧裸字段由 `ActionParameterProjection` 投影为参数字典，再进入 `PluginRuntime.Actions` 的统一激活、校验、租约和调用路径。
 
-### 随包生命周期
+### 官方在线模块同步
 
-`BundledPluginLifecycle` 在启动初始化阶段、`SyncFromDisk` 之前执行，且只做静态扫描与文件同步：
+启动完成后，宿主在后台读取 `StarPie-Official-Plugins` 的 GitHub Release catalog，并按模块版本同步：
 
 ```text
-程序目录 plugin\ 来源区
-  → 首次安装并在登记表标记 Bundled
-  → 已存在时刷新文件元数据，但不改 Enabled / Preload
-  → 宿主区载荷丢失时补回
-  → 来源区完整且可识别时，清理已停止分发的旧随包载荷
-  → SyncFromDisk 建立或就地更新 PluginInstance
-  → PluginActionClaimRegistry 重建路由表
+官方 Release catalog
+  → 缺失或版本过旧的官方模块下载 .spkg
+  → 校验包大小、包 SHA-256、module.manifest.json 与程序集 SHA-256
+  → 安装到 plugin-data 并标记 Official
+  → 启用模块并重建 PluginActionClaimRegistry
 ```
 
-清理遵循保守原则：来源区不存在、为空或存在无法识别 DLL 时，宁可留下旧条目，也不删除用户数据。停止分发时只删载荷和登记，保留插件 `data\` 目录。
-
-随包动作包允许使用 `starpie.*` 保留 ID，但仅在只读来源区、已登记的随包安装副本和自检沙箱中放行；用户手动选择 DLL 的入口仍按社区插件规则拒绝保留 ID。
+网络同步绝不进入鼠标钩子或手势动作热路径。网络失败时只记录日志；本地已经安装的模块仍可继续使用。社区插件候选区 `程序目录\plugin` 仅保留给手动安装社区 DLL。
 
 ### SDK 1.4 能力门禁
 

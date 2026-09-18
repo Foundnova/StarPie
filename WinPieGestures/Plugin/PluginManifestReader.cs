@@ -113,7 +113,7 @@ internal static class PluginManifestReader
     /// 所以这个开关的判据是「这份清单有没有正当理由用官方命名空间」，有两种情况都算：
     /// </para>
     /// <list type="number">
-    /// <item><b>来自随程序分发的只读来源区</b>（<c>&lt;程序目录&gt;\plugin\</c>）——
+    /// <item><b>来自官方在线 catalog 安装后的本地宿主区</b>（<c>&lt;程序目录&gt;\plugin\</c>）——
     /// 官方包用 <c>starpie.*</c> 命名，用的就是这个保留命名空间的本意。拒掉它是规则的假阳性。</item>
     /// <item><b>装载一枚已登记的插件</b>（<see cref="PluginScanner.ScanInstalledPlugin"/>）——
     /// ID 在它进入系统的那一刻（扫描 / 导入）已经查过一次，装载时再查一次只会制造矛盾：
@@ -122,7 +122,7 @@ internal static class PluginManifestReader
     /// </list>
     /// <para>
     /// 这不构成安全边界：往来源区放文件需要对安装目录的写权限；而真正决定「能不能认领顶层类型」
-    /// 的是登记表里的 <c>Bundled</c> 标记，那只由宿主自己写，插件的任何声明都影响不了它。
+    /// 的是登记表里的 <c>Official</c> 标记，那只由宿主自己写，插件的任何声明都影响不了它。
     /// </para>
     /// </param>
     public static bool Validate(

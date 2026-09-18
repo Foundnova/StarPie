@@ -689,9 +689,9 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.7.4-beta.4&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.8.0-beta.1&#x0a;© 2026 StarPie">
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.7.4-beta.4" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.8.0-beta.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -3781,8 +3781,10 @@
           </Grid>
         </Grid>
         <!-- ==================== 🧩 插件与扩展 ==================== -->
-        <Grid Name="PluginsSettingsGrid" Visibility="Collapsed">
+        <ScrollViewer Name="PluginsSettingsGrid" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+          <Grid>
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -3797,10 +3799,10 @@
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
               <TextBlock Name="PluginsPageHeader" Text="插件与扩展" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
-              <TextBlock Name="PluginsPageSubheader" Text="把插件 .dll 放进程序目录的 plugin 文件夹，或手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
+              <TextBlock Name="PluginsPageSubheader" Text="官方插件从 StarPie-Official-Plugins 下载并校验；社区插件仍可手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" TextWrapping="Wrap" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-              <Button Name="InstallPluginButton" Content="➕ 安装插件 (.dll)..." Style="{StaticResource PrimaryButtonStyle}" Height="32" Padding="12,0" Click="InstallPluginButton_Click" />
+              <Button Name="InstallPluginButton" Content="➕ 手动安装社区插件 (.dll)..." Style="{StaticResource PrimaryButtonStyle}" Height="32" Padding="12,0" Click="InstallPluginButton_Click" />
               <Button Name="RescanPluginsButton" Content="🔄 重新扫描" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Margin="8,0,0,0" ToolTip="重新读取扫描目录与插件数据目录，识别新增、手工拷入或外部修改过的插件" Click="RescanPluginsButton_Click" />
               <Button Name="OpenPluginsFolderButton" Content="📂 打开数据目录" Style="{StaticResource ModernButtonStyle}" Height="32" Padding="12,0" Margin="8,0,0,0" ToolTip="打开 StarPie 的可写插件目录：安装副本、启用记录与插件私有数据都在这里" Click="OpenPluginsFolderButton_Click" />
             </StackPanel>
@@ -3820,8 +3822,63 @@
             </Grid>
           </Border>
 
+          <!-- 官方插件在线目录 -->
+          <Border Grid.Row="2" Name="OfficialPluginsPanel" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,12">
+            <StackPanel>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                  <TextBlock Name="OfficialPluginsHeaderText" Text="官方插件" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                  <TextBlock Name="OfficialPluginsStatusText" Text="从 StarPie-Official-Plugins 下载经过 SHA-256 校验的官方模块" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Name="RefreshOfficialPluginsButton" Grid.Column="1" Content="🌐 刷新目录" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" FontSize="11" VerticalAlignment="Center" Click="RefreshOfficialPluginsButton_Click" />
+              </Grid>
+              <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl Name="OfficialPluginItemsControl">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,6">
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                              <TextBlock Text="🔌" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                              <TextBlock Text="{Binding DisplayName}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding VersionText}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                              <Border Background="{DynamicResource SubtleCardBrush}" CornerRadius="8" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding StateText}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+                              </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="{Binding InstallButtonText}" Tag="{Binding Module}" Click="InstallOfficialPluginButton_Click" Height="28" Padding="10,0" FontSize="11.5" VerticalAlignment="Top" Margin="10,0,0,0">
+                            <Button.Style>
+                              <Style TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding CanInstall}" Value="False">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Button.Style>
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
+          </Border>
+
           <!-- 只读扫描目录里的待安装候选 -->
-          <Border Grid.Row="2" Name="PluginCandidatesPanel" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,12" Visibility="Collapsed">
+          <Border Grid.Row="3" Name="PluginCandidatesPanel" Background="{DynamicResource SubtleCardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,12" Visibility="Collapsed">
             <StackPanel>
               <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
@@ -3888,7 +3945,7 @@
           </Border>
 
           <!-- 插件列表 -->
-          <Grid Grid.Row="3">
+          <Grid Grid.Row="4">
             <ListBox Name="PluginListBox" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
@@ -3946,6 +4003,7 @@
             </StackPanel>
           </Grid>
         </Grid>
+        </ScrollViewer>
 
         <Grid Name="SystemSettingsGrid" Visibility="Collapsed">
           <Grid.RowDefinitions>
@@ -4027,7 +4085,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.7.4-beta.4 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.8.0-beta.1 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -4502,7 +4560,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.7.4-beta.4" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.8.0-beta.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />

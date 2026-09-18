@@ -47,15 +47,8 @@ internal sealed class PluginRegistryEntry
 
     /// <summary>安装来源：<c>UserSelectedFile</c> / <c>UserSelectedFolder</c> / <c>DeveloperPath</c> / <c>Discovered</c>。</summary>
     public string Source { get; set; } = "UserSelectedFile";
-
-    /// <summary>
-    /// 随主程序分发的插件（来源是程序目录下的只读扫描目录）。
-    /// <para>
-    /// 带这个标记的条目：首启自动安装并启用、不可卸载（只可停用）、
-    /// 被从宿主区删掉后下次启动会补回来。用户自己装的插件一律为 false。
-    /// </para>
-    /// </summary>
-    public bool Bundled { get; set; }
+    /// <summary>是否由官方在线模块 catalog 安装。</summary>
+    public bool Official { get; set; }
 
     /// <summary>
     /// 本插件认领的顶层动作类型，形如 <c>"Command=command"</c>（见 <see cref="PluginTypeClaim.ToWire"/>）。
@@ -89,7 +82,7 @@ internal sealed class PluginRegistryEntry
         AckedAt = AckedAt,
         AckedHostVersion = AckedHostVersion,
         Source = Source,
-        Bundled = Bundled,
+        Official = Official,
         ClaimedTypes = new List<string>(ClaimedTypes),
         InstalledAt = InstalledAt,
     };

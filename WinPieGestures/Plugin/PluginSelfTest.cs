@@ -182,7 +182,6 @@ internal static class PluginSelfTest
                 Acknowledged = true,
                 OverwriteExisting = true,
                 EnableAfterInstall = false,
-                Bundled = PluginPaths.IsReservedPluginId(manifest.Id),
                 AcknowledgedCapabilities = manifest.Capabilities,
             };
             PluginInstallResult install = PluginHost.CommitInstall(scan, options);

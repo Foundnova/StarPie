@@ -14,9 +14,9 @@
     <Product>StarPie</Product>
     <Company>StarPie Studio</Company>
     <Description>StarPie - 现代化高颜值 Windows 鼠标轮盘笔势与效率管理系统</Description>
-    <Version>1.7.4-beta.4</Version>
-    <AssemblyVersion>1.7.4.0</AssemblyVersion>
-    <FileVersion>1.7.4.0</FileVersion>
+    <Version>1.8.0-beta.1</Version>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
+    <FileVersion>1.8.0.0</FileVersion>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <!-- 编译器告警抑制：消除 Win32 Interop 结构体未显式赋值 (CS0649)、历史反编译遗留字段 (CS0169)、非核心 UI 可空引用分析 (CS8600/CS8601/CS8602/CS8604/CS8618/CS8625)、异步非阻塞缓存保存 (CS4014) 以及 WPF 混合 WinForms 时关于 app.manifest 高 DPI 分析器的误报 (WFAC010)，保障 Release 构建严格 0 错误 0 警告 -->
@@ -43,106 +43,5 @@
     <None Include="tray_icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!--
-    随包分发的动作包
-    ==================================================================
-    ReferenceOutputAssembly=false：主程序**不引用**它们。这个方向是反的 ——
-    插件引用 SDK，宿主引用 SDK，宿主与插件之间没有任何类型引用。
-    这里只是借 MSBuild 的项目图让它们跟着一起构建，再从产物里把 dll
-    放进 plugin\ 来源区（来源区的约定是「扁平，只放 .dll」）。
-
-    为什么必须有这一步：plugin\ 目录在磁盘上一项都不存在时，
-    AutoInstallBundledPlugins 会直接返回 0，随包动作包于是永远不会被装上 ——
-    表现是「配置里配好的动作扇区，触发时提示找不到提供方」。
-
-    【新增一个随包动作包时要改两处，包名必须逐字一致】
-      ① 下面这个 ItemGroup 加一条 ProjectReference；
-      ② 紧接着的 BundledPluginPayload 加一行。
-    漏掉 ② 的表现是「构建成功、plugin\ 里少一枚 dll」——
-    正因为它是静默的，下面才配了一道缺失检查。
-  -->
-  <ItemGroup>
-    <!--
-      逐枚列举，**刻意不用 ..\plugins\*\*.csproj 通配**：新加一个实验工程或临时
-      验证目录时，通配写法会把它默默卷进发行包，而那种「多了一枚没打算分发的插件」
-      从构建日志里完全看不出来。
-    -->
-    <ProjectReference Include="..\plugins\StarPie.Plugin.Launch\StarPie.Plugin.Launch.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.Ocr\StarPie.Plugin.Ocr.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.WebUrl\StarPie.Plugin.WebUrl.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.Folder\StarPie.Plugin.Folder.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.Command\StarPie.Plugin.Command.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.ShellTool\StarPie.Plugin.ShellTool.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.Tile\StarPie.Plugin.Tile.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.ToggleTopmost\StarPie.Plugin.ToggleTopmost.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.MoveMonitor\StarPie.Plugin.MoveMonitor.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.WindowOpacity\StarPie.Plugin.WindowOpacity.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.SwitchWindow\StarPie.Plugin.SwitchWindow.csproj" ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\plugins\StarPie.Plugin.System\StarPie.Plugin.System.csproj" ReferenceOutputAssembly="false" Private="false" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <!-- 随包动作包的产物根目录。跟着宿主的 Configuration 走，避免 Debug/Release 混用。 -->
-    <BundledPluginRoot>$(MSBuildThisFileDirectory)..\plugins\</BundledPluginRoot>
-  </PropertyGroup>
-
-  <!--
-    【载荷清单放在顶层】`Build` 与 `Publish` 两个 Target 都要用它。
-    放在某个 Target 内部的话，@(BundledPluginPayload) 的作用域就只在那一个 Target 里，
-    另一个 Target 引用到的是空列表 —— 复制会「成功执行、什么都没拷」，且不报错。
-  -->
-  <ItemGroup>
-    <!--
-      逐枚列举。刻意不做「整个目录一扫全拷」：那会把
-      StarPie.Plugin.Abstractions.dll 之类的东西一并塞进来源区，
-      而来源区里出现第二份 SDK 程序集正是类型身份分裂的经典成因。
-      包多起来以后这条纪律更容易被顺手违反 —— 加包时请老老实实加一行。
-      下面那道「缺失即报错」的检查是这条纪律的兜底：漏加一行会当场构建失败。
-    -->
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Launch\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Launch.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Ocr\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Ocr.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WebUrl\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WebUrl.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Folder\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Folder.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Command\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Command.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ShellTool\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ShellTool.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.Tile\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.Tile.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.ToggleTopmost\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.ToggleTopmost.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.MoveMonitor\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.MoveMonitor.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.WindowOpacity\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.WindowOpacity.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.SwitchWindow\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.SwitchWindow.dll" />
-    <BundledPluginPayload Include="$(BundledPluginRoot)StarPie.Plugin.System\bin\$(Configuration)\net8.0-windows\StarPie.Plugin.System.dll" />
-  </ItemGroup>
-
-  <Target Name="CopyBundledPlugins" AfterTargets="Build">
-    <!--
-      【必须出声】任何一枚列出的 dll 没构建出来就立刻让构建失败。
-      没有这道检查时，Copy 会静默跳过缺失项：构建成功、plugin\ 里少一枚 dll，
-      而用户侧的表现是「某个动作找不到提供方」—— 从现象根本看不出是打包漏了。
-    -->
-    <ItemGroup>
-      <BundledPluginMissing Include="@(BundledPluginPayload)" Condition="!Exists('%(FullPath)')" />
-    </ItemGroup>
-    <Error Condition="'@(BundledPluginMissing)' != ''"
-           Text="随包插件产物缺失：@(BundledPluginMissing, ', ')。请先单独构建对应插件工程，或检查上面的路径与包名是否一致。" />
-
-    <Copy SourceFiles="@(BundledPluginPayload)"
-          DestinationFolder="$(OutDir)plugin"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <!--
-    【发布也要拷一次 —— $(OutDir) 与 $(PublishDir) 是两个不同的目录】
-    只挂 AfterTargets="Build" 时 plugin\ 只会落在中间构建目录里，于是：
-      · `dotnet build` 的输出是对的（开发机上因此永远看不出问题）；
-      · `dotnet publish -o releases\vX.Y.Z\Lightweight` 的输出里**一枚插件 dll 都没有**，
-        ZIP 包与 Inno Setup 安装包（SourceDir 指向 publish\Standalone）因此都不含来源区。
-    用户侧的表现是：装完之后所有随包动作都不会被安装，配置里配好的扇区一触发就报
-    「找不到提供方」—— 与「忘记加 BundledPluginPayload 那一行」的症状一模一样。
-  -->
-  <Target Name="CopyBundledPluginsToPublish" AfterTargets="Publish">
-    <Copy SourceFiles="@(BundledPluginPayload)"
-          DestinationFolder="$(PublishDir)plugin"
-          SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

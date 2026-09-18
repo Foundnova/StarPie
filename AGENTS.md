@@ -93,8 +93,8 @@ g:\Users\2 Better\Desktop\design\
 │       ├── PluginParameterForm.cs     # 参数表单动态渲染（9 种 ParameterFieldType）
 │       ├── PluginActionBinding.cs     # 「Type + PluginActionRef ⇄ 单 Tag」双向投影
 │       ├── ActionParameterProjection.cs # 认领动作的宿主裸字段 → 参数字典投影
-│       ├── PluginActionClaimRegistry.cs # 随包动作的顶层 Type 认领快照与冲突拒绝
-│       ├── BundledPluginLifecycle.cs  # 随包动作包的同步、刷新、补回与安全清理
+│       ├── PluginActionClaimRegistry.cs # 官方在线动作的顶层 Type 认领快照与冲突拒绝
+│       ├── OfficialPluginClient.cs    # 官方 catalog 拉取、.spkg 下载与 SHA-256 校验
 │       ├── BuiltinActionCatalog.cs     # 仅保留 Hotkey 的进程内动作目录
 │       ├── BuiltinActions/             # 内建动作的插件模型适配实现
 │       ├── PluginCapabilityLabels.cs   # 能力位 → 安装确认风险文案
@@ -250,44 +250,19 @@ g:\Users\2 Better\Desktop\design\
   - **切换类型时不要清空插件引用**：来回切一次类型就把配置弄丢，是最容易被当成「软件有 bug」的行为。
   - 分组名必须**按插件去重统计**重名：直接对注册动作逐个取名，一个有 9 个动作的插件会被数成 9 次，「重名」于是永远成立，组标题会莫名其妙拖上一串插件 ID。
 - **图标 key 前缀**：插件图标形如 `plugin:<pluginId>:<shortKey>`，由 `IconHelper.GetSvgPathByKey` 在 `IconMap` 命中之后、裸 path 判定之前解析。插件 SVG 必须用最朴素的 `M/A/L/H/V/Z` 构造 —— 语法一错会让轮盘几何解析抛异常，收益远小于风险。
-- **两个插件目录，职责严格分开（改动路径逻辑前必读）**：
-  - **只读扫描目录** `程序目录\plugin\`（`PluginPaths.ScanRoot`）：随发行包分发的**待安装候选**。只放 `.dll`，不递归子目录。宿主对这里**只读** —— **绝不创建、绝不写入、绝不删除**，`EnsureDirectories()` 也不例外。程序可能装在 Program Files，`ScanRoot` 不存在时唯一正确的动作是「什么都不做」。
-  - **可写宿主区** `%LOCALAPPDATA%\StarPie\plugin-data\`（`PluginPaths.Root`）：安装副本、`registry.json`、`health.json`、插件私有 `data\` 全在这里。宿主拥有整棵目录，卸载时可以安全删。
-  - 便携模式（`portable.flag` / `PortableMode`）**只改可写宿主区的落点**（挪到程序目录下的 `plugin-data\`），`ScanRoot` 永远固定在程序目录。
-  - 历史上可写宿主区叫 `plugins\`。**只改目录常量而不搬迁 `registry.json` 会静默丢数据**：启用状态、已确认能力、入口哈希全在里面。`PluginPaths.Configure` 里保留了 `MigrateLegacyHostRoot`，`Move` 失败（被占用/跨卷）时退化为复制。
-- **候选安装的三条规则**：
-  1. 扫描目录里的 `.dll` **只登记为候选**，不进 `Instances`、不加载、不出现在插件列表 —— 装不装由用户点按钮决定。这与 `SyncFromDisk` 第 ② 段自动登记的「可写宿主区里带 `plugin.json` 的手工投放」是两回事：后者已经是安装产物；
-  2. **复制策略由 `ManifestSource` 决定，不是由调用方决定**：有 `plugin.json`（`Manifest`）说明那个目录整体是一个插件包，整目录复制；只有裸 DLL（`AssemblyMetadata`）时 `SourceDirectory` 只表示「那枚 dll 碰巧躺在哪个目录」（可能就是「下载」文件夹或 `plugin\`），**只复制那一枚**。历史上无条件整目录复制，会出现「从下载文件夹装一枚 dll，把整个下载目录搬进插件目录」以及「只装了 A，邻居 B 也跟着出现」；
-  3. 覆盖安装裸 DLL 前要**清掉上一次的载荷**（程序集与清单），否则目录里留下两枚业务 dll 会让「唯一业务 dll」的识别约定失效；但必须**保留 `data\` 与 `settings.json`** —— 更新一次版本不该清空用户数据。
-- **`PluginInstance` 的两个目录属性不能混用**：`ManagedDirectory` 是宿主拥有的安装目录（删除/改名/写入只能用它）；`Directory` 仅供展示（外部路径登记时返回 `ExternalPath` **所在目录**）。历史上只有 `Directory` 一个属性，而外部登记分支返回的其实是**dll 文件路径**，当时只是靠 `Directory.Exists(文件路径)` 恒为 `false` 才「恰好」没把开发者的输出目录删掉。现在 `Uninstall` 走 `IsExternal` 分支：外部登记只摘登记、不碰磁盘。
-- **`PluginHost.SyncFromDisk` 必须就地更新**：对已在内存的实例只能更新 `Entry`/`Scan`，**不得**无条件 `new PluginInstance` 替换字典条目，否则旧实例与其 `AssemblyLoadContext` 失去宿主引用形成**孤儿 ALC**（动作仍注册着，内存与文件锁都释放不掉）。进插件管理页就会触发与磁盘对账。
-- **自检通道 `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]`**：覆盖静态识别 → 安装 → 启用 → 词条命中率 → 声明式参数校验（含越界与正向用例）→ 动作选择器接缝 → 只读扫描目录与候选安装 → 内建动作批量接缝（`[3f]`）→ 端到端派发判据（`[3g]`）→ 随包插件三条规则（`[3h]`）→ 顶层类型认领（`[3i]`）→ 随包插件登记信息随文件刷新（`[3k]`）→ 宿主服务面与能力门禁（`[3j]`）→ 真实调用 → 停用并核对 ALC 回收 → 卸载 → 环境还原。
-  - **一次只验传入的那一枚 dll，所以每个随包包都要各跑一次**：`[3h]`~`[3k]` 全部围绕这一个插件展开（认领表断言也只看它自己的清单）。外移动作后只跑其中一个包，另一个包的认领链路（尤其是「认领指向的贡献点真的存在」）就完全没有被覆盖 —— 而那条链路的失效表现恰恰是最难查的「动作找得到归属、却永远执行不了」。`[3f]`/`[3g]`/`[3j]` 与具体插件无关，跑哪个包都会执行。
-  - **编号顺序与实际执行顺序不完全一致，不是笔误**：`[3k]` 排在 `[3j]` 之前跑，因为它需要随包插件在场（要按启动顺序重跑 `AutoInstall → SyncFromDisk → RebuildClaimTable`），必须在「清理现场」之前；而 `[3j]` 验的是与具体插件无关的宿主服务面，刻意放在清理之后。新增段落时请一并说明它为什么落在这个位置。
-  - **自检整体跑在临时沙箱里**：`PluginPaths.OverrideRootsForTesting` 会把两个根目录钉到 `%TEMP%\StarPie-PluginSelfTest-<随机>\`，跑完即删。**`Configure` 见到根目录已被钉住必须直接返回**，否则沙箱会被覆盖回真实目录，自检就成了「每跑一次回归就动一次用户已装插件」。
-  - **附加 `--skip-invoke` 可跳过第 [4] 段真实调用**：那一节会真的下发键鼠/调节系统状态（实测会把屏幕亮度推高 10%）。日常只关心识别、注册与接缝结论的回归应带上这个开关。
-  - 正向用例的基线**只能**照抄插件声明的 `DefaultValue`，缺默认值时必须跳过而不是自己编一个值 —— 编出来的值可能过不了插件的 `ValidationRegex`，让自检报出假失败；反之断言里若用「错误总数 > 0」也会在错误的原因下通过，必须断言「该字段名下确实出现错误」。
-  - **等待 ALC 回收结论的代码，绝不能和持有插件侧对象的代码处在同一个栈帧上**。`PluginActionRegistration` 指向插件程序集里的类型实例，是本栈帧的 GC 根；它还活着时结论永远是「需要重启」，文件锁不释放，而**删沙箱恰恰发生在 `Run` 内部** —— 于是每跑一次自检就在 `%TEMP%` 里留下一坨删不掉的 `.pending-delete` 残留。这就是 `RunEnableAndInvoke` / `RunRestartEquivalenceProbe` / `RunTypeClaimChecks` 全部标注 `[MethodImpl(MethodImplOptions.NoInlining)]` 的唯一理由；新增自检段时请照此办理。删沙箱前还要先催一次 GC 并退避重试（ALC 卸载是异步的，判定跑完不等于 CLR 已放开句柄）。
-- **顶层类型认领（Type Claim）：外移的内建动作如何对用户完全不可见**：
-  - **`ActionItem.Type` 是不可变身份**，全项目近两百处引用；要外移动作就必须让插件反过来声明「我负责哪些 `Type`」，而不是改配置形态。声明写在清单里（`StarPiePluginTypeClaims` 元数据，形如 `Launch=launch;WebUrl=webUrl`），落进登记表 `PluginRegistryEntry.ClaimedTypes`。
-  - **认领表必须在不加载任何程序集的前提下可建**（`RebuildClaimTable` 只读登记表）：轮盘首次触发路径上不允许出现 IO 或程序集加载。调用顺序上它必须在 `SyncFromDisk()` **之后** —— 实例由后者建立。
-  - **只有 `Bundled=true` 的随包插件能认领**。写入侧 `ClaimWire` 与读取侧 `RebuildClaimTable` 各拦一次（后者是因为 `registry.json` 是用户能手改的纯文本）。认领等于接管用户配置里的一整类动作，这个权力不给第三方。
-  - **内建优先**：仍留在 `BuiltinActionCatalog` 里的类型，任何认领一律拒绝 —— 同一 `Type` 挂两条执行路径（双轨制）正是这套机制要消除的东西。
-  - **`Hotkey` 永远不许外移**：它既是 `ActionItem.Type` 的默认值，也是未配置扇区的占位类型（`WheelLayer.EnsureLayers`）。外移之后用户一停用动作包，所有空扇区都会报「包已停用」。
-  - **多提供方整对拒绝**：两个插件抢同一个类型时全部丢弃并记 Error，绝不「后者覆盖前者」——那是静默劫持。
-  - **登记信息必须随来源区文件刷新，认领清单尤其如此**（`PluginHost.RefreshBundledMetadata`）：`ClaimedTypes` / 版本 / 能力集合此前只在**首次安装**时写入一次、之后永不更新。这有两个后果，第二个是灾难级的：①「随包插件升级后新增的认领」永远不生效；②**拆包**（把某个类型从一个包挪到另一个包）时，旧包的老快照与新包的新声明会同时认领同一个类型，撞上上面那条「多提供方整对拒绝」，**一次干掉两个包的全部动作**，而用户唯一能看到的线索是日志里一行 Error。所以 `EnsureBundledPlugin` 对已登记的随包条目要**先按当前 dll 的元数据刷新登记信息、再判断宿主区文件在不在**（两件事互不相干，不能用 `||` 短路掉任一件）。刷新**只同步「文件是什么」，绝不同步「用户怎么选」**：`Enabled` / `Preload` / `InstallPath` / `Bundled` / `ExternalPath` / 确认时间戳一律不碰。**只在值真的变了时落盘** —— 无条件写会让 `registry.json` 的修改时间每次启动都变，「配置有没有被改过」的判断随之全部失效。自检 `[3k]` 守这条。
-  - **拆包时的两条硬约束**：① 「新包加认领」与「旧包删认领」必须在同一个版本里同时发生，且**强依赖上面那条元数据刷新** —— 否则老用户的旧包快照仍认领该类型，与新包形成「多提供方」，触发整对拒绝，一次干掉两个包的全部动作；② **包 ID 与文件名若要改，必须依赖「已停止分发清理」**（`PluginHost.PruneUndistributedBundledPlugins`，跑在 `SyncFromDisk` 之前）：它把「来源区里已经没有了的」随包条目的登记条目与宿主区安装副本一起带走（插件私有 `data\` 保留）。这与上面那条元数据刷新是**互补的两半** —— 那个的前置是「来源区里**还有**这枚 dll」，而拆包恰恰让它没有了。两者缺任一个，改名都会留下幽灵包：宿主区存着副本、来源区已无对应文件，它照常出现在插件列表里、照常可停用，还带着过时的认领快照和新包抢同一个类型。清理的**三条保守守卫**（来源区不存在 / 空目录 / 有文件读不出来 ⇒ 一律不清理）不可松 —— 清理不可逆，判据不完整时最坏只能是「留下一个幽灵包」，绝不能是「误删用户正在用的包」。自检 `[3m]` 守这条。
-  - **认领 ≠ 可用**：插件停用时认领仍留在表里，`IsClaimedTypeAvailable` 才判断此刻能不能干活并给出可操作文案。`ActionExecutor.Execute` 的认领接缝必须在 `switch` **之前**（认领类型走不到 `case "Plugin"`），`switch` 的 `default:` 必须出声报「无法识别的动作类型」而不是静默 `break`。
-  - **被认领的贡献点要从「🔌 插件」子下拉里排除**（`IsClaimedContribution`），否则同一个动作在两处都能配，而两处的持久化形态互不兼容（`Type="Launch"` vs `Type="Plugin"` + 引用）。
-  - **参数零迁移**：认领类型的动作在配置里仍是老形态，参数散在 `ActionItem` 裸字段上，由宿主 `ActionParameterProjection`（**显式白名单，不是反射**）现读现装成字典；键名的事实来源是 SDK 侧常量类 `HostActionFields`，用 `const` 是为了让宿主改名时插件侧变成**编译错误**而不是运行期读到空值。只投影动作参数，**不投影外观字段**（`Name` / `IconKey` / `CustomTextColor` …）。
-  - **保留 ID 前缀（`starpie.*` 等）的检查只在「进入系统」那一刻做**（扫描 / 导入），放行条件是「来自只读来源区」或「该插件已登记」。**装载路径不得复查**（`ScanInstalledPlugin(dir, allowReservedIdPrefix: true)`）—— 否则同一枚随包 DLL 会「装得上、永远起不来」，而报错还指着 ID 说事，与真实原因毫无关系。边界查一次，系统内部不复查。
-  - **认领类型的失败上报走插件路径**（日志 + 托盘气泡），**不弹 `MessageBox`**。判据是「代码是否在独立程序集里」，不是「是否官方」：内建动作是用户亲手配的，失败要立刻打断他；认领类型已是插件，异常冒泡到 `ActionExecutor.Execute` 的 `catch` 会把无人值守的动作线程卡死在对话框上。
-- **派发顺序是一个可断言的纯判据**：`ActionExecutor.Execute` 的分派本体是 `switch (ClassifyAction(action.Type))`，三条路的顺序（内建 → 认领 → `switch` 兜底）**不可调换**。抽出 `ClassifyAction`（纯函数，返回 `ActionDispatchKind`）的唯一理由是让「顺序本身可被断言」：顺序错了的现象是「界面一切正常、按下去却走了另一条路」，从现象根本反推不出来，而原先那种「跑一个动作看产物」的验证法在动作陆续外移之后已经找不到无害探针了。**改了 `Execute` 的分派就必须同步改 `ClassifyAction`**，否则自检验证的是空气。
-- **`[3f]`/`[3g]` 的断言要数据驱动，但设计意图必须写死**：
-  - 内建动作清单从 `BuiltinActionCatalog.SnapshotAll()` 生成，**不在自检里手抄一份**。手抄的成本已经显现过：动作每外移一个就得有人记得删一行，忘了删的表现是自检报「某动作不在内建动作表里」—— 而那恰恰是**预期行为**。「预期的事被报成缺陷」比不报更坏，它会训练人忽略这条消息。
-  - 反过来，「哪些类型**不该**留在内建表里」必须**写死成独立断言**（`migratedTypes`）：那表达的是设计意图，无法从快照推导。同一份清单在 `[3f]`（不得还在内建表里）与 `[3g]`（不得被判为 `Builtin`）各断言一次 —— 只做一次的话，「从内建删了、认领也没建」同样能过。
-  - **`[3g]` 观测的是「有没有出声」，不是「有没有产物」**。静默失效的判据从来不是「产物没出来」，而是「什么都没告诉用户」。探针挂 `PluginNotificationHub.Sink` 收提示，用**注定不会执行**的动作（未知 Type、空必填项）去验派发 —— 这样不必再去找「真跑也无害」的动作（已经一个不剩了）。**用完必须在 `finally` 里摘掉汇**：它是全局静态的，留着会让后续所有段落的提示悄悄流进一个已经没人读的列表。
-  - **探针用的具体类型名同样会过期**。「内建动作校验失败必须出声」那条原先是拿 `Type="Tile"` 做的探针，而 S3a 把 Tile 外移之后它立刻变成误报 —— 报出来的「掉进 default」其实是**正确行为**（那一刻 `[3h]` 还没装包，认领表本来就是空的）。现在改成「从 `SnapshotAll()` 里找第一个带必填参数的动作」：空白 `Parameter` 必然触发它的必填拦截，动作不会真的执行。**凡是拿某个具体动作当探针的地方，都要问一句「它外移之后这条断言还成立吗」** —— 外移过的动作已经撞出两次这类误报。
+- **官方在线模块是默认来源**：12 个原内建动作的源码、打包和发布均在 `StarPie-Official-Plugins` 仓库完成；主仓库不得再引用、构建、复制或随发行包携带这些 DLL。
+  - 启动完成后由 `OfficialPluginClient` 在后台读取官方 GitHub Release catalog；缺失或版本过旧的官方模块下载 `.spkg`，校验包大小、包 SHA-256、`module.manifest.json` 和程序集 SHA-256 后安装并启用。
+  - 网络请求、下载和解压严禁进入鼠标钩子、轮盘显示或动作执行热路径；网络失败只记录日志，本地已安装版本继续可用。
+  - 当前阶段只使用哈希校验；不得下载或依赖 `cosign.exe`、`module-catalog.sigstore.json` 或其他外部验签程序。
+- **两个插件目录，职责严格分开**：
+  - **社区插件候选区** `程序目录\plugin\`（`PluginPaths.ScanRoot`）：只供用户手动安装社区 `.dll`；宿主只读、只扫描，绝不创建、写入或删除。`starpie.*` 保留 ID 不得通过这里安装。
+  - **可写宿主区** `%LOCALAPPDATA%\StarPie\plugin-data\`（`PluginPaths.Root`）：官方在线模块、社区插件、`registry.json`、`health.json`、插件私有 `data\` 都在这里。
+  - 本次插件系统尚未进入主分支发布，`registry.json` 不承担旧版兼容义务；可直接按官方在线模块模型演进。
+- **顶层类型认领（Type Claim）**：只有 `Official=true` 的官方在线模块能认领 `Launch`、`Command` 等历史 `ActionItem.Type`。`PluginActionClaimRegistry` 从登记表快照构造路由，不加载 DLL；冲突认领必须整组拒绝。
+  - 官方模块安装后必须把 `ClaimedTypes` 写入登记表，并在安装、启用、停用、卸载后重建路由表。
+  - 保留 ID 前缀只在官方在线安装和已登记官方模块的装载路径放行；社区手动安装必须拒绝保留 ID。
+  - 认领类型的宿主裸字段仍通过 `ActionParameterProjection` 以显式白名单投影为参数字典；不投影外观字段。
+- **派发顺序不可改变**：`ActionExecutor` 固定按「内建 Hotkey → 官方类型认领 → 普通 `Type="Plugin"` / 历史 switch 兜底」执行。
 - **能力门禁（Capability Gate）：`Process` / `WindowControl` 各有一个真实强制点**：
   - 带门禁的是三个「产生不可忽略后果」的服务：`IHostCommandService.Run`（命令）与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）挂 `Process`；`IHostWindowService` 的五个执行方法（挪走 / 置顶 / 改透明度 / 切走用户正在用的窗口）挂 `WindowControl`。清单未声明对应能力时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
   - **每个服务认自己那项能力，不复用别人的**。`WindowControl` 刻意不与 `Process` 合并：安装确认页上展示的能力必须对应一个真实后果，用户看到「进程」想的是「它要启动程序」，而实际后果是他的窗口被挪走 —— 那是标签名不副实。`Ui` 同样不符（它的语义是「打开自己的窗口」）。三个服务的门禁实现共用一个基类（`PluginGatedService`），所以**复制粘贴时把 required 传错不会有任何编译错误** —— 自检 `[3j]` 用「只声明 A 的插件调 B 的服务」这一组交叉断言守它，否则「认错能力标志」会让上面那些断言照样全绿。
@@ -346,9 +321,9 @@ dotnet publish "g:\Users\2 Better\Desktop\design\WinPieGestures" -c Release -r w
 powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Lightweight\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Lightweight-win-x64.zip' -Force; Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\Standalone\*' -DestinationPath 'g:\Users\2 Better\Desktop\design\releases\vX.Y.Z\StarPie-vX.Y.Z-Standalone-win-x64.zip' -Force"
 ```
 
-> **发布前必查：`plugin\` 有没有落在发布目录里。** `CopyBundledPlugins`（`AfterTargets="Build"`）把 12 枚随包 dll 拷到 `$(OutDir)plugin`，而 `dotnet publish -o <目录>` 的输出是 `$(PublishDir)` —— **这两个不是同一个目录**，所以另有 `CopyBundledPluginsToPublish`（`AfterTargets="Publish"`）负责发布侧，两者共用顶层 ItemGroup `BundledPluginPayload`（放进 Target 内部会因作用域变空，复制会「成功执行但拷了 0 个文件」且不报错）。
+> **发布前校验：主程序发布包不得再包含官方插件 DLL 或旧的 `plugin\` 随包来源区。** 官方模块由 `StarPie-Official-Plugins` 的 GitHub Release catalog 在运行后后台下载；安装包只需包含主程序、SDK 契约程序集和插件运行时。
 >
-> 只做 Build 那一半时，开发机上永远看不出问题（`bin\` 里躺着 plugin\），而 ZIP 与 Inno Setup 安装包（`SourceDir` 指向 `publish\Standalone`）**一枚插件 dll 都没有** —— 用户装完之后所有随包动作都不会被安装，配置里配好的扇区一触发就报「找不到提供方」。改动这段后必须实际 `dotnet publish -o <临时目录>` 一次，确认 `plugin\` 里有 12 枚 dll。
+> 发布前至少验证：干净 `plugin-data` 下启动能后台拉取模块；网络失败时不阻塞首帧；已安装模块在离线时仍可加载。
 
 ### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：

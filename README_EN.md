@@ -283,16 +283,16 @@ Action execution and display icons are fully decoupled — the same action can i
 
 ### 16. 🧩 Plugin System (Community Extensions, In-Process)
 
-- **Two ways to install**: drop a plugin `.dll` into the **`plugin` folder next to the executable** and hit
-  "Rescan", then click Install on the candidate card; or pick the file directly via "Install Plugin (.dll)" in settings.
+- **Official plugins sync online by default**: StarPie fetches the module catalog from the `StarPie-Official-Plugins` GitHub Releases in the background after startup. Missing or outdated official modules are downloaded as `.spkg`, checked against package and assembly SHA-256 values, then installed and enabled.
+- **Community plugins remain locally installable**: drop a community plugin `.dll` into the **`plugin` folder next to the executable** and hit "Rescan", then click Install on the candidate card; or pick it via "Install Community Plugin (.dll)" in settings.
 - **⚠️ A `.dll` in `plugin\` brings only itself**: other files in the plugin package (icons, resources,
-  dependency DLLs) are *not* copied along. For a **full-package install**, use "Install Plugin (.dll)" and select
+  dependency DLLs) are *not* copied along. For a **full-package install**, use "Install Community Plugin (.dll)" and select
   the `.dll` that sits next to a `plugin.json` — once the manifest is detected the host copies the whole folder.
 - **Two directories with separate responsibilities**:
 
   | Directory | Role |
   | :--- | :--- |
-  | `<install dir>\plugin\` | **Read-only source area**: candidates shipped with the release, flat, `.dll` only. StarPie **never creates, writes or deletes** anything here |
+  | `<install dir>\plugin\` | **Community-plugin candidate area**: used only for manual community `.dll` installation. StarPie **never creates, writes or deletes** anything here |
   | `%LOCALAPPDATA%\StarPie\plugin-data\` | **Writable data area**: installed copies, enable state and per-plugin data. Fully removed on uninstall |
 
 - **Install and enable are separate steps**: a freshly installed plugin stays "installed but disabled" until you
