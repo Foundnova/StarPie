@@ -358,6 +358,14 @@ public class GestureController : IDisposable
 		}
 	}
 
+	/// <summary>
+	/// 是否有一次<b>真实手势</b>正在进行。只读查询，供粘滞轮盘会话做「同屏一轮盘」互斥
+	/// （<see cref="WinPieGestures.Plugins.StickyWheelSession.Show"/> 拒绝在手势进行中插盘）。
+	/// 与类内其它读取点同样不加锁：这个值只用于拒绝一个刚开始的呼出，读到旧值的后果是多放行
+	/// 或少放行一次 <c>ShowWheel</c>，没有一致性要求；加 <c>_uiUpdateSync</c> 反而把锁暴露给插件调用线程。
+	/// </summary>
+	internal bool IsGestureActive => _isGestureActive;
+
 	private void QueueHighlightUpdate(int sectorIndex, int subSectorIndex, bool isEscaped, bool showSubTier, long gestureVersion)
 	{
 		bool shouldSchedule;
@@ -1336,7 +1344,8 @@ public class GestureController : IDisposable
 		}
 		bool isMouseWaiting = _mouseTriggerDown && _isWaitingForThreshold;
 		bool isKbWaiting = _kbTriggerWaiting && _isWaitingForThreshold;
-		if ((!isMouseWaiting && !isKbWaiting) || _isGestureActive)
+		// 粘滞轮盘占位期间不起真手势（同屏一轮盘）；反向互斥见 StickyWheelSession.Show。
+		if ((!isMouseWaiting && !isKbWaiting) || _isGestureActive || WinPieGestures.Plugins.StickyWheelSession.IsActive)
 		{
 			return;
 		}
@@ -1922,6 +1931,12 @@ public class GestureController : IDisposable
 				{
 					// 穿透模式持握门槛：触发键按下未满 200ms 不唤出轮盘，
 					// 快速敲击/甩动按普通按键处理；位移持续累积，满门槛后自然激活。
+					return;
+				}
+				// 粘滞轮盘占位期间不起真手势（同屏一轮盘，与长按路径同一道闸）。
+				// 按下不吞位移状态：遮罩收着的这一下最终按普通点击收尾。
+				if (WinPieGestures.Plugins.StickyWheelSession.IsActive)
+				{
 					return;
 				}
 				_kbTriggerWaiting = false;

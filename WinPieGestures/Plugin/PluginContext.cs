@@ -45,6 +45,7 @@ internal sealed class PluginContext : IPluginContext
         Windows = new PluginWindowService(metadata.Id, metadata.Capabilities);
         ScreenCapture = new PluginScreenCaptureService(metadata.Id, metadata.Capabilities);
         System = new PluginSystemService(metadata.Id, metadata.Capabilities);
+        Wheel = new PluginWheelService(metadata.Id, metadata.Capabilities);
 
         Info = new PluginHostInfo(metadata.Capabilities);
         Notify = new PluginNotificationService(metadata.Id);
@@ -80,6 +81,9 @@ internal sealed class PluginContext : IPluginContext
 
     /// <summary>系统功能（最小化 / 任务视图 / 音量 / 锁屏 / 关机 …）。</summary>
     public IHostSystemService System { get; }
+
+    /// <summary>轮盘呼出（粘滞会话，供悬浮球这类常驻形态使用）。</summary>
+    public IHostWheelService Wheel { get; }
 
     public IHostInfo Info { get; }
 

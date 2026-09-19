@@ -1954,6 +1954,7 @@ Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check fo
 		Add("PluginCapabilityRegistry", "· 读写注册表", "· 讀寫登錄檔", "· Read and write the registry", "· レジストリの読み書き");
 		Add("PluginCapabilityScreenCapture", "· 读取屏幕内容（截屏）", "· 讀取螢幕內容（截圖）", "· Read screen contents (screenshot)", "· 画面内容の読み取り（スクリーンショット）");
 		Add("PluginCapabilityUi", "· 显示界面与通知", "· 顯示介面與通知", "· Show windows and notifications", "· ウィンドウと通知の表示");
+		Add("PluginCapabilityWheel", "· 呼出你配置的轮盘，显示期间接管你的点击", "· 呼叫你設定的輻盤，顯示期間接管你的點擊", "· Bring up your configured radial wheel and capture clicks while shown", "· 設定済みのラジアルホイールを呼び出し、表示中はクリックを全て受け取ります");
 		Add("PluginCapabilityWindowControl", "· 移动 / 置顶 / 改变你正在使用的窗口", "· 移動 / 置頂 / 改變你正在使用中的視窗", "· Move, pin, or alter the window you are using", "· 使用中のウィンドウの移動 / 最前面表示 / 変更");
 		Add("PluginPageHeader", "插件与扩展", "外掛與擴充", "Plugins & Extensions", "プラグインと拡張");
 		Add("PluginPageSubheader", "手动选择 .dll 安装社区插件。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。", "手動選擇 .dll 安裝社群外掛。外掛以 StarPie 目前權限在行程內執行，請僅安裝你信任的來源。", "Install community plugins by picking a .dll manually. Plugins run in-process with StarPie's current privileges - only install sources you trust.", "コミュニティプラグインは .dll を手動で選択してインストールします。プラグインは StarPie の権限でプロセス内実行されるため、信頼できる提供元のみ導入してください。");

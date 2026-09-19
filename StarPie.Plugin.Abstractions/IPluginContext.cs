@@ -72,6 +72,12 @@ public interface IPluginContext
     /// </summary>
     IHostSystemService System { get; }
 
+    /// <summary>
+    /// 轮盘呼出（在指定屏幕位置呼出用户的轮盘，由用户选扇区执行）。
+    /// 需要 <see cref="PluginCapability.Wheel"/> 能力，理由见 <see cref="IHostWheelService"/>。
+    /// </summary>
+    IHostWheelService Wheel { get; }
+
     /// <summary>宿主环境信息。</summary>
     IHostInfo Info { get; }
 
