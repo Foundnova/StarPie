@@ -152,8 +152,12 @@ public class SubSlotViewModel : INotifyPropertyChanged
 				if (!IsWindowManagerType)
 				{
 					PluginActionBinding.Clear(Action);
-					Type = "Tile";
-					if (string.IsNullOrEmpty(Parameter)) Parameter = "2L";
+					string? preferredWindowType = ActionTypeCatalog.GetPreferredWindowManagerType();
+					if (preferredWindowType != null)
+					{
+						Type = preferredWindowType;
+						if (preferredWindowType == "Tile" && string.IsNullOrEmpty(Parameter)) Parameter = "2L";
+					}
 				}
 			}
 			else
@@ -723,6 +727,8 @@ public class SubSlotViewModel : INotifyPropertyChanged
 		// 而本方法在一个动作被修改后会被反复调用。纳入全量通知的话，
 		// 用户每选定一次动作都会立刻重建候选集并重设 ItemsSource。
 		// 类型切换那处（AggregatedType 的 setter）已单独通知过它。
+		OnPropertyChanged(nameof(AggregatedActionTypes));
+		OnPropertyChanged(nameof(ActionTypes));
 		OnPropertyChanged(nameof(IsPluginType));
 		OnPropertyChanged(nameof(SelectedPluginActionFullId));
 		OnPropertyChanged(nameof(IsPluginActionBroken));

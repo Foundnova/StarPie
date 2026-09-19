@@ -48,11 +48,20 @@ internal sealed class PluginActionRequest
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(binding);
 
+        Dictionary<string, string> parameters = ActionParameterProjection.Project(action);
+        if (string.Equals(binding.TypeName, "TileRestore", StringComparison.OrdinalIgnoreCase) &&
+            (!parameters.TryGetValue(StarPie.Plugin.HostActionFields.Parameter, out string? value) ||
+             string.IsNullOrWhiteSpace(value)))
+        {
+            // 旧 Type="TileRestore" 没有参数；Tile 插件以宿主 RestoreToken 语义执行。
+            parameters[StarPie.Plugin.HostActionFields.Parameter] = "Restore";
+        }
+
         return new PluginActionRequest(
             binding.PluginId,
             binding.ContributionId,
             string.IsNullOrWhiteSpace(action.Name) ? binding.TypeName : action.Name,
-            new ReadOnlyDictionary<string, string>(ActionParameterProjection.Project(action)));
+            new ReadOnlyDictionary<string, string>(parameters));
     }
     public static bool TryCreate(ActionItem? action, out PluginActionRequest? request)
     {

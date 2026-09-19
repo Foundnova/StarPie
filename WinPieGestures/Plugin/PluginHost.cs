@@ -56,6 +56,8 @@ internal sealed class PluginInstallResult
 /// </summary>
 internal static class PluginHost
 {
+    public static event Action? PluginAvailabilityChanged;
+
     /// <summary>贡献点注册表。全局唯一实例。</summary>
     public static readonly PluginCatalog Catalog = new();
 
@@ -142,15 +144,13 @@ internal static class PluginHost
             CheckSafeMode();
 
             int discovered = SyncFromDisk();
+            // registry.json 是启动期的唯一官方类型认领来源。安装/启用路径会主动重建，
+            // 但已有插件在启动时也必须先恢复这张路由表，否则 UI 会把全部官方动作误判为未安装。
+            PluginActionClaimRegistry.Rebuild(PluginRegistryStore.SnapshotEntries());
             AppLogger.LogInfo(
                 $"[plugin] 插件系统就绪：宿主区={PluginPaths.Root}，扫描目录={PluginPaths.ScanRoot}" +
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
                 $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
-
-            if (!_safeModeActive && !HeadlessMode)
-            {
-                ScheduleOfficialPluginSync();
-            }
 
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
@@ -667,6 +667,9 @@ internal static class PluginHost
     /// <summary>主程序唯一的插件动作入口，具体行为由动作路径模块负责。</summary>
     public static PluginExecuteOutcome ExecutePluginAction(ActionItem action) => Runtime.ExecuteAction(action);
 
+    public static bool IsOfficialClaimedType(string? type) =>
+        PluginActionClaimRegistry.IsOfficialClaimedType(type);
+
     public static bool TryResolveClaimedType(string? type, out PluginTypeClaimBinding binding) =>
         PluginActionClaimRegistry.TryResolve(type, out binding);
 
@@ -681,7 +684,22 @@ internal static class PluginHost
     public static bool IsClaimedTypeAvailable(string? type, out string reason)
     {
         reason = "";
-        if (!PluginActionClaimRegistry.TryResolve(type, out PluginTypeClaimBinding binding)) return true;
+        if (!PluginActionClaimRegistry.TryResolve(type, out PluginTypeClaimBinding binding))
+        {
+            if (PluginActionClaimRegistry.IsOfficialClaimedType(type))
+            {
+                reason = "提供该动作的官方插件尚未安装或未登记。";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!_enabled)
+        {
+            reason = "插件系统当前已关闭。";
+            return false;
+        }
 
         PluginInstance? instance = Find(binding.PluginId);
         if (instance == null)
@@ -858,7 +876,11 @@ internal static class PluginHost
         _enabled = enabled;
         _preferences.EnablePluginSystem = enabled;
 
-        if (enabled) return;
+        if (enabled)
+        {
+            NotifyPluginSetChanged();
+            return;
+        }
 
         List<Task<PluginStopResult>> stops = ListInstances()
             .Where(static instance => instance.IsLoaded)
@@ -873,6 +895,8 @@ internal static class PluginHost
         {
             await Task.WhenAll(stops).ConfigureAwait(false);
         }
+
+        NotifyPluginSetChanged();
     }
 
     // ------------------------------------------------------------------ 统一路径入口
@@ -1445,31 +1469,6 @@ internal static class PluginHost
         }
     }
 
-    /// <summary>启动后台官方模块同步，不阻塞首帧，也不运行在鼠标手势热路径。</summary>
-    private static void ScheduleOfficialPluginSync()
-    {
-        try
-        {
-            Task.Run(async () =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-                try
-                {
-                    OfficialPluginSyncResult result = await OfficialPluginClient.SyncInstalledModulesAsync().ConfigureAwait(false);
-                    AppLogger.LogInfo($"[plugin] 官方模块同步完成：新增/更新 {result.InstalledOrUpdated}，已是最新 {result.AlreadyCurrent}，失败 {result.Failed}");
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.LogWarn($"[plugin] 官方模块同步失败：{ex.Message}");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.LogWarn($"[plugin] 调度官方模块同步失败：{ex.Message}");
-        }
-    }
-
     /// <summary>启动后台预加载（仅 Preload=true 的已启用插件），不阻塞首帧。</summary>
     private static void SchedulePreload()
     {
@@ -1527,6 +1526,15 @@ internal static class PluginHost
         }
         catch
         {
+        }
+
+        try
+        {
+            PluginAvailabilityChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogWarn($"[plugin] 通知动作可用性变化失败：{ex.Message}");
         }
     }
 

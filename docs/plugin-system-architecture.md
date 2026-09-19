@@ -448,8 +448,10 @@ StarPiePluginTypeClaims = "Launch=launch"
 ```text
 ActionExecutor
   1. BuiltinActionCatalog（Hotkey）
-  2. PluginActionClaimRegistry（旧 Type → 官方在线模块贡献点）
-  3. 历史 switch / Type="Plugin" 兜底
+  2. PluginActionClaimRegistry（旧 Type → 官方在线模块贡献点，唯一所有者）
+  3. Type="Plugin" 普通社区插件动作
+
+已完成官方插件交割的旧 Type 不再进入历史 switch；未迁移的遗留类型仍按主程序兼容逻辑处理。
 ```
 
 认领规则：
@@ -462,17 +464,18 @@ ActionExecutor
 
 ### 官方在线模块同步
 
-启动完成后，宿主在后台读取 `StarPie-Official-Plugins` 的 GitHub Release catalog，并按模块版本同步：
+宿主启动时只读取本地已登记插件，不自动联网同步官方模块。用户在插件管理页手动刷新 catalog 并安装指定模块：
 
 ```text
-官方 Release catalog
-  → 缺失或版本过旧的官方模块下载 .spkg
+用户点击安装
+  → 手动获取官方 Release catalog
+  → 下载用户选定的 .spkg
   → 校验包大小、包 SHA-256、module.manifest.json 与程序集 SHA-256
   → 安装到 plugin-data 并标记 Official
   → 启用模块并重建 PluginActionClaimRegistry
 ```
 
-网络同步绝不进入鼠标钩子或手势动作热路径。网络失败时只记录日志；本地已经安装的模块仍可继续使用。社区插件候选区 `程序目录\plugin` 仅保留给手动安装社区 DLL。
+网络请求、下载和解压只在用户明确点击刷新或安装时执行，绝不进入启动、鼠标钩子或手势动作热路径。网络失败不会影响本地已安装模块；社区插件候选区 `程序目录\plugin` 仅保留给手动安装社区 DLL。
 
 ### SDK 1.4 能力门禁
 

@@ -91,10 +91,14 @@ public class GestureMappingViewModel : INotifyPropertyChanged
 					if (!IsWindowManagerType)
 					{
 						PluginActionBinding.Clear(Mapping.Action);
-						Type = "Tile";
-						if (string.IsNullOrEmpty(Mapping.Action.Parameter))
+						string? preferredWindowType = ActionTypeCatalog.GetPreferredWindowManagerType();
+						if (preferredWindowType != null)
 						{
-							Mapping.Action.Parameter = "2L";
+							Type = preferredWindowType;
+							if (preferredWindowType == "Tile" && string.IsNullOrEmpty(Mapping.Action.Parameter))
+							{
+								Mapping.Action.Parameter = "2L";
+							}
 						}
 					}
 				}
