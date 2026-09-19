@@ -43,13 +43,6 @@ internal sealed class OfficialPluginModule
     public List<string> Capabilities { get; set; } = new();
 }
 
-internal sealed class OfficialPluginSyncResult
-{
-    public int InstalledOrUpdated { get; init; }
-    public int AlreadyCurrent { get; init; }
-    public int Failed { get; init; }
-    public string Error { get; init; } = "";
-}
 
 internal sealed class OfficialPluginInstallResult
 {
@@ -124,43 +117,6 @@ internal static class OfficialPluginClient
         }
 
         throw new InvalidDataException("官方插件仓库尚未发布可用模块 catalog。");
-    }
-
-    public static async Task<OfficialPluginSyncResult> SyncInstalledModulesAsync(CancellationToken cancellationToken = default)
-    {
-        OfficialPluginCatalog catalog = await FetchCatalogAsync(cancellationToken).ConfigureAwait(false);
-        int changed = 0;
-        int current = 0;
-        int failed = 0;
-
-        foreach (OfficialPluginModule module in catalog.Modules.OrderBy(item => item.Id, StringComparer.OrdinalIgnoreCase))
-        {
-            PluginInstance? installed = PluginHost.Find(module.Id);
-            bool needsInstall = installed == null
-                || !installed.Scan.Accepted
-                || !string.Equals(installed.Entry.Version, module.Version, StringComparison.OrdinalIgnoreCase);
-
-            if (!needsInstall)
-            {
-                current++;
-                continue;
-            }
-
-            OfficialPluginInstallResult result = await InstallAsync(module, cancellationToken).ConfigureAwait(false);
-            if (result.Success) changed++;
-            else
-            {
-                failed++;
-                AppLogger.LogWarn($"[plugin] 官方模块 {module.Id} 同步失败：{result.Error}");
-            }
-        }
-
-        return new OfficialPluginSyncResult
-        {
-            InstalledOrUpdated = changed,
-            AlreadyCurrent = current,
-            Failed = failed,
-        };
     }
 
     public static async Task<OfficialPluginInstallResult> InstallAsync(

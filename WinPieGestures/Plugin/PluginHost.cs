@@ -152,11 +152,6 @@ internal static class PluginHost
                 $"（存在={PluginPaths.ScanRootExists}），已登记 {Instances.Count} 个插件" +
                 $"（本次扫描新发现 {discovered} 个），安全模式={_safeModeActive}");
 
-            if (!_safeModeActive && !HeadlessMode)
-            {
-                ScheduleOfficialPluginSync();
-            }
-
             if (!_safeModeActive && _preferences.PreloadOnStartup)
             {
                 SchedulePreload();
@@ -1471,31 +1466,6 @@ internal static class PluginHost
         }
         catch
         {
-        }
-    }
-
-    /// <summary>启动后台官方模块同步，不阻塞首帧，也不运行在鼠标手势热路径。</summary>
-    private static void ScheduleOfficialPluginSync()
-    {
-        try
-        {
-            Task.Run(async () =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-                try
-                {
-                    OfficialPluginSyncResult result = await OfficialPluginClient.SyncInstalledModulesAsync().ConfigureAwait(false);
-                    AppLogger.LogInfo($"[plugin] 官方模块同步完成：新增/更新 {result.InstalledOrUpdated}，已是最新 {result.AlreadyCurrent}，失败 {result.Failed}");
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.LogWarn($"[plugin] 官方模块同步失败：{ex.Message}");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.LogWarn($"[plugin] 调度官方模块同步失败：{ex.Message}");
         }
     }
 
