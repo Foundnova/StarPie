@@ -33,6 +33,12 @@ import pathlib
 import re
 import sys
 
+# Windows 控制台常见的 GBK 代码页无法输出 ✓ / ✗；护栏脚本必须在贡献者机器和 CI 都能运行。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "WinPieGestures"
 CJK = r"[\u4e00-\u9fff]"

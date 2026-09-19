@@ -1953,6 +1953,23 @@ internal static class PluginSelfTest
         return null;
     }
 
+    private sealed class FailureKindProbeContribution : IActionContribution
+    {
+        public ActionDescriptor Descriptor { get; } = new()
+        {
+            Id = "selftestFailureKindProbe",
+            DisplayName = "失败原因自检",
+            Kind = ActionKind.Sequential,
+            TimeoutSeconds = 5,
+        };
+
+        public IReadOnlyList<ParameterField> Parameters => Array.Empty<ParameterField>();
+        public string? Validate(IReadOnlyDictionary<string, string> parameters) => null;
+        public string Preview(IReadOnlyDictionary<string, string> parameters) => "失败原因自检";
+        public Task<ActionResult> ExecuteAsync(PluginActionInput input, CancellationToken cancellationToken) =>
+            Task.FromResult(ActionResult.Fail("预期中的自检失败"));
+    }
+
     private sealed class LeaseProbeContribution : IActionContribution
     {
         private readonly TaskCompletionSource<ActionResult> _completion =
@@ -1998,6 +2015,28 @@ internal static class PluginSelfTest
 
         PluginInstance? instance = PluginHost.Find(pluginId);
         if (instance == null || !instance.IsLoaded) return "租约测试开始前插件未加载。";
+
+        var failureProbe = new FailureKindProbeContribution();
+        var failureRegistration = new PluginActionRegistration
+        {
+            PluginId = pluginId,
+            ShortId = "selftestFailureKindProbe",
+            FullId = $"{pluginId}.selftestFailureKindProbe",
+            Contribution = failureProbe,
+            DisplayName = "失败原因自检",
+            Kind = ActionKind.Sequential,
+            TimeoutSeconds = 5,
+        };
+        PluginExecuteOutcome expectedFailure = PluginInvoker.Invoke(
+            instance,
+            failureRegistration,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new PluginCallCoordinator());
+        line($"  插件主动失败：成功={expectedFailure.Success} 原因={expectedFailure.Failure}");
+        if (expectedFailure.Success || expectedFailure.Failure != PluginFailureKind.PluginFailed)
+        {
+            return $"插件返回 ActionResult.Fail 后没有得到结构化 PluginFailed（实际={expectedFailure.Failure}）。";
+        }
 
         var probe = new LeaseProbeContribution();
         var registration = new PluginActionRegistration

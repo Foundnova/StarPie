@@ -1,6 +1,12 @@
 import re, sys, subprocess, pathlib
 
-root = pathlib.Path(r"D:\IO\dotnet\StarPie")
+# Windows 默认 GBK 控制台会把中文检查结果显示成乱码；统一为 UTF-8，便于本机和 CI 诊断。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+root = pathlib.Path(__file__).resolve().parent.parent
 src = root / "WinPieGestures"
 i18n = (src / "I18n.cs").read_text(encoding="utf-8")
 

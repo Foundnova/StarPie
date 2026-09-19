@@ -61,7 +61,7 @@ internal readonly struct PluginExecuteOutcome
     /// <summary>
     /// 失败原因类别 —— 供代码判断，<b>不要</b>拿 <see cref="Message"/> 的文案去做判据。
     /// 与 <see cref="Success"/> 的关系：成功时恒为 <see cref="PluginFailureKind.None"/>；
-    /// 但 <c>Success=false</c> 不一定都填了它（新加的失败分支要记得填）。
+    /// 失败时必须填写具体类别，调用方不得再从本地化后的 <see cref="Message"/> 反推原因。
     /// </summary>
     public PluginFailureKind Failure { get; init; }
 
@@ -370,6 +370,7 @@ internal static class PluginInvoker
             {
                 Handled = true,
                 Success = false,
+                Failure = PluginFailureKind.PluginFailed,
                 Message = string.IsNullOrWhiteSpace(result.Message)
                     ? $"插件动作失败（{registration.DisplayName}）"
                     : result.Message!,

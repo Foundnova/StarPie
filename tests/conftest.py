@@ -4,6 +4,8 @@ import pytest
 import time
 from pywinauto import Application
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 @pytest.fixture(scope="function")
 def sandbox_env(tmp_path):
     """
@@ -32,16 +34,15 @@ def find_exe():
     （目前是 `test_i18n.py`）也能复用，而不必再抄一遍这份候选列表 ——
     抄一份就会漂一份，而这里漂掉的表现是「用例找不到 exe」这种与被测功能无关的失败。
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
-        os.path.join(project_root, "WinPieGestures", "bin", "Release", "net8.0-windows10.0.19041.0", "StarPie.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Release", "net8.0-windows10.0.19041.0", "WinPieGestures.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Release", "net8.0-windows", "StarPie.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Release", "net8.0-windows", "WinPieGestures.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Debug", "net8.0-windows10.0.19041.0", "StarPie.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Debug", "net8.0-windows10.0.19041.0", "WinPieGestures.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Debug", "net8.0-windows", "StarPie.exe"),
-        os.path.join(project_root, "WinPieGestures", "bin", "Debug", "net8.0-windows", "WinPieGestures.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Release", "net8.0-windows10.0.19041.0", "StarPie.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Release", "net8.0-windows10.0.19041.0", "WinPieGestures.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Release", "net8.0-windows", "StarPie.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Release", "net8.0-windows", "WinPieGestures.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Debug", "net8.0-windows10.0.19041.0", "StarPie.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Debug", "net8.0-windows10.0.19041.0", "WinPieGestures.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Debug", "net8.0-windows", "StarPie.exe"),
+        os.path.join(PROJECT_ROOT, "WinPieGestures", "bin", "Debug", "net8.0-windows", "WinPieGestures.exe"),
     ]
     app_path = next((c for c in candidates if os.path.exists(c)), None)
     if not app_path:
@@ -81,7 +82,7 @@ def app(sandbox_env, request):
     
     # Screenshot on failure
     if getattr(getattr(request.node, "rep_call", None), "failed", False):
-        artifacts_dir = os.path.join(project_root, "artifacts")
+        artifacts_dir = os.path.join(PROJECT_ROOT, "artifacts")
         os.makedirs(artifacts_dir, exist_ok=True)
         try:
             win.capture_as_image().save(
