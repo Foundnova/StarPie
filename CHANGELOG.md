@@ -13,6 +13,126 @@
 - 官方模块包下载后校验包大小、包 SHA-256、模块清单和程序集 SHA-256。
 - 保留社区插件的本地安装入口，官方模块默认后台同步。
 
+### 🌍 多语言收口与版本号纠偏
+
+**官方插件面板此前整块没接多语言**：实测 `I18n.cs` 里 `OfficialPlugins*` 词条数 = **0**。这一块是迁移时新加的，只进了 XAML 与代码，没同步接进本地化 —— 切到英文 / 日文后，页头、进度行、卡片徽标、安装按钮与两个弹窗全都还是中文。与 `7cb7120` 修的「插件页整页中文」是同一类问题在新面板上复发。
+
+- **新增 19 个词条 × 4 语言**：XAML 侧 `OfficialPluginsHeaderText` / `OfficialPluginsStatusText` / `RefreshOfficialPluginsButton`；代码侧进度行三态、安装成功 / 失败弹窗与标题；卡片侧 `OfficialPluginListItem` 的状态徽标、按钮文案与摘要兜底（另拆了一个「类型认领分隔符」键 —— 简中仍是 `、`，英文改 `, `，否则英文界面会出现 `Launch、Command` 这种混排）。
+- **进度行改为状态推导**（新增 `RenderOfficialPluginsStatus()`）：原先三个分支各写一遍中文字面量，切语言时无从重渲染。现按「加载中 / 有目录 / 拉取失败 / 初始提示」四态取当前语言，并由 `RefreshPluginManagerUi()` 与 `ApplyPluginsPageLocalization()` 各调一次，所以切语言后这行不会再残留旧语言。
+- **顺带收口**插件动作页两处同样硬编码的中文弹窗（未选动作 / 插件未找到）。
+- **版本号**：`AGENTS.md` §3.7 写「当前契约版本 1.2」，实际已是 **1.4**（1.3 增 `ScreenCapture`、1.4 增 `InputSimulation`），已按 `PluginApi` 注释补齐演进清单；§3.7 能力门禁段还停在「只有 `Process` / `WindowControl` 两个强制点」，实际是**五个服务面、四个能力位**，已改正并补上 `InputSimulation` 为何不与 `Process` 合并。§5.3 的版本同步清单列的是 `App.xaml.cs` / `TrayController.cs` 的「回退文本」，而这两处早已改为统一从 `AppVersionInfo` 取 —— 清单已重写为真实落点（`csproj` / `AppVersionInfo.FallbackVersion` / `SettingsWindow.xaml` 4 处 / `CHANGELOG` / `build-installer.ps1` / `StarPie.iss` 两个 `/D` 兜底）。
+- **消掉一个隐藏同步点**：`UpdateManager` 的 User-Agent 里写着 `?? "1.8.0-beta.1"` 字面量，且取的是 `AssemblyVersion`（会把预发布标识丢成 `1.8.0`），与设置页另一个 UA 写法不一致。改为统一取 `AppVersionInfo.DisplayVersion`。
+
+### 🔧 修复「官方模块自检整段 FAIL」
+
+迁移到在线目录时，**保留前缀只能走官方在线目录**成了硬契约（`PluginHost.InstallCandidateAsync` 与 `PluginInstance.LoadCore` 各拦一次），但自检仍按随包时代的路径把官方 dll 当**社区候选**去装 —— 于是拿任何一枚官方模块 dll 跑自检都会：
+
+- `[3] 启用` FAIL：「插件 ID 使用了保留前缀」；
+- `[5] 活动调用租约` 连带 FAIL（插件没加载起来）；
+- `[5b] 重启后首次惰性调用` 被**静默跳过**（理由写成「插件未加载」）—— 等于丢了一段覆盖却看不出来；
+- `[3d] 候选安装` FAIL：按新契约它本来就该被拒绝。
+
+**已用干净 HEAD（`59d06c2`）复核：同样 FAIL**，确认是迁移引入、与其他改动无关。不改的话，官方模块这条路此后没有任何端到端验收手段。
+
+- `[2]` 安装登记补上 `Official = PluginPaths.IsReservedPluginId(manifest.Id)`。这不是给自检开后门 —— `OfficialPluginClient` 走的就是这套（`Official = true` + 回填 `ClaimedTypes`），加载路径也正是按 `Entry.Official` 决定是否放行保留前缀。
+- `[3d]` 改为按目标身份分支：保留前缀（官方模块）**断言候选安装应被拒绝**并打印拒绝理由；非保留前缀的社区 dll 仍走原来的完整正向流程（含「装完即运行态」「裸 DLL 回填清单」「单枚复制」「ID 重复」等回归断言）。
+- 验收：自检结论 **PASS —— 全链路可用**，且 `[5b]` 从「跳过」变为**真实执行**；`%TEMP%/StarPie-PluginSelfTest-*` 零残留。
+
+### 🩹 恢复在一处合并中丢失的自检护栏 `[3j]`
+
+`PluginSelfTest.cs` 的 `[3j]`（宿主服务面与能力门禁，~200 行）在一次合并中被**整段顶掉**：`refactor` 分支在旧基线上重写了整个自检文件（2813 行 → 945 行），合并时整体取它，`devplugin` 侧后加的 `[3j]` 随之消失。而 `AGENTS.md` §3.7、`PluginCapabilityLabels` 类注释、`PluginHostServices.RunPreset` 注释**仍在引用它** —— 也就是说此后所有「已由 `[3j]` 守」的结论都没有依据。同一批消失的 `[3k]`/`[3m]` 守的是随包机制，该机制已随官方目录迁移移除，消失是对的；`[3j]` 守的能力门禁**功能完好存在**，属真回归。
+
+- 按现行服务名**重写**恢复（非照抄）：类型关系、五个服务面的拒绝路径、三条「声明后放行」、四条跨能力交叉断言、能力位两两不重复、确认页文案全覆盖、四份元数据清单同源、SDK 契约版本一致。
+- 系统预设清单的核对从「只比项数」升级为「逐项比对 `Key` + `DisplayName`」—— 项数对得上但下标串位挡不住「关机写成睡眠」。
+- 另修一处**会说谎的输出**：三条汇总行（能力位 / 能力文案 / 系统预设清单）原先无条件打 ✓，在已经 `[FAIL]` 之后仍然打勾 —— 一份在报错旁边说「覆盖全部」的报告会让人以为报错是误报。已改为条件式，失败时改口为「见上面的 `[FAIL]`」。
+- **`AGENTS.md` §5.1 新增纪律**：改 `PluginSelfTest.cs` 前后必须比对段落号集合（`grep -o '\[[0-9][a-z]*\]' … | sort -u`），少一段就要回答「它守的东西现在由谁守」。
+- 验收：自检 **PASS —— 全链路可用**，`[3j]` 段 18 个 ✓；**变异测试**证明它是真护栏而非一堆永远绿的断言 —— 把 `PluginWindowService` 的 required 从 `WindowControl` 改成 `Process`，构建**仍 0 警告**（编译器抓不到），自检当场报 3 条 `[FAIL]`；删掉 `PluginCapabilityLabels.All` 里 `WindowControl` 一行，报「能力位…在安装确认页上没有对应文案」。
+
+### 🧩 安装确认页收敛为唯一实现，并新增 `[3e]`「整页随语言切换」护栏
+
+「装插件」这个语义此前有**两份互不相干的确认页**：候选卡片一份（`ConfirmCandidateInstall`，全程走词条），手动选 `.dll` 一份（`ConfirmPluginInstall`，约 40 行整块硬编码中文）。同一条路改一处漏一处是必然的，而且**手动安装那份连「装下去会覆盖掉什么」都没说** —— 用户选了一枚与已装版本冲突的 dll，点确定之前看不到任何提示。
+
+- **归一**：新增 `Plugin/PluginInstallConfirmation.cs`，把输入（`Scan` / `State` / `Note` / `EnableAfterInstall`）与正文构造（`PluginInstallConfirmationText.Build`）拆成两个纯数据/纯函数类型；`SettingsWindow.ConfirmPluginInstall` 只剩一行弹窗。正文按「它是谁 → 从哪来 → 会拿到什么能力 → 装到哪 → 装完会怎样 → 风险与接受」六段重排，是两份旧正文的**并集**（手动那份的文件事实 + 候选那份的状态与扫描结果）。
+- **手动安装首次获得安装后果判定**：新增 `PluginHost.ClassifyManualInstall(scan)`，与候选路径共用同一套 `ClassifyCandidate`，只是撞 ID 上下文传空集合（手动选文件不存在「扫描目录内两枚 dll 撞 ID」这一维）。于是手动安装现在会明确告诉你这是**更新 / 降级 / 同版本换内容 / 内容完全相同 / 版本无法比较**，而不是笼统地「确认安装」。
+- **「覆盖了哪一份」与「装完启不启用」拆成两句**：候选安装走 `EnableAfterInstall = true`、手动安装走 `false`（刻意不自动启用，见原注释），原先混在一句话里的措辞没法单独改一条，拆开后两处都会如实说明。
+- **新增 31 个词条 × 4 语言**，删掉被拆分的 5 个旧键（`PluginsConfirmUpdate/Downgrade/Replaced/Fresh/Privileges`）。`InstallPluginButton_Click` 里同属这条路径的对话框标题、文件类型过滤串、读取失败、非插件提示、安装完成提示一并接线 —— 标题与正文必须同时接，只接标题会得到「英文标题 + 中文正文」的混排，比整句原文更糟。
+- **修掉一类漏翻：分隔符也算文案。** 能力清单原用 `string.Join("、", …)` 连接，顿号是写死的中文标点 ⇒ 英文界面出现 `Declared capabilities: Process、WindowControl`。新增 `PluginsEnumSeparator`（简中 / 繁中 / 日文 `、`，英文 `, `），确认页与候选卡片摘要同理修正。纯字形分隔符（`　|　` / `　·　`）是排版装饰、不随语言变，已加注释说明两者区别。
+- **`PluginCapabilityLabels` 整表接入 i18n（12 个新键）**：此前它整块是硬编码中文，于是「已经接好 i18n 的确认页」内部藏着一整段中文风险说明 —— 只看那页代码或只看词表覆盖率都发现不了。表内改存**词条键**、在 `Describe()` 里现取（存文案的话 `static readonly` 只在类型初始化时求值一次，切完语言确认页仍是旧语言）。`[3j]` 的文案断言随之改为校验**解析后**的文本，并专门判「返回的是不是裸键名」（键名写错时 `I18n.T` 原样返回键名，既不空白也不像错的）。
+- **自检新增 `[3e]`「安装确认页正文」**（5 条断言）：用**合成**的扫描结果（全 ASCII）构造正文并逐语言驱动 —— ① 无未替换的 `{n}` 占位符；② **英文页里不许有方块字、假名或全角标点**；③ 四种语言产生四份互不相同的正文；④ 关键字段真的拼进去了；⑤ 两种「装完是否立即启用」产生不同正文。另守「每个具名状态位都有安装后果文案」，判据写成「共用兜底措辞的状态集合**正好**是哪几个」—— 新增状态位忘了配文案时会落进那个集合从而变红，而写成列举式的话新状态位根本没机会被这条断言看见。
+- 顺带修掉一处格式缺陷：`DescribeCapabilities` 与紧随其后的方法挤在同一行（上一次改动留下的），现已拆开。
+
+**这一段的实际价值当场兑现**：`[3e]` 上线第一次运行就报出「英文页里出现了中文字符『启』」，牵出上面那两块（`PluginCapabilityLabels` 与顿号分隔符）—— 它们都属于「编译、静态检查、词表覆盖率全绿，界面仍是原文」这一类，只有真的切一次语言才看得见。
+
+**验证**：构建 0 警告 0 错误；自检 `PASS —— 全链路可用`，`[3e]` 两行 ✓（英文页 1034 字符无方块字）、`[3j]` 全绿，`%TEMP%/StarPie-PluginSelfTest-*` 零残留；**三次变异测试**证明新断言真会红 —— ① 把分隔符改回硬编码顿号 ⇒ 报「英文页出现『、』(U+3001)」；② 删掉一条英文词条 ⇒ 报「英文页出现『插』」并回落到简中；③ 把 `Installed` 改成共用兜底文案 ⇒ 报「共用兜底的状态是 [Installed, Replaced, Duplicate, Reserved, Rejected]，预期是 [Replaced, Duplicate, Reserved, Rejected]」；三次均已还原。词表护栏 `check_i18n.py`：**662 键、0 重复、0 缺语言分支、0 简中空值、0 引用但未定义**，本次新增 44 键全部有引用且占位符跨语言一致；中文判据护栏 `scan_cjk_logic.py`：34 处全部已分类、默认名 8/8 覆盖、退出码 0。
+
+### 🧪 `tests/` 新增「切英文后整页已翻译」棘轮回归
+
+前两轮 i18n 漏接（插件页整页中文、官方面板整块没接）**都躲过了现有 26 个 UI 用例**：唯一沾边的 `test_v138_i18n_multilanguage_support` 每个语言档位只看 2 个控件（`SaveButton` / `NavTab0Text`），而它抽查的那 2 个一直是好的。也就是说，**这套套件此前对「整页漏翻」零灵敏度**。
+
+先量清真实规模再决定护栏形状：`SettingsWindow.xaml` 里含中文的 `Text`/`Content`，**441 处没有 `Name`**、其中 **376 处词表里压根没建键**（抽样确认 `EnableMultiTierDesc` / `SubmenuStyleTitle` 等键存在但代码引用 0 次 ⇒ 整个区块建了没接线）。这批控件既进不了静态差集（`check_i18n.py` 只扫带 `Name="X"` 的），也进不了按 auto_id 的 UI 断言 —— **静态与动态双双漏掉**。所以这不是「补一条用例」的量级，因此改走**台账（棘轮）断言**。
+
+- **新增 `tests/test_i18n.py`**：切英文后逐页签采集「仍含中文的可见文案」，断言**观测集合 ⊆ 基线集合**（`tests/i18n_baseline.json`，共 88 条 / 5 个页签）。只允许变少、新增即红；变少时以 warning 提示收紧台账，让「还欠多少」每次跑都看得见。
+- **基线对应真实首装现场**：夹具第一次启动让程序**自己**生成默认配置，只把 `Language` 改成 `en` 再启动第二次。直接写一个 `{"Language":"en"}` 的最小配置会得到**空轮盘**（实测动作名显示占位符「动作 1」、子动作数 0、级联区只显示空态提示）—— `EnsureConfigHealth` 只校验、不补默认数据。这个差别是被实测抓出来的，不是推测。
+- **避开三处假阳性**（都给不出「界面没翻干净」的信息，收进来只会逼人放宽判据）：操作系统提供的窗口按钮 `关闭/最大化/最小化`（跟随系统语言而非应用语言）；`PluginCandidatesPathText` 里那个作排版分隔符的表意空格 U+3000（故 CJK 判据**刻意不含**它）；每次运行都会变的数字（版本号 / 上次检查时间 / 扇区号）统一归一化为 `#`。
+- **用例主动掐网换确定性**（首次采集后实测到的真问题）：插件系统在启动约 2 秒后后台同步官方模块，**同步赶在采集之前完成时插件页会多出「已安装模块」卡片，赶不上就没有** —— 同一份代码给出时多时少的观测集合，台账随机红。故把 `HTTP(S)_PROXY` / `ALL_PROXY` 指向必然拒绝连接的 `127.0.0.1:1`（实测 .NET 在 Windows 上同样优先读这些变量，应用日志立即出现「刷新官方插件目录失败：目标计算机积极拒绝」）。本用例断言的是应用自身文案，与远端目录里恰好有哪些模块无关；顺带让它在离线 / CI 环境同样成立。**一个会随机红的用例，最大的代价不是它红了，是它训练所有人无视红灯。**
+- **首次「真红」还抓到一处此前无人发现的漏翻**：`SettingsWindow.xaml:3990` 的 `Content="🗑 卸载"` 与同模板的 `Content="启用"` —— 它们在 `ListBox.ItemTemplate` 的 `DataTemplate` 里，**命名域不同、`Name` 对它无效**，所以 `check_i18n.py` 的「具名控件漏接 = 0」看不见它们，正确解法只能是 `{Binding}` 到视图模型的本地化属性。顺查确认同一渲染路径还有 **约 22 条代码拼串**（`BuildPluginListItem` 的 `作者` / `贡献 N 个动作` / `未加载` / `声明能力：` / `已签名` / `未签名` / `外部路径`，`DescribePluginState` 的 10 个状态名，以及 `"StarPie 插件"` 标题与「打开扫描目录失败」）—— 该函数注释自称「所有面向用户的文案都集中在这里」，**集中了、但没接词条**。归属「插件面 i18n」那一笔，已在 `AGENTS.md` §5.4 与记忆里登记（本轮不擅自扩大范围）。
+- **`tab_4`（关于 / 更新日志）显式排除**：正文是发行说明散文，项目有意只发中文。纳入台账会让「每次发版新增一条 release note」都变成一次失败，从而训练所有人去改台账 —— 那等于把这张网拆了。代价是该页的标签类文案一并失去覆盖，已在用例与 `AGENTS.md` §5.4 记为已知欠账。
+- **前置断言先判「语言到底切成英文没有」**：否则配置路径一旦出问题，得到的是一份几百条的大 diff，症状看着像「i18n 全面崩了」，而真相是用例自己的现场没摆对。
+- **`conftest.py` 抽出 `find_exe()` / `launch_app()`**：需要「启动前改现场」的用例（预置语言）必须自己控制启动时机，而 `app` 夹具启动得比用例早、替不了。抽出来是为了不再抄第二份候选路径列表 —— 抄一份漂一份，漂掉时的表现是「找不到 exe」这种与被测功能无关的失败。
+- **验收**：`dotnet build -c Release` → **0 警告 0 错误**；`pytest tests/` 收集 **27** 个用例（26 + 1）；修掉网络不确定性后**连续三次运行**（1 次标定 + 2 次断言）结果一致（0 新增 0 减少）；**变异测试**把 `ConfigModeProRadio.Content = I18n.T(...)` 注释掉（＝真实的「漏接线」形态），构建**仍 0 警告**，用例当场报 `英文界面上出现了 10 条台账里没有的中文文案：⚙️ 高级模式` 并列出页签与控件名；**共享夹具冒烟**再跑 `test_switch_all_tabs_smoothly` 与 `test_v138_i18n_multilanguage_support` 两条老用例，均 PASS。标定用的 `scratch/dump_i18n_en_cjk.py` 与中间产物已删除（台账改由用例自身以 `STARPIE_I18N_UPDATE_BASELINE=1` 重采，避免两份实现漂移）。
+
+### 🔌 插件动作面板接入多语言，并修掉「切完语言编辑器停在旧语言」
+
+插件动作编辑面板（「手势动作」页里选中一个插件动作之后那一块）的文案此前是 `SettingsWindow` 私有方法里的一整段**代码拼串**，一条词条都没接；更要紧的是 **`ApplyLocalization()` 从不调用 `UpdateFocusEditorUi()`** —— 也就是说这块即便接了词条，切语言时也不会重渲染，只会冻结在构建时那门语言。
+
+- **新增 `Plugin/PluginActionPanelText.cs`**：把面板文案抽成纯静态类（`NotChosen` / `Unavailable` / `Registered` / `ParamsHint` / `IssuesCount`），`SettingsWindow` 只剩「把字符串摆到控件上」。**这一步不是为了整洁** —— 窗口类的私有方法无界面自检够不着，「切了语言它还残不残中文」就只能靠人肉点一遍；搬出来之后 `[3g]` 才写得成。与 `[3f]`（`PluginListItem`）、`[3e]`（`PluginInstallConfirmationText`）是同一条理由：**可测性是靠摆放位置换来的**。
+- **入参是基本类型而不是 `PluginActionRegistration`**：注册表字段随时会长，而自检里要构造一个合法 registration 得连带填一堆无关字段 —— 基本类型让「驱动一次」变成一行。
+- **修掉「同一个窗口里两种语言并存」**：在 `ApplyLocalization()` 末尾补一次 `UpdateFocusEditorUi()`（`if (IsLoaded)` 挡住构造期那次调用）。这一处覆盖的不止插件面板 —— `Hotkey` / `Launch` / `WebUrl` / `Folder` / `Command` / `WindowManager` / `System` / `Ocr` / `ShellTool` 九个面板**同样一直停在旧语言**，因为它们全是代码拼串。`UpdateFocusEditorUi` 自带重入守卫、幂等，与它 40+ 个既有调用点走同一条路；且 `PluginParameterForm.Build` 的文档与实现都是「重建表单**并回填已保存的值**」（从 `ActionItem.ExtensionData` 取），所以重建不会清空用户输入。
+- **14 个新词条 × 4 语言**（面板标题复用既有 `ActionTypePluginShort`）：未选择的两种处境各一句、引用失效的正文与警示句、`提供插件` 的两种写法（显示名与 ID 相同时不重复显示）、执行方式（后台并发 / 串行）、超时、贡献点 ID、必填参数提示、全部可选、校验结论「还差几项」。**中文值与原字面量逐字一致 ⇒ 简中界面一字不变。**
+- **三种处境的引导语是分开的**（这是原本就有的设计，本轮加了护栏防止后人合并）：有候选 → 去下拉框里挑；无候选 → 去插件页装并启用；引用失效 → 去插件页确认状态或改选。用户照提示操作走错地方，是这类文案最典型的失效方式。
+- **自检新增 `[3g]`（4 条断言）**：① 四种处境 × 四种语言，标题与正文非空、**不是裸键名**，提示行「要么非空、要么老实是 `null`」；② 同一处境四语言必须给出四份不同正文；③ **四种处境的正文必须四句不同**；④ 英文面板的**宿主部分**无方块字与全角标点（插件自带数据按值降序摘除，沿用 `[3f]` 踩过的坑）。段落同样刻意排在 `[4]` 之前 —— `--skip-invoke` 会在 `[4]` 开头提前 return。
+
+**两次变异测试证明 `[3g]` 是真护栏**：① 把 `PluginsPanelKindSerial` 的英文值换回中文 ⇒ 自检报「英文面板的『正常』里出现了中文/日文字符『串』(U+4E32)」并打印摘除后的原文；② 让「有候选 / 无候选」两个分支共用一句话 ⇒ 报「四种面板处境的正文只得到 3 份不同文案 —— 有两处共用了同一句话」。两次均已还原，`grep MUTATION` 为空。
+
+**诚实边界（已写进 `AGENTS.md` §5.1）**：**「切语言重渲染」这一条没有机器护栏**。UI 套件一律在**启动前**把语言写进 `config.json`（app 内切换在 pywinauto 下因 emoji 被剥而脆弱，故有意不用它采集），所以没有任何一条断言在看「切完之后有没有换」。目前只有 `test_settings.py::test_v138_i18n_multilanguage_support` 真的在 app 内切了一次语言、证明这条路径**不炸**，**但它不校验内容** —— 别把「它绿了」读成「重渲染是对的」。面板文案本身由 `[3g]` 守，两者是分工。
+
+**验证**：`dotnet build -c Release -t:Rebuild` → **0 警告 0 错误**；`--plugin-selftest <官方 Launch.dll> --skip-invoke` → `PASS —— 全链路可用`，段落号 `[0][1][2][3][3b][3c][3d][3e][3f][3g][3j][4][5][5b][6][7]`（**16 段**）、0 条 FAIL、`%TEMP%/StarPie-PluginSelfTest-*` 零残留；`check_i18n.py` → **712 唯一键 / 0 重复 / 0 缺语言分支 / 0 简中空值 / 0 引用但未定义**，本次新增 14 键全部「引用=是、语言=4」、占位符跨语言不一致 **0**、插件页漏接具名控件 **0**；`pytest tests/test_settings.py -k "v138_i18n_multilanguage_support or v139_folder_action_type_and_i18n_consistency"` → **2 passed**（这是「app 内切语言不炸」的实测依据）。
+
+**已知未覆盖（登记）**：插件面仍有约 **250 条**面向用户的中文串 —— `PluginHost` 47 / `PluginManifestReader` 35 / `PluginInstance` 30 / `PluginScanner` 30 / `OfficialPluginClient` 29 / `PluginInvoker` 28 / `PluginContext` 20 / `PluginRuntime` 20 / `PluginParameterForm` 12 / `PluginParameterValidator` 9 等，其中相当一部分是异常消息（只在报错路径出现，且那些路径另有已接词条的摘要行）。**日志与自检控制台输出约 400 行按既有约定不翻**。
+
+### 🌍 插件管理页整块接入多语言，并新增 `[3f]`「卡片文案」护栏
+
+上一笔给台账补「插件卡片看不到」这个盲区时，顺查确认同一条渲染路径上还有 **2 处 `DataTemplate` 硬编码**与**约 22 条代码拼串** —— 它们集中在一个自称「所有面向用户的文案都集中在这里」的函数里，**集中了、但一条词条都没接**。本轮把这块整个接掉。
+
+- **`DataTemplate` 那两处只能改 `{Binding}`**：`SettingsWindow.xaml:3990` 的 `Content="🗑 卸载"` 与同模板的 `Content="启用"` 在 `ListBox.ItemTemplate` 里，**命名域不同、`Name` 对它无效**（所以 `check_i18n.py` 的「具名控件漏接 = 0」看不见它们，动态断言也够不着）。改为 `{Binding UninstallText}` / `{Binding EnableText}`。
+- **卡片文案从窗口类搬进 `PluginListItem`**：`BuildPluginListItem`（约 90 行）与 `DescribePluginState` 原本是 `SettingsWindow` 的私有成员，**无界面自检够不着**，「卡片翻没翻」就写不出断言。整体搬成 `Plugin/PluginListItem.Build` 与 `PluginListItem.DescribeState` —— 这一步不是为了整洁，是**可测性的前提**：面向用户的文案构造必须待在纯静态、非窗口类里。
+- **`DescribeState` 拆出「值驱动」重载**（`(state, requiresRestart, entryEnabled)`）：自检要能用 `Enum.GetValues` 逐个成员驱动它，而「逐成员」没法靠构造 9 个 `PluginInstance` 来做（`Active` / `Installed` 还各有两种处境）。
+- **顺带修掉一处藏了很久的缺陷**：状态兜底原是 `_ => instance.State.ToString()`，于是 `Stopping` 在中文界面上直接显示英文枚举名。现收进 `PluginsStateStopping`，并由穷尽 switch 保证它不可能再落兜底。
+- **补 36 个词条 × 4 语言**：卡片摘要与详情 8 个、两个按钮 2 个、状态名 11 个、弹窗与提示 15 个；简中值与原字面量逐字一致 ⇒ **简中界面一字不变**。
+- **收编一个孤儿键**：`PluginsDisableFailed`（原值 `停用失败：{0}`，此前**全仓 0 引用**）。插件行开关的停用失败分支本来就没接词条，现按 `停用插件 {0} 失败：\n\n{1}` 接通 —— 措辞与启用侧的既有文案对齐，不再出现「停用失败只有动作名、没有原因」。
+- **`PluginRowEnabledCheckBox_Click` 一并接线**：确认停用 / 停用中 / 停用失败 / 启动失败 / 插件系统未就绪，以及重新扫描两条结果提示与两个「打开目录失败」提示。
+- **自检新增 `[3f]`（4 条断言）**：① 逐 `PluginRuntimeState` 成员驱动 `DescribeState`，断言非空、**不是裸键名**、有图标，并单独断言 `Active` 与 `Installed` 的两种处境文案不同；② 逐语言 `PluginListItem.Build`，英文卡片的**宿主部分**（先按长度降序摘掉插件自带数据）不许有方块字与全角标点；③ 断言详情里含 `pluginId`（否则「没有中文」可能只是「什么都没拼」）；④ 四语言卡片两两不同。段落刻意排在 `[4]` **之前** —— `--skip-invoke` 会在 `[4]` 开头提前 return，排到后面等于日常回归根本不执行（`[5b]` 踩过这个坑）。
+- **判据与台账对齐**：`[3f]` 的 CJK 判据与 `tests/test_i18n.py` 的 `CJK_RE` 显式一致，**刻意不含 U+3000**（表意空格在本项目里当排版分隔符用，与语言无关）。两处判据漂了会得到「自检绿、UI 套件红」这种自相矛盾的结果。
+
+**两次变异测试证明 `[3f]` 是真护栏**：① 删掉 `Stopping` 分支 ⇒ 编译期 **CS8509** 报「模式 Stopping 未包含在内」，且 `#pragma warning disable CS8524` 没有把它一起吞掉（这正是「穷尽 switch 能当护栏」成立的前提）；② 把 `PluginsStateActive` 写成 `PluginsStateActiveTypo` ⇒ 自检当场报「状态「Active」取到的是裸键名『PluginsStateActiveTypo』—— 词条键写错了」。两次均已还原，还原后 `grep MUTATION` 为空、全量重建回到 0/0。
+
+**诚实边界（写进注释，免得后人以为运行时断言是全覆盖）**：`[3f]` 的裸键名判据是**前缀形状**（「以 `PluginsState` 开头」），因为 `DescribeState` 内部才认识键名，运行时拿不到。保留前缀的错写会红；**前缀整个写错**（如 `PluginStateActive`）运行时看不见 —— 那一路由 `check_i18n.py` 的「引用但未定义」静态兜住。两者是**分工**，不是互相替代：静态管全覆盖，运行时管「取到手的到底像不像话」。
+
+**台账这一轮零变化，而且是正确结果**：接完之后重采 `tests/i18n_baseline.json`，与旧台账**逐字节相同**（`git diff` 为空）。两层原因：卡片在 `ItemTemplate` 里，而**用例沙箱中没有任何已安装插件** ⇒ 列表为空、模板从未实例化；那条「原先引用的插件动作已不可用」提示也只在特定状态下才出现。也就是说这张台账**根本够不着**插件卡片 —— 这恰恰是 `[3f]` 存在的理由。已把这条实测结论写进 `tests/test_i18n.py` 的盲区 5、`AGENTS.md` §5.4，并给「收紧台账」一节补了一句：**重采后 diff 为空也是有效结论**，该做的是补一条够得着那个界面的断言，而不是反复重跑或去搬台账。
+
+**验证**：`dotnet build -c Release -t:Rebuild` → **0 警告 0 错误**（全量重建；增量构建的 0/0 不作数 —— 构建被残留进程锁住时会顺带打印一批假警告）；`--plugin-selftest <官方 Launch.dll> --skip-invoke` → `PASS —— 全链路可用`，段落号 `[0][1][2][3][3b][3c][3d][3e][3f][3j][4][5][5b][6][7]`、0 条 FAIL、`%TEMP%/StarPie-PluginSelfTest-*` 零残留；`check_i18n.py` → **698 唯一键 / 0 重复 / 0 缺语言分支 / 0 简中空值 / 0 引用但未定义**，本次新增 36 键全部「引用=是、语言=4」，占位符跨语言不一致 **0**，插件页漏接具名控件 **0**；`scan_cjk_logic.py --pending` → 34 处全部已分类、默认名 8/8、退出码 0；`pytest tests/test_i18n.py` → PASSED。
+
+**已知未覆盖（登记，不冒充已做）**：`RefreshFocusPluginPanel` 那 19 条 —— 经查它**只在切换动作类型时被调用**，切语言不会重渲染，接完会残留旧语言，须连带一个重渲染钩子，属独立改动；`SettingsWindow.xaml.cs` 其余约 30 处硬编码中文；插件识别 / 清单校验 / 运行时拒绝文案（`PluginScanner`、`PluginManifestReader`、`PluginRuntime` + `PluginPathModules`、`OfficialPluginClient`、`PluginParameterValidator`）约 80 条。**日志与自检控制台输出约 400 行按既有约定不翻**（它们是给排障的人看的，不随界面语言切换）。
+
+### 🧪 自检
+
+- `dotnet build WinPieGestures/WinPieGestures.csproj -c Release` → **0 警告 0 错误**。
+- 词条完整性（`scratch/check_i18n.py`，新增脚本）：**571 个唯一键、0 组重复、0 个键缺语言分支、简中无空值**；代码里 `I18n.T` / `I18n.TF` 的字面量引用与字典定义求差，「引用但未定义」= **0**；本次新增 19 键**全部有引用**。
+- 漏接复查：插件页「有 `Name` + 硬编码中文却从未被重设」的具名控件数 = **0**。
+- 不变量「简中界面一字不变」：三个 XAML 设计期占位的字面量与对应词条的简中值逐字比对**完全一致**；其余改动均为「字面量 → 词典同值」，简中输出零变化。
+- 自检工具本身：改前后各跑一次官方模块 dll（`--skip-invoke`）。改前 FAIL、改后 PASS，且**用干净 HEAD 复核过改前那次 FAIL**，排除「本次改动引入失败」的可能。
+- 发布产物：`dotnet publish -c Release -r win-x64 --no-self-contained` 输出 **12 个文件、无 `plugin\`、无官方插件 dll**，AGENTS.md §5.2 的发布前校验成立。
+
 ## [未发布] - 2026-09-17（同步上游 dev-plugin：合并 13 个提交、缝合 4 处冲突、恢复两份插件规范）
 
 向上游提 PR 显示「冲突过多」的根因不是本分支改错了，而是**上游把本分支的 PR #129 合并后又整个 revert（`e558028`），再用 PR #132（`pr-129-migration`）重做了一遍** —— 两边对同一批文件成了「功能相同、写法不同」的并行修改，基线漂移。本次把上游合并进来，让冲突收敛掉。

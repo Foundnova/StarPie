@@ -43,6 +43,8 @@ public partial class SettingsWindow : Window
 
 	private OfficialPluginCatalog? _officialPluginCatalog;
 	private bool _officialPluginsLoading;
+	/// <summary>上次拉取官方 catalog 的失败原因。留着是为了切换语言时能把进度行按当前语言重渲染。</summary>
+	private string? _officialPluginsError;
 
 	/// <summary>设置控制台当前已生效的界面缩放比例，用于按倍率换算窗口尺寸增量。</summary>
 	private double _appliedSettingsUiScale = 1.0;
@@ -2786,6 +2788,12 @@ public partial class SettingsWindow : Window
 		{
 			FocusPluginReloadBtn.Content = I18n.T("FocusPluginReload");
 		}
+		if (FocusPluginActionBrokenHint != null)
+		{
+			// 这一段原先没有 Name，Text 是写死的中文 ⇒ 无论切到哪种语言都一直是中文。
+			// 它不在 DataTemplate 里，所以给个名字在这里重设即可（不用 {Binding}）。
+			FocusPluginActionBrokenHint.Text = I18n.T("PluginsActionBrokenHint");
+		}
 		if (FocusPopulateTileSubActionsBtn != null)
 		{
 			FocusPopulateTileSubActionsBtn.Content = I18n.T("FocusPopulateTileSubActions");
@@ -2888,6 +2896,20 @@ public partial class SettingsWindow : Window
 		}
 
 		UpdateFocusActionTypeItemsSource();
+
+		// 动作编辑面板的文案是**代码拼串**（不是 XAML 字面量），所以它只在被**重建**时才换语言。
+		// 这里必须补一次重渲染，否则切完语言会得到「同一个窗口里两种语言并存」：
+		// 侧边栏、页签、按钮都换了，而编辑器里那一整块（插件面板，以及
+		// Hotkey / Launch / WebUrl / Folder / Command / WindowManager / System / Ocr /
+		// ShellTool 九个面板）还停在旧语言 —— 而这一块正是用户改动作时盯着看的地方。
+		// 用 IsLoaded 挡住构造期那次调用：那时编辑器还没起来，重跑没有意义，
+		// 平白多走一遍初始化路径也没有好处。UpdateFocusEditorUi 自带重入守卫且幂等，
+		// 与它 40+ 个调用点走的是同一条路。
+		if (IsLoaded)
+		{
+			UpdateFocusEditorUi();
+		}
+
 		App.RefreshTrayMenu();
 	}
 
@@ -4252,6 +4274,10 @@ public partial class SettingsWindow : Window
 					}
 				}
 				_selectedProfile.BoundProcesses = ProfileBoundProcessesTextBox?.Text ?? proc;
+				// 「配置名是占位还是用户起的」—— 这个判断在本文件里有三处（本节 3 次，动作名之外的另一套）。
+				// 与动作名那套的区别：配置名<b>没有任何走 I18n 的默认值</b>（生成点是
+				// 下面的「<c> - 副本</c>」拼接与设置页的重命名），所以这里的中文字面量
+				// 与赋值同源、不随语言变，属于可接受项，不必收进 ActionNameDefaults。
 				if (string.IsNullOrEmpty(_selectedProfile.DisplayName) || _selectedProfile.DisplayName.StartsWith("自定义配置_") || _selectedProfile.DisplayName.EndsWith(" - 副本"))
 				{
 					if (!string.IsNullOrWhiteSpace(picker.SelectedTitle))
@@ -6246,13 +6272,12 @@ public partial class SettingsWindow : Window
 		StarPie.Plugin.PluginActionRef? reference = item.PluginActionRef;
 		if (reference == null || !reference.IsValid)
 		{
-			FocusPluginTitleText.Text = "🔌 " + I18n.T("ActionTypePluginShort");
-			// 区分「还没选」与「根本没得选」：前者引导去下拉里挑，
-			// 后者让用户对着一个空下拉框找，只会让人以为功能坏了。
-			FocusPluginDetailText.Text = PluginActionBinding.BuildPluginActionItems().Count > 0
-				? "尚未选定具体的插件动作。请在上方「插件动作」下拉框中选择 —— " +
-				  "候选动作按插件分组，同一插件的动作都归在它以自己名字命名的那个分组下。"
-				: "当前没有可用的插件动作。请先到「插件与扩展」页安装并启用插件，再回到这里选择。";
+			// 「还没选」与「根本没得选」要给出两句不同的话，这个分支判据收在
+			// PluginActionPanelText 里（见那里的注释）。窗口类只负责摆控件 ——
+			// 拼串留在窗口类里的话，无界面自检够不着它，[3g] 就写不出来。
+			var notChosen = PluginActionPanelText.NotChosen(PluginActionBinding.BuildPluginActionItems().Count);
+			FocusPluginTitleText.Text = notChosen.Title;
+			FocusPluginDetailText.Text = notChosen.Detail;
 			if (FocusPluginParamsHintText != null) FocusPluginParamsHintText.Visibility = Visibility.Collapsed;
 			if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Collapsed;
 			ClearFocusPluginParameterForm();
@@ -6262,14 +6287,12 @@ public partial class SettingsWindow : Window
 		if (!PluginHost.TryGetAction(reference.FullId, out PluginActionRegistration registration))
 		{
 			// 引用还在、贡献点却没了 —— 最常见的是插件被停用/卸载，或插件升级后不再提供该动作。
-			FocusPluginTitleText.Text = "🔌 " + I18n.T("ActionTypePluginShort");
-			FocusPluginDetailText.Text =
-				$"所引用的插件动作当前不可用：{reference.FullId}\n" +
-				"可能是该插件已被停用或卸载，也可能是插件升级后移除了这个动作。\n" +
-				"到「插件与扩展」页确认插件状态，或直接在上方「插件动作」下拉框里改选另一个动作。";
+			var unavailable = PluginActionPanelText.Unavailable(reference.FullId);
+			FocusPluginTitleText.Text = unavailable.Title;
+			FocusPluginDetailText.Text = unavailable.Detail;
 			if (FocusPluginParamsHintText != null)
 			{
-				FocusPluginParamsHintText.Text = "⚠️ 触发时会明确提示「插件动作不可用」，不会静默无操作。";
+				FocusPluginParamsHintText.Text = unavailable.Hint ?? "";
 				FocusPluginParamsHintText.Visibility = Visibility.Visible;
 			}
 			if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Visible;
@@ -6277,32 +6300,18 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		FocusPluginTitleText.Text = "🔌 " + registration.DisplayName;
-
-		var detail = new System.Text.StringBuilder();
 		// 插件名与子下拉的分组标题保持一致，用户才能把两处对上号；ID 另行标注，
-		// 排查问题时仍然需要它。
-		detail.Append("提供插件：").Append(PluginActionBinding.ResolvePluginDisplayName(registration.PluginId));
-		if (!string.Equals(
-				PluginActionBinding.ResolvePluginDisplayName(registration.PluginId),
-				registration.PluginId,
-				StringComparison.Ordinal))
-		{
-			detail.Append("（").Append(registration.PluginId).Append('）');
-		}
-		detail.Append("　|　执行方式：").Append(registration.Kind == StarPie.Plugin.ActionKind.Background
-			? "后台并发（不占用动作线程）"
-			: "串行（占用动作线程）");
-		if (registration.TimeoutSeconds > 0)
-		{
-			detail.Append("　|　超时：").Append(registration.TimeoutSeconds).Append(" 秒");
-		}
-		detail.Append('\n').Append("贡献点 ID：").Append(registration.FullId);
-		if (!string.IsNullOrWhiteSpace(registration.Description))
-		{
-			detail.Append('\n').Append(registration.Description);
-		}
-		FocusPluginDetailText.Text = detail.ToString();
+		// 排查问题时仍然需要它。这几行摘要的拼串全部收在 PluginActionPanelText 里。
+		var registered = PluginActionPanelText.Registered(
+			registration.DisplayName,
+			registration.PluginId,
+			PluginActionBinding.ResolvePluginDisplayName(registration.PluginId),
+			registration.FullId,
+			registration.Kind == StarPie.Plugin.ActionKind.Background,
+			registration.TimeoutSeconds,
+			registration.Description);
+		FocusPluginTitleText.Text = registered.Title;
+		FocusPluginDetailText.Text = registered.Detail;
 
 		BuildFocusPluginParameterForm(registration);
 
@@ -6329,9 +6338,7 @@ public partial class SettingsWindow : Window
 				int requiredCount = registration.Parameters.Count(
 					p => p.Required && p.Type != StarPie.Plugin.ParameterFieldType.Bool);
 
-				FocusPluginParamsHintText.Text = requiredCount > 0
-					? $"此动作有 {requiredCount} 个必填参数，留空会在触发时被拦下。"
-					: "此动作的参数全部可选。";
+				FocusPluginParamsHintText.Text = PluginActionPanelText.ParamsHint(requiredCount);
 				FocusPluginParamsHintText.Visibility = Visibility.Visible;
 			}
 			else
@@ -6367,7 +6374,7 @@ public partial class SettingsWindow : Window
 			string? message = validation.PluginMessage;
 			if (message == null && validation.DeclaredIssues.Count > 0)
 			{
-				message = $"还有 {validation.DeclaredIssues.Count} 个参数不合法，触发时会被拦下。";
+				message = PluginActionPanelText.IssuesCount(validation.DeclaredIssues.Count);
 			}
 
 			if (string.IsNullOrWhiteSpace(message))
@@ -6441,14 +6448,14 @@ public partial class SettingsWindow : Window
 		StarPie.Plugin.PluginActionRef? reference = item?.PluginActionRef;
 		if (item == null || reference == null || !reference.IsValid)
 		{
-			System.Windows.MessageBox.Show(this, "当前动作尚未选定具体的插件动作。", "StarPie 插件",
+			System.Windows.MessageBox.Show(this, I18n.T("PluginsActionNotSelected"), I18n.T("PluginsMsgTitle"),
 				MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
 
 		if (PluginHost.Find(reference.PluginId) == null)
 		{
-			System.Windows.MessageBox.Show(this, $"未找到插件 {reference.PluginId}，请到「插件与扩展」页查看。", "StarPie 插件",
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsActionPluginNotFound", reference.PluginId), I18n.T("PluginsMsgTitle"),
 				MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
@@ -6528,23 +6535,55 @@ public partial class SettingsWindow : Window
 		if (_officialPluginsLoading) return;
 		_officialPluginsLoading = true;
 		if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = false;
-		if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = "正在从 GitHub 获取官方插件目录…";
+		RenderOfficialPluginsStatus();
 
 		try
 		{
 			_officialPluginCatalog = await OfficialPluginClient.FetchCatalogAsync();
+			_officialPluginsError = null;
 			RenderOfficialPluginItems();
-			if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = $"目录 {_officialPluginCatalog.CatalogVersion} · {_officialPluginCatalog.Modules.Count} 个模块 · 来源 StarPie-Official-Plugins";
+			RenderOfficialPluginsStatus();
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogWarn($"[plugin] 刷新官方插件目录失败：{ex.Message}");
-			if (OfficialPluginsStatusText != null) OfficialPluginsStatusText.Text = "官方插件目录暂时不可用：" + ex.Message;
+			_officialPluginsError = ex.Message;
+			RenderOfficialPluginsStatus();
 		}
 		finally
 		{
 			_officialPluginsLoading = false;
 			if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = true;
+		}
+	}
+
+	/// <summary>
+	/// 按当前状态重渲染官方目录的进度行。
+	/// <para>
+	/// 必须由状态推导、而不是在几处分支里各写一遍字面量：切换语言时只有重跑这里，
+	/// 才能把「正在获取 / 目录版本 / 拉取失败」三种状态一起换成新语言 ——
+	/// 否则用户切到英文后，卡片与标题都换了，只有这行残留中文。
+	/// </para>
+	/// </summary>
+	private void RenderOfficialPluginsStatus()
+	{
+		if (OfficialPluginsStatusText == null) return;
+
+		if (_officialPluginsLoading)
+		{
+			OfficialPluginsStatusText.Text = I18n.T("PluginsOfficialLoading");
+		}
+		else if (_officialPluginCatalog != null)
+		{
+			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialCatalogInfo", _officialPluginCatalog.CatalogVersion, _officialPluginCatalog.Modules.Count);
+		}
+		else if (!string.IsNullOrWhiteSpace(_officialPluginsError))
+		{
+			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialUnavailable", _officialPluginsError);
+		}
+		else
+		{
+			OfficialPluginsStatusText.Text = I18n.T("PluginsOfficialStatusHint");
 		}
 	}
 
@@ -6564,8 +6603,9 @@ public partial class SettingsWindow : Window
 		try
 		{
 			OfficialPluginInstallResult result = await OfficialPluginClient.InstallAsync(module);
-			if (!result.Success) System.Windows.MessageBox.Show(this, $"官方插件 {module.Name} 安装失败：\n\n{result.Error}", "StarPie 官方插件", MessageBoxButton.OK, MessageBoxImage.Warning);
-			else System.Windows.MessageBox.Show(this, $"官方插件 {module.Name} v{module.Version} 已下载、校验并启用。", "StarPie 官方插件", MessageBoxButton.OK, MessageBoxImage.Information);
+			string title = I18n.T("PluginsOfficialMsgTitle");
+			if (!result.Success) System.Windows.MessageBox.Show(this, I18n.TF("PluginsOfficialInstallFailed", module.Name, result.Error), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+			else System.Windows.MessageBox.Show(this, I18n.TF("PluginsOfficialInstalled", module.Name, module.Version), title, MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 		finally
 		{
@@ -6610,7 +6650,7 @@ public partial class SettingsWindow : Window
 		{
 			foreach (PluginInstance instance in PluginHost.ListInstances())
 			{
-				items.Add(BuildPluginListItem(instance));
+				items.Add(PluginListItem.Build(instance));
 			}
 		}
 		catch (Exception ex)
@@ -6648,6 +6688,8 @@ public partial class SettingsWindow : Window
 				PluginsSafeModeText.Text = I18n.T("PluginsSafeModeWarning");
 			}
 		}
+
+		RenderOfficialPluginsStatus();
 
 		if (_officialPluginCatalog == null && !_officialPluginsLoading)
 		{
@@ -6716,6 +6758,18 @@ public partial class SettingsWindow : Window
 			PluginsEmptyHintText.Text = I18n.T("PluginsEmptyHint");
 		}
 
+		// 官方在线目录那一块。进度行是状态推导出来的（三种状态各一句），
+		// 所以这里不能只设一个固定文案 —— 得让状态机自己重渲染一次。
+		if (OfficialPluginsHeaderText != null)
+		{
+			OfficialPluginsHeaderText.Text = I18n.T("PluginsOfficialHeader");
+		}
+		if (RefreshOfficialPluginsButton != null)
+		{
+			RefreshOfficialPluginsButton.Content = I18n.T("PluginsOfficialRefreshButton");
+		}
+		RenderOfficialPluginsStatus();
+
 		// 候选卡片的状态徽标与安装按钮文案是 getter（每次读取时才查表），
 		// 光设静态文本不会让它们换语言 —— 得重新绑定一次数据源。
 		RefreshPluginManagerUi();
@@ -6781,7 +6835,14 @@ public partial class SettingsWindow : Window
 			return;
 		}
 
-		if (!ConfirmCandidateInstall(candidate)) return;
+		if (!ConfirmPluginInstall(new PluginInstallConfirmation
+		{
+			Scan = candidate.Scan,
+			State = candidate.State,
+			Note = candidate.Note,
+			// 与 PluginHost.InstallCandidateAsync 保持一致：候选安装走 EnableAfterInstall = true。
+			EnableAfterInstall = true,
+		})) return;
 
 		PluginInstallResult installResult = await PluginHost.InstallCandidateAsync(candidate);
 		string error = installResult.Error;
@@ -6799,41 +6860,6 @@ public partial class SettingsWindow : Window
 		}
 
 		RefreshPluginManagerUi();
-	}
-
-	/// <summary>候选安装确认卡。文案随状态变化，把「会发生什么」说清楚而不是只问一句「确定吗」。</summary>
-	private bool ConfirmCandidateInstall(PluginCandidate candidate)
-	{
-		var text = new System.Text.StringBuilder();
-		text.AppendLine(I18n.TF("PluginsConfirmAboutToInstall", candidate.DisplayName, candidate.VersionText));
-		text.AppendLine(I18n.TF("PluginsConfirmFile", candidate.DllPath));
-		text.AppendLine();
-
-		if (candidate.Scan.Manifest?.Capabilities is { Count: > 0 } capabilities)
-		{
-			text.AppendLine(I18n.T("PluginsConfirmCapabilities"));
-			text.AppendLine(DescribeCapabilities(candidate.Scan.Manifest.ResolveCapabilities()));
-			text.AppendLine();
-		}
-
-		if (candidate.HasNote)
-		{
-			text.AppendLine(I18n.TF("PluginsConfirmScanResult", candidate.Note));
-			text.AppendLine();
-		}
-
-		text.AppendLine(candidate.State switch
-		{
-			PluginCandidateState.Update => I18n.T("PluginsConfirmUpdate"),
-			PluginCandidateState.Downgrade => I18n.T("PluginsConfirmDowngrade"),
-			PluginCandidateState.Replaced => I18n.T("PluginsConfirmReplaced"),
-			_ => I18n.T("PluginsConfirmFresh"),
-		});
-		text.AppendLine();
-		text.Append(I18n.T("PluginsConfirmPrivileges"));
-
-		return System.Windows.MessageBox.Show(this, text.ToString(),
-			I18n.T("PluginsConfirmTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 	}
 
 	/// <summary>打开只读扫描目录。目录不存在时只提示路径，绝不代为创建。</summary>
@@ -6859,86 +6885,9 @@ public partial class SettingsWindow : Window
 		}
 		catch (Exception ex)
 		{
-			System.Windows.MessageBox.Show(this, $"打开扫描目录失败：{ex.Message}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsOpenScanFolderFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
-	}
-
-	/// <summary>把运行时实例翻译成列表项。所有面向用户的文案都集中在这里。</summary>
-	private static PluginListItem BuildPluginListItem(PluginInstance instance)
-	{
-		PluginRegistryEntry entry = instance.Entry;
-		StarPie.Plugin.PluginManifest? manifest = instance.Scan.Manifest;
-
-		string displayName = !string.IsNullOrWhiteSpace(entry.Name)
-			? entry.Name
-			: (!string.IsNullOrWhiteSpace(manifest?.Name) ? manifest!.Name : instance.PluginId);
-
-		(string glyph, string stateText) = DescribePluginState(instance);
-
-		var summary = new List<string>();
-		if (!string.IsNullOrWhiteSpace(entry.Author)) summary.Add($"作者 {entry.Author}");
-		if (instance.ActionCount > 0) summary.Add($"贡献 {instance.ActionCount} 个动作");
-		else if (instance.State != PluginRuntimeState.Active) summary.Add("未加载");
-		if (!string.IsNullOrWhiteSpace(entry.License)) summary.Add(entry.License);
-
-		string summaryText = string.Join("　|　", summary);
-		if (!string.IsNullOrWhiteSpace(entry.Description))
-		{
-			summaryText = entry.Description + "\n" + summaryText;
-		}
-		if (entry.CapabilitiesAck is { Count: > 0 })
-		{
-			summaryText += $"\n声明能力：{string.Join("、", entry.CapabilitiesAck)}";
-		}
-
-		var detail = new List<string> { $"ID {instance.PluginId}" };
-		if (!string.IsNullOrWhiteSpace(instance.Scan.TargetFramework)) detail.Add(instance.Scan.TargetFramework);
-		if (!string.IsNullOrWhiteSpace(instance.Scan.MachineText)) detail.Add(instance.Scan.MachineText);
-		if (!string.IsNullOrWhiteSpace(instance.Scan.Sha256Short)) detail.Add($"SHA256 {instance.Scan.Sha256Short}");
-		detail.Add(instance.Scan.IsSigned ? "已签名" : "未签名");
-		if (!string.IsNullOrWhiteSpace(instance.Directory)) detail.Add(instance.Directory);
-		if (!string.IsNullOrWhiteSpace(entry.ExternalPath)) detail.Add($"外部路径 {entry.ExternalPath}");
-
-		// 错误行：优先展示插件自己的失败原因；没有失败但待重启时，说明「为什么要重启」。
-		string errorText = instance.LastError ?? "";
-		if (string.IsNullOrWhiteSpace(errorText) && instance.RequiresRestart)
-		{
-			errorText = "旧程序集尚未从内存释放，重启 StarPie 后才会完全生效。";
-		}
-
-		return new PluginListItem
-		{
-			PluginId = instance.PluginId,
-			DisplayName = displayName,
-			VersionText = string.IsNullOrWhiteSpace(entry.Version) ? "" : $"v{entry.Version}",
-			SummaryText = summaryText,
-			DetailText = string.Join("　·　", detail),
-			StateText = stateText,
-			StatusGlyph = glyph,
-			ErrorText = errorText,
-			IsEnabled = entry.Enabled,
-		};
-	}
-
-	private static (string Glyph, string Text) DescribePluginState(PluginInstance instance)
-	{
-		if (instance.State == PluginRuntimeState.Active)
-		{
-			return instance.RequiresRestart ? ("🔄", "运行中 · 待重启") : ("✅", "运行中");
-		}
-
-		return instance.State switch
-		{
-			PluginRuntimeState.Loading => ("⏳", "加载中"),
-			PluginRuntimeState.Installed => ("⭕", instance.Entry.Enabled ? "已启用 · 待加载" : "未启用"),
-			PluginRuntimeState.Faulted => ("⚠️", "运行异常"),
-			PluginRuntimeState.Quarantined => ("🚫", "已隔离"),
-			PluginRuntimeState.Failed => ("❌", "加载失败"),
-			PluginRuntimeState.Incompatible => ("⛔", "不兼容"),
-			PluginRuntimeState.RequiresRestart => ("🔄", "待重启生效"),
-			_ => ("⭕", instance.State.ToString()),
-		};
 	}
 
 	private bool EnsurePluginSystemReady()
@@ -6946,8 +6895,8 @@ public partial class SettingsWindow : Window
 		if (PluginHost.IsInitialized) return true;
 
 		System.Windows.MessageBox.Show(this,
-			"插件系统尚未完成初始化。请稍候片刻再试，或重启 StarPie。",
-			"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+			I18n.T("PluginsNotReady"),
+			I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 		return false;
 	}
 
@@ -6957,8 +6906,8 @@ public partial class SettingsWindow : Window
 
 		var dialog = new Microsoft.Win32.OpenFileDialog
 		{
-			Title = "选择要安装的插件 (.dll)",
-			Filter = "插件程序集 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+			Title = I18n.T("PluginsPickDllTitle"),
+			Filter = I18n.T("PluginsPickDllFilter"),
 			CheckFileExists = true,
 			Multiselect = false,
 		};
@@ -6972,26 +6921,37 @@ public partial class SettingsWindow : Window
 		}
 		catch (Exception ex)
 		{
-			System.Windows.MessageBox.Show(this, $"读取所选文件时出错：\n{ex.Message}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Error);
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsReadFileFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
 			return;
 		}
 
 		if (!scan.Accepted)
 		{
 			System.Windows.MessageBox.Show(this,
-				"这个文件不能作为 StarPie 插件安装。\n\n" +
-				$"原因：{PluginScanFailureText.Title(scan.Failure)}\n" +
-				$"详情：{scan.ErrorDetail}\n\n" +
-				$"建议：{PluginScanFailureText.Hint(scan.Failure)}\n\n" +
-				$"文件：{scan.DllPath}",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+				I18n.TF("PluginsNotAPlugin",
+					PluginScanFailureText.Title(scan.Failure),
+					scan.ErrorDetail,
+					PluginScanFailureText.Hint(scan.Failure),
+					scan.DllPath),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 			return;
 		}
 
 		// 识别已通过 —— 把「它到底是什么」摊开给用户看，确认后才落盘。
 		// 插件是以 StarPie 的权限在进程内跑代码的，这一步是唯一的知情同意关口。
-		if (!ConfirmPluginInstall(scan)) return;
+		//
+		// 这里的「装下去会怎样」与候选路径共用同一套判定（PluginHost.ClassifyManualInstall），
+		// 否则同一枚文件从扫描目录装与手动选进来装，会在确认页上得到两种说法。
+		(PluginCandidateState manualState, string manualNote) = PluginHost.ClassifyManualInstall(scan);
+		if (!ConfirmPluginInstall(new PluginInstallConfirmation
+		{
+			Scan = scan,
+			State = manualState,
+			Note = manualNote,
+			// 与下面 CommitInstallAsync 的 EnableAfterInstall 保持一致。
+			EnableAfterInstall = false,
+		})) return;
 
 		PluginInstallResult result = await PluginHost.CommitInstallAsync(scan, new PluginInstallOptions
 		{
@@ -7005,62 +6965,35 @@ public partial class SettingsWindow : Window
 
 		if (!result.Success)
 		{
-			System.Windows.MessageBox.Show(this, $"安装失败：{result.Error}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Error);
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsInstallFailed", result.Error),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
 			return;
 		}
 
 		RefreshPluginManagerUi();
-		PluginHost.NotifyUser("StarPie 插件", $"{result.PluginId} 安装完成，到列表中启用它即可使用。");
+		PluginHost.NotifyUser(I18n.T("PluginsMsgTitle"), I18n.TF("PluginsInstalledNotify", result.PluginId));
 
-		System.Windows.MessageBox.Show(this,
-			$"插件 {result.PluginId} 已安装。\n\n" +
-			"它当前处于「未启用」状态。在列表里勾选「启用」后，它注册的动作才会出现在" +
-			"「手势与动作」页的动作类型下拉框中，从而可以分配到轮盘上。",
-			"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+		System.Windows.MessageBox.Show(this, I18n.TF("PluginsInstalledDisabled", result.PluginId),
+			I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 	}
 
-	private bool ConfirmPluginInstall(PluginScanResult scan)
-	{
-		StarPie.Plugin.PluginManifest? manifest = scan.Manifest;
-		StarPie.Plugin.PluginCapability capabilities =
-			manifest?.ResolveCapabilities() ?? StarPie.Plugin.PluginCapability.None;
+	/// <summary>
+	/// 安装确认页的<b>唯一实现</b>，候选安装与手动选 .dll 都走这里。
+	/// <para>
+	/// 这里曾经是两份独立实现（候选一份、手动一份），只有候选那份接了 i18n ⇒
+	/// 同一个「确认安装插件」语义两条路，改一处漏一处。现在正文只在
+	/// <see cref="PluginInstallConfirmationText"/> 里写一遍，本方法只剩弹窗。
+	/// </para>
+	/// <para>
+	/// 正文之所以挪出去，是为了让它在无界面自检里能被逐语言驱动 —— 「切到英文后
+	/// 这一页还剩下多少中文」只有变成断言才守得住（自检 <c>[3e]</c>）。
+	/// </para>
+	/// </summary>
+	private bool ConfirmPluginInstall(PluginInstallConfirmation info) =>
+		System.Windows.MessageBox.Show(this, PluginInstallConfirmationText.Build(info),
+			I18n.T("PluginsConfirmTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
 
-		var text = new System.Text.StringBuilder();
-		text.AppendLine($"插件 ID：{manifest?.Id}");
-		text.AppendLine($"名称：{manifest?.Name}");
-		text.AppendLine($"版本：{manifest?.Version}　　作者：{manifest?.Author}");
-		if (!string.IsNullOrWhiteSpace(manifest?.Description))
-		{
-			text.AppendLine($"说明：{manifest.Description}");
-		}
-		text.AppendLine();
-		text.AppendLine($"目标框架：{scan.TargetFramework}");
-		text.AppendLine($"平台架构：{scan.MachineText}");
-		text.AppendLine($"文件大小：{scan.FileSizeText}");
-		text.AppendLine($"SHA256：{scan.Sha256Short}…");
-		text.AppendLine($"数字签名：{(scan.IsSigned ? scan.SignerSubject : "无（未签名）")}");
-		text.AppendLine($"清单来源：{scan.ManifestSource}");
-		text.AppendLine();
-		text.AppendLine($"声明能力：{(manifest?.Capabilities is { Count: > 0 } ? string.Join("、", manifest.Capabilities) : "无")}");
-		text.AppendLine($"拟安装到：{PluginPaths.Root}\\{manifest?.Id}");
-		text.AppendLine();
-		text.AppendLine("⚠️ 安全提示");
-		text.AppendLine("插件会以 StarPie 当前的权限在你的电脑上运行代码。");
-		if (capabilities != StarPie.Plugin.PluginCapability.None)
-		{
-			text.AppendLine("该插件额外声明了以下权限，请确认来源可信：");
-			text.AppendLine(DescribeCapabilities(capabilities));
-		}
-		text.AppendLine();
-		text.Append("点击「确定」表示你已了解并接受以上风险。");
-
-		return System.Windows.MessageBox.Show(this, text.ToString(), "确认安装插件",
-			MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
-	}
-
-	private static string DescribeCapabilities(StarPie.Plugin.PluginCapability capabilities) =>
-		PluginCapabilityLabels.Describe(capabilities);	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
+	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
 	{
 		int discovered = PluginHost.SyncFromDisk();
 
@@ -7069,13 +7002,13 @@ public partial class SettingsWindow : Window
 
 		int installable = PluginHost.Candidates.Count(c => c.CanInstall);
 		string candidateHint = installable > 0
-			? $"扫描目录里另有 {installable} 个可安装项。"
+			? I18n.TF("PluginsRescanCandidateHint", installable)
 			: "";
 
-		PluginHost.NotifyUser("StarPie 插件",
+		PluginHost.NotifyUser(I18n.T("PluginsMsgTitle"),
 			discovered > 0
-				? $"扫描完成，新发现 {discovered} 个插件。{candidateHint}"
-				: $"扫描完成，没有发现新插件。{candidateHint}");
+				? I18n.TF("PluginsRescanFound", discovered, candidateHint)
+				: I18n.TF("PluginsRescanNone", candidateHint));
 	}
 
 	private void OpenPluginsFolderButton_Click(object sender, RoutedEventArgs e)
@@ -7091,8 +7024,8 @@ public partial class SettingsWindow : Window
 		}
 		catch (Exception ex)
 		{
-			System.Windows.MessageBox.Show(this, $"打开插件目录失败：{ex.Message}", "StarPie 插件",
-				MessageBoxButton.OK, MessageBoxImage.Warning);
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsOpenDataFolderFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 	}
 
@@ -7124,10 +7057,8 @@ public partial class SettingsWindow : Window
 		if (!desired && affected > 0)
 		{
 			System.Windows.MessageBox.Show(this,
-				$"插件系统已关闭。\n\n" +
-				$"已经分配到轮盘上的 {affected} 个插件动作会原样保留，但触发时不会执行。\n" +
-				"仍在运行的插件任务会收到取消信号并由宿主继续追踪。",
-				"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Information);
+				I18n.TF("PluginsDisabledNotice", affected),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 	}
 
@@ -7147,10 +7078,8 @@ public partial class SettingsWindow : Window
 			{
 				string pluginName = PluginHost.Find(pluginId)?.Entry.Name ?? pluginId;
 				MessageBoxResult choice = System.Windows.MessageBox.Show(this,
-					$"确定停用「{pluginName}」吗？\n\n" +
-					$"· 当前配置中有 {affected} 个动作由它提供，停用期间这些动作会暂时失效\n" +
-					"· 配置不会丢失，重新启用即可恢复",
-					"停用插件", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+					I18n.TF("PluginsConfirmDisable", pluginName, affected),
+					I18n.T("PluginsConfirmDisableTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
 				if (choice != MessageBoxResult.Yes)
 				{
 					box.IsChecked = true;
@@ -7165,8 +7094,8 @@ public partial class SettingsWindow : Window
 			{
 				if (!PluginHost.Enable(pluginId, out string enableError))
 				{
-					System.Windows.MessageBox.Show(this, $"启用插件 {pluginId} 失败：\n\n{enableError}",
-						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+					System.Windows.MessageBox.Show(this, I18n.TF("PluginsEnableFailed", pluginId, enableError),
+						I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 				}
 			}
 			else
@@ -7178,13 +7107,15 @@ public partial class SettingsWindow : Window
 
 				if (stop.Status == PluginStopStatus.Failed)
 				{
-					System.Windows.MessageBox.Show(this, $"停用插件 {pluginId} 失败：\n\n{stop.Message}",
-						"StarPie 插件", MessageBoxButton.OK, MessageBoxImage.Warning);
+					System.Windows.MessageBox.Show(this, I18n.TF("PluginsDisableFailed", pluginId, stop.Message),
+						I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 				}
 				else if (!stop.IsFullyStopped)
 				{
+					// stop.Message 由宿主生成（「插件「X」仍有 N 个调用未结束…」），
+					// 属宿主内部消息，不在本次接线范围内。
 					System.Windows.MessageBox.Show(this, stop.Message,
-						"插件正在后台停止", MessageBoxButton.OK, MessageBoxImage.Information);
+						I18n.T("PluginsStoppingTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 				}
 			}
 		}
@@ -7204,11 +7135,8 @@ public partial class SettingsWindow : Window
 		}
 
 		MessageBoxResult choice = System.Windows.MessageBox.Show(this,
-			$"确定要卸载插件 {pluginId} 吗？\n\n" +
-			"· 插件文件与它自己的配置会被删除\n" +
-			"· 已经分配到轮盘上的插件动作会保留，但触发时会提示「插件不可用」\n\n" +
-			"此操作不可撤销。",
-			"卸载插件", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+			I18n.TF("PluginsConfirmUninstall", pluginId),
+			I18n.T("PluginsConfirmUninstallTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
 
 		if (choice != MessageBoxResult.Yes) return;
 
@@ -7218,8 +7146,8 @@ public partial class SettingsWindow : Window
 			PluginUninstallResult result = await PluginHost.UninstallAsync(pluginId, removePluginData: true);
 			if (!result.Success)
 			{
-				System.Windows.MessageBox.Show(this, $"卸载失败：\n\n{result.Error}", "StarPie 插件",
-					MessageBoxButton.OK, MessageBoxImage.Warning);
+				System.Windows.MessageBox.Show(this, I18n.TF("PluginsUninstallFailed", result.Error),
+					I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 			}
 		}
 		finally
@@ -7290,7 +7218,7 @@ public partial class SettingsWindow : Window
 				// 已配好的插件动作不应被清掉（改选具体动作是子下拉的事）。
 				// 引用为空只表示「还没选过」，由子下拉的空状态去引导。
 				item.Type = PluginActionBinding.TypeName;
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("动作"))
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
 				{
 					item.Name = I18n.T("ActionTypePluginShort");
 				}
@@ -7302,7 +7230,7 @@ public partial class SettingsWindow : Window
 				{
 					item.Type = "Tile";
 					item.Parameter = "2L";
-					if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("截屏识字"))
+					if (ActionNameDefaults.IsAutoFilled(item.Name))
 					{
 						item.Name = "平铺: " + WindowTiler.LayoutDisplayName("2L");
 					}
@@ -7331,7 +7259,7 @@ public partial class SettingsWindow : Window
 			else if (newType == "Ocr" || newType == "ScreenOcr")
 			{
 				item.Type = "Ocr";
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("平铺"))
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
 				{
 					item.Name = "截屏识字";
 				}
@@ -8038,7 +7966,7 @@ public partial class SettingsWindow : Window
 		{
 			item.Parameter = fbd.SelectedPath;
 			FocusFolderPathTextBox.Text = fbd.SelectedPath;
-			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("文件夹"))
+			if (ActionNameDefaults.IsAutoFilled(item.Name))
 			{
 				string autoName = System.IO.Path.GetFileName(fbd.SelectedPath);
 				if (string.IsNullOrEmpty(autoName)) autoName = fbd.SelectedPath;
@@ -8209,7 +8137,7 @@ public partial class SettingsWindow : Window
 			SystemPresetItem? presetItem = SlotViewModel.SystemPresetList.FirstOrDefault(p => p.Key == presetKey);
 			if (presetItem != null)
 			{
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("快捷动作"))
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
 				{
 					item.Name = presetItem.DefaultName;
 					FocusActionNameTextBox.Text = presetItem.DefaultName;
@@ -16651,7 +16579,7 @@ public partial class SettingsWindow : Window
 		if (programPickerWindow.ShowDialog() == true && !string.IsNullOrEmpty(programPickerWindow.SelectedPath))
 		{
 			dataContext.Parameter = programPickerWindow.SelectedPath;
-			if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("动作") || dataContext.Name == "快捷动作")
+			if (ActionNameDefaults.IsAutoFilled(dataContext.Name))
 			{
 				dataContext.Name = ((!string.IsNullOrEmpty(programPickerWindow.SelectedName)) ? programPickerWindow.SelectedName : System.IO.Path.GetFileNameWithoutExtension(programPickerWindow.SelectedPath));
 			}
@@ -16683,7 +16611,7 @@ public partial class SettingsWindow : Window
 			if (!string.IsNullOrEmpty(folderName))
 			{
 				dataContext.Parameter = folderName;
-				if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("快捷动作") || dataContext.Name.StartsWith("动作") || dataContext.Name == "打开文件夹")
+				if (ActionNameDefaults.IsAutoFilled(dataContext.Name))
 				{
 					DirectoryInfo directoryInfo = new DirectoryInfo(folderName);
 					dataContext.Name = directoryInfo.Name;
@@ -19017,7 +18945,7 @@ public partial class SettingsWindow : Window
 			if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ResultHotkey))
 			{
 				vm.Parameter = dlg.ResultHotkey;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("快捷键"))
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = dlg.ResultHotkey;
 				}
@@ -19038,7 +18966,7 @@ public partial class SettingsWindow : Window
 			if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
 			{
 				vm.Parameter = picker.SelectedPath;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = !string.IsNullOrEmpty(picker.SelectedName)
 						? picker.SelectedName
@@ -19061,7 +18989,7 @@ public partial class SettingsWindow : Window
 			if (winPicker.ShowDialog() == true && !string.IsNullOrEmpty(winPicker.SelectedPath))
 			{
 				vm.Parameter = winPicker.SelectedPath;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = !string.IsNullOrEmpty(winPicker.SelectedTitle) 
 						? winPicker.SelectedTitle 
@@ -19084,7 +19012,7 @@ public partial class SettingsWindow : Window
 		{
 			vm.Type = "WebUrl";
 			vm.Parameter = url;
-			if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("http") || vm.Name == "打开网址")
+			if (ActionNameDefaults.IsAutoFilled(vm.Name) || vm.Name.StartsWith("http"))
 			{
 				vm.Name = name;
 			}
