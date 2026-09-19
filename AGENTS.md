@@ -118,7 +118,8 @@ g:\Users\2 Better\Desktop\design\
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
-│   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
+│   ├── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
+│   └── FloatingBall/              # 常驻形态样本：插件自画 WPF 球窗 + 经 IHostWheelService 呼出宿主轮盘
 ├── releases/                      # 正式发行包构建归档目录
 │   └── vX.Y.Z/
 │       ├── Lightweight/           # 依赖运行时的轻量绿色包 (~2.5MB)
@@ -230,7 +231,7 @@ g:\Users\2 Better\Desktop\design\
 - **三层分界，任何一层都不许越界**：
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
   - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
-  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
+  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本，`FloatingBall` 是常驻形态样本 —— 插件自己画窗口、自己从动作参数取外观、经宿主服务呼出轮盘）。
 - **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
   1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
   2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
@@ -244,7 +245,8 @@ g:\Users\2 Better\Desktop\design\
   - `Bool` 字段未填视为 `false`，**不算必填失败**，也不要「空值即删除」——取消勾选必须显式落盘 `false`，否则插件读到的会是它自己的兜底值（可能为 `true`），表现为「取消勾选没生效」。
   - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。
 - **动作调度类别 `ActionKind`**：`Sequential` 占用唯一的动作线程，**任何可能上百毫秒的操作（DDC/CI、网络、目录遍历）都必须声明为 `Background`**，否则用户会明显感到「触发后轮盘卡一下」，直接违背零延迟红线。
-- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。
+- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。装机时用户可以在确认页上不勾某项能力，所以「清单没勾 → 干不了活」也走这条，不是 `Fail`。
+- **⚠️ 会画窗口的插件：`Dispatcher.Post` 只在真有活要干时投**：宿主的 ALC 卸载探针靠 `WeakReference` 判定，而一次投递会在 UI 线程队列里留下一个握着插件闭包的 `DispatcherOperation` —— **即使那个闭包什么也不做**。实测现象就是 `--plugin-selftest` 的 `[5]` 报「释放租约后插件仍未停止」、`[6]` 卸载失败、`[3d]` 连带判成已安装。所以恢复窗口之前先读一次设置开关、关闭窗口之前先确认窗口真的存在，别把判断整个塞进闭包里。
 - **界面接缝：动作类型下拉「收敛成一个类型 + 一个子下拉」**：插件动作在数据模型上仍是 `ActionItem.Type = "Plugin"` + `PluginActionRef`（`PluginId` + `ContributionId` + `FullId`），但界面上**类型下拉只承载一个选项**「插件动作」，具体是哪个动作由紧随其后的子下拉决定。因此：
   - 类型下拉的 `Tag` 就是**裸 `Plugin`**，不需要也不应该编码身份（历史上有过 `Plugin:<贡献点全ID>` 的编码与配套的 `TryParseTag`/`ProjectTag` 退化逻辑，收敛后全部成了死代码，已删除）；
   - 子下拉用 `ListCollectionView` + `PropertyGroupDescription(GroupName)` 按插件名分组，分组头不是 `ComboBoxItem`，**天然不可选中** —— 从结构上排除「选中了插件名却不是一个动作」这种非法状态；

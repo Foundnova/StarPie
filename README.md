@@ -315,8 +315,9 @@ StarPie 使用轻量的 **.NET 进程内 DLL 插件架构**。插件只需引用
   ID 重复 / 无法识别。同一 ID 出现两份文件时两份都会被标成「ID 重复」且不给安装按钮。
 - **失败自保护**：单个插件加载失败或连续触发异常会被隔离，不影响 StarPie 本体；
   连续两次启动异常会进入安全模式并临时禁用可疑插件。
-- **给插件作者**：`samples/` 下有两个可直接参照的示例（`HelloAction` 为参考模板，
-  `ScreenBrightness` 覆盖 P/Invoke、COM 与耗时 IO 三类难题）。调试时可用
+- **给插件作者**：`samples/` 下有三个可直接参照的示例（`HelloAction` 为参考模板，
+  `ScreenBrightness` 覆盖 P/Invoke、COM 与耗时 IO 三类难题，`FloatingBall` 是常驻窗口形态：
+  插件自己画球、点球经 `IHostWheelService` 呼出宿主轮盘）。调试时可用
   `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]` 在临时沙箱里跑
   全链路自检（不会碰你已装好的插件），或用 `StarPie.exe --plugin-paths` 查看当前生效的目录。
 
@@ -422,7 +423,7 @@ StarPie/
 │   ├── IconHelper.cs                # 内置 / 程序 / 自定义图标解析
 │   └── WinPieGestures.csproj        # .NET 8 WPF 项目配置
 ├── StarPie.Plugin.Abstractions/     # 插件 SDK 契约（插件唯一允许引用的 StarPie 程序集）
-├── samples/                         # 示例插件（参考模板 + P/Invoke / COM / 耗时 IO 压力样本）
+├── samples/                         # 示例插件（参考模板 + P/Invoke / COM / 耗时 IO 压力样本 + 常驻窗口形态）
 ├── releases/                        # 历史版本与发布归档
 ├── attachments/                     # README 截图、GIF 与待补演示素材
 ├── tests/                           # pywinauto GUI 自动化测试
