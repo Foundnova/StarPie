@@ -19,6 +19,14 @@ internal static class PluginActionClaimRegistry
     private static Dictionary<string, PluginTypeClaimBinding> _claims =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // 这些类型已经完成官方插件交割。即使插件当前未安装，也不能再回退到主程序旧 switch，
+    // 否则“插件是唯一执行方式”的语义会被破坏。
+    private static readonly HashSet<string> OfficialClaimedTypeNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Launch", "Folder", "OpenFolder", "WebUrl", "Url", "Command", "Ocr", "ScreenOcr",
+        "ShellTool", "System", "MoveMonitor", "SwitchWindow", "Tile", "TileRestore", "ToggleTopmost", "WindowOpacity",
+    };
+
     public static void Rebuild(IEnumerable<PluginRegistryEntry> entries)
     {
         var candidates = new Dictionary<string, List<PluginTypeClaimBinding>>(StringComparer.OrdinalIgnoreCase);
@@ -50,12 +58,31 @@ internal static class PluginActionClaimRegistry
                     candidates[claim.TypeName] = list;
                 }
 
-                list.Add(new PluginTypeClaimBinding
+                var binding = new PluginTypeClaimBinding
                 {
                     TypeName = claim.TypeName,
                     PluginId = entry.Id,
                     ContributionId = claim.ContributionId,
-                });
+                };
+                list.Add(binding);
+
+                // TileRestore 是拆分前的独立历史类型；现在由同一个 Tile 插件的 Restore 参数承载。
+                // 认领别名只影响旧配置路由，不新增 UI 动作类型。
+                if (string.Equals(claim.TypeName, "Tile", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!candidates.TryGetValue("TileRestore", out List<PluginTypeClaimBinding>? restoreList))
+                    {
+                        restoreList = new List<PluginTypeClaimBinding>();
+                        candidates["TileRestore"] = restoreList;
+                    }
+
+                    restoreList.Add(new PluginTypeClaimBinding
+                    {
+                        TypeName = "TileRestore",
+                        PluginId = entry.Id,
+                        ContributionId = claim.ContributionId,
+                    });
+                }
             }
         }
 
@@ -73,6 +100,9 @@ internal static class PluginActionClaimRegistry
 
         lock (Gate) _claims = next;
     }
+
+    public static bool IsOfficialClaimedType(string? type) =>
+        !string.IsNullOrWhiteSpace(type) && OfficialClaimedTypeNames.Contains(type.Trim());
 
     public static bool TryResolve(string? type, out PluginTypeClaimBinding binding)
     {

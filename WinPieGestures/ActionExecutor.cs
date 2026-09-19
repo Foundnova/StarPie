@@ -286,59 +286,28 @@ public static class ActionExecutor
 			}
 			switch (action.Type.Trim())
 			{
-			case "Launch":
-				ExecuteLaunch(action.Parameter, action.Arguments, action.RunAsStandardUser);
-				break;
-			case "Folder":
-			case "OpenFolder":
-				ExecuteFolder(action.Parameter);
-				break;
-			case "Ocr":
-			case "ScreenOcr":
-				OcrManager.StartCaptureAndRecognize();
-				break;
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
-				break;
-			case "Command":
-				ExecuteCommand(action.Parameter, action.CommandTerminal);
-				break;
-			case "SwitchWindow":
-				ExecuteSwitchWindow(action.Parameter);
-				break;
-			case "Tile":
-				WindowTiler.ExecuteTile(action.Parameter);
-				break;
-			case "TileRestore":
-				WindowTiler.RestoreLastLayout();
-				break;
-			case "MoveMonitor":
-				WindowTiler.MoveWindowToNextMonitor();
-				break;
-			case "ToggleTopmost":
-				WindowTiler.ToggleWindowTopmost(action.Parameter);
-				break;
-			case "WindowOpacity":
-				WindowTiler.SetWindowOpacity(action.Parameter);
 				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
 				break;
-			case "WebUrl":
-			case "Url":
-				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
-				break;
-			case "System":
-				ExecuteSystem(action.Parameter);
-				break;
-			case "ShellTool":
-				ExecuteShellTool(action.Parameter);
-				break;
-
 			case "Plugin":
-				// 普通社区插件动作统一走 PluginHost，避免在历史 switch 中静默失效。
+				// 普通社区插件动作统一走 PluginHost，避免静默失效。
 				ExecutePluginActionItem(action);
+				break;
+			default:
+				if (Plugins.PluginHost.IsOfficialClaimedType(action.Type))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"动作不可用",
+						"该动作由官方插件提供，但对应插件当前未安装、未启用或不可用。请在插件管理页安装或启用它。");
+				}
+				else
+				{
+					AppLogger.LogWarn($"Unknown action type '{action.Type}' was ignored.");
+				}
 				break;
 			}
 		}

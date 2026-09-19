@@ -524,6 +524,7 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		_isUpdatingFocusUi = true;
 		InitializeComponent();
+		PluginHost.PluginAvailabilityChanged += HandlePluginAvailabilityChanged;
 		try
 		{
 			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
@@ -3296,6 +3297,28 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void HandlePluginAvailabilityChanged()
+	{
+		if (!Dispatcher.CheckAccess())
+		{
+			_ = Dispatcher.BeginInvoke(new Action(HandlePluginAvailabilityChanged));
+			return;
+		}
+
+		if (_resourcesReleased || !_isUiInitialized)
+		{
+			return;
+		}
+
+		// 官方插件的安装/启用/停用/卸载可能发生在后台目录同步线程，
+		// 动作类型下拉必须在同一 UI 线程即时重建，避免列表与实际派发路由不一致。
+		RefreshSlots();
+		RefreshGestureMappings();
+		UpdateFocusEditorUi();
+		string? currentTag = (FocusActionTypeComboBox?.SelectedItem as ActionTypeItem)?.Tag;
+		UpdateFocusActionTypeItemsSource(currentTag);
+	}
+
 	private void Window_Closing(object sender, CancelEventArgs e)
 	{
 		if (!_isClosingForRelease && !App.IsExiting)
@@ -3351,6 +3374,7 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		_resourcesReleased = true;
+		PluginHost.PluginAvailabilityChanged -= HandlePluginAvailabilityChanged;
 
 		if (_deferredCloseTimer != null)
 		{
@@ -5112,6 +5136,11 @@ public partial class SettingsWindow : Window
 		if (profile == null) return null;
 		if (_selectedSlotIndex == -1)
 		{
+			// 中心动作同时存在于旧版根属性和当前活跃层。先确保层结构存在，
+			// 再把当前根属性作为编辑源同步到活跃层，避免 UI 勾选/预设刚写入根属性，
+			// 随后被 GetEffectiveCenterAction 的 EnsureLayers 立即覆盖回旧值。
+			profile.EnsureLayers();
+			profile.SyncActiveLayerFromRootProperties();
 			if (profile.CenterAction == null)
 			{
 				if (string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
@@ -6466,7 +6495,7 @@ public partial class SettingsWindow : Window
 
 		if (!string.IsNullOrWhiteSpace(displayItem.Type) &&
 			!string.Equals(displayItem.Type, PluginActionBinding.TypeName, StringComparison.Ordinal) &&
-			PluginHost.TryResolveClaimedType(displayItem.Type, out _) &&
+			PluginHost.IsOfficialClaimedType(displayItem.Type) &&
 			!PluginHost.IsClaimedTypeAvailable(displayItem.Type, out string reason))
 		{
 			FocusActionUnavailableText.Text = "⚠️ " + reason;

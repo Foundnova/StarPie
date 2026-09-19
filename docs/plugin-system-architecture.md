@@ -448,8 +448,10 @@ StarPiePluginTypeClaims = "Launch=launch"
 ```text
 ActionExecutor
   1. BuiltinActionCatalog（Hotkey）
-  2. PluginActionClaimRegistry（旧 Type → 官方在线模块贡献点）
-  3. 历史 switch / Type="Plugin" 兜底
+  2. PluginActionClaimRegistry（旧 Type → 官方在线模块贡献点，唯一所有者）
+  3. Type="Plugin" 普通社区插件动作
+
+已完成官方插件交割的旧 Type 不再进入历史 switch；未迁移的遗留类型仍按主程序兼容逻辑处理。
 ```
 
 认领规则：

@@ -262,7 +262,7 @@ g:\Users\2 Better\Desktop\design\
   - 官方模块安装后必须把 `ClaimedTypes` 写入登记表，并在安装、启用、停用、卸载后重建路由表。
   - 保留 ID 前缀只在官方在线安装和已登记官方模块的装载路径放行；社区手动安装必须拒绝保留 ID。
   - 认领类型的宿主裸字段仍通过 `ActionParameterProjection` 以显式白名单投影为参数字典；不投影外观字段。
-- **派发顺序不可改变**：`ActionExecutor` 固定按「内建 Hotkey → 官方类型认领 → 普通 `Type="Plugin"` / 历史 switch 兜底」执行。
+- **派发顺序不可改变**：`ActionExecutor` 固定按「内建 Hotkey → 官方类型认领 → 普通 `Type="Plugin"`」执行；已完成官方插件交割的类型不再进入历史 switch，历史裸字段只通过对应官方插件路由。
 - **能力门禁（Capability Gate）：`Process` / `WindowControl` 各有一个真实强制点**：
   - 带门禁的是三个「产生不可忽略后果」的服务：`IHostCommandService.Run`（命令）与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）挂 `Process`；`IHostWindowService` 的五个执行方法（挪走 / 置顶 / 改透明度 / 切走用户正在用的窗口）挂 `WindowControl`。清单未声明对应能力时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
   - **每个服务认自己那项能力，不复用别人的**。`WindowControl` 刻意不与 `Process` 合并：安装确认页上展示的能力必须对应一个真实后果，用户看到「进程」想的是「它要启动程序」，而实际后果是他的窗口被挪走 —— 那是标签名不副实。`Ui` 同样不符（它的语义是「打开自己的窗口」）。三个服务的门禁实现共用一个基类（`PluginGatedService`），所以**复制粘贴时把 required 传错不会有任何编译错误** —— 自检 `[3j]` 用「只声明 A 的插件调 B 的服务」这一组交叉断言守它，否则「认错能力标志」会让上面那些断言照样全绿。
@@ -323,7 +323,7 @@ powershell -Command "Compress-Archive -Path 'g:\Users\2 Better\Desktop\design\re
 
 > **发布前校验：主程序发布包不得再包含官方插件 DLL 或旧的 `plugin\` 随包来源区。** 官方模块由 `StarPie-Official-Plugins` 的 GitHub Release catalog 在运行后后台下载；安装包只需包含主程序、SDK 契约程序集和插件运行时。
 >
-> 发布前至少验证：干净 `plugin-data` 下启动能后台拉取模块；网络失败时不阻塞首帧；已安装模块在离线时仍可加载。
+> 发布前至少验证：干净 `plugin-data` 下启动不会自动下载模块；用户手动安装流程可用；已安装模块在离线时仍可加载。
 
 ### 5.3 版本号同步五要素检查清单 (Version Sync Checklist)
 每次发布新版本 `vX.Y.Z` 时，必须同步更新以下 5 处位置：

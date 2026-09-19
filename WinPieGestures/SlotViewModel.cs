@@ -737,157 +737,14 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		}
 	}
 
-	public List<ActionTypeOption> ActionTypes => new List<ActionTypeOption>
-	{
-		new ActionTypeOption
-		{
-			Tag = "Hotkey",
-			DisplayText = I18n.T("ActionTypeHotkeyShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "Launch",
-			DisplayText = I18n.T("ActionTypeLaunchShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "WebUrl",
-			DisplayText = I18n.T("ActionTypeWebUrlShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "Folder",
-			DisplayText = I18n.T("ActionTypeFolderShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "Command",
-			DisplayText = I18n.T("ActionTypeCommandShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "SwitchWindow",
-			DisplayText = I18n.T("ActionTypeSwitchWindowShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "Tile",
-			DisplayText = I18n.T("ActionTypeTileShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "MoveMonitor",
-			DisplayText = I18n.T("ActionTypeMoveMonitorShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "ToggleTopmost",
-			DisplayText = I18n.T("ActionTypeTopmostShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "WindowOpacity",
-			DisplayText = I18n.T("ActionTypeOpacityShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "ShellTool",
-			DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort")
-		},
-		new ActionTypeOption
-		{
-			Tag = "System",
-			DisplayText = I18n.T("ActionTypeSystemShort")
-		}
-	};
+	/// <summary>当前已安装且可用的具体动作类型。</summary>
+	public List<ActionTypeOption> ActionTypes => ActionTypeCatalog.BuildActionTypeOptions();
 
-	public static List<ActionTypeItem> AggregatedActionTypes => new List<ActionTypeItem>
-	{
-		new ActionTypeItem { Tag = "Hotkey", DisplayText = "⌨️ " + I18n.T("ActionTypeHotkeyShort") },
-		new ActionTypeItem { Tag = "Launch", DisplayText = "🚀 " + I18n.T("ActionTypeLaunchShort") },
-		new ActionTypeItem { Tag = "WebUrl", DisplayText = "🌐 " + I18n.T("ActionTypeWebUrlShort") },
-		new ActionTypeItem { Tag = "Folder", DisplayText = "📁 " + I18n.T("ActionTypeFolderShort") },
-		new ActionTypeItem { Tag = "Command", DisplayText = "💻 " + I18n.T("ActionTypeCommandShort") },
-		new ActionTypeItem { Tag = "Ocr", DisplayText = "📝 " + I18n.T("ActionTypeOcrShort") },
-		new ActionTypeItem { Tag = "WindowManager", DisplayText = "🪟 " + I18n.T("ActionTypeWindowManagerShort") },
-		new ActionTypeItem { Tag = "ShellTool", DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort") },
-		new ActionTypeItem { Tag = "System", DisplayText = "⚙️ " + I18n.T("ActionTypeSystemShort") }
-	}
-	// 插件动作追加在内置动作之后：内置项的顺序属于用户的肌肉记忆，不应被打乱。
-	// 插件系统关闭 / 未安装插件时返回的只是那个兜底项，行为与从前完全一致。
-	.Concat(PluginActionBinding.BuildActionTypeItems())
-	.ToList();
+	/// <summary>主动作/手势编辑器使用的、按窗口管理聚合后的可用动作类型。</summary>
+	public static List<ActionTypeItem> AggregatedActionTypes => ActionTypeCatalog.BuildAggregatedActionTypes();
 
-	public static List<ActionTypeItem> LocalizedActionTypes => new List<ActionTypeItem>
-	{
-		new ActionTypeItem
-		{
-			Tag = "Hotkey",
-			DisplayText = "⌨️ " + I18n.T("ActionTypeHotkeyShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "Launch",
-			DisplayText = "🚀 " + I18n.T("ActionTypeLaunchShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "WebUrl",
-			DisplayText = "🌐 " + I18n.T("ActionTypeWebUrlShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "Folder",
-			DisplayText = "📁 " + I18n.T("ActionTypeFolderShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "Command",
-			DisplayText = "💻 " + I18n.T("ActionTypeCommandShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "SwitchWindow",
-			DisplayText = "🔢 " + I18n.T("ActionTypeSwitchWindowShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "Tile",
-			DisplayText = "🔲 " + I18n.T("ActionTypeTileShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "MoveMonitor",
-			DisplayText = "🖥️ " + I18n.T("ActionTypeMoveMonitorShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "ToggleTopmost",
-			DisplayText = "📌 " + I18n.T("ActionTypeTopmostShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "WindowOpacity",
-			DisplayText = "👁️ " + I18n.T("ActionTypeOpacityShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "Ocr",
-			DisplayText = "📝 " + I18n.T("ActionTypeOcrShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "ShellTool",
-			DisplayText = "⚡ " + I18n.T("ActionTypeShellToolShort")
-		},
-		new ActionTypeItem
-		{
-			Tag = "System",
-			DisplayText = "⚙️ " + I18n.T("ActionTypeSystemShort")
-		}
-	}
-	.Concat(PluginActionBinding.BuildActionTypeItems())
-	.ToList();
+	/// <summary>子动作编辑器使用的平铺可用动作类型。</summary>
+	public static List<ActionTypeItem> LocalizedActionTypes => ActionTypeCatalog.BuildLocalizedActionTypes();
 
 	/// <summary>Localized terminal options (shared by the sub-action editor).</summary>
 	public static List<ActionTypeItem> LocalizedTerminals => new List<ActionTypeItem>
@@ -1056,6 +913,7 @@ public class SlotViewModel : INotifyPropertyChanged, IDisposable
 		OnPropertyChanged(nameof(IsVisible));
 		OnPropertyChanged(nameof(CanMoveUp));
 		OnPropertyChanged(nameof(CanMoveDown));
+		OnPropertyChanged(nameof(ActionTypes));
 		OnPropertyChanged(nameof(Name));
 		OnPropertyChanged(nameof(Type));
 		OnPropertyChanged(nameof(Parameter));
