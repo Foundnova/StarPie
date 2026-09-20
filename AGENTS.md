@@ -243,7 +243,17 @@ g:\Users\2 Better\Desktop\design\
   - 插件只声明 `ParameterField`（9 种类型：`Text` / `MultilineText` / `Number` / `Bool` / `Folder` / `File` / `Enum` / `Hotkey` / `Color`），控件由 `PluginParameterForm` 用主程序的隐式样式创建 —— 深浅色、字体、圆角因此由宿主统一保证，主程序改版也不会让插件界面错位；
   - **两层校验，同一入口**：`PluginHost.ValidateActionParameters` 先跑宿主底线 `PluginParameterValidator`（只认 `Required` / `MaxLength` / `Min` / `Max` / `ValidationRegex` 声明，不依赖插件是否记得自查），再跑插件自定义 `IActionContribution.Validate`。**「保存动作」与「执行前」必须都走这一个方法**，否则迟早分叉成「存的时候没事、一触发说参数不合法」。
   - `Bool` 字段未填视为 `false`，**不算必填失败**，也不要「空值即删除」——取消勾选必须显式落盘 `false`，否则插件读到的会是它自己的兜底值（可能为 `true`），表现为「取消勾选没生效」。
-  - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。
+  - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。`PluginSettings`（插件的 `settings.json`）从 1.6 起也走这条，包括 `GetInt` / `GetDouble`。
+- **插件级参数页（SDK 1.6，`ISettingsPageRegistry`）**：插件可以声明一张「跟着插件走」的参数表，宿主在插件管理卡片上渲染「设置」按钮与参数页窗口。
+  - **同一个参数有两种来源时，优先级固定为「动作参数 > 插件级设置 > 插件内置默认」**。动作参数是用户在**那条扇区**上覆盖的值，插件级设置是用户对该插件的全局默认，内置默认是插件代码里的兜底。反过来（让插件级设置盖掉动作参数）会让用户在一个扇区上的定制被另一个扇区的改动冲掉。示例见 `samples/FloatingBall` 的 `BallPreference.FromAction`。
+  - **契约只加声明，不加回调、不加事件订阅、不加能力位**。插件读自己当前值走 `ISettingsPageRegistry.GetValue`（写穿语义：宿主与插件共用同一个 `PluginSettings` 实例，用户一改，插件下一次 `Settings.Get` 就读到新值），**不需要**「设置变了」的通知 —— 加了事件就有事件顺序、订阅释放、插件在回调里做重活这一整类新问题，而插件真正需要的只是**下一次用到时读到新值**。能力位同理：`Settings` 不构成一种后果（它写的是插件自己的 `settings.json`，那本来就是 `Settings` 服务的权限），加一个空门禁位只会让安装确认页多一个没有对应物的勾选项，正是能力门禁一节要消除的东西。
+  - **页面不写进 `plugin.json`**。清单里的 `contributions` 只是「装之前给宿主看个大概」的摘要、不设权限，把字段表搬进去就成了第 4 份真相（声明、渲染、校验、写盘），而且没有任何强制力 —— 参数页由插件在 `Initialize` 里代码声明，字段标签才能走词条。
+  - **值落在插件 `settings.json` 的同一命名空间**，包括与插件私有键混住。这是刻意的：私有键（缓存、上次运行时间）与设置字段本来就同属「这个插件的持久状态」。**代价**是通用表单的「配置里有本版本未声明的键」提示必须能按目标关掉 —— `IPluginParameterTarget.ReportsUndeclaredValues`：动作参数表是封闭的（多出来的键一定是残留，要提醒），插件设置是开放的（多出来的键大概率是插件自己的），在设置页吓到用户没有任何好处。
+  - **不要为了支持插件级设置再写一套表单。** 渲染、回填、校验、写穿统一走 `PluginParameterForm` + `IPluginParameterTarget`；后者把「值存在哪」抽掉，`ActionItemParameterTarget` 写 `ActionItem.ExtensionData`、`PluginSettingsParameterTarget` 写 `settings.json`。**两套表单迟早漂**：一边修了深色模式对比度、另一边没修，用户在两个界面看到同一个字段长得不一样、校验行为也不一样。
+  - **标题与字段标签的解析时机是「点击「设置」的那一刻」**（`PluginSettingsPageService.Open`）。词条在注册期还在暂存区，那里解析必空 —— 见上面那个时序坑。**入口判据 `HasPage` 要求至少一个字段**：声明了页却是空表，点开是一张什么都没有的窗口，比不出现更让人觉得程序坏了。
+  - **`GetValue` 的回落语义**：已存值优先，从未填写才回落到字段声明的 `DefaultValue`。这层回落是它存在的**全部理由** —— 没有它，插件得在「字段声明里的默认值」和「自己代码里的兜底常量」写两遍同一个数字，那两处迟早漂。因此**「清空」与「从未填过」在配置里是同一个状态**（键被删掉），读回来都是默认值；`Bool` 字段仍显式落 `false`（沿用上面那条）。
+  - **落盘时机是关窗口**，不是每次按键：文本框每敲一个字符就触发一次变化，逐字符重写整份 JSON 是纯浪费。所以页面**没有「保存」也没有「取消」** —— 它是写穿的，插件随时在读；校验问题只显示、不拦关闭（拦了等于把用户输入偷偷丢掉）。
+  - **v1 已知欠账**：「设置」按钮只对本会话**已加载并声明过页**的插件出现（判据来自贡献点表），未启用的插件看不到入口。不做惰性激活 —— 为了显示一个按钮而加载插件，代价和收益不成比例。
 - **动作调度类别 `ActionKind`**：`Sequential` 占用唯一的动作线程，**任何可能上百毫秒的操作（DDC/CI、网络、目录遍历）都必须声明为 `Background`**，否则用户会明显感到「触发后轮盘卡一下」，直接违背零延迟红线。
 - **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。装机时用户可以在确认页上不勾某项能力，所以「清单没勾 → 干不了活」也走这条，不是 `Fail`。
 - **⚠️ 会画窗口的插件：`Dispatcher.Post` 只在真有活要干时投**：宿主的 ALC 卸载探针靠 `WeakReference` 判定，而一次投递会在 UI 线程队列里留下一个握着插件闭包的 `DispatcherOperation` —— **即使那个闭包什么也不做**。实测现象就是 `--plugin-selftest` 的 `[5]` 报「释放租约后插件仍未停止」、`[6]` 卸载失败、`[3d]` 连带判成已安装。所以恢复窗口之前先读一次设置开关、关闭窗口之前先确认窗口真的存在，别把判断整个塞进闭包里。
@@ -282,7 +292,7 @@ g:\Users\2 Better\Desktop\design\
   - 同理 `PluginWindowService.Layouts` 由 `WindowTiler.LayoutKeys` + `LayoutDisplayName` 现取，三个标记（`Cycle` / `CycleBack` / `Restore`）与透明度范围（`MinOpacityPercent` / `MaxOpacityPercent`）也一律转发宿主常量。**这些值写死在插件里必然漂**：宿主加一个布局、或把透明度上界从 100 调到 90，插件那份会继续把旧范围展示给用户并据此判断合法性。自检 `[3j]` 用 `SequenceEqual` 逐项比对（连顺序都比 —— 顺序即下拉顺序）。
   - **`Verbs` 不是白名单**：`ExecuteShellTool` 的每个功能同时接受 `Id` 与 `Verb` 两套命名，按清单校验会把另一套命名的老配置整体判死。它只用来做下拉与展示。
   - **ShellTool 的参数刻意声明成自由文本而不是 `Enum`**：它的正式入口是带搜索/分类的 `ShellActionPickerWindow`，压进通用下拉是体验降级、还会让清单出现两份；而执行体接受两套命名，按清单校验会判死老配置。
-- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。**当前契约版本 1.5**，演进清单以 `PluginApi.ApiVersionMinor` 的注释为准（1.1 新增能力门禁 + `IHostCommandService` / `IHostShellService` / `IHostInfo.HasCapability`；1.2 新增 `IHostWindowService` + `WindowControl`；1.3 新增 `IHostScreenCaptureService` + `ScreenCapture`；1.4 新增 `IHostSystemService` + `InputSimulation`；1.5 新增 `IHostWheelService` + `Wheel`）。**每加一个服务面就在那份注释里补一条，别只改数字。**
+- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。**当前契约版本 1.6**，演进清单以 `PluginApi.ApiVersionMinor` 的注释为准（1.1 新增能力门禁 + `IHostCommandService` / `IHostShellService` / `IHostInfo.HasCapability`；1.2 新增 `IHostWindowService` + `WindowControl`；1.3 新增 `IHostScreenCaptureService` + `ScreenCapture`；1.4 新增 `IHostSystemService` + `InputSimulation`；1.5 新增 `IHostWheelService` + `Wheel`；1.6 新增 `IPluginContext.SettingsPage`（`ISettingsPageRegistry` + `SettingsPageDescriptor`），纯增量、旧插件不实现也能装）。**每加一个服务面就在那份注释里补一条，别只改数字。**
 
 ---
 
@@ -308,7 +318,7 @@ g:\Users\2 Better\Desktop\design\
 ### 5.1 代码构建与修改原则
 - **优先直接维护 `WinPieGestures/` 源码**：项目源码已完整解耦，可以直接在 `WinPieGestures` 中进行修改、扩展与调试。
 - **流水线工具 `scratch/Decompiler/Program.cs`**：当需要批量从基线生成或大范围重构时，同步维护 `Program.cs` 并通过 `dotnet run --project scratch/Decompiler` 生成源码。
-- **`PluginSelfTest.cs` 的段落号是结构契约，不是装饰。** 它承载 `[0]`…`[7]`（含 `[3b]`/`[3c]`/`[3d]`/`[3e]`/`[3f]`/`[3g]`/`[3j]`）共十六段断言，而本文件是全仓**唯一**没有单测保护的执行体 —— 它自己就是验证手段。任何「整文件重写」或「解决冲突整体取一侧」都可能在无人察觉的情况下整段顶掉断言。
+- **`PluginSelfTest.cs` 的段落号是结构契约，不是装饰。** 它承载 `[0]`…`[7]`（含 `[3b]`/`[3c]`/`[3d]`/`[3e]`/`[3f]`/`[3g]`/`[3h]`/`[3j]`）共十七段断言，而本文件是全仓**唯一**没有单测保护的执行体 —— 它自己就是验证手段。任何「整文件重写」或「解决冲突整体取一侧」都可能在无人察觉的情况下整段顶掉断言。
   - **真实事故**：`refactor` 分支在旧基线上重写了本文件（2813 行 → 945 行），合并时整体取它，导致 `devplugin` 侧后加的 `[3j]`（宿主服务面与能力门禁，~200 行，含跨能力交叉断言）连同 `[3k]`/`[3m]` 一起消失。此后 `AGENTS.md` §3.7、`PluginCapabilityLabels` 类注释、`PluginHostServices.RunPreset` 注释**仍在引用 `[3j]`**，也就是说后续所有「已由 `[3j]` 守」的结论全都没有依据。已于 2026-09-19 恢复（按现行服务名重写，非照抄）。
   - **改本文件前后都要比对段落号集合**：`grep -o '\[[0-9][a-z]*\]' WinPieGestures/Plugin/PluginSelfTest.cs | sort -u`。少一段就得回答「它守的东西现在由谁守」，答不上来就是回归。这条纪律同样适用于其它「文档/注释在引用它」的断言集合（见技能 `merge-integrity-audit`）。
   - **新增断言要自证有效**：`[3j]` 恢复时用变异测试验过 —— 把 `PluginWindowService` 的 required 从 `WindowControl` 改成 `Process`，构建**仍 0 警告**（编译器抓不到），自检当场报 3 条 [FAIL]。一条从没红过的断言不算护栏。
@@ -323,6 +333,14 @@ g:\Users\2 Better\Desktop\design\
     ④ 英文面板的**宿主部分**无方块字与全角标点，插件自带数据**按值降序**摘除（沿用 `[3f]` 踩过的坑）。
     - **入参刻意是基本类型**（不是 `PluginActionRegistration`）：注册表字段随时会长，而自检里构造一个合法 registration 要连带填一堆无关字段；基本类型让「驱动一次」变成一行。
     - **变异测试**：把一条英文词条换回中文 ⇒ 报「英文面板的『正常』里出现『串』(U+4E32)」；让「有候选 / 无候选」共用一句话 ⇒ 报「四种面板处境的正文只得到 3 份不同文案」。
+  - **`[3h]` 守「插件级参数页」这条数据流**（2026-09-20 加，SDK 1.6）。这一段刻意**不建窗口**，全部只走 `PluginSettingsPageService` 的静态面 —— 一建窗口，断言就退化成「得有人去点一下」，而这条链路上最容易坏的恰恰是没人点的时候：声明 → 拷贝进贡献点表 → 渲染面 → 校验 → 写穿 → 插件读回，五步各自都可能断。五组断言：
+    ① **入口判据**：未声明页的插件 `HasPage` 与 `Open` 都必须给「无」。**未声明也要留这条** —— 判据存在的全部意义就是不让卡片上出现一个点开的空按钮，而它坏的时候正是「判据返回真、页是空的」；
+    ② **字段面逐位核对**：`Page.Fields` 的数量与键序必须等于声明（差一个键就是「用户填的表」和「插件以为的表」不再是同一张，用户填了、插件读不到，两边都不报错）；
+    ③ **标题与字段标签在每一种语言下都解析得开**，判据不是「等于我期望的译文」而是**等于词条里那个值**（宿主不认识插件写的文案，只能核对它真的取自词条表）。这抓的正是 `ResolveStagedDisplayNames` 那个历史坑：键前缀换算写错会**静默退回字面中文**，而中文标题在英文界面既不违反「非空」、也不违反「不是裸键名」，只能拿表里的值比出来；
+    ④ **声明的 `Min`/`Max` 必须在渲染面上真被校验读过**，探针打在 `Page.Fields` 而不是声明本体 —— 只校验声明等于又测一遍 `PluginParameterValidator`（那是 `[3b]` 的活），证明不了注册链交出来的那一份还带着范围；
+    ⑤ **读写往返四步**（宿主写→插件 `Settings.Get` 同值→插件 `SettingsPage.GetValue` 同值→清空→键被删→读回声明的默认值）＋ **重复注册当场拒绝**、暂存丢弃后真实表未被污染。
+    - **段落排在 `[4]` 之前**（同 `[3f]`/`[3g]`：`--skip-invoke` 在 `[4]` 开头提前 return）。它复用 `[3f]` 那次构造的 `cardInstance`，所以必须排在其后。
+    - **变异测试**（两条都是上线当天实测，不是推演）：把 `Open` 的写穿目标换成**新构造的** `PluginSettings`（即「宿主写一份、插件读另一份」这个真实缺陷形状）⇒ 报「宿主写进参数页的值没落到插件的 settings.json」；把标题解析换成插件给的字面文案 ⇒ 报「En 下参数页标题显示成「悬浮球」，而词条里是「Floating ball」」。
   - **面板文案是「代码拼串」时，切语言必须重渲染 —— 否则同一个窗口里两种语言并存。** 实测 `ApplyLocalization()` 此前**从不调用** `UpdateFocusEditorUi()`：切完语言后侧边栏 / 页签 / 按钮全换了，而动作编辑器那一整块（插件面板，以及 `Hotkey`/`Launch`/`WebUrl`/`Folder`/`Command`/`WindowManager`/`System`/`Ocr`/`ShellTool` 九个面板）还停在旧语言 —— 那正是用户改动作时盯着看的地方。现已在 `ApplyLocalization()` 末尾补一次重渲染，并用 `if (IsLoaded)` 挡住构造期那次调用。`UpdateFocusEditorUi` 自带重入守卫、幂等，与它 40+ 个既有调用点同路；`PluginParameterForm.Build` 会从 `ActionItem.ExtensionData` **回填已保存的值**，所以重建不会清空用户输入。
     - **这一条目前没有机器护栏**，原因见 §5.4：UI 套件一律在**启动前**把语言写进 `config.json`（app 内切换在 pywinauto 下因 emoji 被剥而脆弱，故有意不用它采集）。目前只有 `test_settings.py::test_v138_i18n_multilanguage_support` 真的在 app 内切了一次语言、证明这条路径**不炸**，但它不校验内容 —— 属已知欠账，别把「它绿了」读成「重渲染是对的」。
   - **穷尽 switch 当护栏时，`#pragma warning disable CS8524` 是必需的、且不会连 CS8509 一起吞掉**：`CS8524` 抱怨的是**未命名**枚举值（`(PluginRuntimeState)9` 这类强制转换产物）。本枚举只在宿主内部赋值、没有反序列化或强制转换来源，那种值不存在；不屏蔽的话「穷尽」特性根本用不了。实测漏一个具名成员时 CS8509 **仍会出现**（先例：`PluginScanResult.cs` 的 `PluginScanFailureText`，以及 `PluginListItem.DescribeState`）。

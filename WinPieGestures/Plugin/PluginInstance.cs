@@ -203,6 +203,17 @@ internal sealed class PluginInstance
 
     public PluginActionRegistration[] OwnedActions { get; private set; } = Array.Empty<PluginActionRegistration>();
 
+    /// <summary>
+    /// 插件在 <c>Initialize</c> 里拿到的那个上下文对象；未加载时为 null。
+    /// <para>
+    /// 存在的理由只有一条：<b>自检要断言「插件一侧读回来的是什么」</b>。宿主写进 <c>settings.json</c>
+    /// 一个键之后，从 <c>instance.Settings</c> 读回同值只证明了宿主自洽；
+    /// 真正的接缝是插件手里那个 <c>IPluginContext.SettingsPage.GetValue</c>（它还多一层「回落到声明的默认值」），
+    /// 而那层没有入口可就够不着 —— 够不着的接缝就没有回归保护。
+    /// </para>
+    /// </summary>
+    internal IPluginContext? ContextForSelfTest => _pluginContext;
+
     private void SetState(PluginRuntimeState state)
     {
         lock (_gate)

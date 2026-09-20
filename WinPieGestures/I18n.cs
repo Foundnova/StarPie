@@ -2009,6 +2009,7 @@ Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check fo
 		Add("PluginsCardNotLoaded", "未加载", "未載入", "not loaded", "未読み込み");
 		Add("PluginsCardPreloadCheckBox", "开机预加载", "開機預載入", "Preload", "起動時プリロード");
 		Add("PluginsCardRestartReason", "旧程序集尚未从内存释放，重启 StarPie 后才会完全生效。", "舊組件尚未從記憶體釋放，重新啟動 StarPie 後才會完全生效。", "The old assembly is still held in memory; it takes full effect only after restarting StarPie.", "古いアセンブリがまだメモリ上に残っています。StarPie を再起動すると完全に反映されます。");
+		Add("PluginsCardSettingsButton", "⚙ 设置", "⚙ 設定", "⚙ Settings", "⚙ 設定");
 		Add("PluginsCardSigned", "已签名", "已簽章", "signed", "署名済み");
 		Add("PluginsCardUninstallButton", "🗑 卸载", "🗑 解除安裝", "🗑 Uninstall", "🗑 アンインストール");
 		Add("PluginsCardUnsigned", "未签名", "未簽章", "unsigned", "未署名");
@@ -2119,6 +2120,7 @@ Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check fo
 		Add("PluginsScanHeaderMissing", "扫描目录不存在（宿主不会创建它）", "掃描目錄不存在（宿主不會建立它）", "Scan folder does not exist (StarPie will not create it)", "スキャンフォルダーが存在しません（StarPie は作成しません）");
 		Add("PluginsScanHeaderNone", "扫描目录里没有可安装的插件", "掃描目錄裡沒有可安裝的外掛", "No installable plugins in the scan folder", "スキャンフォルダーにインストール可能なプラグインはありません");
 		Add("PluginsScanPathHint", "把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。该目录由你自己创建：StarPie 装在只读位置时无权创建它。", "把外掛 .dll 放進這個資料夾後點「重新掃描」即可識別。該目錄由你自己建立：StarPie 裝在唯讀位置時無權建立它。", "Drop the plugin .dll into this folder and hit \"Rescan\" to pick it up. You create this folder yourself: StarPie has no permission to create it when installed in a read-only location.", "このフォルダーにプラグインの .dll を置いて「再スキャン」を押すと認識されます。このフォルダーはご自身で作成してください（StarPie が読み取り専用の場所にインストールされている場合、作成する権限がありません）。");
+		Add("PluginsSettingsOpenFailed", "无法打开该插件的设置页，详情见日志。", "無法開啟該插件的設定頁，詳情請見記錄。", "Cannot open this plugin's settings page. See the log for details.", "このプラグインの設定ページを開けません。詳細はログをご覧ください。");
 		Add("PluginsStateActive", "运行中", "執行中", "Running", "実行中");
 		Add("PluginsStateActiveRestartPending", "运行中 · 待重启", "執行中 · 待重啟", "Running · restart pending", "実行中 · 再起動待ち");
 		Add("PluginsStateDisabled", "未启用", "未啟用", "Not enabled", "無効");

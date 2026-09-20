@@ -46,6 +46,22 @@ Reason='显示悬浮球 参数不合法：直径要在 24 到 160 之间。'   �
 - **另记一条与本 PR 无关的宿主既有缺陷**：设置页「测试」按钮在 UI 线程上同步执行动作，`PluginInvoker` 又用 `task.Wait` 阻塞同一条线程，于是任何 `await Dispatcher.InvokeAsync` 的插件一点「测试」必报「执行超时（3s）」（本机 12:41:41→45 复现）。真实手势走 `StarPie.ActionExecutor` 后台线程，所以不受影响。**该缺陷已由 `fix/plugin-test-action` 单独修掉**，不在本 PR 内。
 **已知未覆盖（登记，不冒充已做）**：本轮只补了「全空输入」这一格。②～④ 仍然只喂按默认值填满的那一份，**「用户填了一部分」的组合没有被任何一层断言覆盖**；此外这条护栏只在插件被自检加载时生效，宿主自身对空输入的行为靠 `[3b]` ①。
 
+### 🎛️ SDK 1.6：插件级参数页 —— 「设置」入口第一次由宿主统一给
+
+`FloatingBall` 一落地就撞上这件事：它有外观参数，而**宿主此前根本不给插件设置页**。上一轮的写法是把字段全塞进动作参数（外观跟着那条扇区走），代价是「这颗球平时就该是小而淡的」没有地方表达 —— 想开机恢复成某个样子，也没有一个「插件自己的默认值」可存。SDK 1.6 补的就是这一层：插件声明一张参数表，宿主在插件管理卡片上统一渲染「设置」入口与参数页窗口，控件仍由主程序的隐式样式创建，深浅色 / 字体 / 圆角继续跟主程序一致。
+
+- **契约只加声明**：`SettingsPageDescriptor`（标题 / 说明 / 字段表）+ `ISettingsPageRegistry.Register` 返回 `IDisposable`，走既有那套事务语义（暂存 → `Commit` 时冲突整体拒绝 → `RevokeAll` 兜底）。**刻意不加回调、不加 `OnSettingsChanged` 事件、不加 `PluginCapability.Settings`**：值本来就是宿主与插件共用的同一个 `PluginSettings` 实例，插件下一次 `Settings.Get` 就读得到新值，加事件只会引进事件顺序 / 订阅释放 / 回调里做重活这一整类新问题；而「写自己的 `settings.json`」不构成一种新的安装页后果，`Settings` 服务面已经把那个权限给了，再加一个没有强制点的门禁位，正是 §3.7 能力门禁一节要消除的东西。
+- **`GetValue` 的回落是它存在的全部理由**：已存值优先，从未填过才回落到字段声明的 `DefaultValue`。没有这层，插件就得在「声明里的默认值」和「代码里的兜底常量」写两遍同一个数字，那两处迟早漂。于是「清空」与「从未填过」在 `settings.json` 里是同一个状态（键被删）。`Bool` 字段仍显式落 `false`（沿用 §3.7 原有那条纪律），两边共用同一份写入语义。
+- **不 fork 第二套表单**：`PluginParameterForm` 原先直接吃 `ActionItem`，现在抽出 `IPluginParameterTarget`（`Stored` / `Write` / `ReportsUndeclaredValues`），`ActionItemParameterTarget` 写 `ExtensionData`、`PluginSettingsParameterTarget` 写 `settings.json`。同一份声明、同一套渲染与校验，否则两套表单迟早漂：一边修了深色对比度、另一边没修，用户在两个界面看到同一个字段长得不一样。**`ReportsUndeclaredValues` 恰好是两者唯一必须不同的地方** —— 动作参数表是**封闭**的，多出来的键一定是残留、值得提醒；插件的 `settings.json` 是**开放**命名空间，私有键与设置字段同处一处是刻意设计，把它们列成「未声明参数」只会吓到用户。
+- **入口判据在贡献点表，不在清单**：卡片「设置」按钮的出现条件是表里有页**且至少一个字段**（声明了页却给空表 ⇒ 点开是一张什么也没有的窗口，比不出现更让人觉得程序坏了）。页面**不写进 `plugin.json`** —— `contributions` 只是安装前摘要、不设权限，搬进去就是第 4 份真相且没有任何强制力；而字段标签要走词条，也只有代码声明做得到。标题与说明在**点击那一刻**才解析（`PluginSettingsPageService.Open`），沿用 `ResolveStagedDisplayNames` 那条时序结论。
+- **⚠️ 行为变更**：`PluginSettings.GetInt` / `GetDouble` 从「跟当前区域文化」改为 **`InvariantCulture`**。方向与 `PluginActionInput.Int/Double` 对齐（§3.7 已有那条），但已有插件若在逗号作小数点的区域下往 `settings.json` 写过 `0,5`，现在会解析失败并落到调用方给的默认值。示例层三枚插件全部用不变文化写盘，因此不受影响。
+- **`FloatingBall` 跟着改成「两种来源」**：外观优先级固定为**动作参数 > 插件级设置 > 内置默认**（`BallPreference.FromAction`），并**删掉**原先 `ball.diameter` / `ball.opacity` / `ball.color` 这三个「上次实际值」的持久化 —— 它会把用户在设置页里显式设的默认值盖掉，属同一件事的两份真相。位置 `ball.left` / `ball.top` 保留：那是用户拖动出来的事实，不是默认值。
+- 新增 2 个词条 × 4 语言（`PluginsCardSettingsButton` / `PluginsSettingsOpenFailed`），插件卡片从两个按钮变三个；参数页窗口按 §6.3 自包含（自己取主题、`IsCancel` 收 Esc）。
+
+**验证**：三个工程（宿主 / SDK / `FloatingBall`）构建 **0 警告 0 错误**。`--plugin-selftest --skip-invoke` **双向各跑一次**：`FloatingBall`（声明页）与 `HelloAction`（未声明页）均 **PASS**，`[3h]` 分别给出「标题与 3 个字段标签：4 种语言全部走词条 / `diameter` 的 Min/Max 在渲染面上依然生效 / 读写往返四步 / 重复注册按契约拒绝」与「未声明参数页：入口判据一致返回『无』」。**两条断言按 §5.1「从没红过的断言不算护栏」做了变异测试**：把 `Open` 的写穿目标换成新构造的 `PluginSettings`（即「宿主写一份、插件读另一份」这个真实缺陷形状）⇒ 报「宿主写进参数页的值没落到插件的 settings.json」；把标题解析换成插件给的字面文案 ⇒ 报「En 下参数页标题显示成『悬浮球』，而词条里是『Floating ball』」。`scratch/check_i18n.py`：715 唯一键 / 0 重复 / 0 个键缺语言分支 / 「引用但未定义」= 0，本次新增 2 键全部有引用且四语齐全；具名控件漏接 = 0。
+
+**已知未覆盖（登记，不冒充已做）**：参数页窗口的**实际渲染**（字段排版、深浅色、超范围时红字出现的位置、窗口尺寸与滚动）没有机器护栏 —— `[3h]` 刻意不建窗口，一建窗口断言就退化成「得有人去点一下」，这一整块需要人手动跑。另有一处 v1 欠账：「设置」按钮只对本会话**已加载并声明过页**的插件出现，未启用的插件没有入口，不做惰性激活（为显示一个按钮而加载插件，代价与收益不成比例）。
+
 ### 🔧 维护性修复
 
 1. **`scratch/check_i18n.py` 恢复生效：词表格式漂移导致护栏静默空转**

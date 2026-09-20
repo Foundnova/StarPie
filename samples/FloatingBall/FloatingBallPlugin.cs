@@ -7,9 +7,10 @@ namespace StarPie.Plugin.FloatingBall;
 /// <summary>
 /// 悬浮球插件入口。
 /// <para>
-/// 它是 SDK 1.5 那条接缝的<b>第一个真实用户</b>，两半分别在两边：
+/// 它是 SDK 那两条常驻接缝的<b>第一个真实用户</b>，三半分别在三边：
 /// 球由插件自己画（<see cref="PluginCapability.Ui"/>），点球之后由宿主呼出
-/// <b>用户配置的</b>轮盘（<see cref="PluginCapability.Wheel"/>）。
+/// <b>用户配置的</b>轮盘（<see cref="PluginCapability.Wheel"/>），
+/// 而球的默认外观由宿主渲染的设置页来填（<see cref="ISettingsPageRegistry"/>，SDK 1.6）。
 /// 插件全程不认识轮盘的外观、扇区、命中与配置 —— 这正是把它交给宿主的意义。
 /// </para>
 /// <para>
@@ -37,6 +38,10 @@ public sealed class FloatingBallPlugin : IStarPiePlugin
         context.Actions.Register(new ShowBallContribution(context, ball, iconKey));
         context.Actions.Register(new HideBallContribution(context, ball));
 
+        // 插件级设置页（SDK 1.6）：卡片上的「设置」按钮因此出现。
+        // 它声明的是<b>默认值</b>，不是「唯一值」—— 扇区上的动作参数仍然优先。
+        RegisterSettingsPage(context);
+
         WarnIfCapabilitiesMissing(context);
 
         // 上一轮用户留着「球是显示着的」，这一轮开机就该看得见。
@@ -47,7 +52,7 @@ public sealed class FloatingBallPlugin : IStarPiePlugin
         // 而建一个 AllowsTransparency 窗口要过一遍布局与 DWM 合成。
         if (_ball.IsMarkedVisible()) context.Dispatcher.Post(() => _ball.Restore());
 
-        context.Log.Info("已注册 2 个动作（显示 / 隐藏悬浮球）。点球唤出轮盘由宿主 IHostWheelService 负责。");
+        context.Log.Info("已注册 2 个动作（显示 / 隐藏悬浮球）与 1 个插件级设置页。点球唤出轮盘由宿主 IHostWheelService 负责。");
     }
 
     public void Shutdown()
@@ -84,6 +89,16 @@ public sealed class FloatingBallPlugin : IStarPiePlugin
         i18n.Register("action.show-ball.name", "显示悬浮球", "Show floating ball");
         i18n.Register("action.hide-ball.name", "隐藏悬浮球", "Hide floating ball");
 
+        // 插件级设置页的标题与说明。走词条而不是只写字面文案，切英文时页面才不会剩下中文。
+        i18n.Register("settings.page.title", "悬浮球", "Floating ball");
+        i18n.Register("settings.page.description",
+            "这里是悬浮球的默认外观：开机自动恢复的那颗球、以及参数留空的扇区都用它。"
+            + "某个扇区想要另一副样子，去那条动作的参数里填；填了就覆盖这里的默认。"
+            + "改完不会立刻改变屏幕上现有的球，下一次显示时生效。",
+            "These are the defaults: the ball restored at startup, and any sector that leaves its own parameters empty. "
+            + "To give one sector a different look, fill in that action's parameters - they take precedence. "
+            + "Changes apply the next time the ball is shown, not to the one already on screen.");
+
         i18n.Register("field.diameter.label", "直径", "Diameter");
         i18n.Register("field.opacity.label", "不透明度", "Opacity");
         i18n.Register("field.color.label", "颜色", "Color");
@@ -111,6 +126,20 @@ public sealed class FloatingBallPlugin : IStarPiePlugin
         i18n.Register("error.opacity-range", "不透明度要在 {0} 到 {1} 之间。", "Opacity must be between {0} and {1}.");
         i18n.Register("error.show-failed", "悬浮球没能显示出来：{0}", "The floating ball could not be shown: {0}");
         i18n.Register("error.hide-failed", "悬浮球没能收起来：{0}", "The floating ball could not be hidden: {0}");
+    }
+
+    private static void RegisterSettingsPage(IPluginContext context)
+    {
+        context.SettingsPage.Register(new SettingsPageDescriptor
+        {
+            Title = "悬浮球",
+            TitleKey = "settings.page.title",
+            Description = "这里是悬浮球的默认外观：开机自动恢复的那颗球、以及参数留空的扇区都用它。"
+                + "某个扇区想要另一副样子，去那条动作的参数里填；填了就覆盖这里的默认。"
+                + "改完不会立刻改变屏幕上现有的球，下一次显示时生效。",
+            DescriptionKey = "settings.page.description",
+            Fields = BallSettingsFields.Build(),
+        });
     }
 
     private static string? RegisterIcon(IPluginContext context)

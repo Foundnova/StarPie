@@ -16,9 +16,6 @@ namespace StarPie.Plugin.FloatingBall;
 internal sealed class BallController
 {
     private const string KeyVisible = "ball.visible";
-    private const string KeyDiameter = "ball.diameter";
-    private const string KeyOpacity = "ball.opacity";
-    private const string KeyColor = "ball.color";
     private const string KeyLeft = "ball.left";
     private const string KeyTop = "ball.top";
 
@@ -44,7 +41,7 @@ internal sealed class BallController
         if (_ball != null && SameLook(diameterDiu, opacityPercent, color))
         {
             if (!_ball.IsVisible) _ball.Show();
-            PersistAppearance(diameterDiu, opacityPercent, color);
+            MarkVisible();
             return;
         }
 
@@ -64,7 +61,6 @@ internal sealed class BallController
 
         CloseBall();
         CreateAndShow(diameterDiu, opacityPercent, color, keepLeft, keepTop);
-        PersistAppearance(diameterDiu, opacityPercent, color);
     }
 
     /// <summary>隐藏球（保留位置与外观，下次 Show 回到原处）。</summary>
@@ -88,13 +84,20 @@ internal sealed class BallController
     /// </summary>
     public bool IsMarkedVisible() => _context.Settings.GetBool(KeyVisible, false);
 
-    /// <summary>按上次保存的外观与位置把球放回来（开机预加载走这条）。</summary>
+    /// <summary>
+    /// 按插件级设置页的外观、上次拖动到的位置把球放回来（开机预加载走这条）。
+    /// <para>
+    /// 外观<b>不再单独记「上次实际用了什么」</b>：那会和设置页并存出两份真相，
+    /// 而用户刚在设置页改大直径、重启后发现球还是上轮的小尺寸时，只能理解为「设置没生效」。
+    /// 位置不同 —— 它是用户拖动出来的事实，不是任何地方声明过的值，保留下来才符合预期。
+    /// </para>
+    /// </summary>
     public void Restore()
     {
         CreateAndShow(
-            _context.Settings.GetDouble(KeyDiameter, Defaults.DiameterDiu),
-            _context.Settings.GetDouble(KeyOpacity, Defaults.OpacityPercent),
-            _context.Settings.Get(KeyColor) ?? Defaults.Color,
+            BallPreference.Diameter(_context),
+            BallPreference.Opacity(_context),
+            BallPreference.Color(_context),
             ReadInt(KeyLeft),
             ReadInt(KeyTop));
     }
@@ -144,8 +147,7 @@ internal sealed class BallController
 
         ball.Show();
 
-        _context.Settings.Set(KeyVisible, "true");
-        SaveSettings();
+        MarkVisible();
     }
 
     private void CloseBall()
@@ -201,11 +203,9 @@ internal sealed class BallController
         SaveSettings();
     }
 
-    private void PersistAppearance(double diameterDiu, double opacityPercent, string color)
+    /// <summary>记住「球此刻是显示着的」，供下次开机预加载判断要不要把球放回来。</summary>
+    private void MarkVisible()
     {
-        _context.Settings.Set(KeyDiameter, diameterDiu.ToString("0.##", CultureInfo.InvariantCulture));
-        _context.Settings.Set(KeyOpacity, opacityPercent.ToString("0.##", CultureInfo.InvariantCulture));
-        _context.Settings.Set(KeyColor, color);
         _context.Settings.Set(KeyVisible, "true");
         SaveSettings();
     }

@@ -7297,7 +7297,12 @@ public partial class SettingsWindow : Window
 	private PluginParameterForm EnsureFocusPluginParameterForm() =>
 		_focusPluginParameterForm ??= new PluginParameterForm(
 			FocusPluginParamsPanel,
-			() => GetCurrentFocusActionItem(),
+			() =>
+			{
+				// 每次取表单目标时都重新解析当前动作：切换扇区 / 换动作不会把写入指向旧对象。
+				ActionItem? item = GetCurrentFocusActionItem();
+				return item == null ? null : new ActionItemParameterTarget(item);
+			},
 			OnFocusPluginParameterChanged);
 
 	/// <param name="keepHintText">为真时保留提示行（用于「动作不可用」这类需要继续展示给的说明）。</param>
@@ -8055,6 +8060,30 @@ public partial class SettingsWindow : Window
 		{
 			box.IsEnabled = true;
 			RefreshPluginManagerUi();
+		}
+	}
+
+	private void PluginRowSettingsButton_Click(object sender, RoutedEventArgs e)
+	{
+		// 与另外两个按钮一样从 Tag 取插件 ID：ItemTemplate 里的控件拿不到 Name。
+		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } ||
+			string.IsNullOrWhiteSpace(pluginId))
+		{
+			return;
+		}
+
+		try
+		{
+			// 模态：参数页是写穿的，若允许非模态，用户可能在插件正读一半时改值，
+			// 更麻烦的是同一个插件会开出两张页，两张页互相覆盖。
+			var window = new PluginSettingsPageWindow(pluginId) { Owner = this };
+			window.ShowDialog();
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError($"[plugin] 打开插件 \"{pluginId}\" 的参数页失败", ex);
+			System.Windows.MessageBox.Show(this, I18n.T("PluginsSettingsOpenFailed"),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 		}
 	}
 

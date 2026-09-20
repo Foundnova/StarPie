@@ -10,10 +10,10 @@ namespace StarPie.Plugin.FloatingBall;
 /// <summary>
 /// 动作一：显示悬浮球（并按参数设定它的外观）。
 /// <para>
-/// 直径 / 不透明度 / 颜色做成<b>动作参数</b>而不是插件自己的设置界面，是这套插件系统的前提：
-/// 宿主不给插件任何设置页（参数由宿主用主程序既有的控件风格渲染，见 <see cref="ParameterField"/>）。
-/// 于是「这颗球长什么样」跟着那条动作走 —— 用户可以配两个扇区，一个常规球、一个小而淡的球，
-/// 这比在插件里塞一个设置窗更符合轮盘的使用方式。
+/// 直径 / 不透明度 / 颜色同时存在于<b>两处</b>：这里是「这个扇区的球要长什么样」，
+/// 插件级设置页（见 <see cref="BallSettingsFields"/>）是「没有特别指定时长什么样」。
+/// 两处的键名相同、优先级固定为<b>动作参数 &gt; 插件级设置 &gt; 内置默认</b>，
+/// 于是「配两个扇区、一个常规球一个小而淡的球」和「开机恢复那颗球」都能各得其所。
 /// </para>
 /// </summary>
 internal sealed class ShowBallContribution : IActionContribution
@@ -45,40 +45,42 @@ internal sealed class ShowBallContribution : IActionContribution
     {
         new()
         {
-            Key = "diameter",
+            Key = BallPreference.DiameterKey,
             Label = "直径",
             LabelKey = "field.diameter.label",
             Type = ParameterFieldType.Number,
             DefaultValue = Defaults.DiameterDiu.ToString("0.##", CultureInfo.InvariantCulture),
             Min = Defaults.DiameterMin,
             Max = Defaults.DiameterMax,
-            HelpText = "单位是逻辑像素（跟随系统缩放）。",
+            HelpText = "留空则用插件设置页里的默认直径。",
         },
         new()
         {
-            Key = "opacity",
+            Key = BallPreference.OpacityKey,
             Label = "不透明度",
             LabelKey = "field.opacity.label",
             Type = ParameterFieldType.Number,
             DefaultValue = Defaults.OpacityPercent.ToString("0.##", CultureInfo.InvariantCulture),
             Min = Defaults.OpacityMin,
             Max = Defaults.OpacityMax,
+            HelpText = "留空则用插件设置页里的默认不透明度。",
         },
         new()
         {
-            Key = "color",
+            Key = BallPreference.ColorKey,
             Label = "颜色",
             LabelKey = "field.color.label",
             Type = ParameterFieldType.Color,
             DefaultValue = Defaults.Color,
+            HelpText = "留空则用插件设置页里的默认颜色。",
         },
     };
 
     public string? Validate(IReadOnlyDictionary<string, string> parameters)
     {
-        // 「没填」与「填了但不合法」必须分开判：留空的含义是「用默认值」，
+        // 只校验「扇区上确实填了」的项：留空是合法的，含义是「用插件级设置页的默认值」，
         // 把它算成越界会让刚装好、一个参数都没动的用户点哪都失败。
-        if (!TryReadDouble(parameters, "diameter", out double? diameter))
+        if (!TryReadDouble(parameters, BallPreference.DiameterKey, out double? diameter))
         {
             return _context.I18n.T("error.diameter", "直径得是个数（像素）。");
         }
@@ -90,7 +92,7 @@ internal sealed class ShowBallContribution : IActionContribution
                 Defaults.DiameterMin, Defaults.DiameterMax);
         }
 
-        if (!TryReadDouble(parameters, "opacity", out double? opacity))
+        if (!TryReadDouble(parameters, BallPreference.OpacityKey, out double? opacity))
         {
             return _context.I18n.T("error.opacity", "不透明度得是个数（百分比）。");
         }
@@ -107,9 +109,14 @@ internal sealed class ShowBallContribution : IActionContribution
 
     public string Preview(IReadOnlyDictionary<string, string> parameters)
     {
-        // 契约要求极快：这里只做字符串拼接，不碰窗口、不读设置。
-        TryReadDouble(parameters, "diameter", out double? diameter);
-        TryReadDouble(parameters, "opacity", out double? opacity);
+        // 契约要求极快：这里只做字符串拼接，不碰窗口。
+        // 回落到插件级默认值读的是内存字典（PluginSettings 在实例化时就整份载入并缓存），
+        // 不是磁盘 —— 否则预览会显示内置默认，而实际放出来的是用户配的另一套尺寸。
+        TryReadDouble(parameters, BallPreference.DiameterKey, out double? diameter);
+        TryReadDouble(parameters, BallPreference.OpacityKey, out double? opacity);
+
+        diameter ??= BallPreference.Diameter(_context);
+        opacity ??= BallPreference.Opacity(_context);
 
         return string.Format(
             CultureInfo.InvariantCulture,
@@ -134,9 +141,19 @@ internal sealed class ShowBallContribution : IActionContribution
                 silent: false);
         }
 
-        double diameter = input.Double("diameter", Defaults.DiameterDiu);
-        double opacity = input.Double("opacity", Defaults.OpacityPercent);
-        string color = string.IsNullOrWhiteSpace(input.Parameter("color")) ? Defaults.Color : input.Parameter("color")!.Trim();
+        // 优先级：扇区上填了这个参数就用它，留空 → 插件级设置页 → 内置默认。
+        // 三个值都在这里收敛，BallController 只接最终数字，不参与来源判断。
+        double diameter = BallPreference.FromAction(
+            input, BallPreference.DiameterKey,
+            BallPreference.Diameter(_context), Defaults.DiameterMin, Defaults.DiameterMax);
+        double opacity = BallPreference.FromAction(
+            input, BallPreference.OpacityKey,
+            BallPreference.Opacity(_context), Defaults.OpacityMin, Defaults.OpacityMax);
+
+        string? actionColor = input.Parameter(BallPreference.ColorKey);
+        string color = string.IsNullOrWhiteSpace(actionColor)
+            ? BallPreference.Color(_context)
+            : actionColor!.Trim();
 
         try
         {

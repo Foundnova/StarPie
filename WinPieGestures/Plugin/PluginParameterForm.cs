@@ -30,7 +30,7 @@ internal sealed class PluginParameterForm
 	private static readonly Brush RequiredBrush = FrozenBrush("#D97706");
 
 	private readonly StackPanel _host;
-	private readonly Func<ActionItem?> _targetProvider;
+	private readonly Func<IPluginParameterTarget?> _targetSource;
 	private readonly Action _onChanged;
 	private readonly Dictionary<string, FieldRow> _rows = new(StringComparer.OrdinalIgnoreCase);
 
@@ -39,12 +39,12 @@ internal sealed class PluginParameterForm
 	private bool _suppress;
 
 	/// <param name="host">承载表单的容器。</param>
-	/// <param name="targetProvider">取当前正在编辑的动作；返回 <c>null</c> 时表单只读不写。</param>
+	/// <param name="targetSource">取当前写入目标（动作项 / 插件配置）；返回 <c>null</c> 时表单只读不写。</param>
 	/// <param name="onChanged">任一字段变化后的回调（用于自动保存与预览刷新）。</param>
-	internal PluginParameterForm(StackPanel host, Func<ActionItem?> targetProvider, Action onChanged)
+	internal PluginParameterForm(StackPanel host, Func<IPluginParameterTarget?> targetSource, Action onChanged)
 	{
 		_host = host ?? throw new ArgumentNullException(nameof(host));
-		_targetProvider = targetProvider ?? throw new ArgumentNullException(nameof(targetProvider));
+		_targetSource = targetSource ?? throw new ArgumentNullException(nameof(targetSource));
 		_onChanged = onChanged ?? (() => { });
 	}
 
@@ -66,8 +66,8 @@ internal sealed class PluginParameterForm
 
 		if (_fields.Count == 0) return;
 
-		ActionItem? target = _targetProvider();
-		IReadOnlyDictionary<string, string>? stored = target?.ExtensionData;
+		IPluginParameterTarget? target = _targetSource();
+		IReadOnlyDictionary<string, string>? stored = target?.Stored;
 
 		// 构建期间控件赋值会触发 Changed 事件，必须挡住，否则一打开设置页
 		// 就会把「回填」当成「用户修改」写一遍配置并触发自动保存。
@@ -91,7 +91,7 @@ internal sealed class PluginParameterForm
 				row.Write(ResolveInitialValue(row.Field, stored));
 			}
 
-			AppendUndeclaredNotice(stored, declared);
+			AppendUndeclaredNotice(target, stored, declared);
 		}
 		catch (Exception ex)
 		{
@@ -114,8 +114,8 @@ internal sealed class PluginParameterForm
 	/// <summary>按声明校验当前表单值。</summary>
 	internal List<PluginParameterIssue> Validate()
 	{
-		ActionItem? target = _targetProvider();
-		return PluginParameterValidator.Validate(_fields, target?.ExtensionData);
+		IPluginParameterTarget? target = _targetSource();
+		return PluginParameterValidator.Validate(_fields, target?.Stored);
 	}
 
 	/// <summary>
@@ -506,45 +506,32 @@ internal sealed class PluginParameterForm
 	}
 
 	/// <summary>
-	/// 写穿到 <c>ActionItem.ExtensionData</c>。
+	/// 写穿到当前目标（<c>ActionItem.ExtensionData</c> 或插件的 <c>settings.json</c>）。
 	/// 空值一律<b>删除键</b>而非写入空串：这样「未填写」在配置里有唯一表示，
-	/// 也不会让 config.json 被一堆空 KV 撑大。
+	/// 也不会让配置文件被一堆空 KV 撑大。删除与「值没变」都不触发回调 ——
+	/// 后者是自动保存的空转，前者本来就无事发生。
 	/// </summary>
 	private void Commit(string key, string? value)
 	{
 		if (_suppress) return;
 		if (string.IsNullOrEmpty(key)) return;
 
-		ActionItem? target = _targetProvider();
+		IPluginParameterTarget? target = _targetSource();
 		if (target == null) return;
 
 		string text = value ?? "";
 
+		// 单个值超长直接截断而不是拒绝：上限是宿主的内存红线，
+		// 不该变成一个用户看不懂的保存失败。
+		if (text.Length > PluginApi.MaxParameterValueLength)
+		{
+			text = text.Substring(0, PluginApi.MaxParameterValueLength);
+		}
+
+		bool changed;
 		try
 		{
-			if (text.Length == 0)
-			{
-				if (target.ExtensionData == null) return;
-				if (!target.ExtensionData.Remove(key)) return;
-				if (target.ExtensionData.Count == 0) target.ExtensionData = null;
-			}
-			else
-			{
-				// 单个值超长直接截断而不是拒绝：上限是宿主的内存红线，
-				// 不该变成一个用户看不懂的保存失败。
-				if (text.Length > PluginApi.MaxParameterValueLength)
-				{
-					text = text.Substring(0, PluginApi.MaxParameterValueLength);
-				}
-
-				target.ExtensionData ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-				if (target.ExtensionData.TryGetValue(key, out string? existing) &&
-					string.Equals(existing, text, StringComparison.Ordinal))
-				{
-					return; // 值没变，不必触发自动保存
-				}
-				target.ExtensionData[key] = text;
-			}
+			changed = target.Write(key, text);
 		}
 		catch (Exception ex)
 		{
@@ -552,6 +539,7 @@ internal sealed class PluginParameterForm
 			return;
 		}
 
+		if (!changed) return;
 		_onChanged();
 	}
 
@@ -559,9 +547,14 @@ internal sealed class PluginParameterForm
 	/// 提示「配置里有当前插件版本未声明的参数」。
 	/// 不删除它们（向前兼容：插件升级后可能重新用到），但也不能让它们彻底隐形 ——
 	/// 否则用户会以为配置丢了，而插件作者会以为自己写错了键名。
+	/// <para>
+	/// 只对「封闭」的目标生效（<see cref="IPluginParameterTarget.ReportsUndeclaredValues"/>）：
+	/// 插件的 settings.json 里本来就该有插件自己的私有键，列出来是误报。
+	/// </para>
 	/// </summary>
-	private void AppendUndeclaredNotice(IReadOnlyDictionary<string, string>? stored, HashSet<string> declared)
+	private void AppendUndeclaredNotice(IPluginParameterTarget? target, IReadOnlyDictionary<string, string>? stored, HashSet<string> declared)
 	{
+		if (target == null || !target.ReportsUndeclaredValues) return;
 		if (stored == null || stored.Count == 0) return;
 
 		var unknown = new List<string>();

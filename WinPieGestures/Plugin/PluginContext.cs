@@ -33,6 +33,7 @@ internal sealed class PluginContext : IPluginContext
         Actions = new PluginActionRegistry(session, metadata.Id);
         I18n = new PluginI18nRegistry(session, metadata.Id);
         Icons = new PluginIconRegistry(session, metadata.Id);
+        SettingsPage = new PluginSettingsPageRegistry(session, metadata.Id, settings);
         Host = new PluginHostActionInvoker(metadata.Id);
 
         // 这四个服务带能力门禁：构造时就把清单里的 Capabilities 交给它们，
@@ -67,6 +68,9 @@ internal sealed class PluginContext : IPluginContext
     public II18nRegistry I18n { get; }
 
     public IIconRegistry Icons { get; }
+
+    /// <summary>插件级参数页声明（SDK 1.6 起）。</summary>
+    public ISettingsPageRegistry SettingsPage { get; }
 
     public IHostActionInvoker Host { get; }
 
@@ -444,6 +448,137 @@ internal sealed class PluginIconRegistry : IIconRegistry
         }
 
         return _shortToFull.TryGetValue(raw, out string? full) ? full : null;
+    }
+}
+
+/// <summary>
+/// 插件级参数页注册表实现（SDK 1.6）。
+/// <para>
+/// 校验口径与 <see cref="PluginActionRegistry"/> 对动作参数的要求<b>完全一致</b>：
+/// 同一份 <see cref="ParameterField"/> 声明不该因为挂在动作上还是挂在插件上而受到不同的约束，
+/// 差异只会让插件作者写出「一处能过、另一处抛契约异常」的代码。
+/// </para>
+/// </summary>
+internal sealed class PluginSettingsPageRegistry : ISettingsPageRegistry
+{
+    private readonly PluginRegistrationSession _session;
+    private readonly string _pluginId;
+    private readonly PluginSettings _settings;
+    private readonly PluginCatalog _catalog;
+
+    /// <summary>本插件已暂存的页。「一个插件一页」的判定依据。</summary>
+    private PluginSettingsPageRegistration? _staged;
+
+    public PluginSettingsPageRegistry(PluginRegistrationSession session, string pluginId, PluginSettings settings)
+    {
+        _session = session;
+        _pluginId = pluginId;
+        _settings = settings;
+        _catalog = PluginHost.Catalog;
+    }
+
+    public IDisposable Register(SettingsPageDescriptor page)
+    {
+        if (page == null)
+        {
+            throw new PluginContractException("SettingsPage.Register(page) 传入了 null。");
+        }
+        if (_staged != null)
+        {
+            throw new PluginContractException("本插件已声明过设置页：一个插件只允许一页，请把字段合并进同一张表。");
+        }
+
+        IReadOnlyList<ParameterField> fields;
+        try
+        {
+            fields = page.Fields ?? Array.Empty<ParameterField>();
+        }
+        catch (Exception ex)
+        {
+            throw new PluginContractException("读取 Fields 时插件抛出了异常。", ex);
+        }
+
+        var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (ParameterField field in fields)
+        {
+            if (field == null)
+            {
+                throw new PluginContractException($"{_pluginId} 的设置页 Fields 里含有 null 项。");
+            }
+            if (string.IsNullOrWhiteSpace(field.Key))
+            {
+                throw new PluginContractException($"{_pluginId} 的设置页字段缺少 Key。");
+            }
+            if (!seenKeys.Add(field.Key))
+            {
+                throw new PluginContractException($"{_pluginId} 的设置页字段 Key 重复：{field.Key}。");
+            }
+            if (field.Type == ParameterFieldType.Enum && (field.Options == null || field.Options.Count == 0))
+            {
+                throw new PluginContractException($"{_pluginId} 的字段 {field.Key} 是 Enum 类型，但没有提供 Options。");
+            }
+        }
+
+        var registration = new PluginSettingsPageRegistration
+        {
+            PluginId = _pluginId,
+            Title = page.Title ?? "",
+            TitleKey = TrimToNull(page.TitleKey),
+            Description = page.Description ?? "",
+            DescriptionKey = TrimToNull(page.DescriptionKey),
+            // 复制成数组再留档：插件给的列表可能实现自插件自己程序集的类型，
+            // 长期表留着它，插件停用后收集上下文就回收不掉了。
+            Fields = ToArray(fields),
+        };
+
+        _session.StageSettingsPage(registration);
+        _staged = registration;
+
+        return new RegistrationToken(() =>
+        {
+            _staged = null;
+            _catalog.RemoveSettingsPage(_pluginId);
+        });
+    }
+
+    /// <summary>
+    /// 读当前值：已保存的取值优先，从未填写过才回落到字段声明的默认值。
+    /// <para>
+    /// 这层回落是 <see cref="GetValue"/> 存在的全部理由：没有它，插件得在「字段声明里的
+    /// DefaultValue」和「自己代码里的兜底常量」写两遍同一个数字，而这两处迟早会漂。
+    /// 用户清空某个字段时宿主会删除该键（见 <c>PluginSettings.Set</c> 的 null 语义），
+    /// 于是「清空」与「从未填过」在配置里是同一个状态，读回来也都是默认值 —— 这正是用户期望的。
+    /// </para>
+    /// </summary>
+    public string? GetValue(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+
+        string trimmed = key.Trim();
+        string? saved = _settings.Get(trimmed);
+        if (saved != null) return saved;
+
+        PluginSettingsPageRegistration? page = _staged;
+        if (page == null) return null;
+
+        foreach (ParameterField field in page.Fields)
+        {
+            if (field != null && string.Equals(field.Key, trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                return field.DefaultValue;
+            }
+        }
+        return null;
+    }
+
+    private static string? TrimToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+
+    private static ParameterField[] ToArray(IReadOnlyList<ParameterField> fields)
+    {
+        var array = new ParameterField[fields.Count];
+        for (int i = 0; i < array.Length; i++) array[i] = fields[i];
+        return array;
     }
 }
 

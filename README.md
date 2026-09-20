@@ -317,7 +317,8 @@ StarPie 使用轻量的 **.NET 进程内 DLL 插件架构**。插件只需引用
   连续两次启动异常会进入安全模式并临时禁用可疑插件。
 - **给插件作者**：`samples/` 下有三个可直接参照的示例（`HelloAction` 为参考模板，
   `ScreenBrightness` 覆盖 P/Invoke、COM 与耗时 IO 三类难题，`FloatingBall` 是常驻窗口形态：
-  插件自己画球、点球经 `IHostWheelService` 呼出宿主轮盘）。调试时可用
+  插件自己画球、点球经 `IHostWheelService` 呼出宿主轮盘，外观参数同时示范了「动作参数」与
+  「插件级设置页」两种来源 —— 后者的界面由宿主在插件卡片上统一渲染）。调试时可用
   `StarPie.exe --plugin-selftest <插件.dll> [报告路径] [--skip-invoke]` 在临时沙箱里跑
   全链路自检（不会碰你已装好的插件），或用 `StarPie.exe --plugin-paths` 查看当前生效的目录。
 
