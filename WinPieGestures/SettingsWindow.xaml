@@ -3812,7 +3812,10 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <CheckBox Name="PluginSystemEnabledCheckBox" Content="启用插件系统" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" ToolTip="关闭后所有插件动作都不会被触发，但插件配置与已分配到轮盘的动作会被完整保留" Click="PluginSystemEnabledCheckBox_Click" />
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox Name="PluginSystemEnabledCheckBox" Content="启用插件系统" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" ToolTip="关闭后所有插件动作都不会被触发，但插件配置与已分配到轮盘的动作会被完整保留" Click="PluginSystemEnabledCheckBox_Click" />
+                <CheckBox Name="PluginPreloadOnStartupCheckBox" Content="启动时预加载" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="16,0,0,0" Click="PluginPreloadOnStartupCheckBox_Click" />
+              </StackPanel>
               <TextBlock Name="PluginsStatusSummaryText" Grid.Column="1" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap" />
               <TextBlock Name="PluginsSafeModeText" Grid.Column="2" FontSize="11.5" Foreground="#D97706" VerticalAlignment="Center" Margin="10,0,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
             </Grid>
@@ -3982,6 +3985,7 @@
                         </TextBlock>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                        <CheckBox Content="{Binding PreloadText}" Tag="{Binding PluginId}" IsChecked="{Binding IsPreload, Mode=OneWay}" Click="PluginRowPreloadCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
                         <CheckBox Content="{Binding EnableText}" Tag="{Binding PluginId}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Click="PluginRowEnabledCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <Button Content="{Binding UninstallText}" Tag="{Binding PluginId}" Click="UninstallPluginButton_Click" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" Margin="10,0,0,0" FontSize="11" />
                       </StackPanel>

@@ -2006,6 +2006,7 @@ Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check fo
 		Add("PluginsCardEnableCheckBox", "启用", "啟用", "Enable", "有効化");
 		Add("PluginsCardExternalPath", "外部路径 {0}", "外部路徑 {0}", "external path {0}", "外部パス {0}");
 		Add("PluginsCardNotLoaded", "未加载", "未載入", "not loaded", "未読み込み");
+		Add("PluginsCardPreloadCheckBox", "开机预加载", "開機預載入", "Preload", "起動時プリロード");
 		Add("PluginsCardRestartReason", "旧程序集尚未从内存释放，重启 StarPie 后才会完全生效。", "舊組件尚未從記憶體釋放，重新啟動 StarPie 後才會完全生效。", "The old assembly is still held in memory; it takes full effect only after restarting StarPie.", "古いアセンブリがまだメモリ上に残っています。StarPie を再起動すると完全に反映されます。");
 		Add("PluginsCardSigned", "已签名", "已簽章", "signed", "署名済み");
 		Add("PluginsCardUninstallButton", "🗑 卸载", "🗑 解除安裝", "🗑 Uninstall", "🗑 アンインストール");
@@ -2097,6 +2098,11 @@ Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check fo
 		Add("PluginsPanelUnavailableHint", "⚠️ 触发时会明确提示「插件动作不可用」，不会静默无操作。", "⚠️ 觸發時會明確提示「外掛動作無法使用」，不會靜默無操作。", "⚠️ Triggering it reports \"plugin action unavailable\" — it will not silently do nothing.", "⚠️ 実行時は「プラグイン動作を利用できません」と明示されます。無言で何も起きることはありません。");
 		Add("PluginsPickDllFilter", "插件程序集 (*.dll)|*.dll|所有文件 (*.*)|*.*", "外掛組件 (*.dll)|*.dll|所有檔案 (*.*)|*.*", "Plugin assemblies (*.dll)|*.dll|All files (*.*)|*.*", "プラグイン アセンブリ (*.dll)|*.dll|すべてのファイル (*.*)|*.*");
 		Add("PluginsPickDllTitle", "选择要安装的插件 (.dll)", "選擇要安裝的外掛 (.dll)", "Select a plugin to install (.dll)", "インストールするプラグインを選択 (.dll)");
+		Add("PluginsPreloadBlockedSafeMode", "插件系统处于安全模式", "外掛系統處於安全模式", "the plugin system is in safe mode", "プラグイン機能がセーフモード中です");
+		Add("PluginsPreloadBlockedSystemOff", "插件系统未启用", "外掛系統未啟用", "the plugin system is disabled", "プラグイン機能が有効化されていません");
+		Add("PluginsPreloadCheckBox", "启动时预加载", "啟動時預載入", "Preload at startup", "起動時にプリロード");
+		Add("PluginsPreloadCheckBoxToolTip", "开启后，启动完成数秒会在后台加载勾选了「开机预加载」的已启用插件；关闭时所有插件保持按需惰性加载，不增加启动与内存成本。", "開啟後，啟動完成數秒會在背景載入勾選了「開機預載入」的已啟用外掛；關閉時所有外掛維持依需求延遲載入，不增加啟動與記憶體成本。", "When on, enabled plugins marked \"Preload\" are loaded in the background a few seconds after startup. When off, every plugin stays lazily loaded, with no startup or memory cost.", "オンにすると「起動時プリロード」を有効にした有効化プラグインが、起動完了数秒後にバックグラウンドで読み込まれます。オフの場合、すべてのプラグインは遅延読み込みのままとなり、起動時間もメモリも増加しません。");
+		Add("PluginsPreloadFailed", "插件「{0}」已登记预加载，但当场加载未成功（不影响下次启动重试）：{1}", "外掛「{0}」已登記預載入，但當場載入未成功（不影響下次啟動重試）：{1}", "Plugin \"{0}\" is marked for preload, but loading it now failed (next startup will retry): {1}", "プラグイン「{0}」はプリロードとして登録されましたが、今回の読み込みに失敗しました（次回起動時に再試行されます）：{1}");
 		Add("PluginsReadFileFailed", "读取所选文件时出错：\n{0}", "讀取所選檔案時發生錯誤：\n{0}", "Failed to read the selected file:\n{0}", "選択したファイルの読み込みに失敗しました:\n{0}");
 		Add("PluginsReloadFailed", "重新加载失败：{0}", "重新載入失敗：{0}", "Reload failed: {0}", "再読み込みに失敗しました：{0}");
 		Add("PluginsReloadNotStopped", "旧插件尚未完全停止，不能重新加载：\n\n{0}", "舊外掛尚未完全停止，不能重新載入：\n\n{0}", "The old plugin has not fully stopped, so it cannot be reloaded:\n\n{0}", "古いプラグインがまだ完全に停止していないため、再読み込みできません：\n\n{0}");

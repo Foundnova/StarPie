@@ -1518,6 +1518,47 @@ internal static class PluginHost
         }
     }
 
+    /// <summary>
+    /// 立即预加载单个插件：设置页勾选「开机预加载」后当场拉起，而不是等下一次启动。
+    /// <para>失败不改写登记（勾选是用户偏好，下次启动仍会重试），只把原因返回给调用方。</para>
+    /// </summary>
+    public static bool PreloadNow(string pluginId, out string error)
+    {
+        error = "";
+        if (!_initialized || !_enabled)
+        {
+            error = I18n.T("PluginsPreloadBlockedSystemOff");
+            return false;
+        }
+        if (_safeModeActive)
+        {
+            error = I18n.T("PluginsPreloadBlockedSafeMode");
+            return false;
+        }
+
+        PluginActivationResult activation = Runtime.EnsurePluginLoaded(
+            pluginId,
+            PluginActivationReason.StartupPreload,
+            requireEnabled: true);
+        if (!activation.IsReady)
+        {
+            error = activation.Error;
+            AppLogger.LogWarn($"[plugin] 立即预加载 {pluginId} 失败：{activation.Error}");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 立即补跑一轮启动预加载（用户在运行中打开「启动时预加载」总开关时用）。
+    /// 条件与 <see cref="SchedulePreload"/> 一致：非安全模式且总开关已开，否则什么都不做。
+    /// </summary>
+    public static void RequestPreloadSweep()
+    {
+        if (!_initialized || _safeModeActive || !_preferences.PreloadOnStartup) return;
+        SchedulePreload();
+    }
+
     /// <summary>启动后台预加载（仅 Preload=true 的已启用插件），不阻塞首帧。</summary>
     private static void SchedulePreload()
     {

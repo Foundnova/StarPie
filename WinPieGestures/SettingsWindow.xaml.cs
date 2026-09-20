@@ -7551,6 +7551,12 @@ public partial class SettingsWindow : Window
 			PluginSystemEnabledCheckBox.IsEnabled = PluginHost.IsInitialized;
 		}
 
+		if (PluginPreloadOnStartupCheckBox != null)
+		{
+			PluginPreloadOnStartupCheckBox.IsChecked =
+				ConfigManager.CurrentConfig?.Plugins?.PreloadOnStartup == true;
+		}
+
 		if (PluginsStatusSummaryText != null)
 		{
 			int enabledCount = items.Count(i => i.IsEnabled);
@@ -7628,6 +7634,11 @@ public partial class SettingsWindow : Window
 		if (PluginSystemEnabledCheckBox != null)
 		{
 			PluginSystemEnabledCheckBox.Content = I18n.T("PluginsEnableCheckBox");
+		}
+		if (PluginPreloadOnStartupCheckBox != null)
+		{
+			PluginPreloadOnStartupCheckBox.Content = I18n.T("PluginsPreloadCheckBox");
+			PluginPreloadOnStartupCheckBox.ToolTip = I18n.T("PluginsPreloadCheckBoxToolTip");
 		}
 		if (PluginsEmptyTitleText != null)
 		{
@@ -7940,6 +7951,47 @@ public partial class SettingsWindow : Window
 				I18n.TF("PluginsDisabledNotice", affected),
 				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
 		}
+	}
+
+	/// <summary>
+	/// 「启动时预加载」总开关（config.json 的 Plugins.PreloadOnStartup）。
+	/// 打开时立刻补跑一轮预加载扫描，让已勾选预加载的插件当场生效，而不是等下一次开机。
+	/// </summary>
+	private void PluginPreloadOnStartupCheckBox_Click(object sender, RoutedEventArgs e)
+	{
+		if (PluginPreloadOnStartupCheckBox == null || ConfigManager.CurrentConfig == null) return;
+
+		bool desired = PluginPreloadOnStartupCheckBox.IsChecked == true;
+		ConfigManager.CurrentConfig.Plugins.PreloadOnStartup = desired;
+		ConfigManager.SaveConfig();
+		if (desired)
+		{
+			PluginHost.RequestPreloadSweep();
+		}
+	}
+
+	/// <summary>
+	/// 卡片上的「开机预加载」勾选（registry.json 的 Entry.Preload）。
+	/// 勾上时立即尝试拉起；失败只提示、不反选 —— 勾选是用户偏好，下次启动仍会重试。
+	/// 取消勾选只影响下一次预加载扫描，已加载的插件本次运行内保持加载。
+	/// </summary>
+	private void PluginRowPreloadCheckBox_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.CheckBox { Tag: string pluginId } box ||
+			string.IsNullOrWhiteSpace(pluginId))
+		{
+			return;
+		}
+
+		bool desired = box.IsChecked == true;
+		PluginRegistryStore.SetPreload(pluginId, desired);
+		if (desired && !PluginHost.PreloadNow(pluginId, out string preloadError))
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsPreloadFailed", pluginId, preloadError),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+		RefreshPluginManagerUi();
 	}
 
 	private async void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
