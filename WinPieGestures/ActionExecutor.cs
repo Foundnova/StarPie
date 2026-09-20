@@ -273,56 +273,41 @@ public static class ActionExecutor
 		try
 		{
 			AppLogger.LogInfo($"Executing Action: Name='{action.Name}', Type='{action.Type}', Param='{action.Parameter}', Args='{action.Arguments}', Term='{action.CommandTerminal}'");
+			if (Plugins.BuiltinActionCatalog.TryGet(action.Type, out Plugins.BuiltinActionRegistration builtin))
+			{
+				ExecuteBuiltinActionItem(action, builtin);
+				return;
+			}
+
+			if (Plugins.PluginHost.TryResolveClaimedType(action.Type, out Plugins.PluginTypeClaimBinding claim))
+			{
+				ExecuteClaimedActionItem(action, claim);
+				return;
+			}
 			switch (action.Type.Trim())
 			{
-			case "Launch":
-				ExecuteLaunch(action.Parameter, action.Arguments, action.RunAsStandardUser);
-				break;
-			case "Folder":
-			case "OpenFolder":
-				ExecuteFolder(action.Parameter);
-				break;
-			case "Ocr":
-			case "ScreenOcr":
-				OcrManager.StartCaptureAndRecognize();
-				break;
 			case "Hotkey":
 				ExecuteHotkey(action.Parameter);
-				break;
-			case "Command":
-				ExecuteCommand(action.Parameter, action.CommandTerminal);
-				break;
-			case "SwitchWindow":
-				ExecuteSwitchWindow(action.Parameter);
-				break;
-			case "Tile":
-				WindowTiler.ExecuteTile(action.Parameter);
-				break;
-			case "TileRestore":
-				WindowTiler.RestoreLastLayout();
-				break;
-			case "MoveMonitor":
-				WindowTiler.MoveWindowToNextMonitor();
-				break;
-			case "ToggleTopmost":
-				WindowTiler.ToggleWindowTopmost(action.Parameter);
-				break;
-			case "WindowOpacity":
-				WindowTiler.SetWindowOpacity(action.Parameter);
 				break;
 			case "Text":
 			case "String":
 				SendTextInput(action.Parameter);
 				break;
-			case "WebUrl":
-			case "Url":
-				ExecuteWebUrl(action.Parameter, action.BrowserChoice, action.BrowserPath);
+			case "Plugin":
+				// 普通社区插件动作统一走 PluginHost，避免静默失效。
+				ExecutePluginActionItem(action);
 				break;
-			case "System":
-				ExecuteSystem(action.Parameter);
-				break;
-			case "ShellTool":
-				ExecuteShellTool(action.Parameter);
+			default:
+				if (Plugins.PluginHost.IsOfficialClaimedType(action.Type))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"动作不可用",
+						"该动作由官方插件提供，但对应插件当前未安装、未启用或不可用。请在插件管理页安装或启用它。");
+				}
+				else
+				{
+					AppLogger.LogWarn($"Unknown action type '{action.Type}' was ignored.");
+				}
 				break;
 			}
 		}
@@ -331,6 +316,74 @@ public static class ActionExecutor
 			AppLogger.LogError($"Failed to execute action '{action.Name}' (Type: {action.Type}, Param: {action.Parameter})", ex);
 			MessageBox.Show("Failed to execute action '" + action.Name + "': " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 		}
+	}
+
+	/// <summary>
+	/// 插件动作的执行包装。
+	/// <para>
+	/// 刻意做成独立方法而不是直接写在 <c>switch</c> 里，有两个原因：
+	/// ① 让「主程序唯一的插件接缝」在代码里一眼可见、可搜索；
+	/// ② 所有失败都走 <see cref="AppLogger"/> + 托盘气泡，而<b>不是</b> MessageBox ——
+	///    插件是社区代码，它的失败必须可诊断、可忽略，绝不能打断用户。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteBuiltinActionItem(ActionItem action, Plugins.BuiltinActionRegistration registration)
+	{
+		var parameters = registration.ProjectParameters(action);
+		string? invalid = registration.Contribution.Validate(parameters);
+		if (!string.IsNullOrWhiteSpace(invalid))
+		{
+			Plugins.PluginHost.NotifyUser(registration.Contribution.Descriptor.DisplayName, invalid);
+			return;
+		}
+
+		var input = new StarPie.Plugin.PluginActionInput
+		{
+			ContributionId = registration.FullId,
+			Parameters = parameters,
+			Context = new StarPie.Plugin.ActionContext(),
+		};
+		StarPie.Plugin.ActionResult result = registration.Contribution.ExecuteAsync(input, CancellationToken.None)
+			.GetAwaiter().GetResult();
+		if (!result.Success)
+		{
+			throw new InvalidOperationException(result.Message ?? $"内建动作 {registration.FullId} 执行失败。");
+		}
+	}
+
+	private static void ExecuteClaimedActionItem(ActionItem action, Plugins.PluginTypeClaimBinding claim)
+	{
+		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecuteClaimedAction(action, claim);
+		if (!outcome.Success)
+		{
+			AppLogger.LogWarn($"Claimed action failed: {claim.FullId}, Reason='{outcome.Message}'");
+			Plugins.PluginHost.NotifyUser("内置动作执行失败", outcome.Message);
+		}
+	}
+	private static void ExecutePluginActionItem(ActionItem action)
+	{
+		Plugins.PluginExecuteOutcome outcome = Plugins.PluginHost.ExecutePluginAction(action);
+
+		if (!outcome.Handled)
+		{
+			AppLogger.LogWarn($"Plugin action not handled: Name='{action.Name}', Ref='{action.PluginActionRef}'");
+			return;
+		}
+
+		if (outcome.QueuedToBackground)
+		{
+			AppLogger.LogInfo($"Plugin action queued to background: {action.PluginActionRef}, Name='{action.Name}'");
+			return;
+		}
+
+		if (outcome.Success)
+		{
+			AppLogger.LogInfo($"Plugin action succeeded: {action.PluginActionRef}");
+			return;
+		}
+
+		AppLogger.LogWarn($"Plugin action failed: {action.PluginActionRef}, Reason='{outcome.Message}'");
+		Plugins.PluginHost.NotifyUser("插件动作执行失败", outcome.Message);
 	}
 
 	public static bool TryToggleProcessWindow(string processOrExePath)
@@ -551,7 +604,7 @@ public static class ActionExecutor
 		return null;
 	}
 
-	private static void ExecuteWebUrl(string url, string? browserChoice, string? customBrowserPath)
+	internal static void ExecuteWebUrl(string url, string? browserChoice, string? customBrowserPath)
 	{
 		if (string.IsNullOrWhiteSpace(url))
 		{
@@ -647,7 +700,7 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void SafeSetClipboardText(string text)
+	internal static void SafeSetClipboardText(string text)
 	{
 		if (string.IsNullOrEmpty(text))
 		{
@@ -699,7 +752,7 @@ public static class ActionExecutor
 		}
 	}
 
-	public static void ExecuteShellTool(string verb)
+	internal static void ExecuteShellTool(string verb)
 	{
 		if (string.IsNullOrWhiteSpace(verb)) return;
 		AppLogger.LogInfo($"Executing ShellTool verb: '{verb}'");
@@ -1075,7 +1128,7 @@ public static class ActionExecutor
 		return paths.FirstOrDefault(File.Exists) ?? "WinRAR.exe";
 	}
 
-	private static void ExecuteFolder(string folderPath)
+	internal static void ExecuteFolder(string folderPath)
 	{
 		if (string.IsNullOrWhiteSpace(folderPath))
 		{
@@ -1155,7 +1208,7 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteLaunch(string path, string arguments, bool runAsStandardUser = false)
+	internal static void ExecuteLaunch(string path, string arguments, bool runAsStandardUser = false)
 	{
 		if (string.IsNullOrWhiteSpace(path))
 		{
@@ -1332,11 +1385,11 @@ public static class ActionExecutor
 	}
 
 	/// <summary>Runs a command in the selected terminal (cmd / PowerShell / WSL), with or without a window.</summary>
-	private static void ExecuteCommand(string command, string? terminal)
+	internal static bool ExecuteCommand(string command, string? terminal)
 	{
 		if (string.IsNullOrWhiteSpace(command))
 		{
-			return;
+			return false;
 		}
 		string term = string.IsNullOrEmpty(terminal) ? "cmd" : terminal.Trim().ToLowerInvariant();
 		bool hidden = term.EndsWith("_hidden", StringComparison.OrdinalIgnoreCase);
@@ -1373,16 +1426,31 @@ public static class ActionExecutor
 				});
 				break;
 			}
+
+			return true;
 		}
 		catch (Exception ex)
 		{
 			AppLogger.LogError($"Failed to run command '{command}' in '{terminal}'", ex);
-			MessageBox.Show("Failed to run command: " + ex.Message, "StarPie", MessageBoxButton.OK, MessageBoxImage.Hand);
+			return false;
 		}
 	}
 
-/// <summary>切换到任务栏第 N 个窗口；参数缺失/非法默认第 1 个。全程后台线程执行（UIA 遍历/前台激活不得阻塞 UI 与钩子线程）。</summary>
-	private static void ExecuteSwitchWindow(string? parameter)
+	/// <summary>
+	/// 切换到任务栏第 N 个窗口；参数缺失/非法时默认第 1 个。
+	/// 全程在后台线程执行 —— UIA 遍历与前台激活都不得阻塞 UI 与钩子线程。
+	/// <para>
+	/// 可见性从 <c>private</c> 放宽到 <c>internal</c>：现在唯一的调用方是
+	/// <c>Plugins.PluginWindowService.ActivateTaskbarSlot</c>（随包动作包「切换窗口」经它过来），
+	/// 宿主界面层不直接调。
+	/// </para>
+	/// <para>
+	/// <b>刻意保持 <c>void</c>、不改成 <c>bool</c></b>：实现体把工作丢给 <c>Task.Run</c> 就返回了，
+	/// 真正的失败（第 N 个槽位不存在）发生在后台线程上，这里根本无从得知。
+	/// 与其编一个不可靠的返回值，不如把语义留空，由调用方如实说明「只表示已受理」。
+	/// </para>
+	/// </summary>
+	internal static void ExecuteSwitchWindow(string? parameter)
 	{
 		int n = 1;
 		if (int.TryParse(parameter?.Trim(), out int parsed) && parsed > 0)
@@ -1526,7 +1594,7 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteHotkey(string hotkeyString)
+	internal static void ExecuteHotkey(string hotkeyString)
 	{
 		if (string.IsNullOrWhiteSpace(hotkeyString))
 		{
@@ -1724,11 +1792,26 @@ public static class ActionExecutor
 		}
 	}
 
-	private static void ExecuteSystem(string presetName)
+	/// <summary>
+	/// 执行系统功能预设。
+	/// <para>
+	/// <b>入参是稳定 ID 还是中文名？两者都收。</b>先 <c>ToLowerInvariant()</c> 再比对，
+	/// 所以主力分支是一串英文小写 ID（<c>windowswitcher</c> / <c>alttab</c> / …），
+	/// 它们与 <c>SlotViewModel.SystemPresetList</c> 的 <c>Key</c> 一一对应。
+	/// </para>
+	/// <para>
+	/// <b>那几处中文 case 是历史数据兼容，不要把它们改掉、也不要以为它们该接 i18n</b>：
+	/// 老版本往 <c>Action.Parameter</c> 里存的是中文显示名（「锁屏」「控制台」「文件秒搜」…），
+	/// 用户升级后这些配置还在。中文 case 匹配的是<b>已存在配置文件里的历史字符串</b>，
+	/// 属于数据而不是界面文案 —— 界面语言怎么切都不影响老配置里的那几个字。
+	/// 拿「中文参与判断」的扫描结果挨个清理时，这几处要按可接受项排除。
+	/// </para>
+	/// </summary>
+	internal static bool ExecuteSystem(string presetName)
 	{
 		if (string.IsNullOrEmpty(presetName))
 		{
-			return;
+			return false;
 		}
 		string text = presetName.Trim().ToLowerInvariant();
 
@@ -1738,44 +1821,44 @@ public static class ActionExecutor
 		case "taskswitcher":
 		case "alttabsticky":
 			ExecuteHotkey("Ctrl+Alt+Tab");
-			break;
+			return true;
 		case "alttab":
 		case "switchwindow":
 			ExecuteHotkey("Alt+Tab");
-			break;
+			return true;
 		case "closewindow":
 			ExecuteHotkey("Alt+F4");
-			break;
+			return true;
 		case "minimize":
 			ExecuteHotkey("Win+Down");
-			break;
+			return true;
 		case "maximize":
 			ExecuteHotkey("Win+Up");
-			break;
+			return true;
 		case "snapleft":
 			ExecuteHotkey("Win+Left");
-			break;
+			return true;
 		case "snapright":
 			ExecuteHotkey("Win+Right");
-			break;
+			return true;
 		case "taskview":
 			ExecuteHotkey("Win+Tab");
-			break;
+			return true;
 		case "prevdesktop":
 			ExecuteHotkey("Win+Ctrl+Left");
-			break;
+			return true;
 		case "nextdesktop":
 			ExecuteHotkey("Win+Ctrl+Right");
-			break;
+			return true;
 		case "showdesktop":
 			ExecuteHotkey("Win+D");
-			break;
+			return true;
 		case "fullscreen":
 			ExecuteHotkey("F11");
-			break;
+			return true;
 		case "screenshot":
 			ExecuteHotkey("Win+Shift+S");
-			break;
+			return true;
 		case "taskmanager":
 			if (!TryToggleProcessWindow("taskmgr"))
 			{
@@ -1792,7 +1875,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Ctrl+Shift+Esc");
 				}
 			}
-			break;
+			return true;
 		case "explorer":
 			try
 			{
@@ -1806,7 +1889,7 @@ public static class ActionExecutor
 			{
 				ExecuteHotkey("Win+E");
 			}
-			break;
+			return true;
 		case "opensettings":
 		case "openstarpie":
 		case "starpie":
@@ -1816,7 +1899,7 @@ public static class ActionExecutor
 			{
 				App.ShowSettingsWindow();
 			});
-			break;
+			return true;
 		case "settings":
 			if (!TryToggleProcessWindow("SystemSettings"))
 			{
@@ -1833,7 +1916,7 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+I");
 				}
 			}
-			break;
+			return true;
 		case "calculator":
 			AppLogger.LogInfo("Launching System Calculator");
 			try
@@ -1861,13 +1944,13 @@ public static class ActionExecutor
 					ExecuteHotkey("Win+R");
 				}
 			}
-			break;
+			return true;
 		case "rundialog":
 			ExecuteHotkey("Win+R");
-			break;
+			return true;
 		case "windowssearch":
 			ExecuteHotkey("Win+S");
-			break;
+			return true;
 		case "quicksearch":
 		case "quickfinder":
 		case "nativesearch":
@@ -1878,61 +1961,61 @@ public static class ActionExecutor
 			{
 				QuickSearchWindow.ShowOrActivate();
 			});
-			break;
+			return true;
 		case "clipboardhistory":
 			ExecuteHotkey("Win+V");
-			break;
+			return true;
 		case "lockworkstation":
 		case "锁定屏幕":
 		case "锁屏":
 		case "lock":
 			LockWorkStation();
-			break;
+			return true;
 		case "volumeup":
 			SimulateSingleKey(175);
-			break;
+			return true;
 		case "volumedown":
 			SimulateSingleKey(174);
-			break;
+			return true;
 		case "volumemute":
 			SimulateSingleKey(173);
-			break;
+			return true;
 		case "playpause":
 			SimulateSingleKey(179);
-			break;
+			return true;
 		case "nexttrack":
 			SimulateSingleKey(176);
-			break;
+			return true;
 		case "prevtrack":
 			SimulateSingleKey(177);
-			break;
+			return true;
 		case "stopmedia":
 			SimulateSingleKey(178);
-			break;
+			return true;
 		case "newtab":
 			ExecuteHotkey("Ctrl+T");
-			break;
+			return true;
 		case "closetab":
 			ExecuteHotkey("Ctrl+W");
-			break;
+			return true;
 		case "reopentab":
 			ExecuteHotkey("Ctrl+Shift+T");
-			break;
+			return true;
 		case "refresh":
 			ExecuteHotkey("F5");
-			break;
+			return true;
 		case "hardrefresh":
 			ExecuteHotkey("Ctrl+F5");
-			break;
+			return true;
 		case "zoomin":
 			ExecuteHotkey("Ctrl+Plus");
-			break;
+			return true;
 		case "zoomout":
 			ExecuteHotkey("Ctrl+Minus");
-			break;
+			return true;
 		case "zoomreset":
 			ExecuteHotkey("Ctrl+0");
-			break;
+			return true;
 		case "sleep":
 		case "睡眠":
 		case "休眠":
@@ -1947,7 +2030,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "restart":
 		case "重启":
 		case "reboot":
@@ -1961,7 +2044,7 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
 		case "shutdown":
 		case "关机":
 		case "poweroff":
@@ -1975,7 +2058,9 @@ public static class ActionExecutor
 				});
 			}
 			catch { }
-			break;
+			return true;
+		default:
+			return false;
 		}
 	}
 

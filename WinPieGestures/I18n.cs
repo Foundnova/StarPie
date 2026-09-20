@@ -74,101 +74,68 @@ public static void SetLanguage(string code)
 			}
 			return;
 		}
-		if (code != null)
+		// 反编译残留清理：原文是 ILSpy 还原结构化控制流失败后吐出的「长度 + 字符试探 + 跳转表」
+		// （31 处 `IL_xxxx` 标签跳转），这里改回它本来的形状 —— 对受支持的语言代码做精确匹配。
+		// 注意 code 为 null（配置文件里 Language 缺失）时，原实现兜底落到的同样是 ZhCn，
+		// 因此并入 `_` 分支，语义与原来逐条等价。
+		CurrentLanguage = code switch
 		{
-			int length = code.Length;
-			if (length != 2)
-			{
-				if (length != 5)
-				{
-					if (length == 7 && code == "zh-Hant")
-					{
-						goto IL_0169;
-					}
-				}
-				else
-				{
-					switch (code[3])
-					{
-					case 'T':
-						break;
-					case 'H':
-						goto IL_0100;
-					case 'U':
-						goto IL_010f;
-					case 'G':
-						goto IL_011e;
-					case 'J':
-						goto IL_012d;
-					default:
-						goto IL_0175;
-					}
-					if (code == "zh-TW")
-					{
-						goto IL_0169;
-					}
-				}
-			}
-			else
-			{
-				char c = code[0];
-				if (c != 'e')
-				{
-					if (c == 'j' && code == "ja")
-					{
-						goto IL_0171;
-					}
-				}
-				else if (code == "en")
-				{
-					goto IL_016d;
-				}
-			}
-		}
-		goto IL_0175;
-		IL_012d:
-		if (code == "ja-JP")
-		{
-			goto IL_0171;
-		}
-		goto IL_0175;
-		IL_0100:
-		if (code == "zh-HK")
-		{
-			goto IL_0169;
-		}
-		goto IL_0175;
-		IL_010f:
-		if (code == "en-US")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
-		IL_0169:
-		LanguageCode currentLanguage = LanguageCode.ZhTw;
-		goto IL_0177;
-		IL_0175:
-		currentLanguage = LanguageCode.ZhCn;
-		goto IL_0177;
-		IL_0171:
-		currentLanguage = LanguageCode.Ja;
-		goto IL_0177;
-		IL_0177:
-		CurrentLanguage = currentLanguage;
-		return;
-		IL_016d:
-		currentLanguage = LanguageCode.En;
-		goto IL_0177;
-		IL_011e:
-		if (code == "en-GB")
-		{
-			goto IL_016d;
-		}
-		goto IL_0175;
+			"zh-TW" or "zh-Hant" or "zh-HK" => LanguageCode.ZhTw,
+			"en" or "en-US" or "en-GB" => LanguageCode.En,
+			"ja" or "ja-JP" => LanguageCode.Ja,
+			_ => LanguageCode.ZhCn
+		};
 	}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static string T(string key) => GetString(key);
+
+	/// <summary>
+	/// 查表并填充占位符（词条里写 <c>{0}</c> / <c>{1}</c>）。
+	/// <para>
+	/// 单独开这个方法、而不是让每个调用方各自写 <c>string.Format</c>：一是省掉重复代码，
+	/// 二是键缺失时 <see cref="T"/> 会原样返回键名，此时 <c>string.Format</c> 作用在不含
+	/// 占位符的字符串上是安全的（不会抛）—— 失败路径不会把界面搞崩。
+	/// </para>
+	/// </summary>
+	public static string TF(string key, params object?[] args)
+	{
+		return string.Format(T(key), args);
+	}
+
+	/// <summary>
+	/// 取某个键在<b>全部语言</b>下的值（去重后的非空集合，仅内置词条）。
+	/// <para>
+	/// 专供「与语言无关的判据」使用。典型用例是判断一个动作名是不是系统自动填的默认名：
+	/// 只认当前语言的话，用户切一次语言之后，界面里那个<b>旧语言</b>的默认名就会被
+	/// 当成「用户自己起的名字」，自动填充从此对那条动作失效 —— 而且换回语言也不恢复。
+	/// </para>
+	/// <para>
+	/// 不含插件注册的外部词条：外部词条在停用插件时会被回收，拿它做判据会让
+	/// 「这个名字算不算默认名」随插件启停而变。
+	/// </para>
+	/// </summary>
+	internal static IEnumerable<string> AllTranslations(string key)
+	{
+		if (!Translations.TryGetValue(key, out LocalizedString value))
+		{
+			return Array.Empty<string>();
+		}
+
+		var result = new List<string>(4);
+		void AddIfValid(string? str)
+		{
+			if (!string.IsNullOrWhiteSpace(str) && !result.Contains(str))
+			{
+				result.Add(str);
+			}
+		}
+		AddIfValid(value.ZhCn);
+		AddIfValid(value.ZhTw);
+		AddIfValid(value.En);
+		AddIfValid(value.Ja);
+		return result;
+	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static string GetString(string key)
@@ -177,7 +144,74 @@ public static void SetLanguage(string code)
 		{
 			return localized.Get(_currentLanguage);
 		}
+
+		// 插件词条（外部注册）。
+		// 走「写时复制」的独立字典而不是直接改 Translations：Translations 在静态构造后即视为只读，
+		// 而它的读取遍布 UI 与渲染线程，直接插入会与其形成无锁并发读写。
+		// 外部字典在零插件时恒为空，这里的开销只有一次 volatile 读 + Count 判断。
+		Dictionary<string, Dictionary<LanguageCode, string>>? external = _externalTranslations;
+		if (external.Count > 0 && external.TryGetValue(key, out Dictionary<LanguageCode, string>? extValue))
+		{
+			if (extValue.TryGetValue(_currentLanguage, out var extCurrent))
+			{
+				return extCurrent;
+			}
+			if (extValue.TryGetValue(LanguageCode.ZhCn, out var extFallback))
+			{
+				return extFallback;
+			}
+			// 有词条但没有当前语言也没有中文兜底：取第一个可用值，好过把 key 显示给用户
+			foreach (string candidate in extValue.Values)
+			{
+				return candidate;
+			}
+		}
+
 		return key;
+	}
+
+// ------------------------------------------------------------------ 插件外部词条
+
+	/// <summary>
+	/// 插件词条的写时复制快照。读取侧完全无锁；写入侧只在插件启用/停用时发生（低频）。
+	/// </summary>
+	private static volatile Dictionary<string, Dictionary<LanguageCode, string>> _externalTranslations
+		= new Dictionary<string, Dictionary<LanguageCode, string>>(StringComparer.Ordinal);
+
+	/// <summary>当前已注册的插件词条数量（诊断用）。</summary>
+	public static int ExternalTranslationCount => _externalTranslations.Count;
+
+	/// <summary>
+	/// 注册一条插件词条。<paramref name="fullKey"/> 必须是完整 key（含 <c>plugin.&lt;id&gt;.</c> 前缀），
+	/// 归一化由宿主在 <c>II18nRegistry</c> 实现里完成，此处不做二次加工。
+	/// </summary>
+	public static bool RegisterExternal(string fullKey, Dictionary<LanguageCode, string> values)
+	{
+		if (string.IsNullOrWhiteSpace(fullKey) || values == null || values.Count == 0)
+		{
+			return false;
+		}
+
+		var next = new Dictionary<string, Dictionary<LanguageCode, string>>(_externalTranslations, StringComparer.Ordinal)
+		{
+			[fullKey] = new Dictionary<LanguageCode, string>(values),
+		};
+		_externalTranslations = next;
+		return true;
+	}
+
+	/// <summary>注销一条插件词条。</summary>
+	public static bool UnregisterExternal(string fullKey)
+	{
+		if (string.IsNullOrWhiteSpace(fullKey) || !_externalTranslations.ContainsKey(fullKey))
+		{
+			return false;
+		}
+
+		var next = new Dictionary<string, Dictionary<LanguageCode, string>>(_externalTranslations, StringComparer.Ordinal);
+		bool removed = next.Remove(fullKey);
+		_externalTranslations = next;
+		return removed;
 	}
 
 public static string FormatKeyName(string? keyStr, uint vkCode = 0)
@@ -1828,6 +1862,303 @@ public static string FormatKeyName(string? keyStr, uint vkCode = 0)
 		Add("SysCategory_Shutdown", "电源控制", "電源控制", "Power Options", "電源制御");
 		Add("SysPreset_Shutdown", "关闭电脑 (Shutdown)", "關閉電腦 (Shutdown)", "Shut Down PC", "シャットダウン");
 		Add("SysPresetName_Shutdown", "关机", "關機", "Shut Down", "シャットダウン");
+
+Add("AboutCheckUpdate", "🔄 检查更新", "🔄 檢查更新", "🔄 Check for updates", "🔄 更新を確認");
+		Add("ActionTypePluginShort", "插件动作", "外掛動作", "Plugin Action", "プラグイン動作");
+		Add("AddGestureMapping", "➕ 添加手势映射", "➕ 新增手勢對應", "➕ Add mapping", "➕ マッピングを追加");
+		Add("AddLayer", "➕ 加层", "➕ 新增圖層", "➕ Add layer", "➕ レイヤーを追加");
+		Add("AddProfileShort", "➕ 新增", "➕ 新增", "➕ New", "➕ 新規");
+		Add("ApplyRestartUpdate", "🚀 立即退出并重启更新", "🚀 立即結束並重新啟動更新", "🚀 Exit and restart to update", "🚀 終了して再起動し更新");
+		Add("BatchLayoutBoth", "🖼️+🔤 图文", "🖼️+🔤 圖文", "🖼️+🔤 Icon + text", "🖼️+🔤 アイコン＋文字");
+		Add("BatchLayoutIconOnly", "🖼️ 仅图标", "🖼️ 僅圖示", "🖼️ Icon only", "🖼️ アイコンのみ");
+		Add("BatchLayoutInherit", "🌐 继承全局", "🌐 繼承全域", "🌐 Inherit global", "🌐 グローバルを継承");
+		Add("BatchLayoutTextOnly", "🔤 仅文字", "🔤 僅文字", "🔤 Text only", "🔤 文字のみ");
+		Add("BatchResetCustom", "🔄 清除自定义，恢复跟随全局统一", "🔄 清除自訂，恢復跟隨全域統一", "🔄 Clear customisations, follow global", "🔄 カスタムを消去しグローバルに従う");
+		Add("BrowseCoreImage", "浏览图片...", "瀏覽圖片...", "Browse image...", "画像を参照…");
+		Add("BtnDeleteCurrentProfile", "\ud83d\uddd1\ufe0f 删除当前配置", "\ud83d\uddd1\ufe0f 刪除當前配置", "\ud83d\uddd1\ufe0f Delete Profile", "\ud83d\uddd1\ufe0f 設定を削除");
+		Add("BtnRenameCurrentProfile", "✏\ufe0f 重命名当前配置", "✏\ufe0f 重新命名當前配置", "✏\ufe0f Rename Profile", "✏\ufe0f 名前を変更");
+		Add("CancelDownload", "✖ 取消下载", "✖ 取消下載", "✖ Cancel download", "✖ ダウンロードを中止");
+		Add("CenterInfoToggle", "ℹ️ 说明 ▾", "ℹ️ 說明 ▾", "ℹ️ Help ▾", "ℹ️ 説明 ▾");
+		Add("CenterPresetsToggle", "⚡ 常用预设 ▾", "⚡ 常用預設 ▾", "⚡ Presets ▾", "⚡ よく使うプリセット ▾");
+		Add("ClearCoreImage", "清除", "清除", "Clear", "クリア");
+		Add("CopyLayer", "📑 复制", "📑 複製", "📑 Copy", "📑 複製");
+		Add("CustomSoundExportProfile", "💾 导出", "💾 匯出", "💾 Export", "💾 書き出し");
+		Add("CustomSoundImportProfile", "📂 导入", "📂 匯入", "📂 Import", "📂 読み込み");
+		Add("CustomSoundNewProfile", "➕ 新建", "➕ 新增", "➕ New", "➕ 新規");
+		Add("CustomSoundOpenEditorWindow", "🎛️ 独立大窗", "🎛️ 獨立大視窗", "🎛️ Open in window", "🎛️ 別ウィンドウで開く");
+		Add("CustomSoundPlayFlow", "🔊 连续模拟完整手势交互体验", "🔊 連續模擬完整手勢互動體驗", "🔊 Play the full gesture interaction", "🔊 一連の操作をまとめて再生");
+		Add("CustomSoundResetProfile", "🔄 重置", "🔄 重設", "🔄 Reset", "🔄 リセット");
+		Add("EnableCenterAction", "启用中心核圆动作", "啟用中心核圓動作", "Enable centre core action", "中央コアの動作を有効にする");
+		Add("EnableGlobalInheritance", "🌐 继承全局方案未配置槽位", "🌐 繼承全域方案未配置槽位", "🌐 Inherit global for unconfigured slots", "🌐 未設定スロットはグローバルを継承");
+		Add("FocusAddSubAction", "➕ 添加二级动作", "➕ 新增二級動作", "➕ Add sub-action", "➕ サブ動作を追加");
+		Add("FocusBackToParent", "◀ 返回父级扇区", "◀ 返回上層扇區", "◀ Back to parent sector", "◀ 親セクターに戻る");
+		Add("FocusBatchExit", "✕ 退出多选", "✕ 結束多選", "✕ Exit multi-select", "✕ 複数選択を終了");
+		Add("FocusCenterCore", "🎯 中心核圆", "🎯 中心核圓", "🎯 Centre core", "🎯 中央コア");
+		Add("FocusClearInheritedIcon", "✕ 清除关联", "✕ 清除關聯", "✕ Clear link", "✕ 関連付けを解除");
+		Add("FocusClearSubActions", "🗑️ 清空", "🗑️ 清空", "🗑️ Clear all", "🗑️ すべて消去");
+		Add("FocusNextSlot", "下一槽 ▶", "下一槽 ▶", "Next slot ▶", "次のスロット ▶");
+		Add("FocusPickShellTool", "⚡ 挑选功能...", "⚡ 挑選功能...", "⚡ Pick a tool...", "⚡ 機能を選択…");
+		Add("FocusPluginReload", "🔄 停用后重新加载", "🔄 停用後重新載入", "🔄 Reload after disabling", "🔄 無効化して再読み込み");
+		Add("FocusPopulateTileSubActions", "✨ 预设 8 布局二级轮盘", "✨ 預設 8 佈局二級輪盤", "✨ Fill 8 tile layouts", "✨ 8分割レイアウトを設定");
+		Add("FocusPrevSlot", "◀ 上一槽", "◀ 上一槽", "◀ Previous slot", "◀ 前のスロット");
+		Add("FocusRestoreInherit", "🌐 恢复继承全局", "🌐 恢復繼承全域", "🌐 Restore global inheritance", "🌐 グローバル継承に戻す");
+		Add("FocusTestAction", "▶ 测试触发", "▶ 測試觸發", "▶ Test trigger", "▶ テスト実行");
+		Add("FocusUndoSubActions", "↩️ 撤销", "↩️ 復原", "↩️ Undo", "↩️ 元に戻す");
+		Add("IconLayoutModeTitle", "排版模式:", "排版模式:", "Layout mode:", "レイアウトモード:");
+		Add("MappingsSectorCount12", "12 键钟表方位", "12 鍵鐘錶方位", "12 positions (clock)", "12方位（時計）");
+		Add("MappingsSectorCount4", "4 键十字方位", "4 鍵十字方位", "4 positions (cross)", "4方位（十字）");
+		Add("MappingsSectorCount8", "8 键全向方位 (推荐)", "8 鍵全向方位 (推薦)", "8 positions (recommended)", "8方位（推奨）");
+		Add("MappingsTier1Segment", "🔘 一级主轮盘", "🔘 一級主輪盤", "🔘 Tier 1 wheel", "🔘 第1階層ホイール");
+		Add("MappingsTier2Segment", "🌟 二级级联", "🌟 二級串聯", "🌟 Tier 2 cascade", "🌟 第2階層カスケード");
+		Add("MappingsViewModeCanvas", "🎯 画布联动精调 (推荐)", "🎯 畫布關聯精調 (推薦)", "🎯 Canvas live editor (recommended)", "🎯 キャンバス連動編集（推奨）");
+		Add("MappingsViewModeList", "📋 紧凑全览列表", "📋 精簡總覽清單", "📋 Compact list", "📋 コンパクト一覧");
+		Add("OpenUpdateFolder", "📂 打开文件位置", "📂 開啟檔案位置", "📂 Open file location", "📂 ファイルの場所を開く");
+		Add("OpenWebRelease", "🌐 前往网页", "🌐 前往網頁", "🌐 Open release page", "🌐 リリースページを開く");
+		Add("PickCoreIcon", "选择图标...", "選擇圖示...", "Choose icon...", "アイコンを選択…");
+		Add("PluginCandidateAuthor", "作者 {0}", "作者 {0}", "by {0}", "作者 {0}");
+		Add("PluginCandidateCapabilities", "声明能力：{0}", "宣告能力：{0}", "Capabilities: {0}", "宣言機能：{0}");
+		Add("PluginCandidateInstall", "📦 安装", "📦 安裝", "📦 Install", "📦 インストール");
+		Add("PluginCandidateInstallDowngrade", "⬇️ 降级安装", "⬇️ 降級安裝", "⬇️ Downgrade", "⬇️ ダウングレード");
+		Add("PluginCandidateInstallOverwrite", "📦 覆盖安装", "📦 覆蓋安裝", "📦 Overwrite", "📦 上書きインストール");
+		Add("PluginCandidateInstallUpdate", "⬆️ 更新", "⬆️ 更新", "⬆️ Update", "⬆️ 更新");
+		Add("PluginCandidateNoteDifferentContent", "内容与已装的不同。", "內容與已裝的不同。", "The content differs from the installed version.", "内容はインストール済みのものと異なります。");
+		Add("PluginCandidateNoteDowngrade", "已装 v{0}，这枚是更旧的 v{1}。一般不建议降级。", "已裝 v{0}，這枚是更舊的 v{1}。一般不建議降級。", "v{0} is installed; this file is the older v{1}. Downgrading is usually not recommended.", "v{0} がインストール済みで、これは古い v{1} です。通常、ダウングレードは推奨しません。");
+		Add("PluginCandidateNoteDuplicate", "扫描目录里有 {0} 枚 .dll 声明了同一个 ID（{1}），无法判断该装哪一枚。请只保留需要的那一个文件。", "掃描目錄裡有 {0} 枚 .dll 宣告了同一個 ID（{1}），無法判斷該裝哪一枚。請只保留需要的那一個檔案。", "{0} .dll files in the scan folder declare the same ID ({1}), so there is no way to tell which one to install. Keep only the file you need.", "スキャンフォルダー内の {0} 個の .dll が同じ ID（{1}）を宣言しているため、どれをインストールすべきか判断できません。必要なファイルだけを残してください。");
+		Add("PluginCandidateNoteExternalRegistered", "同一个 ID 已被开发者模式的外部路径登记占用：{0}。如需改为安装副本，请先在列表里卸载那条登记。", "同一個 ID 已被開發者模式的外部路徑登記占用：{0}。如需改為安裝副本，請先在清單裡解除那條登記。", "The same ID is already claimed by a developer-mode external path registration: {0}. To switch to an installed copy, unregister it in the list first.", "同じ ID は既に開発者モードの外部パス登録（{0}）が使用しています。インストール済みのコピーに切り替える場合は、先に一覧からその登録を解除してください。");
+		Add("PluginCandidateNoteInstallable", "尚未安装，可直接安装。", "尚未安裝，可直接安裝。", "Not installed yet — you can install it directly.", "まだインストールされていません。そのままインストールできます。");
+		Add("PluginCandidateNoteInstalled", "已装同一个版本（v{0}），无需重复安装。", "已裝同一個版本（v{0}），無需重複安裝。", "Version v{0} is already installed — no need to install it again.", "同じバージョン（v{0}）が既にインストールされています。再インストールは不要です。");
+		Add("PluginCandidateNoteRejected", "无法安装：{0}", "無法安裝：{0}", "Cannot install: {0}", "インストールできません：{0}");
+		Add("PluginCandidateNoteReplaced", "已装的 v{0} 与这枚文件版本号相同但内容不同（哈希不一致）。覆盖安装会用它替换现有文件。", "已裝的 v{0} 與這枚檔案版本號相同但內容不同（雜湊不一致）。覆蓋安裝會用它取代現有檔案。", "The installed v{0} and this file share the same version number but differ in content (hash mismatch). Overwriting will replace the existing file with this one.", "インストール済みの v{0} とこのファイルはバージョンが同じで内容が異なります（ハッシュ不一致）。上書きインストールするとこのファイルに置き換わります。");
+		Add("PluginCandidateNoteReserved", "这是官方模块（{0}）。扫描目录只用于手动安装社区插件 —— 官方模块请到上方「官方插件」列表里下载和更新，宿主不会从这里安装它。", "這是官方模組（{0}）。掃描目錄只用於手動安裝社群外掛 —— 官方模組請到上方「官方外掛」清單裡下載和更新，宿主不會從這裡安裝它。", "This is an official module ({0}). The scan folder is only for installing community plugins by hand — download and update official modules from the \"Official plugins\" list above; StarPie will not install it from here.", "これは公式モジュール（{0}）です。スキャンフォルダーはコミュニティプラグインを手動でインストールするためのもので、公式モジュールは上の「公式プラグイン」一覧からダウンロード・更新してください。ここからはインストールされません。");
+		Add("PluginCandidateNoteSameContent", "内容与已装的一致。", "內容與已裝的一致。", "The content matches the installed version.", "内容はインストール済みのものと一致します。");
+		Add("PluginCandidateNoteUpdate", "已装 v{0}，这枚是更新的 v{1}。", "已裝 v{0}，這枚是更新的 v{1}。", "v{0} is installed; this file is the newer v{1}.", "v{0} がインストール済みで、これは新しい v{1} です。");
+		Add("PluginCandidateNoteVersionUnknown", "已装版本「{0}」与候选版本「{1}」至少有一侧解析不了，无法比较新旧。", "已裝版本「{0}」與候選版本「{1}」至少有一側無法解析，無法比較新舊。", "At least one of the installed version \"{0}\" or the candidate version \"{1}\" cannot be parsed, so the two cannot be compared.", "インストール済みバージョン「{0}」と候補バージョン「{1}」の少なくとも一方を解析できないため、新旧を比較できません。");
+		Add("PluginCandidateStateDowngrade", "版本更旧", "版本更舊", "Older version", "古いバージョン");
+		Add("PluginCandidateStateDuplicate", "ID 重复", "ID 重複", "Duplicate ID", "ID 重複");
+		Add("PluginCandidateStateExternalRegistered", "已外部引用", "已外部引用", "Externally registered", "外部参照済み");
+		Add("PluginCandidateStateInstallable", "可安装", "可安裝", "Installable", "インストール可能");
+		Add("PluginCandidateStateInstalled", "已装同版本", "已裝同版本", "Same version installed", "同じバージョンを導入済み");
+		Add("PluginCandidateStateRejected", "无法识别", "無法識別", "Unrecognized", "認識できません");
+		Add("PluginCandidateStateReplaced", "内容已变", "內容已變", "Content changed", "内容が変更されています");
+		Add("PluginCandidateStateReserved", "官方模块", "官方模組", "Official module", "公式モジュール");
+		Add("PluginCandidateStateUpdate", "有新版本", "有新版本", "Update available", "新しいバージョンあり");
+		Add("PluginCandidateStateVersionUnknown", "版本待确认", "版本待確認", "Version unknown", "バージョン未確認");
+		Add("PluginCapabilityAdmin", "· 需要管理员权限", "· 需要系統管理員權限", "· Require administrator privileges", "· 管理者権限が必要");
+		Add("PluginCapabilityClipboard", "· 读取或修改剪贴板", "· 讀取或修改剪貼簿", "· Read or modify the clipboard", "· クリップボードの読み取り・変更");
+		Add("PluginCapabilityFileSystem", "· 读写你的文件", "· 讀寫你的檔案", "· Read and write your files", "· ファイルの読み書き");
+		Add("PluginCapabilityGlobalHook", "· 安装全局键盘/鼠标钩子", "· 安裝全域鍵盤/滑鼠鉤子", "· Install global keyboard/mouse hooks", "· グローバルなキーボード・マウスフックの設置");
+		Add("PluginCapabilityInputSimulation", "· 向当前窗口发送按键", "· 向目前視窗傳送按鍵", "· Send keystrokes to the current window", "· 現在のウィンドウへキー入力を送信");
+		Add("PluginCapabilityNetwork", "· 访问网络", "· 存取網路", "· Access the network", "· ネットワークへのアクセス");
+		Add("PluginCapabilityNone", "（无）", "（無）", "(none)", "（なし）");
+		Add("PluginCapabilityProcess", "· 启动进程 / 执行命令", "· 啟動行程 / 執行命令", "· Start processes / run commands", "· プロセスの起動 / コマンドの実行");
+		Add("PluginCapabilityRegistry", "· 读写注册表", "· 讀寫登錄檔", "· Read and write the registry", "· レジストリの読み書き");
+		Add("PluginCapabilityScreenCapture", "· 读取屏幕内容（截屏）", "· 讀取螢幕內容（截圖）", "· Read screen contents (screenshot)", "· 画面内容の読み取り（スクリーンショット）");
+		Add("PluginCapabilityUi", "· 显示界面与通知", "· 顯示介面與通知", "· Show windows and notifications", "· ウィンドウと通知の表示");
+		Add("PluginCapabilityWindowControl", "· 移动 / 置顶 / 改变你正在使用的窗口", "· 移動 / 置頂 / 改變你正在使用中的視窗", "· Move, pin, or alter the window you are using", "· 使用中のウィンドウの移動 / 最前面表示 / 変更");
+		Add("PluginPageHeader", "插件与扩展", "外掛與擴充", "Plugins & Extensions", "プラグインと拡張");
+		Add("PluginPageSubheader", "手动选择 .dll 安装社区插件。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。", "手動選擇 .dll 安裝社群外掛。外掛以 StarPie 目前權限在行程內執行，請僅安裝你信任的來源。", "Install community plugins by picking a .dll manually. Plugins run in-process with StarPie's current privileges - only install sources you trust.", "コミュニティプラグインは .dll を手動で選択してインストールします。プラグインは StarPie の権限でプロセス内実行されるため、信頼できる提供元のみ導入してください。");
+		Add("PluginScanFailureHintAmbiguousContractImplementation", "程序集里有多个 IStarPiePlugin 实现。请在 plugin.json 的 entryType 里明确指定入口类全名。", "組件裡有多個 IStarPiePlugin 實作。請在 plugin.json 的 entryType 裡明確指定進入點類別全名。", "The assembly has several IStarPiePlugin implementations. Name the entry class explicitly in plugin.json's entryType.", "アセンブリ内に IStarPiePlugin の実装が複数あります。plugin.json の entryType でエントリクラスの完全名を指定してください。");
+		Add("PluginScanFailureHintApiVersionMismatch", "插件编译时使用的 SDK 契约主版本与当前 StarPie 不一致。请更新插件，或升级 StarPie。", "外掛編譯時使用的 SDK 契約主版本與目前 StarPie 不一致。請更新外掛，或升級 StarPie。", "The plugin was built against a different SDK contract major version than this StarPie. Update the plugin, or update StarPie.", "プラグインがビルド時に使用した SDK 契約のメジャーバージョンが現在の StarPie と一致しません。プラグインを更新するか、StarPie を更新してください。");
+		Add("PluginScanFailureHintContractAssemblyVersionMismatch", "插件自带了 StarPie.Plugin.Abstractions.dll 且版本与宿主不一致。请删除插件目录里的这个文件，它会由 StarPie 统一提供。", "外掛自帶了 StarPie.Plugin.Abstractions.dll 且版本與宿主不一致。請刪除外掛目錄裡的這個檔案，它會由 StarPie 統一提供。", "The plugin ships its own StarPie.Plugin.Abstractions.dll whose version differs from the host's. Delete that file from the plugin folder — StarPie provides it centrally.", "プラグインが独自に StarPie.Plugin.Abstractions.dll を同梱しており、バージョンがホストと一致しません。プラグインフォルダーからこのファイルを削除してください。StarPie が一元提供します。");
+		Add("PluginScanFailureHintDependencyCycle", "插件之间形成了循环依赖，无法确定加载顺序。请联系作者修复依赖声明。", "外掛之間形成了循環相依，無法確定載入順序。請聯絡作者修復相依宣告。", "The plugins depend on each other in a cycle, so the load order cannot be determined. Ask the author to fix the dependency declarations.", "プラグイン間に循環依存があり、読み込み順を決定できません。作者に依存関係の宣言を修正してもらってください。");
+		Add("PluginScanFailureHintDependencyMissing", "插件依赖的另一个插件没有安装或未启用。请先安装并启用依赖项。", "外掛相依的另一個外掛沒有安裝或未啟用。請先安裝並啟用相依項目。", "Another plugin this one depends on is not installed or not enabled. Install and enable the dependency first.", "このプラグインが依存する別のプラグインがインストールされていないか、有効になっていません。先に依存プラグインをインストールして有効にしてください。");
+		Add("PluginScanFailureHintDllNotFound", "清单里声明的程序集文件不在插件目录中，请确认打包时没有漏掉 .dll。", "清單裡宣告的組件檔案不在外掛目錄中，請確認封裝時沒有漏掉 .dll。", "The assembly declared in the manifest is not in the plugin folder. Make sure the .dll was not left out when packaging.", "マニフェストで宣言されたアセンブリがプラグインフォルダーにありません。パッケージ作成時に .dll を入れ忘れていないか確認してください。");
+		Add("PluginScanFailureHintEntryTypeNotFound", "plugin.json 里 entryType 写的类型名在程序集中不存在，请核对命名空间与类型名拼写。", "plugin.json 裡 entryType 寫的型別名稱在組件中不存在，請核對命名空間與型別名稱拼寫。", "The type named in plugin.json's entryType does not exist in the assembly. Check the namespace and type name spelling.", "plugin.json の entryType に書かれた型名がアセンブリ内に存在しません。名前空間と型名の綴りを確認してください。");
+		Add("PluginScanFailureHintHostVersionOutOfRange", "当前 StarPie 版本不在插件声明的可运行区间内。请升级 StarPie，或联系作者放宽版本区间。", "目前 StarPie 版本不在外掛宣告的可執行區間內。請升級 StarPie，或聯絡作者放寬版本區間。", "This StarPie version is outside the range the plugin declares it runs on. Update StarPie, or ask the author to widen the range.", "現在の StarPie のバージョンが、プラグインが宣言した動作可能範囲に含まれていません。StarPie を更新するか、作者に範囲の拡大を依頼してください。");
+		Add("PluginScanFailureHintIdNotDeclared", "这个 .dll 既没有同级的 plugin.json，也没有在程序集里声明 StarPiePluginId 元数据。让作者按文档在 csproj 里补上 AssemblyMetadata 是推荐做法（分发时只需一枚 .dll）；带 plugin.json 的完整插件包同样可以安装。", "這個 .dll 既沒有同層的 plugin.json，也沒有在組件裡宣告 StarPiePluginId 中繼資料。請作者依文件在 csproj 裡補上 AssemblyMetadata 是推薦做法（散佈時只需一枚 .dll）；附帶 plugin.json 的完整外掛包同樣可以安裝。", "This .dll has no plugin.json beside it and declares no StarPiePluginId assembly metadata. The recommended fix is for the author to add AssemblyMetadata in the csproj (so only one .dll needs to ship); a full plugin package with plugin.json works just as well.", "この .dll には同じ階層の plugin.json も、アセンブリ内の StarPiePluginId メタデータもありません。作者がドキュメントに沿って csproj に AssemblyMetadata を追加するのが推奨です（配布時は .dll 1 枚で済みます）。plugin.json を含む完全なプラグインパッケージでもインストールできます。");
+		Add("PluginScanFailureHintInvalidIdFormat", "插件 ID 需要是反向域名风格，全小写，例如 com.example.mytool。", "外掛 ID 需要是反向網域風格，全小寫，例如 com.example.mytool。", "A plugin ID must be reverse-DNS style, all lowercase, for example com.example.mytool.", "プラグイン ID は逆ドメイン形式のすべて小文字にしてください（例：com.example.mytool）。");
+		Add("PluginScanFailureHintManifestInvalid", "请检查 plugin.json 的字段名与类型是否与规范一致（可对照 plugin.schema.json）。", "請檢查 plugin.json 的欄位名稱與型別是否與規範一致（可對照 plugin.schema.json）。", "Check that the field names and types in plugin.json match the spec (compare against plugin.schema.json).", "plugin.json のフィールド名と型が仕様どおりか確認してください（plugin.schema.json と照合できます）。");
+		Add("PluginScanFailureHintNoContractImplementation", "程序集里找不到 IStarPiePlugin 的实现类，说明它不是一个 StarPie 插件。", "組件裡找不到 IStarPiePlugin 的實作類別，說明它不是一個 StarPie 外掛。", "The assembly contains no IStarPiePlugin implementation, so it is not a StarPie plugin.", "アセンブリ内に IStarPiePlugin の実装クラスが見つかりません。StarPie プラグインではありません。");
+		Add("PluginScanFailureHintNone", "识别已通过，无需修复。", "識別已通過，無需修復。", "The scan passed — nothing to fix.", "スキャンは通過しました。修正の必要はありません。");
+		Add("PluginScanFailureHintNotDotNetAssembly", "这是一枚原生 C++ DLL 或非托管库，StarPie 插件必须是 .NET 程序集。你可能选错了文件。", "這是一枚原生 C++ DLL 或非受控程式庫，StarPie 外掛必須是 .NET 組件。你可能選錯了檔案。", "This is a native C++ DLL or an unmanaged library. A StarPie plugin must be a .NET assembly — you may have picked the wrong file.", "これはネイティブ C++ DLL またはアンマネージドライブラリです。StarPie プラグインは .NET アセンブリである必要があります。ファイルの選択を誤っている可能性があります。");
+		Add("PluginScanFailureHintNotIlOnly", "程序集混合了本机代码（C++/CLI）。StarPie 只接受纯托管（ILOnly）程序集。", "組件混合了原生程式碼（C++/CLI）。StarPie 只接受純受控（ILOnly）組件。", "The assembly mixes in native code (C++/CLI). StarPie only accepts purely managed (ILOnly) assemblies.", "アセンブリにネイティブコード（C++/CLI）が混在しています。StarPie は純粋なマネージド（ILOnly）アセンブリのみを受け付けます。");
+		Add("PluginScanFailureHintReservedIdPrefix", "starpie / windows / microsoft / system / builtin 前缀保留给官方，请换一个前缀。", "starpie / windows / microsoft / system / builtin 前綴保留給官方，請換一個前綴。", "The starpie / windows / microsoft / system / builtin prefixes are reserved for official modules. Please pick a different prefix.", "starpie / windows / microsoft / system / builtin の各プレフィックスは公式用に予約されています。別のプレフィックスを使用してください。");
+		Add("PluginScanFailureHintSha256Mismatch", "文件内容与清单声明的哈希不一致，可能下载不完整或被第三方修改过。请从官方渠道重新获取。", "檔案內容與清單宣告的雜湊不一致，可能下載不完整或被第三方修改過。請從官方管道重新取得。", "The file content does not match the hash declared in the manifest — the download may be incomplete or the file modified by a third party. Get it again from the official source.", "ファイルの内容がマニフェストで宣言されたハッシュと一致しません。ダウンロードが不完全か、第三者によって改変された可能性があります。公式の配布元から再取得してください。");
+		Add("PluginScanFailureHintTargetFrameworkMismatch", "插件的目标框架高于当前 StarPie。请升级 StarPie，或联系作者改用更低的 net8.0-windows 目标。", "外掛的目標框架高於目前的 StarPie。請升級 StarPie，或聯絡作者改用較低的 net8.0-windows 目標。", "The plugin targets a newer framework than this StarPie build. Update StarPie, or ask the author to target net8.0-windows or lower.", "プラグインのターゲットフレームワークが現在の StarPie より新しいものです。StarPie を更新するか、作者に net8.0-windows 以下へ下げてもらってください。");
+		Add("PluginScanFailureHintWrongArchitecture", "程序集被编译为仅 32 位（Requires32Bit）。请把插件的平台目标改为 x64 或 AnyCPU 后重新发布。", "組件被編譯為僅 32 位元（Requires32Bit）。請把外掛的平台目標改為 x64 或 AnyCPU 後重新發佈。", "The assembly is compiled as 32-bit only (Requires32Bit). Change the plugin's platform target to x64 or AnyCPU and rebuild.", "アセンブリが 32 ビット専用（Requires32Bit）でコンパイルされています。プラグインのプラットフォームターゲットを x64 または AnyCPU に変更して再発行してください。");
+		Add("PluginScanFailureSeparator", "：", "：", ": ", "：");
+		Add("PluginScanFailureTitleAmbiguousContractImplementation", "入口类型不唯一", "進入點類型不唯一", "Ambiguous entry type", "エントリ型が一意に定まりません");
+		Add("PluginScanFailureTitleApiVersionMismatch", "插件 SDK 契约版本不兼容", "外掛 SDK 契約版本不相容", "Incompatible plugin SDK version", "プラグイン SDK の契約バージョンが非互換です");
+		Add("PluginScanFailureTitleContractAssemblyVersionMismatch", "SDK 程序集版本身份不一致", "SDK 組件版本身分不一致", "SDK assembly version identity mismatch", "SDK アセンブリのバージョン同一性が一致しません");
+		Add("PluginScanFailureTitleDependencyCycle", "插件依赖存在环", "外掛相依存在環", "Cyclic plugin dependency", "プラグインの依存関係に循環があります");
+		Add("PluginScanFailureTitleDependencyMissing", "缺少依赖插件", "缺少相依外掛", "Missing dependency plugin", "依存プラグインが不足しています");
+		Add("PluginScanFailureTitleDllNotFound", "找不到插件程序集", "找不到外掛組件", "Plugin assembly not found", "プラグインアセンブリが見つかりません");
+		Add("PluginScanFailureTitleEntryTypeNotFound", "清单声明的入口类型不存在", "清單宣告的進入點類型不存在", "Declared entry type does not exist", "マニフェストで宣言されたエントリ型が存在しません");
+		Add("PluginScanFailureTitleHostVersionOutOfRange", "宿主版本超出插件声明区间", "宿主版本超出外掛宣告區間", "Host version outside the declared range", "ホストのバージョンが宣言範囲外です");
+		Add("PluginScanFailureTitleIdNotDeclared", "未找到插件标识", "找不到外掛識別碼", "No plugin ID found", "プラグイン識別子が見つかりません");
+		Add("PluginScanFailureTitleInvalidIdFormat", "插件 ID 格式非法", "外掛 ID 格式不合法", "Invalid plugin ID format", "プラグイン ID の形式が不正です");
+		Add("PluginScanFailureTitleManifestInvalid", "plugin.json 格式不正确", "plugin.json 格式不正確", "plugin.json is malformed", "plugin.json の形式が正しくありません");
+		Add("PluginScanFailureTitleNoContractImplementation", "不是 StarPie 插件", "不是 StarPie 外掛", "Not a StarPie plugin", "StarPie プラグインではありません");
+		Add("PluginScanFailureTitleNone", "正常", "正常", "Normal", "正常");
+		Add("PluginScanFailureTitleNotDotNetAssembly", "不是 .NET 程序集", "不是 .NET 組件", "Not a .NET assembly", ".NET アセンブリではありません");
+		Add("PluginScanFailureTitleNotIlOnly", "程序集含本机代码", "組件含原生程式碼", "Assembly contains native code", "アセンブリにネイティブコードが含まれています");
+		Add("PluginScanFailureTitleReservedIdPrefix", "插件 ID 使用了保留前缀", "外掛 ID 使用了保留前綴", "Plugin ID uses a reserved prefix", "プラグイン ID が予約済みプレフィックスを使用しています");
+		Add("PluginScanFailureTitleSha256Mismatch", "文件已损坏或被修改", "檔案已損毀或被修改", "File is corrupted or modified", "ファイルが破損または改変されています");
+		Add("PluginScanFailureTitleTargetFrameworkMismatch", "目标框架不兼容", "目標框架不相容", "Incompatible target framework", "ターゲットフレームワークが非互換です");
+		Add("PluginScanFailureTitleWrongArchitecture", "架构不匹配（需要 64 位）", "架構不符（需要 64 位元）", "Wrong architecture (64-bit required)", "アーキテクチャが一致しません（64 ビットが必要）");
+		Add("PluginsActionBrokenHint", "⚠️ 原先引用的插件动作已不可用（插件可能已被停用或卸载），请重新选择。", "⚠️ 原先引用的外掛動作已無法使用（外掛可能已被停用或解除安裝），請重新選擇。", "⚠️ The plugin action this referred to is no longer available (the plugin may be disabled or uninstalled). Please choose another one.", "⚠️ 参照していたプラグイン動作は利用できません（プラグインが無効化または削除された可能性があります）。選び直してください。");
+		Add("PluginsActionNotSelected", "当前动作尚未选定具体的插件动作。", "目前動作尚未選定具體的外掛動作。", "No specific plugin action has been selected for this action yet.", "この動作には具体的なプラグイン動作がまだ選択されていません。");
+		Add("PluginsActionPluginNotFound", "未找到插件 {0}，请到「插件与扩展」页查看。", "找不到外掛 {0}，請到「外掛與擴充」頁查看。", "Plugin {0} was not found. Check the Plugins page.", "プラグイン {0} が見つかりません。「プラグイン」ページを確認してください。");
+		Add("PluginsCandidateGone", "这枚候选已经不在扫描目录里了（可能刚被移走或改名）。已重新扫描，请再试一次。", "這枚候選已經不在掃描目錄裡了（可能剛被移走或改名）。已重新掃描，請再試一次。", "This candidate is no longer in the scan folder (it may have been moved or renamed). Rescanned, please try again.", "この候補はスキャンフォルダーに存在しません（移動または名前変更された可能性があります）。再スキャンしましたので、もう一度お試しください。");
+		Add("PluginsCardActionCount", "贡献 {0} 个动作", "貢獻 {0} 個動作", "provides {0} action(s)", "動作 {0} 個を提供");
+		Add("PluginsCardAuthor", "作者 {0}", "作者 {0}", "by {0}", "作者 {0}");
+		Add("PluginsCardCapabilities", "声明能力：{0}", "宣告能力：{0}", "Declared capabilities: {0}", "宣言された機能：{0}");
+		Add("PluginsCardEnableCheckBox", "启用", "啟用", "Enable", "有効化");
+		Add("PluginsCardExternalPath", "外部路径 {0}", "外部路徑 {0}", "external path {0}", "外部パス {0}");
+		Add("PluginsCardNotLoaded", "未加载", "未載入", "not loaded", "未読み込み");
+		Add("PluginsCardRestartReason", "旧程序集尚未从内存释放，重启 StarPie 后才会完全生效。", "舊組件尚未從記憶體釋放，重新啟動 StarPie 後才會完全生效。", "The old assembly is still held in memory; it takes full effect only after restarting StarPie.", "古いアセンブリがまだメモリ上に残っています。StarPie を再起動すると完全に反映されます。");
+		Add("PluginsCardSigned", "已签名", "已簽章", "signed", "署名済み");
+		Add("PluginsCardUninstallButton", "🗑 卸载", "🗑 解除安裝", "🗑 Uninstall", "🗑 アンインストール");
+		Add("PluginsCardUnsigned", "未签名", "未簽章", "unsigned", "未署名");
+		Add("PluginsConfirmAboutToInstall", "即将安装：{0} {1}", "即將安裝：{0} {1}", "About to install: {0} {1}", "インストール予定：{0} {1}");
+		Add("PluginsConfirmAccept", "点击「确定」表示你已了解并接受以上风险。", "點擊「確定」表示你已了解並接受以上風險。", "Clicking OK means you understand and accept these risks.", "「OK」を押すと、以上のリスクを理解し受け入れたものとみなします。");
+		Add("PluginsConfirmActDowngrade", "⚠️ 这会用更旧的版本覆盖现有安装。除非你明确需要退回旧版，否则不建议继续。", "⚠️ 這會用更舊的版本覆蓋現有安裝。除非你明確需要退回舊版，否則不建議繼續。", "⚠️ This overwrites the existing installation with an older version. Not recommended unless you specifically need to roll back.", "⚠️ これにより、より古い版で既存のインストールを上書きします。旧版へ戻す必要が明確でない限り推奨しません。");
+		Add("PluginsConfirmActExternal", "这个 ID 目前由「外部路径登记」占用（见上方扫描结果）。继续安装会改由数据目录里的副本接管。", "這個 ID 目前由「外部路徑登記」佔用（見上方掃描結果）。繼續安裝會改由資料目錄裡的副本接管。", "This ID is currently held by an external-path registration (see the scan result above). Continuing makes the copy in the data folder take over.", "この ID は現在「外部パス登録」が使用しています（上のスキャン結果を参照）。続行すると、データフォルダー内のコピーが引き継ぎます。");
+		Add("PluginsConfirmActFresh", "这是全新安装，复制进去不会动到已有的任何插件。", "這是全新安裝，複製進去不會動到既有的任何外掛。", "This is a fresh install; nothing already installed is touched.", "これは新規インストールです。既存のプラグインには影響しません。");
+		Add("PluginsConfirmActInstalled", "已装的那份与这枚文件完全相同（同版本、同内容），继续安装只会把同样的文件再复制一遍。", "已裝的那份與這枚檔案完全相同（同版本、同內容），繼續安裝只會把同樣的檔案再複製一遍。", "What is installed is identical to this file (same version, same content); continuing only copies the same file again.", "インストール済みのものとこのファイルは完全に同一です（同じバージョン・同じ内容）。続行しても同じファイルをコピーし直すだけです。");
+		Add("PluginsConfirmActReplaced", "这会覆盖现有安装：版本号相同，但文件内容不同（重编译或手改过）。", "這會覆蓋現有安裝：版本號相同，但檔案內容不同（重新編譯或手動改過）。", "This overwrites the existing installation: same version number, different file content (rebuilt or hand-edited).", "これは既存のインストールを上書きします（バージョンは同じでも、ファイルの内容が異なります）。");
+		Add("PluginsConfirmActUpdate", "这会用较新的版本覆盖现有安装。如果插件正在运行，宿主会先自动停用它再替换文件。", "這會用較新的版本覆蓋現有安裝。如果外掛正在執行，宿主會先自動停用它再取代檔案。", "This overwrites the existing installation with a newer version. If the plugin is running, StarPie disables it first, then replaces the files.", "これにより、より新しい版で既存のインストールを上書きします。プラグインが実行中の場合は、先に自動で無効化してからファイルを置き換えます。");
+		Add("PluginsConfirmActVersionUnknown", "已装版本与这枚文件的版本号至少有一侧无法解析，判断不出新旧 —— 继续安装会直接覆盖现有安装。", "已裝版本與這枚檔案的版本號至少有一側無法解析，判斷不出新舊 —— 繼續安裝會直接覆蓋現有安裝。", "At least one of the version numbers cannot be parsed, so newer/older cannot be determined — continuing overwrites the existing installation.", "既存版とこのファイルのバージョン番号の少なくとも一方が解釈できないため、新旧を判断できません。続行すると既存のインストールを上書きします。");
+		Add("PluginsConfirmAuthor", "作者：{0}", "作者：{0}", "Author: {0}", "作者：{0}");
+		Add("PluginsConfirmCapabilities", "该插件声明了以下能力：", "此外掛宣告了以下能力：", "This plugin declares the following capabilities:", "このプラグインは以下の機能を宣言しています：");
+		Add("PluginsConfirmDeclaredCapabilities", "声明能力：{0}", "宣告能力：{0}", "Declared capabilities: {0}", "宣言された機能：{0}");
+		Add("PluginsConfirmDescription", "说明：{0}", "說明：{0}", "Description: {0}", "説明：{0}");
+		Add("PluginsConfirmDisable", "确定停用「{0}」吗？\n\n· 当前配置中有 {1} 个动作由它提供，停用期间这些动作会暂时失效\n· 配置不会丢失，重新启用即可恢复", "確定停用「{0}」嗎？\n\n· 目前設定中有 {1} 個動作由它提供，停用期間這些動作會暫時失效\n· 設定不會遺失，重新啟用即可恢復", "Disable plugin {0}?\n\n· {1} action(s) in the current configuration come from it and will stop working while it is disabled\n· Nothing is lost from your configuration; re-enabling restores them", "プラグイン「{0}」を無効化しますか？\n\n· 現在の設定には、これが提供する動作が {1} 個あり、無効化中は使用できなくなります\n· 設定は失われません。再度有効化すれば復元します");
+		Add("PluginsConfirmDisableTitle", "停用插件", "停用外掛", "Disable plugin", "プラグインを無効化");
+		Add("PluginsConfirmEnableLater", "装完处于「未启用」状态：需要你到插件列表里勾选启用，它注册的动作才会出现在「手势与动作」页的动作类型下拉框中。", "裝完處於「未啟用」狀態：需要你到外掛清單裡勾選啟用，它註冊的動作才會出現在「手勢與動作」頁的動作類型下拉選單中。", "It stays disabled after installation: tick \"Enabled\" in the plugin list, and only then do its actions appear in the action-type dropdown on the Gestures & Actions page.", "インストール直後は「無効」のままです。プラグイン一覧で有効化してはじめて、登録した動作が「ジェスチャーと動作」ページの動作タイプのドロップダウンに現れます。");
+		Add("PluginsConfirmEnableNow", "装完会立即启用。", "裝完會立即啟用。", "It will be enabled right after installation.", "インストール後すぐに有効化されます。");
+		Add("PluginsConfirmFile", "文件：{0}", "檔案：{0}", "File: {0}", "ファイル：{0}");
+		Add("PluginsConfirmFileSize", "文件大小：{0}", "檔案大小：{0}", "File size: {0}", "ファイルサイズ：{0}");
+		Add("PluginsConfirmMachine", "平台架构：{0}", "平台架構：{0}", "Platform architecture: {0}", "プラットフォーム：{0}");
+		Add("PluginsConfirmManifestSource", "清单来源：{0}", "清單來源：{0}", "Manifest source: {0}", "マニフェストの取得元：{0}");
+		Add("PluginsConfirmNoCapabilities", "无", "無", "none", "なし");
+		Add("PluginsConfirmPluginId", "插件 ID：{0}", "外掛 ID：{0}", "Plugin ID: {0}", "プラグイン ID：{0}");
+		Add("PluginsConfirmScanResult", "扫描结果：{0}", "掃描結果：{0}", "Scan result: {0}", "スキャン結果：{0}");
+		Add("PluginsConfirmSecurityBody", "插件会以 StarPie 当前的权限在你的电脑上运行代码，请只安装你信任的来源。", "外掛會以 StarPie 目前的權限在你的電腦上執行代碼，請只安裝你信任的來源。", "Plugins run code on your computer with StarPie's own privileges, so only install sources you trust.", "プラグインは StarPie と同じ権限でお使いの PC 上でコードを実行します。信頼できる提供元のみインストールしてください。");
+		Add("PluginsConfirmSecurityTitle", "⚠️ 安全提示", "⚠️ 安全提示", "⚠️ Security notice", "⚠️ セキュリティ上の注意");
+		Add("PluginsConfirmSha256", "SHA256：{0}…", "SHA256：{0}…", "SHA256: {0}…", "SHA256：{0}…");
+		Add("PluginsConfirmSignature", "数字签名：{0}", "數位簽章：{0}", "Digital signature: {0}", "デジタル署名：{0}");
+		Add("PluginsConfirmTargetFramework", "目标框架：{0}", "目標框架：{0}", "Target framework: {0}", "ターゲットフレームワーク：{0}");
+		Add("PluginsConfirmTargetPath", "拟安装到：{0}", "擬安裝至：{0}", "Will be installed to: {0}", "インストール先：{0}");
+		Add("PluginsConfirmTitle", "确认安装插件", "確認安裝外掛", "Confirm plugin installation", "プラグインのインストール確認");
+		Add("PluginsConfirmUninstall", "确定要卸载插件 {0} 吗？\n\n· 插件文件与它自己的配置会被删除\n· 已经分配到轮盘上的插件动作会保留，但触发时会提示「插件不可用」\n\n此操作不可撤销。", "確定要解除安裝外掛 {0} 嗎？\n\n· 外掛檔案與它自己的設定會被刪除\n· 已經分配到轉盤上的外掛動作會保留，但觸發時會提示「外掛無法使用」\n\n此操作無法復原。", "Uninstall plugin {0}?\n\n· The plugin files and its own settings will be deleted\n· Plugin actions already assigned to your wheels are kept, but they will report that the plugin is unavailable when triggered\n\nThis cannot be undone.", "プラグイン {0} をアンインストールしますか？\n\n· プラグインのファイルと独自の設定が削除されます\n· ホイールに割り当て済みのプラグイン動作は残りますが、実行時にプラグインが利用できない旨が表示されます\n\nこの操作は取り消せません。");
+		Add("PluginsConfirmUninstallTitle", "卸载插件", "解除安裝外掛", "Uninstall plugin", "プラグインをアンインストール");
+		Add("PluginsConfirmUnsigned", "无（未签名）", "無（未簽章）", "None (unsigned)", "なし（未署名）");
+		Add("PluginsDataDirectoryHint", "数据目录：{0}", "資料目錄：{0}", "Data folder: {0}", "データフォルダー：{0}");
+		Add("PluginsDisableFailed", "停用插件 {0} 失败：\n\n{1}", "停用外掛 {0} 失敗：\n\n{1}", "Failed to disable plugin {0}:\n\n{1}", "プラグイン {0} の無効化に失敗しました：\n\n{1}");
+		Add("PluginsDisabledNotice", "插件系统已关闭。\n\n已经分配到轮盘上的 {0} 个插件动作会原样保留，但触发时不会执行。\n仍在运行的插件任务会收到取消信号并由宿主继续追踪。", "外掛系統已關閉。\n\n已經分配到轉盤上的 {0} 個外掛動作會原樣保留，但觸發時不會執行。\n仍在執行的外掛工作會收到取消訊號並由宿主繼續追蹤。", "The plugin system is now off.\n\nThe {0} plugin action(s) already assigned to your wheels are kept, but they will not run when triggered.\nPlugin tasks still running will get a cancel signal, and the host keeps tracking them.", "プラグインシステムをオフにしました。\n\nホイールに割り当て済みの {0} 個のプラグイン動作はそのまま残りますが、実行されません。\n実行中のプラグイン処理にはキャンセルが通知され、ホストが引き続き追跡します。");
+		Add("PluginsEmptyHint", "把插件 .dll 放进程序目录的 plugin 文件夹并点上方「重新扫描」，或直接点右上角「安装插件 (.dll)」选择文件", "把外掛 .dll 放進程式目錄的 plugin 資料夾並點上方「重新掃描」，或直接點右上角「安裝外掛 (.dll)」選擇檔案", "Drop the plugin .dll into the \"plugin\" folder next to the program and hit \"Rescan\" above, or click \"Install Plugin (.dll)\" at the top right to pick a file", "プラグインの .dll をプログラムフォルダー内の plugin フォルダーに置いて上の「再スキャン」を押すか、右上の「プラグインをインストール (.dll)」でファイルを選択してください");
+		Add("PluginsEmptyTitle", "还没有安装任何插件", "還沒有安裝任何外掛", "No plugins installed yet", "プラグインはまだインストールされていません");
+		Add("PluginsEnableCheckBox", "启用插件系统", "啟用外掛系統", "Enable plugin system", "プラグイン機能を有効にする");
+		Add("PluginsEnableFailed", "启用插件 {0} 失败：\n\n{1}", "啟用外掛 {0} 失敗：\n\n{1}", "Failed to enable plugin {0}:\n\n{1}", "プラグイン {0} の有効化に失敗しました：\n\n{1}");
+		Add("PluginsEnumSeparator", "、", "、", ", ", "、");
+		Add("PluginsInstallButton", "➕ 手动安装社区插件 (.dll)...", "➕ 手動安裝社群外掛 (.dll)...", "➕ Install Community Plugin (.dll)...", "➕ コミュニティプラグインを手動インストール (.dll)...");
+		Add("PluginsInstallFailed", "安装失败：{0}", "安裝失敗：{0}", "Install failed: {0}", "インストールに失敗しました：{0}");
+		Add("PluginsInstalledDisabled", "插件 {0} 已安装。\n\n它当前处于「未启用」状态。在列表里勾选「启用」后，它注册的动作才会出现在「手势与动作」页的动作类型下拉框中，从而可以分配到轮盘上。", "外掛 {0} 已安裝。\n\n它目前處於「未啟用」狀態。在清單裡勾選「啟用」後，它註冊的動作才會出現在「手勢與動作」頁的動作類型下拉選單中，從而可以分配到輪盤上。", "Plugin {0} is installed.\n\nIt is currently disabled. Tick \"Enabled\" in the list, and only then do its actions appear in the action-type dropdown on the Gestures & Actions page, where you can assign them to the wheel.", "プラグイン {0} をインストールしました。\n\n現在は「無効」の状態です。一覧で「有効」にチェックを入れてはじめて、登録した動作が「ジェスチャーと動作」ページの動作タイプのドロップダウンに現れ、ホイールに割り当てられるようになります。");
+		Add("PluginsInstalledNotify", "{0} 安装完成，到列表中启用它即可使用。", "{0} 安裝完成，到清單中啟用它即可使用。", "{0} installed — enable it in the list to start using it.", "{0} をインストールしました。一覧で有効化すると使えます。");
+		Add("PluginsMsgTitle", "StarPie 插件", "StarPie 外掛", "StarPie Plugins", "StarPie プラグイン");
+		Add("PluginsNotAPlugin", "这个文件不能作为 StarPie 插件安装。\n\n原因：{0}\n详情：{1}\n\n建议：{2}\n\n文件：{3}", "這個檔案不能作為 StarPie 外掛安裝。\n\n原因：{0}\n詳情：{1}\n\n建議：{2}\n\n檔案：{3}", "This file cannot be installed as a StarPie plugin.\n\nReason: {0}\nDetails: {1}\n\nSuggestion: {2}\n\nFile: {3}", "このファイルは StarPie プラグインとしてインストールできません。\n\n理由：{0}\n詳細：{1}\n\n推奨：{2}\n\nファイル：{3}");
+		Add("PluginsNotReady", "插件系统尚未完成初始化。请稍候片刻再试，或重启 StarPie。", "外掛系統尚未完成初始化。請稍候片刻再試，或重新啟動 StarPie。", "The plugin system has not finished initializing yet. Please wait a moment and try again, or restart StarPie.", "プラグインシステムの初期化が完了していません。しばらく待ってから再試行するか、StarPie を再起動してください。");
+		Add("PluginsOfficialActionInstall", "⬇️ 下载并安装", "⬇️ 下載並安裝", "⬇️ Download and install", "⬇️ ダウンロードしてインストール");
+		Add("PluginsOfficialActionInstalled", "已安装", "已安裝", "Installed", "インストール済み");
+		Add("PluginsOfficialActionUpdate", "⬆️ 更新", "⬆️ 更新", "⬆️ Update", "⬆️ 更新");
+		Add("PluginsOfficialCatalogInfo", "目录 {0} · {1} 个模块 · 来源 StarPie-Official-Plugins", "目錄 {0} · {1} 個模組 · 來源 StarPie-Official-Plugins", "Catalog {0} · {1} modules · from StarPie-Official-Plugins", "カタログ {0} · {1} モジュール · 提供元 StarPie-Official-Plugins");
+		Add("PluginsOfficialClaimSeparator", "、", "、", ", ", "、");
+		Add("PluginsOfficialHeader", "官方插件", "官方外掛", "Official plugins", "公式プラグイン");
+		Add("PluginsOfficialInstallFailed", "官方插件 {0} 安装失败：\n\n{1}", "官方外掛 {0} 安裝失敗：\n\n{1}", "Failed to install official plugin {0}:\n\n{1}", "公式プラグイン {0} のインストールに失敗しました：\n\n{1}");
+		Add("PluginsOfficialInstalled", "官方插件 {0} v{1} 已下载、校验并启用。", "官方外掛 {0} v{1} 已下載、校驗並啟用。", "Official plugin {0} v{1} has been downloaded, verified and enabled.", "公式プラグイン {0} v{1} をダウンロード・検証し、有効化しました。");
+		Add("PluginsOfficialLoading", "正在从 GitHub 获取官方插件目录…", "正在從 GitHub 取得官方外掛目錄…", "Fetching the official plugin catalog from GitHub…", "GitHub から公式プラグインカタログを取得しています…");
+		Add("PluginsOfficialMsgTitle", "StarPie 官方插件", "StarPie 官方外掛", "StarPie official plugins", "StarPie 公式プラグイン");
+		Add("PluginsOfficialRefreshButton", "🌐 刷新目录", "🌐 重新整理目錄", "🌐 Refresh catalog", "🌐 カタログを更新");
+		Add("PluginsOfficialStateNotInstalled", "未安装", "尚未安裝", "Not installed", "未インストール");
+		Add("PluginsOfficialStateUpToDate", "已是最新", "已是最新", "Up to date", "最新です");
+		Add("PluginsOfficialStateUpdateAvailable", "已装 v{0} · 有更新", "已裝 v{0} · 有更新", "v{0} installed · update available", "v{0} 導入済み · 更新あり");
+		Add("PluginsOfficialStatusHint", "从 StarPie-Official-Plugins 下载经过 SHA-256 校验的官方模块", "從 StarPie-Official-Plugins 下載經過 SHA-256 校驗的官方模組", "Official modules are downloaded from StarPie-Official-Plugins and verified with SHA-256", "公式モジュールは StarPie-Official-Plugins からダウンロードし、SHA-256 で検証します");
+		Add("PluginsOfficialSummaryFallback", "官方动作模块", "官方動作模組", "Official action module", "公式アクションモジュール");
+		Add("PluginsOfficialUnavailable", "官方插件目录暂时不可用：{0}", "官方外掛目錄暫時無法使用：{0}", "The official plugin catalog is temporarily unavailable: {0}", "公式プラグインカタログは一時的に利用できません：{0}");
+		Add("PluginsOpenDataFolderButton", "📂 打开数据目录", "📂 開啟資料目錄", "📂 Open Data Folder", "📂 データフォルダーを開く");
+		Add("PluginsOpenDataFolderFailed", "打开插件目录失败：{0}", "開啟外掛目錄失敗：{0}", "Failed to open the plugin folder: {0}", "プラグインフォルダーを開けませんでした：{0}");
+		Add("PluginsOpenScanFolderButton", "📂 打开扫描目录", "📂 開啟掃描目錄", "📂 Open Scan Folder", "📂 スキャンフォルダーを開く");
+		Add("PluginsOpenScanFolderFailed", "打开扫描目录失败：{0}", "開啟掃描目錄失敗：{0}", "Failed to open the scan folder: {0}", "スキャンフォルダーを開けませんでした：{0}");
+		Add("PluginsPageSubheader", "官方插件从 StarPie-Official-Plugins 下载并校验；社区插件仍可手动选择 .dll 安装。插件以 StarPie 当前权限在进程内运行，请只安装你信任的来源。", "官方外掛從 StarPie-Official-Plugins 下載並校驗；社群外掛仍可手動選擇 .dll 安裝。外掛以 StarPie 目前權限在行程內執行，請只安裝你信任的來源。", "Official plugins are downloaded and verified from StarPie-Official-Plugins; community plugins can still be installed manually. Plugins run in-process with StarPie's own privileges, so only install sources you trust.", "公式プラグインは StarPie-Official-Plugins からダウンロードして検証します。コミュニティプラグインは引き続き .dll を手動で選択できます。プラグインは StarPie と同じ権限で実行されるため、信頼できる提供元のみインストールしてください。");
+		Add("PluginsPanelAllOptional", "此动作的参数全部可选。", "此動作的參數全部可選。", "All parameters of this action are optional.", "この動作のパラメーターはすべて任意です。");
+		Add("PluginsPanelContributionId", "贡献点 ID：{0}", "貢獻點 ID：{0}", "Contribution ID: {0}", "提供ポイント ID：{0}");
+		Add("PluginsPanelExecutionMode", "执行方式：{0}", "執行方式：{0}", "Runs: {0}", "実行方式：{0}");
+		Add("PluginsPanelIssuesCount", "还有 {0} 个参数不合法，触发时会被拦下。", "還有 {0} 個參數不合法，觸發時會被攔下。", "{0} parameter(s) are still invalid; the trigger will be blocked.", "まだ {0} 個のパラメーターが不正です。実行時にブロックされます。");
+		Add("PluginsPanelKindBackground", "后台并发（不占用动作线程）", "背景並行（不佔用動作執行緒）", "background, concurrent (does not hold the action thread)", "バックグラウンド並行（動作スレッドを占有しません）");
+		Add("PluginsPanelKindSerial", "串行（占用动作线程）", "序列（佔用動作執行緒）", "serial (holds the action thread)", "直列（動作スレッドを占有します）");
+		Add("PluginsPanelNotChosenEmpty", "当前没有可用的插件动作。请先到「插件与扩展」页安装并启用插件，再回到这里选择。", "目前沒有可用的外掛動作。請先到「外掛與擴充」頁安裝並啟用外掛，再回到這裡選擇。", "No plugin actions are available. Install and enable a plugin on the plugins page first, then come back here to choose one.", "利用できるプラグイン動作がありません。先に「プラグインと拡張」ページでプラグインをインストールして有効化し、ここに戻って選択してください。");
+		Add("PluginsPanelNotChosenPick", "尚未选定具体的插件动作。请在上方「插件动作」下拉框中选择 —— 候选动作按插件分组，同一插件的动作都归在它以自己名字命名的那个分组下。", "尚未選定具體的外掛動作。請在上方「外掛動作」下拉選單中選擇 —— 候選動作依外掛分組，同一外掛的動作都歸在它以自己名字命名的那個分組下。", "No plugin action selected yet. Pick one in the plugin action dropdown above — candidates are grouped by plugin, and every action of a plugin lives under the group named after it.", "具体的なプラグイン動作が未選択です。上の「プラグイン動作」ドロップダウンで選択してください —— 候補はプラグインごとにまとまっており、同じプラグインの動作はその名前のグループに入っています。");
+		Add("PluginsPanelProvider", "提供插件：{0}", "提供外掛：{0}", "Plugin: {0}", "提供プラグイン：{0}");
+		Add("PluginsPanelProviderWithId", "提供插件：{0}（{1}）", "提供外掛：{0}（{1}）", "Plugin: {0} ({1})", "提供プラグイン：{0}（{1}）");
+		Add("PluginsPanelRequiredParams", "此动作有 {0} 个必填参数，留空会在触发时被拦下。", "此動作有 {0} 個必填參數，留空會在觸發時被攔下。", "This action has {0} required parameter(s); leaving them empty blocks the trigger.", "この動作には必須パラメーターが {0} 個あります。空欄のまま実行するとブロックされます。");
+		Add("PluginsPanelTimeout", "超时：{0} 秒", "逾時：{0} 秒", "Timeout: {0} s", "タイムアウト：{0} 秒");
+		Add("PluginsPanelUnavailable", "所引用的插件动作当前不可用：{0}\n可能是该插件已被停用或卸载，也可能是插件升级后移除了这个动作。\n到「插件与扩展」页确认插件状态，或直接在上方「插件动作」下拉框里改选另一个动作。", "所引用的外掛動作目前無法使用：{0}\n可能是該外掛已被停用或解除安裝，也可能是外掛升級後移除了這個動作。\n到「外掛與擴充」頁確認外掛狀態，或直接在上方「外掛動作」下拉選單裡改選另一個動作。", "The referenced plugin action is currently unavailable: {0}\nThe plugin may have been disabled or uninstalled, or an upgrade removed this action.\nCheck the plugin's state on the plugins page, or pick another action in the dropdown above.", "参照しているプラグイン動作は現在利用できません：{0}\nプラグインが無効化／アンインストールされたか、更新でこの動作が削除された可能性があります。\n「プラグインと拡張」ページで状態を確認するか、上の「プラグイン動作」ドロップダウンで別の動作を選び直してください。");
+		Add("PluginsPanelUnavailableHint", "⚠️ 触发时会明确提示「插件动作不可用」，不会静默无操作。", "⚠️ 觸發時會明確提示「外掛動作無法使用」，不會靜默無操作。", "⚠️ Triggering it reports \"plugin action unavailable\" — it will not silently do nothing.", "⚠️ 実行時は「プラグイン動作を利用できません」と明示されます。無言で何も起きることはありません。");
+		Add("PluginsPickDllFilter", "插件程序集 (*.dll)|*.dll|所有文件 (*.*)|*.*", "外掛組件 (*.dll)|*.dll|所有檔案 (*.*)|*.*", "Plugin assemblies (*.dll)|*.dll|All files (*.*)|*.*", "プラグイン アセンブリ (*.dll)|*.dll|すべてのファイル (*.*)|*.*");
+		Add("PluginsPickDllTitle", "选择要安装的插件 (.dll)", "選擇要安裝的外掛 (.dll)", "Select a plugin to install (.dll)", "インストールするプラグインを選択 (.dll)");
+		Add("PluginsReadFileFailed", "读取所选文件时出错：\n{0}", "讀取所選檔案時發生錯誤：\n{0}", "Failed to read the selected file:\n{0}", "選択したファイルの読み込みに失敗しました:\n{0}");
+		Add("PluginsReloadFailed", "重新加载失败：{0}", "重新載入失敗：{0}", "Reload failed: {0}", "再読み込みに失敗しました：{0}");
+		Add("PluginsReloadNotStopped", "旧插件尚未完全停止，不能重新加载：\n\n{0}", "舊外掛尚未完全停止，不能重新載入：\n\n{0}", "The old plugin has not fully stopped, so it cannot be reloaded:\n\n{0}", "古いプラグインがまだ完全に停止していないため、再読み込みできません：\n\n{0}");
+		Add("PluginsReloaded", "{0} 已重新加载。", "{0} 已重新載入。", "{0} reloaded.", "{0} を再読み込みしました。");
+		Add("PluginsReloadedRestartNeeded", "{0} 已重新加载，但旧程序集未能立即从内存释放，需要重启 StarPie 才能完全生效。", "{0} 已重新載入，但舊組件未能立即從記憶體釋放，需要重新啟動 StarPie 才能完全生效。", "{0} reloaded, but the old assembly could not be released from memory right away; restart StarPie for the change to fully take effect.", "{0} を再読み込みしましたが、古いアセンブリをメモリから解放できませんでした。完全に反映するには StarPie を再起動してください。");
+		Add("PluginsRescanButton", "🔄 重新扫描", "🔄 重新掃描", "🔄 Rescan", "🔄 再スキャン");
+		Add("PluginsRescanCandidateHint", "扫描目录里另有 {0} 个可安装项。", "掃描目錄裡另有 {0} 個可安裝項目。", "There are also {0} installable items in the scan folder.", "スキャンフォルダーには他に {0} 件のインストール可能な項目があります。");
+		Add("PluginsRescanFound", "扫描完成，新发现 {0} 个插件。{1}", "掃描完成，新發現 {0} 個外掛。{1}", "Scan complete: {0} new plugin(s) found. {1}", "スキャン完了。新しいプラグインを {0} 個検出しました。{1}");
+		Add("PluginsRescanNone", "扫描完成，没有发现新插件。{0}", "掃描完成，沒有發現新外掛。{0}", "Scan complete: no new plugins found. {0}", "スキャン完了。新しいプラグインは見つかりませんでした。{0}");
+		Add("PluginsSafeModeWarning", "⚠️ 安全模式：上次启动时插件引发异常，已自动禁用问题插件，避免反复崩溃。", "⚠️ 安全模式：上次啟動時外掛引發例外，已自動停用問題外掛，避免反覆崩潰。", "⚠️ Safe mode: a plugin threw an exception during the last startup. The offending plugin was disabled automatically to prevent repeated crashes.", "⚠️ セーフモード：前回の起動時にプラグインが例外を発生させたため、問題のあるプラグインを自動的に無効化しました。");
+		Add("PluginsScanFolderMissing", "扫描目录还不存在：\n{0}\n\nStarPie 不会替你创建它 —— 程序可能装在只读位置，宿主对这里只读不写。\n如需使用随包附带的插件，请手工创建该文件夹，把插件 .dll 放进去，再点「重新扫描」。", "掃描目錄還不存在：\n{0}\n\nStarPie 不會替你建立它 —— 程式可能裝在唯讀位置，宿主對這裡唯讀不寫。\n如需使用隨附的外掛，請手動建立該資料夾，把外掛 .dll 放進去，再點「重新掃描」。", "The scan folder does not exist yet:\n{0}\n\nStarPie will not create it for you — the program may be installed in a read-only location, and StarPie never writes there.\nTo use the plugins shipped with the package, create the folder yourself, drop the plugin .dll into it, then click \"Rescan\".", "スキャンフォルダーがまだ存在しません：\n{0}\n\nStarPie が代わりに作成することはありません（読み取り専用の場所にインストールされている場合があり、ホストはここへ書き込みません）。\n同梱のプラグインを使う場合は、このフォルダーを手動で作成し、プラグインの .dll を置いてから「再スキャン」を押してください。");
+		Add("PluginsScanHeaderFound", "扫描目录里发现 {0} 个 .dll，其中 {1} 个可以安装", "掃描目錄裡發現 {0} 個 .dll，其中 {1} 個可以安裝", "Found {0} .dll file(s) in the scan folder, {1} installable", "スキャンフォルダーに .dll が {0} 個あり、うち {1} 個がインストール可能です");
+		Add("PluginsScanHeaderMissing", "扫描目录不存在（宿主不会创建它）", "掃描目錄不存在（宿主不會建立它）", "Scan folder does not exist (StarPie will not create it)", "スキャンフォルダーが存在しません（StarPie は作成しません）");
+		Add("PluginsScanHeaderNone", "扫描目录里没有可安装的插件", "掃描目錄裡沒有可安裝的外掛", "No installable plugins in the scan folder", "スキャンフォルダーにインストール可能なプラグインはありません");
+		Add("PluginsScanPathHint", "把插件 .dll 放进这个文件夹后点「重新扫描」即可识别。该目录由你自己创建：StarPie 装在只读位置时无权创建它。", "把外掛 .dll 放進這個資料夾後點「重新掃描」即可識別。該目錄由你自己建立：StarPie 裝在唯讀位置時無權建立它。", "Drop the plugin .dll into this folder and hit \"Rescan\" to pick it up. You create this folder yourself: StarPie has no permission to create it when installed in a read-only location.", "このフォルダーにプラグインの .dll を置いて「再スキャン」を押すと認識されます。このフォルダーはご自身で作成してください（StarPie が読み取り専用の場所にインストールされている場合、作成する権限がありません）。");
+		Add("PluginsStateActive", "运行中", "執行中", "Running", "実行中");
+		Add("PluginsStateActiveRestartPending", "运行中 · 待重启", "執行中 · 待重啟", "Running · restart pending", "実行中 · 再起動待ち");
+		Add("PluginsStateDisabled", "未启用", "未啟用", "Not enabled", "無効");
+		Add("PluginsStateEnabledPendingLoad", "已启用 · 待加载", "已啟用 · 待載入", "Enabled · pending load", "有効 · 読み込み待ち");
+		Add("PluginsStateFailed", "加载失败", "載入失敗", "Load failed", "読み込み失敗");
+		Add("PluginsStateFaulted", "运行异常", "執行異常", "Runtime error", "実行時エラー");
+		Add("PluginsStateIncompatible", "不兼容", "不相容", "Incompatible", "非互換");
+		Add("PluginsStateLoading", "加载中", "載入中", "Loading", "読み込み中");
+		Add("PluginsStateQuarantined", "已隔离", "已隔離", "Quarantined", "隔離済み");
+		Add("PluginsStateRestartPending", "待重启生效", "待重啟生效", "Restart required", "再起動で有効");
+		Add("PluginsStateStopping", "正在停止", "正在停止", "Stopping", "停止中");
+		Add("PluginsStatusEmpty", "尚未安装任何插件。{0}", "尚未安裝任何外掛。{0}", "No plugins installed yet. {0}", "プラグインはまだインストールされていません。{0}");
+		Add("PluginsStatusSummary", "共 {0} 个插件，{1} 个已启用。{2}", "共 {0} 個外掛，{1} 個已啟用。{2}", "{0} plugin(s), {1} enabled. {2}", "プラグイン {0} 個、有効 {1} 個。{2}");
+		Add("PluginsStoppingTitle", "插件正在后台停止", "外掛正在背景停止", "Plugin is stopping in the background", "プラグインはバックグラウンドで停止中");
+		Add("PluginsUninstallFailed", "卸载失败：\n\n{0}", "解除安裝失敗：\n\n{0}", "Uninstall failed:\n\n{0}", "アンインストールに失敗しました：\n\n{0}");
+		Add("PluginsUpdatedAndEnabled", "{0} 已更新到 {1} 并已启用。\n\n如果它之前已经在运行，旧程序集要到下次启动 StarPie 才会完全从内存释放。", "{0} 已更新到 {1} 並已啟用。\n\n如果它之前已經在執行，舊組件要到下次啟動 StarPie 才會完全從記憶體釋放。", "{0} was updated to {1} and enabled.\n\nIf it was already running, the old assembly stays in memory until the next StarPie restart.", "{0} を {1} に更新して有効化しました。\n\n既に実行中だった場合、古いアセンブリは次回 StarPie を起動するまでメモリに残ります。");
+		Add("ProfileBrowseExe", "📁 浏览...", "📁 瀏覽...", "📁 Browse...", "📁 参照…");
+		Add("ProfileCaptureWindow", "🎯 捕捉窗口...", "🎯 擷取視窗...", "🎯 Capture window...", "🎯 ウィンドウを取得…");
+		Add("ProfilePickProgram", "🖥️ 软件库...", "🖥️ 軟體庫...", "🖥️ App library...", "🖥️ アプリ一覧…");
+		Add("ResetProcessTrigger", "🔄 恢复默认", "🔄 恢復預設", "🔄 Restore default", "🔄 既定に戻す");
+		Add("ResetSubDimensions", "🔄 恢复二级轮盘默认尺寸", "🔄 恢復二級輪盤預設尺寸", "🔄 Restore default tier 2 size", "🔄 第2階層の既定サイズに戻す");
+		Add("ResetSubTheme", "🔄 恢复与一级轮盘相同主题", "🔄 恢復與一級輪盤相同主題", "🔄 Match tier 1 theme", "🔄 第1階層と同じテーマに戻す");
+		Add("ResetTextOffset", "🔄 位置归位", "🔄 位置歸位", "🔄 Reset position", "🔄 位置を初期化");
+		Add("RestoreSystemAudio", "🔊 一键解除静音并恢复音量 (50%)", "🔊 一鍵解除靜音並恢復音量 (50%)", "🔊 Unmute and restore volume (50%)", "🔊 ミュート解除して音量を復元（50%）");
+		Add("SectorFontSizeTitle", "文字字号大小:", "文字字號大小:", "Text size:", "文字サイズ:");
+		Add("SectorIconSizeTitle", "图标尺寸大小:", "圖示尺寸大小:", "Icon size:", "アイコンサイズ:");
+		Add("SectorTextPlacementTitle", "文字相对位置:", "文字相對位置:", "Text position:", "文字の位置:");
+		Add("ShowCoreIcon", "启用中心图案/图标显示", "啟用中心圖案/圖示顯示", "Show centre pattern / icon", "中央の図柄／アイコンを表示");
+		Add("StartDownloadUpdate", "⬇️ 立即下载更新", "⬇️ 立即下載更新", "⬇️ Download update", "⬇️ 更新をダウンロード");
+		Add("TabPlugins", "插件与扩展", "外掛與擴充", "Plugins", "プラグイン");
+		Add("TestCancelAction", "🧪 模拟测试触发", "🧪 模擬測試觸發", "🧪 Test trigger", "🧪 テスト実行");
+		Add("Tier2DimensionsExpander", "🌐 二级轮盘几何形态与尺寸 (展开微调)", "🌐 二級輪盤幾何形態與尺寸 (展開微調)", "🌐 Tier 2 geometry and size (expand to fine-tune)", "🌐 第2階層の形状とサイズ（展開して微調整）");
+		Add("Tier2ThemeExpander", "🌐 二级轮盘风格与配色 (展开定制)", "🌐 二級輪盤風格與配色 (展開自訂)", "🌐 Tier 2 style and colours (expand to customise)", "🌐 第2階層のスタイルと配色（展開してカスタマイズ）");
+		Add("UpdatePkgLightweight", "依赖 .NET 8 运行时轻量版 (~2.7 MB)", "依賴 .NET 8 執行階段輕量版 (~2.7 MB)", "Lightweight, needs .NET 8 runtime (~2.7 MB)", "軽量版・.NET 8 ランタイムが必要（約 2.7 MB）");
+		Add("UpdatePkgStandalone", "独立免安装单文件版 (~68 MB, 推荐)", "獨立免安裝單檔案版 (~68 MB, 推薦)", "Standalone, no install needed (~68 MB, recommended)", "単体動作・インストール不要（約 68 MB、推奨）");
+		Add("ViewReleasesWeb", "🌐 网页发布页", "🌐 網頁發佈頁", "🌐 Release page", "🌐 リリースページ");
+		// --- Tab4 里程碑卡片 (v1.8.0-beta.1 与 v1.7.4-beta.4) ---
+		Add("Tab4_Ms_180b1_Title", "v1.8.0-beta.1 插件系统首个公开测试版", "v1.8.0-beta.1 外掛系統首個公開測試版", "v1.8.0-beta.1 Plugin System First Public Beta", "v1.8.0-beta.1 プラグインシステム初の公開ベータ版");
+		Add("Tab4_Ms_180b1_P1", "• 🧩 【官方动作插件化】：程序启动、命令、OCR、系统与窗口管理等动作拆分为独立模块，并统一通过插件路径执行；", "• 🧩 【官方動作外掛化】：程式啟動、命令、OCR、系統與視窗管理等動作拆分為獨立模組，並統一透過外掛路徑執行；", "• 🧩 [Official Actions as Plugins]: App launch, command, OCR, system and window management split into modular plugins with unified execution path;", "• 🧩 【公式アクションのプラグイン化】：アプリ起動、コマンド、OCR、システム制御、ウィンドウ管理を独立モジュール化し、統一プラグインパス経由で実行；");
+		Add("Tab4_Ms_180b1_P2", "• 📦 【手动安装与集中管理】：新增插件管理页，支持刷新官方目录以及安装、启用、停用、更新和卸载，启动时不自动下载模块；", "• 📦 【手動安裝與集中管理】：新增外掛管理頁，支援重新整理官方目錄以及安裝、啟用、停用、更新和解除安裝，啟動時不自動下載模組；", "• 📦 [Manual Install & Unified Management]: New plugins tab supporting catalog refresh, installation, enabling, disabling, updates and removal without auto-downloading;", "• 📦 【手動インストールと集中管理】：プラグイン管理ページを新設。公式カタログの更新、インストール、有効/無効化、更新、削除に対応し、起動時の自動ダウンロードは行いません；");
+		Add("Tab4_Ms_180b1_P3", "• 🧰 【社区 SDK 与参数表单】：开放插件契约、宿主服务和声明式参数系统，插件动作统一分组选择并继承主程序主题与多语言；", "• 🧰 【社群 SDK 與參數表單】：開放外掛協定、宿主服務和宣告式參數系統，外掛動作統一分組選取並繼承主程式主題與多語言；", "• 🧰 [Community SDK & Parameter Forms]: Open plugin contract, host services and declarative parameters; plugin actions grouped cleanly and inheriting themes and i18n;", "• 🧰 【コミュニティSDKとパラメータフォーム】：プラグイン契約、ホストサービス、宣言的パラメータを提供。プラグインアクションはグループ表示され、テーマと言語を継承；");
+		Add("Tab4_Ms_180b1_P4", "• 🛡️ 【惰性加载与故障保护】：完善调用租约、异步停用、能力门禁、异常隔离和端到端自检，降低插件对轮盘核心运行的影响。", "• 🛡️ 【惰性載入與故障保護】：完善呼叫租約、非同步停用、能力門禁、例外隔離和端到端自我檢測，降低外掛對輪盤核心運行的影響。", "• 🛡️ [Lazy Loading & Fault Isolation]: Call leases, async deactivation, capability gating, crash resilience and end-to-end self-testing to safeguard radial wheel core.", "• 🛡️ 【遅延ロードと障害保護】：呼び出しリース、非同期停止、権限ゲート、例外分離、エンドツーエンドの自己診断を整備し、ホイール本体への影響を最小限に抑制。");
+		Add("Tab4_Ms_174b4_Title", "v1.7.4-beta.4 多层轮盘全局继承解耦 & 同层精准映射与超层优雅回退", "v1.7.4-beta.4 多層輪盤全域繼承解耦 & 同層精準對應與超層優雅回退", "v1.7.4-beta.4 Multi-Layer Wheel Global Inheritance Decoupling & Precise Layer Mapping", "v1.7.4-beta.4 多階層ホイールのグローバル継承分離＆同階層マッピングと階層フォールバック");
+		Add("Tab4_Ms_174b4_P1", "• 🧩 【全局层级状态污染消除】：重构动作继承求值链路，彻底解耦对全局方案当前浏览层指针的依赖，在控制台切换全局方案层数时不再污染其他应用程序方案的未配置槽位；", "• 🧩 【全域層級狀態污染消除】：重構動作繼承求值鏈路，徹底解耦對全域方案當前瀏覽層指標的依賴，在控制台切換全域方案層數時不再污染其他應用程式方案的未配置槽位；", "• 🧩 [Global Layer State Decoupling]: Refactored inheritance evaluation pipeline to eliminate dependency on global profile active browsing layer, preventing slot pollution across app profiles;", "• 🧩 【グローバル階層状態の汚染解消】：アクション継承の評価パスを再構築し、設定画面でグローバル階層を切り替えてもアプリ個別プロファイルのスロットを汚染しないよう完全分離；");
+		Add("Tab4_Ms_174b4_P2", "• 🎯 【同层对应优先继承】：专属程序方案第 N 层的空白扇区与中心核心圆，优先对应继承全局方案第 N 层的动作与子动作配置；", "• 🎯 【同層對應優先繼承】：專屬程式方案第 N 層的空白扇區與中心核心圓，優先對應繼承全域方案第 N 層的動作與子動作配置；", "• 🎯 [Peer-Layer Priority Inheritance]: Empty sectors and core icon on Layer N of dedicated profiles prioritize inheriting configurations from Layer N of the global profile;", "• 🎯 【同階層優先継承】：個別アプリプロファイルの第N階層の空きセクターと中央コアは、グローバルプロファイルの第N階層のアクション設定を優先継承；");
+		Add("Tab4_Ms_174b4_P3", "• 🪜 【多层超额优雅回退】：当程序方案层数多于全局方案时（如程序 3 层、全局 2 层），超额层的未配置槽位自动回退继承全局方案第 1 层动作，杜绝越界与空指针异常；", "• 🪜 【多層超額優雅回退】：當程式方案層數多於全域方案時（如程式 3 層、全域 2 層），超額層的未配置槽位自動回退繼承全域方案第 1 層動作，杜絕越界與空指標例外；", "• 🪜 [Graceful Overflow Fallback]: When an app profile has more layers than the global profile (e.g. 3 vs 2), excess unconfigured slots fallback gracefully to Layer 1 of the global profile;", "• 🪜 【超過階層のフォールバック】：アプリ個別設定の階層数がグローバル設定より多い場合（例: 個別3層、全体2層）、超過した未設定スロットはグローバルの第1層へ安全にフォールバック；");
+		Add("Tab4_Ms_174b4_P4", "• ⚡ 【实时运行态切层同步】：桌面划动手势与滚轮切层时，继承动作跟随层级切换毫秒级即时重新评估与渲染。", "• ⚡ 【即時執行態切層同步】：桌面劃動手勢與滾輪切層時，繼承動作跟隨層級切換毫秒級即時重新評估與渲染。", "• ⚡ [Real-time Runtime Layer Sync]: During desktop gesture flicks or wheel-switching layers, inherited actions re-evaluate and render in milliseconds.", "• ⚡ 【実行時のリアルタイム階層同期】：ジェスチャーやホイール操作で階层を切り替える際、継承アクションをミリ秒単位で即座に再評価・レンダリング。");
 
 		Translations = dictionary;
 	}

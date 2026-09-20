@@ -12,18 +12,21 @@ class Program
 {
     static unsafe void Main(string[] args)
     {
-        string inputPath = @"g:\Users\2 Better\Desktop\design\attachments\cover.v3.png";
-        string outputLogo = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo.png";
-        string outputAssetsLogo = @"g:\Users\2 Better\Desktop\design\assets\logo.png";
-        string outputLogoDark = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo_dark.png";
-        string outputAssetsLogoDark = @"g:\Users\2 Better\Desktop\design\assets\logo_dark.png";
-        string outputLogoLight = @"g:\Users\2 Better\Desktop\design\WinPieGestures\logo_light.png";
-        string outputAssetsLogoLight = @"g:\Users\2 Better\Desktop\design\assets\logo_light.png";
-        string outputIco = @"g:\Users\2 Better\Desktop\design\WinPieGestures\app_icon.ico";
-        string outputAssetsIco = @"g:\Users\2 Better\Desktop\design\assets\app_icon.ico";
-        string outputTrayIco = @"g:\Users\2 Better\Desktop\design\WinPieGestures\tray_icon.ico";
-        string outputAssetsTrayIco = @"g:\Users\2 Better\Desktop\design\assets\tray_icon.ico";
-        string outputPreviewPng = @"g:\Users\2 Better\Desktop\design\scratch\icon_clarity_preview.png";
+        // 路径不再写死在本机桌面目录：默认从可执行文件所在目录向上回溯到仓库根，
+        // 也可以用 `--root <仓库根>` 显式指定（便于在别的机器 / CI 上复跑）。
+        string root = ResolveRepoRoot(args);
+        string inputPath = Path.Combine(root, "attachments", "cover.v3.png");
+        string outputLogo = Path.Combine(root, "WinPieGestures", "logo.png");
+        string outputAssetsLogo = Path.Combine(root, "assets", "logo.png");
+        string outputLogoDark = Path.Combine(root, "WinPieGestures", "logo_dark.png");
+        string outputAssetsLogoDark = Path.Combine(root, "assets", "logo_dark.png");
+        string outputLogoLight = Path.Combine(root, "WinPieGestures", "logo_light.png");
+        string outputAssetsLogoLight = Path.Combine(root, "assets", "logo_light.png");
+        string outputIco = Path.Combine(root, "WinPieGestures", "app_icon.ico");
+        string outputAssetsIco = Path.Combine(root, "assets", "app_icon.ico");
+        string outputTrayIco = Path.Combine(root, "WinPieGestures", "tray_icon.ico");
+        string outputAssetsTrayIco = Path.Combine(root, "assets", "tray_icon.ico");
+        string outputPreviewPng = Path.Combine(root, "scratch", "icon_clarity_preview.png");
 
         Console.WriteLine("Loading source image: " + inputPath);
         using var srcBmp = new Bitmap(inputPath);
@@ -814,6 +817,33 @@ class Program
         darkWheel.UnlockBits(srcData);
         lightBmp.UnlockBits(dstData);
         return lightBmp;
+    }
+
+    /// <summary>
+    /// 定位仓库根：从可执行文件所在目录逐级向上，找到同时含 <c>WinPieGestures</c> 与 <c>assets</c> 的那一级。
+    /// 也支持 <c>--root &lt;仓库根&gt;</c> 显式指定。
+    /// </summary>
+    static string ResolveRepoRoot(string[] args)
+    {
+        if (args.Length >= 2 && args[0] == "--root")
+        {
+            return Path.GetFullPath(args[1]);
+        }
+
+        DirectoryInfo? dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, "WinPieGestures")) &&
+                Directory.Exists(Path.Combine(dir.FullName, "assets")))
+            {
+                return dir.FullName;
+            }
+
+            dir = dir.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "未能自动定位仓库根（判据：该目录下同时存在 WinPieGestures 与 assets）。请用 --root <仓库根> 显式指定。");
     }
 }
 

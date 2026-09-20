@@ -29,20 +29,48 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Verify tag points to latest main commit
+      - name: Verify tag points to latest commit of an allowed release branch
         shell: pwsh
         run: |
-          git fetch origin main
+          # Release tags may only point to the current tip of main, dev-* or dev/**.
+          # A tag push does not carry the source branch, so compare the tagged commit
+          # with every remote branch that matches the allowed release-branch policy.
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*" --prune
 
-          $tagCommit = (git rev-list -n 1 $env:RELEASE_TAG).Trim()
-          $mainCommit = (git rev-parse origin/main).Trim()
+          $tagCommit = (git rev-parse "$env:RELEASE_TAG^{commit}").Trim()
+          $allowedBranches = @(
+            git for-each-ref --format="%(refname:strip=3)" refs/remotes/origin |
+              Where-Object { $_ -match '^(main|dev-.*|dev/.*)$' }
+          )
 
-          if ($tagCommit -ne $mainCommit) {
-            throw "Release tag must point to the latest origin/main commit. Tag=$tagCommit Main=$mainCommit"
+          if ($allowedBranches.Count -eq 0) {
+            throw "No release branches matched the allowed patterns: main, dev-* or dev/**"
+          }
+
+          $matchingBranches = [System.Collections.Generic.List[string]]::new()
+          foreach ($branch in $allowedBranches) {
+            $branchCommit = (git rev-parse "origin/$branch").Trim()
+            if ($tagCommit -eq $branchCommit) {
+              $matchingBranches.Add($branch)
+            }
+          }
+
+          if ($matchingBranches.Count -eq 0) {
+            $allowedTips = @($allowedBranches | ForEach-Object {
+              $branchCommit = (git rev-parse "origin/$_").Trim()
+              "$_=$branchCommit"
+            })
+            throw @"
+          Release tag must point to the latest commit of an allowed release branch.
+          Allowed branches: main, dev-* or dev/**
+          Tag=$tagCommit
+          Allowed branch tips:
+          $($allowedTips -join [Environment]::NewLine)
+          "@
           }
 
           Write-Host "Verified release commit: $tagCommit"
-
+          Write-Host "Matching release branch(es): $($matchingBranches -join ', ')"
       - name: Verify compiled version fields
         shell: pwsh
         run: |
