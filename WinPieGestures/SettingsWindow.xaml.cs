@@ -3206,6 +3206,11 @@ public partial class SettingsWindow : Window
 		if (Tab4_AboutDescText != null) Tab4_AboutDescText.Text = I18n.T("Tab4_AboutDescText");
 		if (Tab4_AppSloganText != null) Tab4_AppSloganText.Text = I18n.T("Tab4_AppSloganText");
 		if (Tab4_MilestonesHeaderTitle != null) Tab4_MilestonesHeaderTitle.Text = I18n.T("Tab4_MilestonesHeaderTitle");
+		if (Tab4_Ms_174_Title != null) Tab4_Ms_174_Title.Text = I18n.T("Tab4_Ms_174_Title");
+		if (Tab4_Ms_174_P1 != null) Tab4_Ms_174_P1.Text = I18n.T("Tab4_Ms_174_P1");
+		if (Tab4_Ms_174_P2 != null) Tab4_Ms_174_P2.Text = I18n.T("Tab4_Ms_174_P2");
+		if (Tab4_Ms_174_P3 != null) Tab4_Ms_174_P3.Text = I18n.T("Tab4_Ms_174_P3");
+		if (Tab4_Ms_174_P4 != null) Tab4_Ms_174_P4.Text = I18n.T("Tab4_Ms_174_P4");
 		if (Tab4_Ms_174b3_Title != null) Tab4_Ms_174b3_Title.Text = I18n.T("Tab4_Ms_174b3_Title");
 		if (Tab4_Ms_174b3_P1 != null) Tab4_Ms_174b3_P1.Text = I18n.T("Tab4_Ms_174b3_P1");
 		if (Tab4_Ms_174b3_P2 != null) Tab4_Ms_174b3_P2.Text = I18n.T("Tab4_Ms_174b3_P2");
