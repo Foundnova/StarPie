@@ -15637,19 +15637,41 @@ public partial class SettingsWindow : Window
 			?? "默认配置";
 	}
 
+	private readonly List<ConfigProfileDisplayItem> _cachedProfileDisplayItems = new();
+
 	private void RefreshConfigProfilesUi()
 	{
 		if (ConfigProfilesComboBox == null) return;
 		var rawProfiles = ConfigManager.GetSavedConfigNames();
 		string active = ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
 
-		var profiles = rawProfiles.Select(p => new ConfigProfileDisplayItem
+		string defaultLabel = I18n.T("DefaultConfigProfile");
+
+		while (_cachedProfileDisplayItems.Count > rawProfiles.Count)
 		{
-			Name = p,
-			DisplayName = (string.Equals(p, "默认配置", StringComparison.OrdinalIgnoreCase) || string.Equals(p, "Default", StringComparison.OrdinalIgnoreCase))
-				? I18n.T("DefaultConfigProfile")
-				: p
-		}).ToList();
+			_cachedProfileDisplayItems.RemoveAt(_cachedProfileDisplayItems.Count - 1);
+		}
+		for (int i = 0; i < rawProfiles.Count; i++)
+		{
+			string p = rawProfiles[i];
+			string disp = (string.Equals(p, "默认配置", StringComparison.OrdinalIgnoreCase) || string.Equals(p, "Default", StringComparison.OrdinalIgnoreCase))
+				? defaultLabel
+				: p;
+
+			if (i < _cachedProfileDisplayItems.Count)
+			{
+				_cachedProfileDisplayItems[i].Name = p;
+				_cachedProfileDisplayItems[i].DisplayName = disp;
+			}
+			else
+			{
+				_cachedProfileDisplayItems.Add(new ConfigProfileDisplayItem
+				{
+					Name = p,
+					DisplayName = disp
+				});
+			}
+		}
 
 		bool wasUpdating = _isUpdatingUi;
 		_isUpdatingUi = true;
@@ -15658,15 +15680,15 @@ public partial class SettingsWindow : Window
 			ConfigProfilesComboBox.ItemsSource = null;
 			ConfigProfilesComboBox.SelectedValuePath = "Name";
 			ConfigProfilesComboBox.DisplayMemberPath = "DisplayName";
-			ConfigProfilesComboBox.ItemsSource = profiles;
+			ConfigProfilesComboBox.ItemsSource = _cachedProfileDisplayItems;
 			ConfigProfilesComboBox.SelectedValue = active;
-			if (ConfigProfilesComboBox.SelectedIndex < 0 && profiles.Count > 0)
+			if (ConfigProfilesComboBox.SelectedIndex < 0 && _cachedProfileDisplayItems.Count > 0)
 			{
 				ConfigProfilesComboBox.SelectedIndex = 0;
 			}
 
 			string displayActive = (string.Equals(active, "默认配置", StringComparison.OrdinalIgnoreCase) || string.Equals(active, "Default", StringComparison.OrdinalIgnoreCase))
-				? I18n.T("DefaultConfigProfile")
+				? defaultLabel
 				: active;
 
 			if (ActiveProfileBadgeText != null)
@@ -15676,7 +15698,7 @@ public partial class SettingsWindow : Window
 
 			if (DeleteProfileBtn != null)
 			{
-				DeleteProfileBtn.IsEnabled = profiles.Count > 1;
+				DeleteProfileBtn.IsEnabled = _cachedProfileDisplayItems.Count > 1;
 			}
 		}
 		finally

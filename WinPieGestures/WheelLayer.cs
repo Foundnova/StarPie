@@ -36,14 +36,63 @@ public class WheelLayer : INotifyPropertyChanged
 			{
 				return _name;
 			}
-			var m = System.Text.RegularExpressions.Regex.Match(_name.Trim(), @"^(?:第\s*(\d+)\s*[层層]|Layer\s*(\d+)|レイヤー\s*(\d+))$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-			if (m.Success)
+			if (TryParseDefaultLayerNumber(_name, out string? numStr))
 			{
-				string numStr = m.Groups[1].Success ? m.Groups[1].Value : (m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value);
 				return string.Format(I18n.T("WheelLayerFmt"), numStr);
 			}
 			return _name;
 		}
+	}
+
+	private static bool TryParseDefaultLayerNumber(string name, out string? numberStr)
+	{
+		numberStr = null;
+		ReadOnlySpan<char> span = name.AsSpan().Trim();
+		if (span.IsEmpty) return false;
+
+		// 1. "第" ... "层/層"
+		if (span.StartsWith("第", StringComparison.Ordinal) && (span.EndsWith("层", StringComparison.Ordinal) || span.EndsWith("層", StringComparison.Ordinal)) && span.Length >= 3)
+		{
+			ReadOnlySpan<char> inner = span.Slice(1, span.Length - 2).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		// 2. "Layer" ...
+		if (span.StartsWith("Layer", StringComparison.OrdinalIgnoreCase) && span.Length >= 6)
+		{
+			ReadOnlySpan<char> inner = span.Slice(5).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		// 3. "レイヤー" ...
+		if (span.StartsWith("レイヤー", StringComparison.Ordinal) && span.Length >= 5)
+		{
+			ReadOnlySpan<char> inner = span.Slice(4).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static bool IsAllDigits(ReadOnlySpan<char> span)
+	{
+		for (int i = 0; i < span.Length; i++)
+		{
+			if (!char.IsDigit(span[i])) return false;
+		}
+		return true;
 	}
 
 	public int SectorCount { get; set; } = 8;
