@@ -4255,6 +4255,7 @@
                 <UIElement.Effect>
                   <StaticResource ResourceKey="CardShadowEffect" />
                 </UIElement.Effect>
+                <StackPanel>
                   <TextBlock Text="v1.7.4 正式版 原生全盘极速秒搜 &amp; 专属方案隔离 &amp; 控制台精简 &amp; 性能调优" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
                   <TextBlock Text="• ⚡ 【StarPie 100% 纯原生极速秒搜】：全面告别外部第三方依赖，毫秒级应用内存短路与 50ms 深盘时间预算硬控，消除扫描卡顿；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                   <TextBlock Text="• 🌐 【全局方案继承按需隔离】：专属程序方案支持多层独立轮盘并彻底解耦全局串扰；继承全局未配置槽位功能默认调整为关闭，保障新建方案纯净独立；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
