@@ -196,7 +196,11 @@ public class UpdateManager
 		{
 			Timeout = TimeSpan.FromSeconds(15)
 		};
-		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.7.4"));
+		// User-Agent 里的版本号从 AppVersionInfo 取，不要再写一份字面量：
+		// 那份字面量不在任何发版检查清单上，发版时必然漏改，而且
+		// 这里原来取的是 AssemblyVersion（1.8.0.0 → "1.8.0"），会把预发布标识丢掉，
+		// 与设置页里另一个 UA 的写法也不一致。
+		_httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StarPie-Updater", AppVersionInfo.DisplayVersion));
 	}
 
 	public bool IsCurrentInstallationStandalone()
@@ -462,6 +466,9 @@ public class UpdateManager
 				if (releaseVersion == null) continue;
 				Version parsedVer = releaseVersion.CoreVersion;
 
+				// 「内测」「尝鲜」匹配的是 GitHub Release 的<b>标题</b> —— 那串字是发布者
+				// （本项目自己）写在 tag / release 上的数据，不是本程序的界面文案，
+				// 也不随用户切语言而变化。做 i18n 清理时按可接受项排除。
 				bool isPrerelease = releaseVersion.IsPrerelease ||
 					tag.Contains("beta", StringComparison.OrdinalIgnoreCase) ||
 					tag.Contains("alpha", StringComparison.OrdinalIgnoreCase) ||
@@ -486,7 +493,7 @@ public class UpdateManager
 					Title = string.IsNullOrWhiteSpace(title) ? tag : title,
 					Body = body,
 					PublishedAt = publishedAt != default ? publishedAt : DateTime.Now,
-					IsPrerelease = isPrerelease || releaseVersion?.IsPrerelease == true,
+					IsPrerelease = isPrerelease || releaseVersion.IsPrerelease,
 					HtmlUrl = htmlUrl,
 					IsNewerVersion = isNewer,
 					StandaloneAssetUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/download/{tag}/StarPie-{tag}-Standalone-win-x64.zip",

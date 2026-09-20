@@ -72,10 +72,6 @@ public partial class InputDialog : Window
 
 	private void InputTextBox_KeyDown(object sender, KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0007: Invalid comparison between Unknown and I4
-		//IL_001a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0021: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 6)
 		{
 			OkButton_Click(sender, e);

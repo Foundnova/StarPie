@@ -29,6 +29,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Win32;
+using WinPieGestures.Plugins;
 
 namespace WinPieGestures;
 
@@ -39,6 +40,11 @@ public partial class SettingsWindow : Window
 	private const double SidebarCollapsedWidth = 68.0;
 
 	private bool _isSidebarCollapsed = false;
+
+	private OfficialPluginCatalog? _officialPluginCatalog;
+	private bool _officialPluginsLoading;
+	/// <summary>上次拉取官方 catalog 的失败原因。留着是为了切换语言时能把进度行按当前语言重渲染。</summary>
+	private string? _officialPluginsError;
 
 	/// <summary>设置控制台当前已生效的界面缩放比例，用于按倍率换算窗口尺寸增量。</summary>
 	private double _appliedSettingsUiScale = 1.0;
@@ -178,6 +184,12 @@ public partial class SettingsWindow : Window
 	private List<ActionItem>? _lastSubActionsBackup = null;
 	private int _lastSubActionsBackupSlotIndex = -1;
 	private bool _isUpdatingFocusUi = true;
+
+	/// <summary>
+	/// 插件动作的参数表单。按需创建 —— 绝大多数动作没有参数，
+	/// 为它们提前维持一份控件树只是白占内存。
+	/// </summary>
+	private PluginParameterForm? _focusPluginParameterForm;
 	private Point? _mappingsDragStartPos = null;
 	private int _dragSourceSlotIndex = -999; // -1: Center Core, >=0: Sector slot
 	private bool _isDraggingSlot = false;
@@ -514,6 +526,7 @@ public partial class SettingsWindow : Window
 		_isUpdatingUi = true;
 		_isUpdatingFocusUi = true;
 		InitializeComponent();
+		PluginHost.PluginAvailabilityChanged += HandlePluginAvailabilityChanged;
 		try
 		{
 			this.Icon = BitmapFrame.Create(new Uri("pack://application:,,,/app_icon.ico"));
@@ -800,8 +813,8 @@ public partial class SettingsWindow : Window
 			}
 		}
 
-		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[5] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4 };
-		TextBlock[] navigationTexts = new TextBlock[5] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text };
+		System.Windows.Controls.RadioButton[] navigationButtons = new System.Windows.Controls.RadioButton[6] { NavTab0, NavTab1, NavTab2, NavTab3, NavTab4, NavTab5 };
+		TextBlock[] navigationTexts = new TextBlock[6] { NavTab0Text, NavTab1Text, NavTab2Text, NavTab3Text, NavTab4Text, NavTab5Text };
 		for (int i = 0; i < navigationButtons.Length; i++)
 		{
 			if (navigationButtons[i] == null) continue;
@@ -1781,6 +1794,11 @@ public partial class SettingsWindow : Window
 		{
 			NavTab4Text.Text = I18n.T("TabAbout");
 		}
+		if (NavTab5Text != null)
+		{
+			NavTab5Text.Text = I18n.T("TabPlugins");
+		}
+		ApplyPluginsPageLocalization();
 		if (SidebarToggleButton != null)
 		{
 			string toggleText = I18n.T(_isSidebarCollapsed ? "SidebarExpand" : "SidebarCollapse");
@@ -2246,11 +2264,13 @@ public partial class SettingsWindow : Window
 		}
 		if (RenameProfileButton != null)
 		{
-			RenameProfileButton.Content = I18n.T("BtnRenameProfile");
+			// 列表模式的整宽按钮用长标签；画布模式的紧凑工具条按钮
+			// （RenameProfileBtn / RenameProfileBtn2）另用短标签键。见 I18n.cs 的拆键说明。
+			RenameProfileButton.Content = I18n.T("BtnRenameCurrentProfile");
 		}
 		if (DeleteProfileButton != null)
 		{
-			DeleteProfileButton.Content = I18n.T("BtnDeleteProfile");
+			DeleteProfileButton.Content = I18n.T("BtnDeleteCurrentProfile");
 		}
 		if (DuplicateProfileBtn != null)
 		{
@@ -2489,8 +2509,407 @@ public partial class SettingsWindow : Window
 		{
 			PreviewPanHintText.Text = I18n.T("PreviewPanHint");
 		}
+		// ===== 补接漏接的 UI 文案（合并后新增/遗留控件）=====
+		// 说明：XAML 里的中文只是设计期占位，运行时必须由本方法按当前语言重设，
+		// 否则切换语言后这些控件会一直保持中文。以下 94 处原先从未被赋值过。
+		if (SubWheelTriggerDistLabel != null)
+		{
+			SubWheelTriggerDistLabel.Text = I18n.T("SubWheelTriggerDistLabel");
+		}
+		if (SubWheelTriggerDistDesc != null)
+		{
+			SubWheelTriggerDistDesc.Text = I18n.T("SubWheelTriggerDistDesc");
+		}
+		if (AddGestureMappingButton != null)
+		{
+			AddGestureMappingButton.Content = I18n.T("AddGestureMapping");
+		}
+		if (AnimSpeedCustomRadio != null)
+		{
+			AnimSpeedCustomRadio.Content = I18n.T("AnimSpeedCustom");
+		}
+		if (CustomSoundNewProfileBtn != null)
+		{
+			CustomSoundNewProfileBtn.Content = I18n.T("CustomSoundNewProfile");
+		}
+		if (CustomSoundDeleteProfileBtn != null)
+		{
+			CustomSoundDeleteProfileBtn.Content = I18n.T("BtnDeleteProfile");
+		}
+		if (CustomSoundImportProfileBtn != null)
+		{
+			CustomSoundImportProfileBtn.Content = I18n.T("CustomSoundImportProfile");
+		}
+		if (CustomSoundExportProfileBtn != null)
+		{
+			CustomSoundExportProfileBtn.Content = I18n.T("CustomSoundExportProfile");
+		}
+		if (CustomSoundResetProfileBtn != null)
+		{
+			CustomSoundResetProfileBtn.Content = I18n.T("CustomSoundResetProfile");
+		}
+		if (CustomSoundOpenEditorWindowBtn != null)
+		{
+			CustomSoundOpenEditorWindowBtn.Content = I18n.T("CustomSoundOpenEditorWindow");
+		}
+		if (CustomSoundPlayFlowButton != null)
+		{
+			CustomSoundPlayFlowButton.Content = I18n.T("CustomSoundPlayFlow");
+		}
+		if (SystemAudioWarningText != null)
+		{
+			SystemAudioWarningText.Text = I18n.T("SystemAudioWarning");
+		}
+		if (RestoreSystemAudioButton != null)
+		{
+			RestoreSystemAudioButton.Content = I18n.T("RestoreSystemAudio");
+		}
+		if (OuterEscapeCheckboxDescText != null)
+		{
+			OuterEscapeCheckboxDescText.Text = I18n.T("OuterEscapeCheckboxDesc");
+		}
+		if (TestCancelActionButton != null)
+		{
+			TestCancelActionButton.Content = I18n.T("TestCancelAction");
+		}
+		if (CancelActionStatusHint != null)
+		{
+			CancelActionStatusHint.Text = I18n.T("CancelActionStatusHint");
+		}
+		if (EdgeOverflowTitleText != null)
+		{
+			EdgeOverflowTitleText.Text = I18n.T("EdgeOverflowTitle");
+		}
+		if (EdgeOverflowDescText != null)
+		{
+			EdgeOverflowDescText.Text = I18n.T("EdgeOverflowDesc");
+		}
+		if (ResetProcessTriggerButton != null)
+		{
+			ResetProcessTriggerButton.Content = I18n.T("ResetProcessTrigger");
+		}
+		if (Tier2ThemeExpander != null)
+		{
+			Tier2ThemeExpander.Header = I18n.T("Tier2ThemeExpander");
+		}
+		if (NewSubCustomColorPresetButton != null)
+		{
+			NewSubCustomColorPresetButton.Content = I18n.T("NewCustomPresetButton");
+		}
+		if (RenameSubCustomColorPresetButton != null)
+		{
+			RenameSubCustomColorPresetButton.Content = I18n.T("RenameCustomPresetButton");
+		}
+		if (DeleteSubCustomColorPresetButton != null)
+		{
+			DeleteSubCustomColorPresetButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (SubCustomColorsExpanderTitleText != null)
+		{
+			SubCustomColorsExpanderTitleText.Text = I18n.T("SubCustomColorsExpanderTitle");
+		}
+		if (SubCustomColorsExpanderDescText != null)
+		{
+			SubCustomColorsExpanderDescText.Text = I18n.T("SubCustomColorsExpanderDesc");
+		}
+		if (SaveAsNewSubPresetButton != null)
+		{
+			SaveAsNewSubPresetButton.Content = I18n.T("SaveAsNewPresetButton");
+		}
+		if (DeleteSubPresetInPanelButton != null)
+		{
+			DeleteSubPresetInPanelButton.Content = I18n.T("BtnDeletePreset");
+		}
+		if (ResetSubThemeButton != null)
+		{
+			ResetSubThemeButton.Content = I18n.T("ResetSubTheme");
+		}
+		if (Tier2DimensionsExpander != null)
+		{
+			Tier2DimensionsExpander.Header = I18n.T("Tier2DimensionsExpander");
+		}
+		if (ResetSubDimensionsButton != null)
+		{
+			ResetSubDimensionsButton.Content = I18n.T("ResetSubDimensions");
+		}
+		if (LayoutOptionsSectionTitle != null)
+		{
+			LayoutOptionsSectionTitle.Text = I18n.T("LayoutOptionsSectionTitle");
+		}
+		if (IconLayoutModeTitleText != null)
+		{
+			IconLayoutModeTitleText.Text = I18n.T("IconLayoutModeTitle");
+		}
+		if (SectorIconSizeTitleText != null)
+		{
+			SectorIconSizeTitleText.Text = I18n.T("SectorIconSizeTitle");
+		}
+		if (SectorFontSizeTitleText != null)
+		{
+			SectorFontSizeTitleText.Text = I18n.T("SectorFontSizeTitle");
+		}
+		if (SectorTextPlacementTitleText != null)
+		{
+			SectorTextPlacementTitleText.Text = I18n.T("SectorTextPlacementTitle");
+		}
+		if (ResetTextOffsetBtn != null)
+		{
+			ResetTextOffsetBtn.Content = I18n.T("ResetTextOffset");
+		}
+		if (CoreSectionTitle != null)
+		{
+			CoreSectionTitle.Text = I18n.T("CoreSectionTitle");
+		}
+		if (ShowCoreIconCheckBox != null)
+		{
+			ShowCoreIconCheckBox.Content = I18n.T("ShowCoreIcon");
+		}
+		if (PickCoreIconButton != null)
+		{
+			PickCoreIconButton.Content = I18n.T("PickCoreIcon");
+		}
+		if (BrowseCoreImageButton != null)
+		{
+			BrowseCoreImageButton.Content = I18n.T("BrowseCoreImage");
+		}
+		if (ClearCoreImageButton != null)
+		{
+			ClearCoreImageButton.Content = I18n.T("ClearCoreImage");
+		}
+		if (Tier1ConfigSegmentRadio != null)
+		{
+			Tier1ConfigSegmentRadio.Content = I18n.T("Tier1ConfigSegment");
+		}
+		if (Tier2ConfigSegmentRadio != null)
+		{
+			Tier2ConfigSegmentRadio.Content = I18n.T("Tier2ConfigSegment");
+		}
+		if (AddLayerBtn != null)
+		{
+			AddLayerBtn.Content = I18n.T("AddLayer");
+		}
+		if (CopyLayerBtn != null)
+		{
+			CopyLayerBtn.Content = I18n.T("CopyLayer");
+		}
+		if (LayerSwitchTriggerLabel != null)
+		{
+			LayerSwitchTriggerLabel.Text = I18n.T("LayerSwitchTriggerLabel");
+		}
+		if (GesturesPageSubheader != null)
+		{
+			GesturesPageSubheader.Text = I18n.T("GesturesPageSubheader");
+		}
+		if (MappingsViewModeCanvasRadio != null)
+		{
+			MappingsViewModeCanvasRadio.Content = I18n.T("MappingsViewModeCanvas");
+		}
+		if (MappingsViewModeListRadio != null)
+		{
+			MappingsViewModeListRadio.Content = I18n.T("MappingsViewModeList");
+		}
+		if (AddProfileBtn2 != null)
+		{
+			AddProfileBtn2.Content = I18n.T("AddProfileShort");
+		}
+		if (RenameProfileBtn2 != null)
+		{
+			RenameProfileBtn2.Content = I18n.T("BtnRenameProfile");
+		}
+		if (ProfileCaptureWindowBtn != null)
+		{
+			ProfileCaptureWindowBtn.Content = I18n.T("ProfileCaptureWindow");
+		}
+		if (ProfilePickProgramBtn != null)
+		{
+			ProfilePickProgramBtn.Content = I18n.T("ProfilePickProgram");
+		}
+		if (ProfileBrowseExeBtn != null)
+		{
+			ProfileBrowseExeBtn.Content = I18n.T("ProfileBrowseExe");
+		}
+		if (MappingsSectorCount4Radio != null)
+		{
+			MappingsSectorCount4Radio.Content = I18n.T("MappingsSectorCount4");
+		}
+		if (MappingsSectorCount8Radio != null)
+		{
+			MappingsSectorCount8Radio.Content = I18n.T("MappingsSectorCount8");
+		}
+		if (MappingsSectorCount12Radio != null)
+		{
+			MappingsSectorCount12Radio.Content = I18n.T("MappingsSectorCount12");
+		}
+		if (EnableGlobalInheritanceCheckBox != null)
+		{
+			EnableGlobalInheritanceCheckBox.Content = I18n.T("EnableGlobalInheritance");
+		}
+		if (FocusBackToParentBtn != null)
+		{
+			FocusBackToParentBtn.Content = I18n.T("FocusBackToParent");
+		}
+		if (FocusPrevSlotBtn != null)
+		{
+			FocusPrevSlotBtn.Content = I18n.T("FocusPrevSlot");
+		}
+		if (FocusNextSlotBtn != null)
+		{
+			FocusNextSlotBtn.Content = I18n.T("FocusNextSlot");
+		}
+		if (FocusCenterCoreBtn != null)
+		{
+			FocusCenterCoreBtn.Content = I18n.T("FocusCenterCore");
+		}
+		if (EnableCenterActionCheckBox != null)
+		{
+			EnableCenterActionCheckBox.Content = I18n.T("EnableCenterAction");
+		}
+		if (CenterPresetsToggleBtn != null)
+		{
+			CenterPresetsToggleBtn.Content = I18n.T("CenterPresetsToggle");
+		}
+		if (CenterInfoToggleBtn != null)
+		{
+			CenterInfoToggleBtn.Content = I18n.T("CenterInfoToggle");
+		}
+		if (FocusActionNameLabel != null)
+		{
+			FocusActionNameLabel.Text = I18n.T("FocusActionNameLabel");
+		}
+		if (FocusRestoreInheritBtn != null)
+		{
+			FocusRestoreInheritBtn.Content = I18n.T("FocusRestoreInherit");
+		}
+		if (FocusTestActionBtn != null)
+		{
+			FocusTestActionBtn.Content = I18n.T("FocusTestAction");
+		}
+		if (FocusPluginReloadBtn != null)
+		{
+			FocusPluginReloadBtn.Content = I18n.T("FocusPluginReload");
+		}
+		if (FocusPluginActionBrokenHint != null)
+		{
+			// 这一段原先没有 Name，Text 是写死的中文 ⇒ 无论切到哪种语言都一直是中文。
+			// 它不在 DataTemplate 里，所以给个名字在这里重设即可（不用 {Binding}）。
+			FocusPluginActionBrokenHint.Text = I18n.T("PluginsActionBrokenHint");
+		}
+		if (FocusPopulateTileSubActionsBtn != null)
+		{
+			FocusPopulateTileSubActionsBtn.Content = I18n.T("FocusPopulateTileSubActions");
+		}
+		if (FocusPickShellToolBtn != null)
+		{
+			FocusPickShellToolBtn.Content = I18n.T("FocusPickShellTool");
+		}
+		if (FocusClearInheritedIconBtn != null)
+		{
+			FocusClearInheritedIconBtn.Content = I18n.T("FocusClearInheritedIcon");
+		}
+		if (FocusAddSubActionBtn != null)
+		{
+			FocusAddSubActionBtn.Content = I18n.T("FocusAddSubAction");
+		}
+		if (FocusClearSubActionsBtn != null)
+		{
+			FocusClearSubActionsBtn.Content = I18n.T("FocusClearSubActions");
+		}
+		if (FocusUndoSubActionsBtn != null)
+		{
+			FocusUndoSubActionsBtn.Content = I18n.T("FocusUndoSubActions");
+		}
+		if (FocusBatchExitBtn != null)
+		{
+			FocusBatchExitBtn.Content = I18n.T("FocusBatchExit");
+		}
+		if (BatchLayoutBothBtn != null)
+		{
+			BatchLayoutBothBtn.Content = I18n.T("BatchLayoutBoth");
+		}
+		if (BatchLayoutIconOnlyBtn != null)
+		{
+			BatchLayoutIconOnlyBtn.Content = I18n.T("BatchLayoutIconOnly");
+		}
+		if (BatchLayoutTextOnlyBtn != null)
+		{
+			BatchLayoutTextOnlyBtn.Content = I18n.T("BatchLayoutTextOnly");
+		}
+		if (BatchLayoutInheritBtn != null)
+		{
+			BatchLayoutInheritBtn.Content = I18n.T("BatchLayoutInherit");
+		}
+		if (BatchResetCustomBtn != null)
+		{
+			BatchResetCustomBtn.Content = I18n.T("BatchResetCustom");
+		}
+		if (MappingsTier1SegmentRadio != null)
+		{
+			MappingsTier1SegmentRadio.Content = I18n.T("MappingsTier1Segment");
+		}
+		if (MappingsTier2SegmentRadio != null)
+		{
+			MappingsTier2SegmentRadio.Content = I18n.T("MappingsTier2Segment");
+		}
+		if (ViewReleasesWebBtn != null)
+		{
+			ViewReleasesWebBtn.Content = I18n.T("ViewReleasesWeb");
+		}
+		if (StartDownloadUpdateBtn != null)
+		{
+			StartDownloadUpdateBtn.Content = I18n.T("StartDownloadUpdate");
+		}
+		if (OpenWebReleaseBtn != null)
+		{
+			OpenWebReleaseBtn.Content = I18n.T("OpenWebRelease");
+		}
+		if (UpdatePkgStandaloneRadio != null)
+		{
+			UpdatePkgStandaloneRadio.Content = I18n.T("UpdatePkgStandalone");
+		}
+		if (UpdatePkgLightweightRadio != null)
+		{
+			UpdatePkgLightweightRadio.Content = I18n.T("UpdatePkgLightweight");
+		}
+		if (CancelDownloadBtn != null)
+		{
+			CancelDownloadBtn.Content = I18n.T("CancelDownload");
+		}
+		if (ApplyRestartUpdateBtn != null)
+		{
+			ApplyRestartUpdateBtn.Content = I18n.T("ApplyRestartUpdate");
+		}
+		if (OpenUpdateFolderBtn != null)
+		{
+			OpenUpdateFolderBtn.Content = I18n.T("OpenUpdateFolder");
+		}
+		if (AboutCheckUpdateBtn != null)
+		{
+			AboutCheckUpdateBtn.Content = I18n.T("AboutCheckUpdate");
+		}
+		if (OpenChangelogButton != null)
+		{
+			OpenChangelogButton.Content = I18n.T("BtnOpenChangelog");
+		}
+		if (OlderMilestonesExpander != null)
+		{
+			OlderMilestonesExpander.Header = I18n.T("MilestonesOlderExpander");
+		}
 
 		UpdateFocusActionTypeItemsSource();
+
+		// 动作编辑面板的文案是**代码拼串**（不是 XAML 字面量），所以它只在被**重建**时才换语言。
+		// 这里必须补一次重渲染，否则切完语言会得到「同一个窗口里两种语言并存」：
+		// 侧边栏、页签、按钮都换了，而编辑器里那一整块（插件面板，以及
+		// Hotkey / Launch / WebUrl / Folder / Command / WindowManager / System / Ocr /
+		// ShellTool 九个面板）还停在旧语言 —— 而这一块正是用户改动作时盯着看的地方。
+		// 用 IsLoaded 挡住构造期那次调用：那时编辑器还没起来，重跑没有意义，
+		// 平白多走一遍初始化路径也没有好处。UpdateFocusEditorUi 自带重入守卫且幂等，
+		// 与它 40+ 个调用点走的是同一条路。
+		if (IsLoaded)
+		{
+			UpdateFocusEditorUi();
+		}
+
 		App.RefreshTrayMenu();
 	}
 
@@ -2543,17 +2962,18 @@ public partial class SettingsWindow : Window
 
 	public void SwitchToTab(int index)
 	{
-		if (TriggerSettingsGrid == null || AppearanceSettingsGrid == null || MappingsSettingsGrid == null || SystemSettingsGrid == null || AboutSettingsGrid == null)
+		if (TriggerSettingsGrid == null || AppearanceSettingsGrid == null || MappingsSettingsGrid == null || SystemSettingsGrid == null || AboutSettingsGrid == null || PluginsSettingsGrid == null)
 		{
 			return;
 		}
-		index = Math.Clamp(index, 0, 4);
+		index = Math.Clamp(index, 0, 5);
 		_lastSelectedTabIndex = index;
 		TriggerSettingsGrid.Visibility = ((index != 0) ? Visibility.Collapsed : Visibility.Visible);
 		AppearanceSettingsGrid.Visibility = ((index != 1) ? Visibility.Collapsed : Visibility.Visible);
 		MappingsSettingsGrid.Visibility = ((index != 2) ? Visibility.Collapsed : Visibility.Visible);
 		SystemSettingsGrid.Visibility = ((index != 3) ? Visibility.Collapsed : Visibility.Visible);
 		AboutSettingsGrid.Visibility = ((index != 4) ? Visibility.Collapsed : Visibility.Visible);
+		PluginsSettingsGrid.Visibility = ((index != 5) ? Visibility.Collapsed : Visibility.Visible);
 		_isUpdatingUi = true;
 		try
 		{
@@ -2577,10 +2997,20 @@ public partial class SettingsWindow : Window
 			{
 				NavTab4.IsChecked = index == 4;
 			}
+			if (NavTab5 != null)
+			{
+				NavTab5.IsChecked = index == 5;
+			}
 		}
 		finally
 		{
 			_isUpdatingUi = false;
+		}
+		if (index == 5)
+		{
+			// 进入插件页时重新与磁盘对一次账：用户可能在资源管理器里手工拷入了新插件，
+			// 也可能直接删掉了某个插件目录。不重扫的话界面会显示陈旧状态。
+			RefreshPluginManagerUi(resyncFromDisk: true);
 		}
 		switch (index)
 		{
@@ -2628,9 +3058,6 @@ public partial class SettingsWindow : Window
 
 	private void ScheduleAutoSave()
 	{
-		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Expected O, but got Unknown
 		if (!_isUiInitialized || _isUpdatingUi || ConfigManager.CurrentConfig == null)
 		{
 			return;
@@ -2892,6 +3319,28 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void HandlePluginAvailabilityChanged()
+	{
+		if (!Dispatcher.CheckAccess())
+		{
+			_ = Dispatcher.BeginInvoke(new Action(HandlePluginAvailabilityChanged));
+			return;
+		}
+
+		if (_resourcesReleased || !_isUiInitialized)
+		{
+			return;
+		}
+
+		// 官方插件的安装/启用/停用/卸载可能发生在后台目录同步线程，
+		// 动作类型下拉必须在同一 UI 线程即时重建，避免列表与实际派发路由不一致。
+		RefreshSlots();
+		RefreshGestureMappings();
+		UpdateFocusEditorUi();
+		string? currentTag = (FocusActionTypeComboBox?.SelectedItem as ActionTypeItem)?.Tag;
+		UpdateFocusActionTypeItemsSource(currentTag);
+	}
+
 	private void Window_Closing(object sender, CancelEventArgs e)
 	{
 		if (!_isClosingForRelease && !App.IsExiting)
@@ -2947,6 +3396,7 @@ public partial class SettingsWindow : Window
 			return;
 		}
 		_resourcesReleased = true;
+		PluginHost.PluginAvailabilityChanged -= HandlePluginAvailabilityChanged;
 
 		if (_deferredCloseTimer != null)
 		{
@@ -3824,6 +4274,10 @@ public partial class SettingsWindow : Window
 					}
 				}
 				_selectedProfile.BoundProcesses = ProfileBoundProcessesTextBox?.Text ?? proc;
+				// 「配置名是占位还是用户起的」—— 这个判断在本文件里有三处（本节 3 次，动作名之外的另一套）。
+				// 与动作名那套的区别：配置名<b>没有任何走 I18n 的默认值</b>（生成点是
+				// 下面的「<c> - 副本</c>」拼接与设置页的重命名），所以这里的中文字面量
+				// 与赋值同源、不随语言变，属于可接受项，不必收进 ActionNameDefaults。
 				if (string.IsNullOrEmpty(_selectedProfile.DisplayName) || _selectedProfile.DisplayName.StartsWith("自定义配置_") || _selectedProfile.DisplayName.EndsWith(" - 副本"))
 				{
 					if (!string.IsNullOrWhiteSpace(picker.SelectedTitle))
@@ -4708,6 +5162,11 @@ public partial class SettingsWindow : Window
 		if (profile == null) return null;
 		if (_selectedSlotIndex == -1)
 		{
+			// 中心动作同时存在于旧版根属性和当前活跃层。先确保层结构存在，
+			// 再把当前根属性作为编辑源同步到活跃层，避免 UI 勾选/预设刚写入根属性，
+			// 随后被 GetEffectiveCenterAction 的 EnsureLayers 立即覆盖回旧值。
+			profile.EnsureLayers();
+			profile.SyncActiveLayerFromRootProperties();
 			if (profile.CenterAction == null)
 			{
 				if (string.Equals(profile.ProcessName, "Global", StringComparison.OrdinalIgnoreCase))
@@ -4854,6 +5313,8 @@ public partial class SettingsWindow : Window
 
 			ActionItem displayItem = (isInherited && effectiveInheritedAction != null) ? effectiveInheritedAction : item;
 
+			UpdateFocusActionUnavailableHint(displayItem);
+
 			if (_selectedSlotIndex == -1)
 			{
 				// Center Core
@@ -4995,7 +5456,11 @@ public partial class SettingsWindow : Window
 			bool isWindowManager = type == "Tile" || type == "ToggleTopmost" || type == "MoveMonitor" || type == "WindowOpacity" || type == "SwitchWindow";
 			if (FocusActionTypeComboBox != null)
 			{
-				string targetTag = isWindowManager ? "WindowManager" : type;
+				// 插件动作在类型下拉里就投影成它自己（只有这一项）；
+				// 具体是哪一个动作由下方的子下拉承载，见 RefreshFocusPluginActionComboBox。
+				string targetTag = type == PluginActionBinding.TypeName
+					? PluginActionBinding.TypeName
+					: (isWindowManager ? "WindowManager" : type);
 				UpdateFocusActionTypeItemsSource(targetTag);
 				if (FocusActionTypeComboBox.ItemsSource is IEnumerable<ActionTypeItem> typeItems)
 				{
@@ -5019,6 +5484,11 @@ public partial class SettingsWindow : Window
 			if (FocusWindowManagerPanel != null) FocusWindowManagerPanel.Visibility = isWindowManager ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusSystemPanel != null) FocusSystemPanel.Visibility = type == "System" ? Visibility.Visible : Visibility.Collapsed;
 			if (FocusOcrPanel != null) FocusOcrPanel.Visibility = (type == "Ocr" || type == "ScreenOcr") ? Visibility.Visible : Visibility.Collapsed;
+			if (FocusPluginPanel != null) FocusPluginPanel.Visibility = (type == PluginActionBinding.TypeName) ? Visibility.Visible : Visibility.Collapsed;
+			if (type == PluginActionBinding.TypeName) RefreshFocusPluginPanel(displayItem);
+
+			// 插件动作子下拉（按插件分组）。非插件类型时由该方法自行隐藏并清空。
+			RefreshFocusPluginActionComboBox(displayItem);
 			if (FocusShellToolPanel != null)
 			{
 				FocusShellToolPanel.Visibility = (type == "ShellTool") ? Visibility.Visible : Visibility.Collapsed;
@@ -5720,6 +6190,973 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	/// <summary>
+	/// 刷新焦点编辑器的「插件动作」子下拉（按插件分组）。
+	/// <para>
+	/// 候选集合每次重建，以便在插件管理页里启用 / 停用一个插件后立刻反映到这里。
+	/// 重建会让下拉框短暂把 <c>SelectedValue</c> 置空，因此整段用
+	/// <c>_isUpdatingFocusUi</c> 包住 —— 否则那次置空会被 SelectionChanged 当成
+	/// 用户的选择，把已配好的动作清掉。
+	/// </para>
+	/// </summary>
+	private void RefreshFocusPluginActionComboBox(ActionItem item)
+	{
+		if (FocusPluginActionComboBox == null || FocusPluginActionRow == null) return;
+
+		bool isPlugin = item.Type == PluginActionBinding.TypeName;
+		if (!isPlugin)
+		{
+			FocusPluginActionRow.Visibility = Visibility.Collapsed;
+			FocusPluginActionComboBox.ItemsSource = null;
+			return;
+		}
+
+		FocusPluginActionRow.Visibility = Visibility.Visible;
+
+		bool oldUpdating = _isUpdatingFocusUi;
+		try
+		{
+			_isUpdatingFocusUi = true;
+			FocusPluginActionComboBox.ItemsSource = PluginActionBinding.BuildPluginActionView();
+
+			// 引用失效（插件停用 / 卸载）时 ProjectSelectedAction 会返回 null，
+			// 下拉框显示为未选中；具体原因由下方的插件面板如实说明。
+			FocusPluginActionComboBox.SelectedValue = PluginActionBinding.ProjectSelectedAction(item);
+		}
+		finally
+		{
+			_isUpdatingFocusUi = oldUpdating;
+		}
+	}
+
+	/// <summary>
+	/// 用户在子下拉里选定了一个具体的插件动作。
+	/// <para>
+	/// 这里刻意不复用 <c>UpdateFocusEditorUi</c> 之外的路径：<c>Apply</c> 在「名称 / 图标尚未
+	/// 自定义」时会自动填充，必须整体刷新一次界面对齐，否则名称框会停在旧动作的名字上。
+	/// </para>
+	/// </summary>
+	private void FocusPluginActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (_isUpdatingUi || _isUpdatingFocusUi || !_isUiInitialized || _isUiInitializing) return;
+		if (FocusPluginActionComboBox == null) return;
+
+		ActionItem? item = GetCurrentFocusActionItem();
+		if (item == null || item.Type != PluginActionBinding.TypeName) return;
+
+		if (FocusPluginActionComboBox.SelectedValue is not string fullId || string.IsNullOrWhiteSpace(fullId)) return;
+
+		// 写失败说明插件刚好被停用 / 卸载 —— 保持原配置不动，重新拉一次候选让界面回到真实状态。
+		if (!PluginActionBinding.Apply(item, fullId))
+		{
+			RefreshFocusPluginActionComboBox(item);
+			return;
+		}
+
+		UpdateFocusEditorUi();
+		ScheduleAutoSave();
+	}
+
+	/// <summary>
+	/// 刷新焦点编辑器中的「插件动作」面板：动作信息 + 参数表单 + 参数校验结论。
+	/// <para>
+	/// 参数表单完全由插件声明的 <see cref="StarPie.Plugin.ParameterField"/> 驱动，
+	/// 插件不提供 XAML —— 深浅色对比度、字体、圆角因此都由宿主统一保证，
+	/// 主程序改版也不会让插件界面错位。
+	/// </para>
+	/// </summary>
+	private void RefreshFocusPluginPanel(ActionItem item)
+	{
+		if (FocusPluginTitleText == null || FocusPluginDetailText == null) return;
+
+		StarPie.Plugin.PluginActionRef? reference = item.PluginActionRef;
+		if (reference == null || !reference.IsValid)
+		{
+			// 「还没选」与「根本没得选」要给出两句不同的话，这个分支判据收在
+			// PluginActionPanelText 里（见那里的注释）。窗口类只负责摆控件 ——
+			// 拼串留在窗口类里的话，无界面自检够不着它，[3g] 就写不出来。
+			var notChosen = PluginActionPanelText.NotChosen(PluginActionBinding.BuildPluginActionItems().Count);
+			FocusPluginTitleText.Text = notChosen.Title;
+			FocusPluginDetailText.Text = notChosen.Detail;
+			if (FocusPluginParamsHintText != null) FocusPluginParamsHintText.Visibility = Visibility.Collapsed;
+			if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Collapsed;
+			ClearFocusPluginParameterForm();
+			return;
+		}
+
+		if (!PluginHost.TryGetAction(reference.FullId, out PluginActionRegistration registration))
+		{
+			// 引用还在、贡献点却没了 —— 最常见的是插件被停用/卸载，或插件升级后不再提供该动作。
+			var unavailable = PluginActionPanelText.Unavailable(reference.FullId);
+			FocusPluginTitleText.Text = unavailable.Title;
+			FocusPluginDetailText.Text = unavailable.Detail;
+			if (FocusPluginParamsHintText != null)
+			{
+				FocusPluginParamsHintText.Text = unavailable.Hint ?? "";
+				FocusPluginParamsHintText.Visibility = Visibility.Visible;
+			}
+			if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Visible;
+			ClearFocusPluginParameterForm(keepHintText: true);
+			return;
+		}
+
+		// 插件名与子下拉的分组标题保持一致，用户才能把两处对上号；ID 另行标注，
+		// 排查问题时仍然需要它。这几行摘要的拼串全部收在 PluginActionPanelText 里。
+		var registered = PluginActionPanelText.Registered(
+			registration.DisplayName,
+			registration.PluginId,
+			PluginActionBinding.ResolvePluginDisplayName(registration.PluginId),
+			registration.FullId,
+			registration.Kind == StarPie.Plugin.ActionKind.Background,
+			registration.TimeoutSeconds,
+			registration.Description);
+		FocusPluginTitleText.Text = registered.Title;
+		FocusPluginDetailText.Text = registered.Detail;
+
+		BuildFocusPluginParameterForm(registration);
+
+		if (FocusPluginReloadBtn != null) FocusPluginReloadBtn.Visibility = Visibility.Visible;
+	}
+
+	/// <summary>按插件的字段声明重建参数表单。</summary>
+	private void BuildFocusPluginParameterForm(PluginActionRegistration registration)
+	{
+		if (FocusPluginParamsPanel == null) return;
+
+		PluginParameterForm form = EnsureFocusPluginParameterForm();
+		form.Build(registration.Parameters, registration.PluginId);
+
+		bool hasFields = !form.IsEmpty;
+		FocusPluginParamsPanel.Visibility = hasFields ? Visibility.Visible : Visibility.Collapsed;
+
+		if (FocusPluginParamsHintText != null)
+		{
+			if (hasFields)
+			{
+				// 布尔项不计入必填提示：它未填即视为 false，不存在「留空被拦」的问题，
+				// 把它算进去会让用户以为有个开关必须先动一下才能保存。
+				int requiredCount = registration.Parameters.Count(
+					p => p.Required && p.Type != StarPie.Plugin.ParameterFieldType.Bool);
+
+				FocusPluginParamsHintText.Text = PluginActionPanelText.ParamsHint(requiredCount);
+				FocusPluginParamsHintText.Visibility = Visibility.Visible;
+			}
+			else
+			{
+				FocusPluginParamsHintText.Visibility = Visibility.Collapsed;
+			}
+		}
+
+		RefreshFocusPluginValidation();
+	}
+
+	/// <summary>
+	/// 刷新参数校验结论。
+	/// <para>
+	/// 走 <see cref="PluginHost.ValidateActionParameters"/> —— 与用户真正触发轮盘时同一个入口，
+	/// 因此界面上显示的结论与触发时的判断必然一致，不会出现
+	/// 「这里看着没问题、一触发就说参数不合法」。
+	/// </para>
+	/// </summary>
+	private void RefreshFocusPluginValidation()
+	{
+		if (FocusPluginValidationText == null) return;
+
+		try
+		{
+			PluginActionValidation validation =
+				PluginHost.ValidateActionParameters(GetCurrentFocusActionItem());
+
+			// 字段级错误交给表单就地标红，此处只给「字段之外的结论」+ 未通过字段的计数，
+			// 免得同一条信息在界面上出现两遍。
+			_focusPluginParameterForm?.ShowIssues(validation.DeclaredIssues);
+
+			string? message = validation.PluginMessage;
+			if (message == null && validation.DeclaredIssues.Count > 0)
+			{
+				message = PluginActionPanelText.IssuesCount(validation.DeclaredIssues.Count);
+			}
+
+			if (string.IsNullOrWhiteSpace(message))
+			{
+				FocusPluginValidationText.Text = "";
+				FocusPluginValidationText.Visibility = Visibility.Collapsed;
+			}
+			else
+			{
+				FocusPluginValidationText.Text = "⛔ " + message;
+				FocusPluginValidationText.Visibility = Visibility.Visible;
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("[plugin] 刷新插件参数校验结论时异常", ex);
+			FocusPluginValidationText.Visibility = Visibility.Collapsed;
+		}
+	}
+
+	/// <summary>参数表单内任一字段变化时的回调。</summary>
+	private void OnFocusPluginParameterChanged()
+	{
+		if (_isUpdatingFocusUi || _isUpdatingUi || !_isUiInitialized) return;
+
+		try
+		{
+			// 只刷新校验结论与自动保存，刻意<b>不</b>调用 RefreshSlots()：
+			// 那会重建槽位列表并连带刷新焦点编辑器，把用户正在输入的参数控件整个换掉 ——
+			// 外在表现就是「每敲一个字就失去焦点」。参数不影响槽位显示名，无需刷新列表。
+			RefreshFocusPluginValidation();
+			ScheduleAutoSave();
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogError("[plugin] 处理插件参数变更时异常", ex);
+		}
+	}
+
+	private PluginParameterForm EnsureFocusPluginParameterForm() =>
+		_focusPluginParameterForm ??= new PluginParameterForm(
+			FocusPluginParamsPanel,
+			() => GetCurrentFocusActionItem(),
+			OnFocusPluginParameterChanged);
+
+	/// <param name="keepHintText">为真时保留提示行（用于「动作不可用」这类需要继续展示给的说明）。</param>
+	private void ClearFocusPluginParameterForm(bool keepHintText = false)
+	{
+		_focusPluginParameterForm?.Reset();
+
+		if (FocusPluginParamsPanel != null) FocusPluginParamsPanel.Visibility = Visibility.Collapsed;
+		if (FocusPluginValidationText != null)
+		{
+			FocusPluginValidationText.Text = "";
+			FocusPluginValidationText.Visibility = Visibility.Collapsed;
+		}
+		if (!keepHintText && FocusPluginParamsHintText != null)
+		{
+			FocusPluginParamsHintText.Visibility = Visibility.Collapsed;
+		}
+	}
+
+	private void FocusOpenPluginPageBtn_Click(object sender, RoutedEventArgs e)
+	{
+		SwitchToTab(5);
+	}
+
+	private async void FocusReloadPluginBtn_Click(object sender, RoutedEventArgs e)
+	{
+		ActionItem? item = GetCurrentFocusActionItem();
+		StarPie.Plugin.PluginActionRef? reference = item?.PluginActionRef;
+		if (item == null || reference == null || !reference.IsValid)
+		{
+			System.Windows.MessageBox.Show(this, I18n.T("PluginsActionNotSelected"), I18n.T("PluginsMsgTitle"),
+				MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		if (PluginHost.Find(reference.PluginId) == null)
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsActionPluginNotFound", reference.PluginId), I18n.T("PluginsMsgTitle"),
+				MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		// 进程内插件无法原地热替换 —— 已加载的程序集不会被重新读取。
+		// 必须走「停用 → 启用」才会真正把磁盘上的新二进制加载进来。
+		string msgTitle = I18n.T("PluginsMsgTitle");
+
+		// 用 DisableAsync 而不是同步 Disable：前者会等未归还的调用租约，IsFullyStopped
+		// 为 false 说明还有调用在跑，此时替换程序集等于让旧实例继续吃旧代码。
+		PluginStopResult stop = await PluginHost.DisableAsync(
+			reference.PluginId,
+			PluginStopReason.Reload,
+			PluginHost.DefaultStopGracePeriod);
+
+		if (!stop.IsFullyStopped)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsReloadNotStopped", stop.Message),
+				msgTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		if (!PluginHost.Enable(reference.PluginId, out string enableError))
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsReloadFailed", enableError), msgTitle,
+				MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		PluginInstance? reloaded = PluginHost.Find(reference.PluginId);
+		PluginHost.NotifyUser(msgTitle, I18n.TF("PluginsReloaded", reference.PluginId));
+
+		if (reloaded?.RequiresRestart == true)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsReloadedRestartNeeded", reference.PluginId),
+				msgTitle, MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		UpdateFocusEditorUi();
+		RefreshPluginManagerUi();
+	}
+
+	private void UpdateFocusActionUnavailableHint(ActionItem displayItem)
+	{
+		if (FocusActionUnavailableText == null || FocusActionUnavailableBanner == null) return;
+
+		if (!string.IsNullOrWhiteSpace(displayItem.Type) &&
+			!string.Equals(displayItem.Type, PluginActionBinding.TypeName, StringComparison.Ordinal) &&
+			PluginHost.IsOfficialClaimedType(displayItem.Type) &&
+			!PluginHost.IsClaimedTypeAvailable(displayItem.Type, out string reason))
+		{
+			FocusActionUnavailableText.Text = "⚠️ " + reason;
+			FocusActionUnavailableBanner.Visibility = Visibility.Visible;
+			return;
+		}
+
+		FocusActionUnavailableBanner.Visibility = Visibility.Collapsed;
+	}
+	// ==================== 🧩 插件与扩展 ====================
+
+	/// <summary>
+	/// 刷新插件管理页。
+	/// </summary>
+	/// <param name="resyncFromDisk">
+	/// 是否先与磁盘对账。进入页面时为 true —— 用户可能刚在资源管理器里拷入或删除了插件目录；
+	/// 页面内操作（启用/停用/卸载）之后为 false，那些操作自身已经把状态同步过了。
+	/// </param>
+	private async void RefreshOfficialPluginsButton_Click(object sender, RoutedEventArgs e)
+	{
+		await RefreshOfficialPluginsAsync();
+	}
+
+	private async Task RefreshOfficialPluginsAsync()
+	{
+		if (_officialPluginsLoading) return;
+		_officialPluginsLoading = true;
+		if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = false;
+		RenderOfficialPluginsStatus();
+
+		try
+		{
+			_officialPluginCatalog = await OfficialPluginClient.FetchCatalogAsync();
+			_officialPluginsError = null;
+			RenderOfficialPluginItems();
+			RenderOfficialPluginsStatus();
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"[plugin] 刷新官方插件目录失败：{ex.Message}");
+			_officialPluginsError = ex.Message;
+			RenderOfficialPluginsStatus();
+		}
+		finally
+		{
+			_officialPluginsLoading = false;
+			if (RefreshOfficialPluginsButton != null) RefreshOfficialPluginsButton.IsEnabled = true;
+		}
+	}
+
+	/// <summary>
+	/// 按当前状态重渲染官方目录的进度行。
+	/// <para>
+	/// 必须由状态推导、而不是在几处分支里各写一遍字面量：切换语言时只有重跑这里，
+	/// 才能把「正在获取 / 目录版本 / 拉取失败」三种状态一起换成新语言 ——
+	/// 否则用户切到英文后，卡片与标题都换了，只有这行残留中文。
+	/// </para>
+	/// </summary>
+	private void RenderOfficialPluginsStatus()
+	{
+		if (OfficialPluginsStatusText == null) return;
+
+		if (_officialPluginsLoading)
+		{
+			OfficialPluginsStatusText.Text = I18n.T("PluginsOfficialLoading");
+		}
+		else if (_officialPluginCatalog != null)
+		{
+			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialCatalogInfo", _officialPluginCatalog.CatalogVersion, _officialPluginCatalog.Modules.Count);
+		}
+		else if (!string.IsNullOrWhiteSpace(_officialPluginsError))
+		{
+			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialUnavailable", _officialPluginsError);
+		}
+		else
+		{
+			OfficialPluginsStatusText.Text = I18n.T("PluginsOfficialStatusHint");
+		}
+	}
+
+	private void RenderOfficialPluginItems()
+	{
+		if (OfficialPluginItemsControl == null || _officialPluginCatalog == null) return;
+		var installed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+		foreach (PluginInstance instance in PluginHost.ListInstances()) installed[instance.PluginId] = instance.Entry.Version;
+		OfficialPluginItemsControl.ItemsSource = _officialPluginCatalog.Modules.OrderBy(module => module.Name, StringComparer.CurrentCultureIgnoreCase).Select(module => new OfficialPluginListItem(module, installed.TryGetValue(module.Id, out string? version) ? version : null)).ToList();
+	}
+
+	private async void InstallOfficialPluginButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button { Tag: OfficialPluginModule module } button) return;
+		if (!EnsurePluginSystemReady()) return;
+		button.IsEnabled = false;
+		try
+		{
+			OfficialPluginInstallResult result = await OfficialPluginClient.InstallAsync(module);
+			string title = I18n.T("PluginsOfficialMsgTitle");
+			if (!result.Success) System.Windows.MessageBox.Show(this, I18n.TF("PluginsOfficialInstallFailed", module.Name, result.Error), title, MessageBoxButton.OK, MessageBoxImage.Warning);
+			else System.Windows.MessageBox.Show(this, I18n.TF("PluginsOfficialInstalled", module.Name, module.Version), title, MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+		finally
+		{
+			button.IsEnabled = true;
+			RefreshPluginManagerUi();
+			RenderOfficialPluginItems();
+		}
+	}
+
+	private void RefreshPluginManagerUi(bool resyncFromDisk = false)
+	{
+		if (PluginListBox == null) return;
+
+		if (resyncFromDisk && PluginHost.IsInitialized)
+		{
+			try
+			{
+				PluginHost.SyncFromDisk();
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogWarn($"[plugin] 与磁盘对账失败：{ex.Message}");
+			}
+		}
+
+		// 候选列表每次都重扫。扫描目录里的 .dll 是用户随时会替换的东西，
+		// 缓存一次再复用只会让界面显示上一个版本的信息；而且通常只有寥寥几枚文件。
+		if (PluginHost.IsInitialized)
+		{
+			try
+			{
+				PluginHost.ScanCandidates();
+			}
+			catch (Exception ex)
+			{
+				AppLogger.LogWarn($"[plugin] 扫描候选目录失败：{ex.Message}");
+			}
+		}
+
+		var items = new List<PluginListItem>();
+		try
+		{
+			foreach (PluginInstance instance in PluginHost.ListInstances())
+			{
+				items.Add(PluginListItem.Build(instance));
+			}
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"[plugin] 读取插件列表失败：{ex.Message}");
+		}
+
+		PluginListBox.ItemsSource = items;
+
+		if (PluginsEmptyStatePanel != null)
+		{
+			PluginsEmptyStatePanel.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+		}
+
+		if (PluginSystemEnabledCheckBox != null)
+		{
+			PluginSystemEnabledCheckBox.IsChecked = PluginHost.IsEnabled;
+			PluginSystemEnabledCheckBox.IsEnabled = PluginHost.IsInitialized;
+		}
+
+		if (PluginsStatusSummaryText != null)
+		{
+			int enabledCount = items.Count(i => i.IsEnabled);
+			string directoryHint = I18n.TF("PluginsDataDirectoryHint", PluginPaths.Root);
+			PluginsStatusSummaryText.Text = items.Count == 0
+				? I18n.TF("PluginsStatusEmpty", directoryHint)
+				: I18n.TF("PluginsStatusSummary", items.Count, enabledCount, directoryHint);
+		}
+
+		if (PluginsSafeModeText != null)
+		{
+			PluginsSafeModeText.Visibility = PluginHost.IsSafeModeActive ? Visibility.Visible : Visibility.Collapsed;
+			if (PluginHost.IsSafeModeActive)
+			{
+				PluginsSafeModeText.Text = I18n.T("PluginsSafeModeWarning");
+			}
+		}
+
+		RenderOfficialPluginsStatus();
+
+		if (_officialPluginCatalog == null && !_officialPluginsLoading)
+		{
+			_ = RefreshOfficialPluginsAsync();
+		}
+		else
+		{
+			RenderOfficialPluginItems();
+		}
+
+		RefreshPluginCandidatesUi();
+	}
+
+	/// <summary>
+	/// 刷新「只读扫描目录」那一块。
+	/// <para>
+	/// 目录不存在时也要显示这一块（而不是整块藏起来）：用户按文档把 .dll 放进
+	/// 「程序目录\plugin」，结果发现界面上什么都没有，是最容易让人以为功能坏了的情形。
+	/// 所以这里始终把<b>实际路径</b>写出来，并明确说明宿主不会替用户创建它。
+	/// </para>
+	/// </summary>
+	/// <summary>
+	/// 插件页的静态文案：页头、副标题、各按钮与复选框。
+	/// <para>
+	/// 覆盖的是 <c>SettingsWindow.xaml</c> 里那几个硬编码中文默认值。插件页是 S4 拆包时新加的，
+	/// 当时没有同步接进 <see cref="ApplyLocalization"/>，于是切到英文 / 日文时整页仍是中文。
+	/// 列表状态、候选区那几段带数字的文案各自在刷新方法里取（见 <see cref="TF"/>）。
+	/// </para>
+	/// </summary>
+	private void ApplyPluginsPageLocalization()
+	{
+		if (PluginsPageHeader != null)
+		{
+			PluginsPageHeader.Text = I18n.T("TabPlugins");
+		}
+		if (PluginsPageSubheader != null)
+		{
+			PluginsPageSubheader.Text = I18n.T("PluginsPageSubheader");
+		}
+		if (InstallPluginButton != null)
+		{
+			InstallPluginButton.Content = I18n.T("PluginsInstallButton");
+		}
+		if (RescanPluginsButton != null)
+		{
+			RescanPluginsButton.Content = I18n.T("PluginsRescanButton");
+		}
+		if (OpenPluginsFolderButton != null)
+		{
+			OpenPluginsFolderButton.Content = I18n.T("PluginsOpenDataFolderButton");
+		}
+		if (OpenPluginScanFolderButton != null)
+		{
+			OpenPluginScanFolderButton.Content = I18n.T("PluginsOpenScanFolderButton");
+		}
+		if (PluginSystemEnabledCheckBox != null)
+		{
+			PluginSystemEnabledCheckBox.Content = I18n.T("PluginsEnableCheckBox");
+		}
+		if (PluginsEmptyTitleText != null)
+		{
+			PluginsEmptyTitleText.Text = I18n.T("PluginsEmptyTitle");
+		}
+		if (PluginsEmptyHintText != null)
+		{
+			PluginsEmptyHintText.Text = I18n.T("PluginsEmptyHint");
+		}
+
+		// 官方在线目录那一块。进度行是状态推导出来的（三种状态各一句），
+		// 所以这里不能只设一个固定文案 —— 得让状态机自己重渲染一次。
+		if (OfficialPluginsHeaderText != null)
+		{
+			OfficialPluginsHeaderText.Text = I18n.T("PluginsOfficialHeader");
+		}
+		if (RefreshOfficialPluginsButton != null)
+		{
+			RefreshOfficialPluginsButton.Content = I18n.T("PluginsOfficialRefreshButton");
+		}
+		RenderOfficialPluginsStatus();
+
+		// 候选卡片的状态徽标与安装按钮文案是 getter（每次读取时才查表），
+		// 光设静态文本不会让它们换语言 —— 得重新绑定一次数据源。
+		RefreshPluginManagerUi();
+	}
+
+	private void RefreshPluginCandidatesUi()
+	{
+		if (PluginCandidatesPanel == null) return;
+
+		IReadOnlyList<PluginCandidate> candidates;
+		try
+		{
+			candidates = PluginHost.Candidates;
+		}
+		catch (Exception ex)
+		{
+			AppLogger.LogWarn($"[plugin] 读取候选列表失败：{ex.Message}");
+			candidates = Array.Empty<PluginCandidate>();
+		}
+
+		int installable = candidates.Count(c => c.CanInstall);
+
+		if (PluginCandidatesHeaderText != null)
+		{
+			PluginCandidatesHeaderText.Text = PluginPaths.ScanRootExists
+				? (installable > 0
+					? I18n.TF("PluginsScanHeaderFound", candidates.Count, installable)
+					: I18n.T("PluginsScanHeaderNone"))
+				: I18n.T("PluginsScanHeaderMissing");
+		}
+
+		if (PluginCandidatesPathText != null)
+		{
+			PluginCandidatesPathText.Text = PluginPaths.ScanRootExists
+				? PluginPaths.ScanRoot
+				: PluginPaths.ScanRoot + "　—　" + I18n.T("PluginsScanPathHint");
+		}
+
+		if (PluginCandidateItemsControl != null)
+		{
+			PluginCandidateItemsControl.ItemsSource = candidates.Count == 0 ? null : candidates;
+		}
+
+		PluginCandidatesPanel.Visibility = Visibility.Visible;
+	}
+
+	/// <summary>点候选卡片上的「安装 / 更新 / 降级安装」。</summary>
+	private async void InstallPluginCandidateButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button button) return;
+		string? dllPath = button.Tag as string;
+		if (string.IsNullOrWhiteSpace(dllPath)) return;
+
+		PluginCandidate? candidate = PluginHost.Candidates
+			.FirstOrDefault(c => string.Equals(c.DllPath, dllPath, StringComparison.OrdinalIgnoreCase));
+
+		if (candidate == null)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.T("PluginsCandidateGone"),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+			RefreshPluginManagerUi();
+			return;
+		}
+
+		if (!ConfirmPluginInstall(new PluginInstallConfirmation
+		{
+			Scan = candidate.Scan,
+			State = candidate.State,
+			Note = candidate.Note,
+			// 与 PluginHost.InstallCandidateAsync 保持一致：候选安装走 EnableAfterInstall = true。
+			EnableAfterInstall = true,
+		})) return;
+
+		PluginInstallResult installResult = await PluginHost.InstallCandidateAsync(candidate);
+		string error = installResult.Error;
+
+		if (!installResult.Success)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsInstallFailed", error), I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+		else if (candidate.State == PluginCandidateState.Update)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsUpdatedAndEnabled", candidate.DisplayName, candidate.VersionText),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		RefreshPluginManagerUi();
+	}
+
+	/// <summary>打开只读扫描目录。目录不存在时只提示路径，绝不代为创建。</summary>
+	private void OpenPluginScanFolderButton_Click(object sender, RoutedEventArgs e)
+	{
+		string scanRoot = PluginPaths.ScanRoot;
+
+		if (!PluginPaths.ScanRootExists)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsScanFolderMissing", scanRoot),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		try
+		{
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+			{
+				FileName = scanRoot,
+				UseShellExecute = true,
+			});
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsOpenScanFolderFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+	}
+
+	private bool EnsurePluginSystemReady()
+	{
+		if (PluginHost.IsInitialized) return true;
+
+		System.Windows.MessageBox.Show(this,
+			I18n.T("PluginsNotReady"),
+			I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+		return false;
+	}
+
+	private async void InstallPluginButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (!EnsurePluginSystemReady()) return;
+
+		var dialog = new Microsoft.Win32.OpenFileDialog
+		{
+			Title = I18n.T("PluginsPickDllTitle"),
+			Filter = I18n.T("PluginsPickDllFilter"),
+			CheckFileExists = true,
+			Multiselect = false,
+		};
+
+		if (dialog.ShowDialog(this) != true) return;
+
+		PluginScanResult scan;
+		try
+		{
+			scan = PluginHost.PrepareInstall(dialog.FileName);
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsReadFileFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+			return;
+		}
+
+		if (!scan.Accepted)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsNotAPlugin",
+					PluginScanFailureText.Title(scan.Failure),
+					scan.ErrorDetail,
+					PluginScanFailureText.Hint(scan.Failure),
+					scan.DllPath),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		// 识别已通过 —— 把「它到底是什么」摊开给用户看，确认后才落盘。
+		// 插件是以 StarPie 的权限在进程内跑代码的，这一步是唯一的知情同意关口。
+		//
+		// 这里的「装下去会怎样」与候选路径共用同一套判定（PluginHost.ClassifyManualInstall），
+		// 否则同一枚文件从扫描目录装与手动选进来装，会在确认页上得到两种说法。
+		(PluginCandidateState manualState, string manualNote) = PluginHost.ClassifyManualInstall(scan);
+		if (!ConfirmPluginInstall(new PluginInstallConfirmation
+		{
+			Scan = scan,
+			State = manualState,
+			Note = manualNote,
+			// 与下面 CommitInstallAsync 的 EnableAfterInstall 保持一致。
+			EnableAfterInstall = false,
+		})) return;
+
+		PluginInstallResult result = await PluginHost.CommitInstallAsync(scan, new PluginInstallOptions
+		{
+			Acknowledged = true,
+			OverwriteExisting = true,
+			// 安装与启用分开：先让用户在列表里看清它、再决定是否启用，
+			// 避免「装完即运行」这种用户还没反应过来就已经生效的体验。
+			EnableAfterInstall = false,
+			AcknowledgedCapabilities = scan.Manifest?.Capabilities?.ToList() ?? new List<string>(),
+		});
+
+		if (!result.Success)
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsInstallFailed", result.Error),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+			return;
+		}
+
+		RefreshPluginManagerUi();
+		PluginHost.NotifyUser(I18n.T("PluginsMsgTitle"), I18n.TF("PluginsInstalledNotify", result.PluginId));
+
+		System.Windows.MessageBox.Show(this, I18n.TF("PluginsInstalledDisabled", result.PluginId),
+			I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+	}
+
+	/// <summary>
+	/// 安装确认页的<b>唯一实现</b>，候选安装与手动选 .dll 都走这里。
+	/// <para>
+	/// 这里曾经是两份独立实现（候选一份、手动一份），只有候选那份接了 i18n ⇒
+	/// 同一个「确认安装插件」语义两条路，改一处漏一处。现在正文只在
+	/// <see cref="PluginInstallConfirmationText"/> 里写一遍，本方法只剩弹窗。
+	/// </para>
+	/// <para>
+	/// 正文之所以挪出去，是为了让它在无界面自检里能被逐语言驱动 —— 「切到英文后
+	/// 这一页还剩下多少中文」只有变成断言才守得住（自检 <c>[3e]</c>）。
+	/// </para>
+	/// </summary>
+	private bool ConfirmPluginInstall(PluginInstallConfirmation info) =>
+		System.Windows.MessageBox.Show(this, PluginInstallConfirmationText.Build(info),
+			I18n.T("PluginsConfirmTitle"), MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+
+	private void RescanPluginsButton_Click(object sender, RoutedEventArgs e)
+	{
+		int discovered = PluginHost.SyncFromDisk();
+
+		// 刷新界面时内部会重扫候选目录，这里跑完就能读到最新结果。
+		RefreshPluginManagerUi();
+
+		int installable = PluginHost.Candidates.Count(c => c.CanInstall);
+		string candidateHint = installable > 0
+			? I18n.TF("PluginsRescanCandidateHint", installable)
+			: "";
+
+		PluginHost.NotifyUser(I18n.T("PluginsMsgTitle"),
+			discovered > 0
+				? I18n.TF("PluginsRescanFound", discovered, candidateHint)
+				: I18n.TF("PluginsRescanNone", candidateHint));
+	}
+
+	private void OpenPluginsFolderButton_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			PluginPaths.EnsureDirectories();
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+			{
+				FileName = PluginPaths.Root,
+				UseShellExecute = true,
+			});
+		}
+		catch (Exception ex)
+		{
+			System.Windows.MessageBox.Show(this, I18n.TF("PluginsOpenDataFolderFailed", ex.Message),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+	}
+
+	/// <summary>
+	/// 插件系统总开关。
+	/// <para>
+	/// 用 Click 而不是 Checked/Unchecked：给 <c>IsChecked</c> 赋值同样会触发
+	/// Checked/Unchecked，那样每次刷新页面都会把用户的配置再写一遍。
+	/// Click 只在真实交互时触发，天然规避这类误写。
+	/// </para>
+	/// </summary>
+	private async void PluginSystemEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	{
+		if (PluginSystemEnabledCheckBox == null) return;
+
+		bool desired = PluginSystemEnabledCheckBox.IsChecked == true;
+		int affected = PluginHost.GetRegisteredActions().Count;
+		PluginSystemEnabledCheckBox.IsEnabled = false;
+		try
+		{
+			await PluginHost.SetEnabledAsync(desired);
+		}
+		finally
+		{
+			PluginSystemEnabledCheckBox.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
+
+		if (!desired && affected > 0)
+		{
+			System.Windows.MessageBox.Show(this,
+				I18n.TF("PluginsDisabledNotice", affected),
+				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+	}
+
+	private async void PluginRowEnabledCheckBox_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.CheckBox { Tag: string pluginId } box ||
+			string.IsNullOrWhiteSpace(pluginId))
+		{
+			return;
+		}
+
+		bool desired = box.IsChecked == true;
+		if (!desired)
+		{
+			int affected = PluginImpactAnalyzer.CountAffectedActions(ConfigManager.CurrentConfig, pluginId);
+			if (affected > 0)
+			{
+				string pluginName = PluginHost.Find(pluginId)?.Entry.Name ?? pluginId;
+				MessageBoxResult choice = System.Windows.MessageBox.Show(this,
+					I18n.TF("PluginsConfirmDisable", pluginName, affected),
+					I18n.T("PluginsConfirmDisableTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+				if (choice != MessageBoxResult.Yes)
+				{
+					box.IsChecked = true;
+					return;
+				}
+			}
+		}
+		box.IsEnabled = false;
+		try
+		{
+			if (desired)
+			{
+				if (!PluginHost.Enable(pluginId, out string enableError))
+				{
+					System.Windows.MessageBox.Show(this, I18n.TF("PluginsEnableFailed", pluginId, enableError),
+						I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+			}
+			else
+			{
+				PluginStopResult stop = await PluginHost.DisableAsync(
+					pluginId,
+					PluginStopReason.UserDisabled,
+					PluginHost.DefaultStopGracePeriod);
+
+				if (stop.Status == PluginStopStatus.Failed)
+				{
+					System.Windows.MessageBox.Show(this, I18n.TF("PluginsDisableFailed", pluginId, stop.Message),
+						I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+				else if (!stop.IsFullyStopped)
+				{
+					// stop.Message 由宿主生成（「插件「X」仍有 N 个调用未结束…」），
+					// 属宿主内部消息，不在本次接线范围内。
+					System.Windows.MessageBox.Show(this, stop.Message,
+						I18n.T("PluginsStoppingTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+				}
+			}
+		}
+		finally
+		{
+			box.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
+	}
+
+	private async void UninstallPluginButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button { Tag: string pluginId } button ||
+			string.IsNullOrWhiteSpace(pluginId))
+		{
+			return;
+		}
+
+		MessageBoxResult choice = System.Windows.MessageBox.Show(this,
+			I18n.TF("PluginsConfirmUninstall", pluginId),
+			I18n.T("PluginsConfirmUninstallTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+
+		if (choice != MessageBoxResult.Yes) return;
+
+		button.IsEnabled = false;
+		try
+		{
+			PluginUninstallResult result = await PluginHost.UninstallAsync(pluginId, removePluginData: true);
+			if (!result.Success)
+			{
+				System.Windows.MessageBox.Show(this, I18n.TF("PluginsUninstallFailed", result.Error),
+					I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
+		}
+		finally
+		{
+			button.IsEnabled = true;
+			RefreshPluginManagerUi();
+		}
+	}
+
 	private void UpdateFocusActionTypeItemsSource(string? currentTag = null)
 	{
 		if (FocusActionTypeComboBox == null) return;
@@ -5753,6 +7190,8 @@ public partial class SettingsWindow : Window
 			FocusActionTypeComboBox.ItemsSource = targetList;
 			if (prevSelectedTag != null)
 			{
+				// 插件动作的 Tag 现在固定是裸 "Plugin"，一定在列表里 ——
+				// 不再需要「引用失效时退回兜底项」的退化匹配（那是贡献点 ID 编码进 Tag 时代的产物）。
 				var match = targetList.FirstOrDefault(t => string.Equals(t.Tag, prevSelectedTag, StringComparison.OrdinalIgnoreCase));
 				if (match != null)
 				{
@@ -5773,14 +7212,25 @@ public partial class SettingsWindow : Window
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null && FocusActionTypeComboBox.SelectedValue is string newType)
 		{
-			if (newType == "WindowManager")
+			if (newType == PluginActionBinding.TypeName)
+			{
+				// 只切类型，**刻意不清插件引用**：用户在内置类型与插件动作之间来回切换时，
+				// 已配好的插件动作不应被清掉（改选具体动作是子下拉的事）。
+				// 引用为空只表示「还没选过」，由子下拉的空状态去引导。
+				item.Type = PluginActionBinding.TypeName;
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
+				{
+					item.Name = I18n.T("ActionTypePluginShort");
+				}
+			}
+			else if (newType == "WindowManager")
 			{
 				bool wasWindowType = item.Type == "Tile" || item.Type == "ToggleTopmost" || item.Type == "MoveMonitor" || item.Type == "WindowOpacity" || item.Type == "SwitchWindow";
 				if (!wasWindowType)
 				{
 					item.Type = "Tile";
 					item.Parameter = "2L";
-					if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("截屏识字"))
+					if (ActionNameDefaults.IsAutoFilled(item.Name))
 					{
 						item.Name = "平铺: " + WindowTiler.LayoutDisplayName("2L");
 					}
@@ -5792,6 +7242,9 @@ public partial class SettingsWindow : Window
 			}
 			else
 			{
+				// 从插件动作切回内置类型时，必须清掉插件引用，
+				// 否则会留下「内置类型 + 悬挂插件引用」的混合状态。
+				PluginActionBinding.Clear(item);
 				item.Type = newType;
 			}
 
@@ -5806,7 +7259,7 @@ public partial class SettingsWindow : Window
 			else if (newType == "Ocr" || newType == "ScreenOcr")
 			{
 				item.Type = "Ocr";
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("扇区") || item.Name.StartsWith("新动作") || item.Name.StartsWith("平铺"))
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
 				{
 					item.Name = "截屏识字";
 				}
@@ -6513,7 +7966,7 @@ public partial class SettingsWindow : Window
 		{
 			item.Parameter = fbd.SelectedPath;
 			FocusFolderPathTextBox.Text = fbd.SelectedPath;
-			if (string.IsNullOrWhiteSpace(item.Name) || item.Name.StartsWith("快捷动作") || item.Name.StartsWith("文件夹"))
+			if (ActionNameDefaults.IsAutoFilled(item.Name))
 			{
 				string autoName = System.IO.Path.GetFileName(fbd.SelectedPath);
 				if (string.IsNullOrEmpty(autoName)) autoName = fbd.SelectedPath;
@@ -6684,7 +8137,7 @@ public partial class SettingsWindow : Window
 			SystemPresetItem? presetItem = SlotViewModel.SystemPresetList.FirstOrDefault(p => p.Key == presetKey);
 			if (presetItem != null)
 			{
-				if (string.IsNullOrEmpty(item.Name) || item.Name.StartsWith("快捷动作"))
+				if (ActionNameDefaults.IsAutoFilled(item.Name))
 				{
 					item.Name = presetItem.DefaultName;
 					FocusActionNameTextBox.Text = presetItem.DefaultName;
@@ -7455,6 +8908,8 @@ public partial class SettingsWindow : Window
 						IsHitTestVisible = false
 					};
 
+					// 这个判空不能删：上面的兜底块是 try { iconElement = new Path { Data = Geometry.Parse(...) } }
+					// catch { } —— 空 catch 吞掉异常时 iconElement 依然是 null。CA1508 报「恒真」是误报。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)
@@ -7507,6 +8962,7 @@ public partial class SettingsWindow : Window
 				}
 				else
 				{
+					// 同上：兜底块的 catch 会吞异常，iconElement 仍可能为 null。
 					if (iconElement != null)
 					{
 						if (action != null && action.IsInherited)
@@ -8691,28 +10147,6 @@ public partial class SettingsWindow : Window
 
 	public void ProcessRawMouseButton(string mouseButton, uint mouseData = 0u)
 	{
-		//IL_0077: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0083: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0085: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0096: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013e: Invalid comparison between Unknown and I4
-		//IL_0146: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0148: Unknown result type (might be due to invalid IL or missing references)
-		//IL_014a: Invalid comparison between Unknown and I4
-		//IL_0152: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0154: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0156: Invalid comparison between Unknown and I4
-		//IL_015e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0160: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0162: Invalid comparison between Unknown and I4
 		if ((base.IsVisible || _isRecordingTrigger || _isRecordingProcessTrigger) && ConfigManager.CurrentConfig != null)
 		{
 			string text = mouseButton switch
@@ -8809,67 +10243,6 @@ public partial class SettingsWindow : Window
 
 	private void ProcessRawKeyEvent(GlobalKeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_000a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0011: Invalid comparison between Unknown and I4
-		//IL_0024: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0029: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0082: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0087: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0090: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009b: Invalid comparison between Unknown and I4
-		//IL_00d8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00da: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c0: Invalid comparison between Unknown and I4
-		//IL_009e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Invalid comparison between Unknown and I4
-		//IL_00fd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ff: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00de: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e5: Invalid comparison between Unknown and I4
-		//IL_00c3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ca: Invalid comparison between Unknown and I4
-		//IL_0103: Unknown result type (might be due to invalid IL or missing references)
-		//IL_010a: Invalid comparison between Unknown and I4
-		//IL_00e8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ef: Invalid comparison between Unknown and I4
-		//IL_010d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0114: Invalid comparison between Unknown and I4
-		//IL_01bf: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c6: Invalid comparison between Unknown and I4
-		//IL_01c9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01d0: Invalid comparison between Unknown and I4
-		//IL_01d3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01da: Invalid comparison between Unknown and I4
-		//IL_01dd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01e4: Invalid comparison between Unknown and I4
-		//IL_01e7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ee: Invalid comparison between Unknown and I4
-		//IL_01f1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01f8: Invalid comparison between Unknown and I4
-		//IL_01fb: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0202: Invalid comparison between Unknown and I4
-		//IL_0205: Unknown result type (might be due to invalid IL or missing references)
-		//IL_020c: Invalid comparison between Unknown and I4
-		//IL_0226: Unknown result type (might be due to invalid IL or missing references)
-		//IL_022b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024f: Invalid comparison between Unknown and I4
-		//IL_0257: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0259: Unknown result type (might be due to invalid IL or missing references)
-		//IL_025b: Invalid comparison between Unknown and I4
-		//IL_0263: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0265: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0267: Invalid comparison between Unknown and I4
-		//IL_026f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0271: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0273: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 0)
 		{
 			return;
@@ -13681,8 +15054,6 @@ public partial class SettingsWindow : Window
 
 	private void NewBlacklistProcessTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0007: Invalid comparison between Unknown and I4
 		if ((int)e.Key == 6)
 		{
 			AddBlacklistButton_Click(sender, e);
@@ -15208,7 +16579,7 @@ public partial class SettingsWindow : Window
 		if (programPickerWindow.ShowDialog() == true && !string.IsNullOrEmpty(programPickerWindow.SelectedPath))
 		{
 			dataContext.Parameter = programPickerWindow.SelectedPath;
-			if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("动作") || dataContext.Name == "快捷动作")
+			if (ActionNameDefaults.IsAutoFilled(dataContext.Name))
 			{
 				dataContext.Name = ((!string.IsNullOrEmpty(programPickerWindow.SelectedName)) ? programPickerWindow.SelectedName : System.IO.Path.GetFileNameWithoutExtension(programPickerWindow.SelectedPath));
 			}
@@ -15240,7 +16611,7 @@ public partial class SettingsWindow : Window
 			if (!string.IsNullOrEmpty(folderName))
 			{
 				dataContext.Parameter = folderName;
-				if (string.IsNullOrEmpty(dataContext.Name) || dataContext.Name.StartsWith("快捷动作") || dataContext.Name.StartsWith("动作") || dataContext.Name == "打开文件夹")
+				if (ActionNameDefaults.IsAutoFilled(dataContext.Name))
 				{
 					DirectoryInfo directoryInfo = new DirectoryInfo(folderName);
 					dataContext.Name = directoryInfo.Name;
@@ -15325,7 +16696,6 @@ public partial class SettingsWindow : Window
 
 	private void RenderLiveWheelPreview()
 	{
-		//IL_09d6: Unknown result type (might be due to invalid IL or missing references)
 		if (_isRenderingPreview || LiveWheelPreviewCanvas == null || ConfigManager.CurrentConfig == null)
 		{
 			return;
@@ -17575,7 +18945,7 @@ public partial class SettingsWindow : Window
 			if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ResultHotkey))
 			{
 				vm.Parameter = dlg.ResultHotkey;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("快捷键"))
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = dlg.ResultHotkey;
 				}
@@ -17596,7 +18966,7 @@ public partial class SettingsWindow : Window
 			if (picker.ShowDialog() == true && !string.IsNullOrEmpty(picker.SelectedPath))
 			{
 				vm.Parameter = picker.SelectedPath;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = !string.IsNullOrEmpty(picker.SelectedName)
 						? picker.SelectedName
@@ -17619,7 +18989,7 @@ public partial class SettingsWindow : Window
 			if (winPicker.ShowDialog() == true && !string.IsNullOrEmpty(winPicker.SelectedPath))
 			{
 				vm.Parameter = winPicker.SelectedPath;
-				if (string.IsNullOrEmpty(vm.Name) || vm.Name == "启动程序" || vm.Name == "取消动作")
+				if (ActionNameDefaults.IsAutoFilled(vm.Name))
 				{
 					vm.Name = !string.IsNullOrEmpty(winPicker.SelectedTitle) 
 						? winPicker.SelectedTitle 
@@ -17642,7 +19012,7 @@ public partial class SettingsWindow : Window
 		{
 			vm.Type = "WebUrl";
 			vm.Parameter = url;
-			if (string.IsNullOrEmpty(vm.Name) || vm.Name.StartsWith("http") || vm.Name == "打开网址")
+			if (ActionNameDefaults.IsAutoFilled(vm.Name) || vm.Name.StartsWith("http"))
 			{
 				vm.Name = name;
 			}

@@ -434,6 +434,17 @@ public static class IconHelper
 		{
 			return value;
 		}
+		// 插件贡献的矢量图标：key 形如 plugin:<pluginId>:<shortKey>（见 PluginApi.IconKeyPrefix）。
+		// 放在内置图标之后、裸 path 判定之前 —— 前缀唯一，不会与既有 key 撞车；
+		// 而放在裸 path 判定之前是因为插件 key 一定不是以 "M" 开头的路径数据。
+		if (key.StartsWith(StarPie.Plugin.PluginApi.IconKeyPrefix, StringComparison.OrdinalIgnoreCase))
+		{
+			string? pluginSvg = Plugins.PluginHost.Catalog.ResolveIcon(key);
+			if (!string.IsNullOrEmpty(pluginSvg))
+			{
+				return pluginSvg;
+			}
+		}
 		if (key.Trim().StartsWith("M", StringComparison.OrdinalIgnoreCase) && key.Contains(","))
 		{
 			return key.Trim();
@@ -466,8 +477,6 @@ public static class IconHelper
 
 	public static Geometry CreateAdvancedSectorGeometry(double cx, double cy, double startAngle, double endAngle, double innerR, double outerR, string shape, double gap = 0.0, double cornerRadius = 0.0)
 	{
-		//IL_00d9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024f: Unknown result type (might be due to invalid IL or missing references)
 		double num = (startAngle + endAngle) / 2.0;
 		double num2 = num * (Math.PI / 180.0);
 		double num3 = (innerR + outerR) / 2.0;
@@ -585,21 +594,6 @@ public static class IconHelper
 
 	public static Geometry CreateRoundedAnnularSectorGeometry(double cx, double cy, double startAngle, double endAngle, double innerRadius, double outerRadius, double cornerRadius)
 	{
-		//IL_0282: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02a0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02a6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02c9: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02cb: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02ea: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02fe: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0300: Unknown result type (might be due to invalid IL or missing references)
-		//IL_031f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0325: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0348: Unknown result type (might be due to invalid IL or missing references)
-		//IL_034a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0369: Unknown result type (might be due to invalid IL or missing references)
-		//IL_037d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_037f: Unknown result type (might be due to invalid IL or missing references)
 		double num = endAngle - startAngle;
 		if (num <= 0.0)
 		{
@@ -673,12 +667,6 @@ public static class IconHelper
 
 	private static Geometry CreateStandardSectorGeometry(double cx, double cy, double startAngle, double endAngle, double innerRadius, double outerRadius)
 	{
-		//IL_00a7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0108: Unknown result type (might be due to invalid IL or missing references)
-		//IL_011c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013e: Unknown result type (might be due to invalid IL or missing references)
 		double num = startAngle * (Math.PI / 180.0);
 		double num2 = endAngle * (Math.PI / 180.0);
 		Point startPoint = default(Point);
@@ -1041,7 +1029,6 @@ public static class IconHelper
 
 	public static BitmapSource? ExtractShellItemIcon(string path, int size = 64)
 	{
-		//IL_00f3: Unknown result type (might be due to invalid IL or missing references)
 		if (string.IsNullOrWhiteSpace(path))
 		{
 			return null;
@@ -1102,9 +1089,6 @@ public static class IconHelper
 
 	private static BitmapSource? ExtractPureIconFromFile(string filePath, int iconIndex)
 	{
-		//IL_001a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ab: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005a: Unknown result type (might be due to invalid IL or missing references)
 		try
 		{
 			uint num = ExtractIconEx(filePath, iconIndex, out var phiconLarge, out var phiconSmall, 1u);
