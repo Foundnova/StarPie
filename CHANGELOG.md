@@ -4,6 +4,17 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
+## [未发布] - 2026-09-20
+
+### 🐛 修：设置页点「测试」必报「执行超时（3s）」，而同一个动作从轮盘上触发完全正常
+
+- **症状与误导方向**：设置页里点「测试」，3 秒后弹出「执行超时（3s）」；把同一个动作挂到扇区上经手势触发则一切正常。这看起来像插件写坏了，实际是宿主把自己锁死了 —— 设置页的 5 个「测试」按钮都在 **UI 线程**上同步调用 `ActionExecutor.Execute`，而插件动作那条路上 `PluginInvoker` 用 `task.Wait(超时)` 等结果。任何 `await Dispatcher.InvokeAsync(…)` 的插件（也就是要画窗口的那一类）都会让 UI 线程等一个「要等 UI 线程空出来才能完成」的任务，必然耗满超时。
+- **定位依据是日志里的线程名**：失败那几条打在 `[Thread-1]`，成功那几条打在 `[StarPie.ActionExecutor]`。AGENTS.md §4 早就写着「设置页不得在 UI 线程同步等待」，这五个按钮是一整片违反。
+- **改法**：新增 `ActionExecutor.ExecuteForTesting(ActionItem?)` —— 走宿主本来就有的 `EnqueueAction` 通道（真实手势与轮盘都走它），并投递 `Clone()` 出的快照而非界面上那个活实例（入队后执行发生在另一条线程的稍后时刻，那时用户可能已经在继续改这个动作）。五个入口统一改指它：扇区 `Test_Click`、焦点动作 `FocusTestActionBtn_Click`、手势映射 `TestGesture_Click`、取消动作 `TestCancelAction_Click`、子动作 `SubTest_Click`。没有新造线程池；顺带让「测试」与真实触发跑在同一条线程上，「测试通过」才对得上「轮盘上也会通过」。
+- **新增静态护栏** `scratch/check_test_button_thread.py`：在「名字里带 `Test` 的 `_Click` 处理器」作用域内禁止直接调用 `ActionExecutor.Execute(`。这条约束编译器抓不到，UI 回归套件也够不着（要复现得在沙箱里装一个真插件再点一次按钮）。
+- **验证**：`dotnet build WinPieGestures -c Release` → **0 警告 0 错误**；新护栏扫到 9 个测试类处理器、**PASS**；变异测试把 `SettingsWindow.xaml.cs:8501` 换回 `Execute` ⇒ 当场报 `[FAIL] FocusTestActionBtn_Click 里同步调用了 ActionExecutor.Execute(...)`，还原后重新 PASS。
+- **已知未覆盖（登记，不冒充已做）**：本轮只做了静态护栏，**没有真机点过一次「测试」** —— 那需要装一个真插件并开 GUI，属人工回归。另 `GestureController.cs:972` 那处同步 `Execute` 刻意未改（它在自己的线程上，是有意为之），护栏的作用域也因此限定在测试处理器而不是全仓。
+
 ## [v1.8.0-beta.1] - 2026-09-20
 
 StarPie v1.8.0-beta.1 是插件系统的首个公开测试版本。本次更新将原本集中在主程序中的动作能力拆分为可独立安装和管理的官方插件模块，同时开放社区插件 SDK、声明式参数表单与统一调用运行时，使 StarPie 可以在不持续膨胀主程序核心的前提下扩展新的动作能力。

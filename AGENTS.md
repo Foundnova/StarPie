@@ -295,6 +295,9 @@ g:\Users\2 Better\Desktop\design\
 - **动作路径拥有完整执行语义**：`ActionExecutionPathModule` 负责从 `ActionItem` 复制不可变 `PluginActionRequest`，再按“公用激活 → FullId 查询 → 同一 registration 参数校验 → `PluginInvoker` 调度”执行。设置页校验复用同一校验实现但不得触发惰性加载；动作解析和执行逻辑不得重新塞回 `PluginHost`。
 - **活动调用租约由宿主自动维护**：每次进入插件自定义 `Validate`、`ExecuteAsync`、事件回调或结构查询前，必须从 `PluginInstance` 获取内部 `PluginInvocationLease`；插件开发者不可见也不手动维护。`PluginInstance` 按实例保存 `_activeCallCount`、`_acceptingCalls` 与停止取消源，进入 `Stopping` 后原子拒绝新租约。Background 与超时任务的租约必须保持到真实 `Task` 结束，不能在排队或向用户报告超时后提前释放。
 - **停用是异步状态机**：`DisableAsync` 必须先关闭 `Entry.Enabled` 和新租约入口，再撤销路径路由、发送取消并等待活动租约归零，最后才允许 `Shutdown` 与 ALC 卸载。普通停用默认等待 5 秒；超时后返回 `Pending`、保持后台观察且不得强制卸载。热重载、覆盖安装和卸载只有拿到完全停止结果后才能继续；设置页不得在 UI 线程同步等待。
+  - **「设置页不得在 UI 线程同步等待」这条规则曾被 5 个「测试」按钮整片违反**（2026-09-20 修）。症状极像插件缺陷：设置页点「测试」⇒ 3 秒后报「执行超时（3s）」，而**同一个动作从轮盘上触发完全正常**。根因是 `ActionExecutor.Execute` 是同步的，而插件那条路上 `PluginInvoker` 用 `task.Wait(超时)` 等结果 —— 在 UI 线程上调它，等于让 UI 线程去等一个「要等 UI 线程空出来才能完成」的任务（`await Dispatcher.InvokeAsync` 的插件必然中招，也就是所有要画窗口的插件）。真机日志抓到的就是这一条：`12:41:41 → 12:41:45` 报超时，而**线程名是 `[Thread-1]`**，同时成功的那几条线程名是 `[StarPie.ActionExecutor]` —— 线程名是这类「同一段代码在两条线程上行为不同」问题最快的入口。
+    - **修法用的是宿主本来就有的通道**：`ActionExecutor.ExecuteForTesting` 投 `EnqueueAction`（真实手势与轮盘走的都是它），并投 `Clone()` 快照而不是界面上那个活实例 —— 入队意味着执行发生在稍后的另一条线程上，而那一刻用户可能已经在继续改这个动作。没有新造线程池，顺带让「测试」与真实触发走同一条线程，「测试通过」这才对得上「轮盘上也会通过」。五个入口：扇区 / 焦点动作 / 手势映射 / 取消动作 / 子动作。
+    - **它有静态护栏**：`scratch/check_test_button_thread.py`。这条约束编译器抓不到（`Execute` 与 `ExecuteForTesting` 都是合法调用），UI 回归套件也够不着（要复现得在沙箱里装一个真插件再点一次按钮，属 §5.4 那条「沙箱里没有已安装插件 ⇒ 渲染不出来」的盲区）。判据限定在**名字里带 `Test` 的 `_Click` 处理器**这个作用域，不是全仓禁 `Execute` —— `GestureController` 等真实触发路径按自己的方式调用是有意的。变异测试：把其中一个调用换回 `Execute` ⇒ 报 `SettingsWindow.xaml.cs:8496 FocusTestActionBtn_Click 里同步调用了 ActionExecutor.Execute(...)`。
 
 ---
 

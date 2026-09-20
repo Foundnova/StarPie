@@ -234,6 +234,31 @@ public static class ActionExecutor
 		}
 	}
 
+	/// <summary>
+	/// 设置页「测试」按钮的统一入口：把动作交给后台执行线程，而不是在 UI 线程上就地跑。
+	/// <para>
+	/// 两个理由缺一不可。① <see cref="Execute"/> 是同步的，而插件动作那条路上 <c>PluginInvoker</c>
+	/// 用 <c>task.Wait(超时)</c> 等结果 —— 在 UI 线程上调它就等于让 UI 线程去等一个「要等 UI 线程
+	/// 空出来才能完成」的任务。任何 <c>await Dispatcher.InvokeAsync(…)</c> 的插件（也就是要画窗口
+	/// 的那一类）点「测试」必然耗满超时，用户看到「执行超时（3s）」，而同一个动作从轮盘上触发完全
+	/// 正常。那是最容易被误判成「插件写坏了」的一种假故障。
+	/// ② 走 <see cref="EnqueueAction"/> 之后，测试与真实手势跑的是同一条线程，日志里的线程名也因此
+	/// 一致 —— 「测试通过」这才对得上「轮盘上也会通过」。
+	/// </para>
+	/// <para>
+	/// 投出去的是 <see cref="ActionItem.Clone"/> 出来的快照而不是界面上那个活的实例：入队意味着执行
+	/// 发生在稍后的另一条线程上，而那一刻用户可能已经在继续改这个动作了。
+	/// </para>
+	/// </summary>
+	public static void ExecuteForTesting(ActionItem? action)
+	{
+		if (action == null)
+		{
+			return;
+		}
+		EnqueueAction(action.Clone());
+	}
+
 	private static void ProcessActionQueue()
 	{
 		var reader = s_actionChannel.Reader;
