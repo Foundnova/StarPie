@@ -80,6 +80,7 @@ internal sealed class ShowBallContribution : IActionContribution
     {
         // 只校验「扇区上确实填了」的项：留空是合法的，含义是「用插件级设置页的默认值」，
         // 把它算成越界会让刚装好、一个参数都没动的用户点哪都失败。
+        // 判据是「键在不在、空不空」而不是「值是不是大于 0」：后者会把显式填的 0 当成没填。
         if (!TryReadDouble(parameters, BallPreference.DiameterKey, out double? diameter))
         {
             return _context.I18n.T("error.diameter", "直径得是个数（像素）。");
@@ -112,17 +113,22 @@ internal sealed class ShowBallContribution : IActionContribution
         // 契约要求极快：这里只做字符串拼接，不碰窗口。
         // 回落到插件级默认值读的是内存字典（PluginSettings 在实例化时就整份载入并缓存），
         // 不是磁盘 —— 否则预览会显示内置默认，而实际放出来的是用户配的另一套尺寸。
+        // 钳制口径与 ExecuteAsync 的 BallPreference.FromAction 保持一致，预览就不会撒谎。
         TryReadDouble(parameters, BallPreference.DiameterKey, out double? diameter);
         TryReadDouble(parameters, BallPreference.OpacityKey, out double? opacity);
 
-        diameter ??= BallPreference.Diameter(_context);
-        opacity ??= BallPreference.Opacity(_context);
+        double shownDiameter = diameter is double d
+            ? BallPreference.Clamp(d, Defaults.DiameterMin, Defaults.DiameterMax)
+            : BallPreference.Diameter(_context);
+        double shownOpacity = opacity is double o
+            ? BallPreference.Clamp(o, Defaults.OpacityMin, Defaults.OpacityMax)
+            : BallPreference.Opacity(_context);
 
         return string.Format(
             CultureInfo.InvariantCulture,
             _context.I18n.T("preview.show-ball", "直径 {0} · 不透明 {1}%"),
-            (diameter ?? Defaults.DiameterDiu).ToString("0.##", CultureInfo.InvariantCulture),
-            (opacity ?? Defaults.OpacityPercent).ToString("0.##", CultureInfo.InvariantCulture));
+            shownDiameter.ToString("0.##", CultureInfo.InvariantCulture),
+            shownOpacity.ToString("0.##", CultureInfo.InvariantCulture));
     }
 
     public async Task<ActionResult> ExecuteAsync(PluginActionInput input, CancellationToken cancellationToken)
@@ -174,12 +180,12 @@ internal sealed class ShowBallContribution : IActionContribution
 
     /// <summary>
     /// 读一个可选的数值参数。三种结局必须分得开：
-    /// <b>没填</b>（键不存在，或填了空白）→ <paramref name="value"/> 为 <c>null</c>，合法，含义是「用默认值」；
+    /// <b>没填</b>（键不存在，或填了空白）→ <paramref name="value"/> 为 <c>null</c>，合法，含义是「用插件级默认值」；
     /// <b>填了但不是数</b> → 返回 false；<b>填了且是数</b> → 返回 true 并带出值。
     /// <para>
-    /// 不要退回成「拿 0 当未填」的哨兵写法：那样显式填 0 会溜过范围校验，最后画出一颗直径 0 的隐形球，
-    /// 而 0 恰恰是最该被范围校验拦住的那个输入。真机踩过：缺键被读成 0，于是刚装好的插件
-    /// 在用户一个参数都没填的情况下永远报「直径要在 24 到 160 之间」。
+    /// 不要退回成「拿 0 当未填」的哨兵写法：那样显式填 0 会溜过范围校验，而 0 恰恰是最该被拦住的那个输入。
+    /// 真机踩过反过来的一种：缺键被读成 0，于是刚装好的插件在用户一个参数都没填的情况下
+    /// 永远报「直径要在 24 到 160 之间」。
     /// </para>
     /// </summary>
     private static bool TryReadDouble(IReadOnlyDictionary<string, string> parameters, string key, out double? value)
