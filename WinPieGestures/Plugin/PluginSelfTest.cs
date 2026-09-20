@@ -1421,6 +1421,53 @@ internal static class PluginSelfTest
                     return $"「{candidate.ShortId}」声明了必填参数，但全空输入未被拦下 —— 空值会直接存进配置。";
                 }
 
+                // ①b 同一份全空输入再走一遍「统一校验入口」（声明约束 + 插件自定义 Validate）。
+                // 这一条判失败，不像 ④ 那样只警告。
+                //
+                // 存在理由是「一个参数都没填」才是插件真实面对的第一种状态，而 ②③④ 喂的全是
+                // 按默认值填满的那一份 —— 于是留下「自检一路绿、用户装上点哪都失败」的空档。
+                // 真机踩过：FloatingBall 的声明里没有必填项（① 因此放行），而插件自己的 Validate
+                // 把缺键读成 0 再判成越界，用户 7 次触发全部失败。
+                //
+                // 敢判失败，是因为空输入上没有 ④ 那种「规则与默认值互斥」的正当借口：
+                // 声明层放行、插件层拒绝只有两种解释 —— 该字段本就该标 Required（声明写漏），
+                // 或插件把「未填」当成了非法值（读值写错）。两种都是作者当场改得掉的问题。
+                //
+                // 这里刻意不用 PluginHost.CreateActionItem 造探针：它会用声明的默认值把参数表填满
+                // （见其「用参数默认值填充」一段），空输入根本传不进去 —— ④ 看不见这类缺陷的根因
+                // 就在这。手搓 ActionItem 才等价于「用户把一个没填过参数的扇区切成了插件动作」。
+                if (emptyIssues.Count == 0)
+                {
+                    ActionItem emptyProbe = new()
+                    {
+                        Type = PluginApi.ActionTypeName,
+                        Name = candidate.DisplayName,
+                        PluginActionRef = new PluginActionRef
+                        {
+                            PluginId = candidate.PluginId,
+                            ContributionId = candidate.ShortId,
+                        },
+                        ExtensionData = new Dictionary<string, string>(),
+                    };
+
+                    PluginActionValidation emptyUnified =
+                        PluginHost.ValidateActionParameters(emptyProbe);
+
+                    line("    ①b 同一份全空输入走统一入口 → " +
+                         (emptyUnified.IsValid ? "通过" : "不通过"));
+
+                    if (!emptyUnified.IsValid)
+                    {
+                        return $"「{candidate.ShortId}」的声明校验放行全空输入，插件自己的校验却拒绝" +
+                               $"（{emptyUnified.Describe()}）—— 用户装上插件后一个参数都不填就会点哪都失败。" +
+                               "要么该字段应声明 Required，要么插件要把「未填」和「填了非法值」分开判。";
+                    }
+                }
+                else
+                {
+                    line("    ①b 跳过：声明层已经拦下全空输入，插件层是否也拒绝不再影响用户。");
+                }
+
                 // ②③④ 都需要一份「除被测字段外其余都合法」的基线。
                 //
                 // 只有当插件为每个字段都声明了 DefaultValue 时这份基线才存在。

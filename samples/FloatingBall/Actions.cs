@@ -76,11 +76,13 @@ internal sealed class ShowBallContribution : IActionContribution
 
     public string? Validate(IReadOnlyDictionary<string, string> parameters)
     {
-        if (!TryReadDouble(parameters, "diameter", out double diameter))
+        // 「没填」与「填了但不合法」必须分开判：留空的含义是「用默认值」，
+        // 把它算成越界会让刚装好、一个参数都没动的用户点哪都失败。
+        if (!TryReadDouble(parameters, "diameter", out double? diameter))
         {
             return _context.I18n.T("error.diameter", "直径得是个数（像素）。");
         }
-        if (diameter < Defaults.DiameterMin || diameter > Defaults.DiameterMax)
+        if (OutOfRange(diameter, Defaults.DiameterMin, Defaults.DiameterMax))
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
@@ -88,11 +90,11 @@ internal sealed class ShowBallContribution : IActionContribution
                 Defaults.DiameterMin, Defaults.DiameterMax);
         }
 
-        if (!TryReadDouble(parameters, "opacity", out double opacity))
+        if (!TryReadDouble(parameters, "opacity", out double? opacity))
         {
             return _context.I18n.T("error.opacity", "不透明度得是个数（百分比）。");
         }
-        if (opacity < Defaults.OpacityMin || opacity > Defaults.OpacityMax)
+        if (OutOfRange(opacity, Defaults.OpacityMin, Defaults.OpacityMax))
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
@@ -106,17 +108,14 @@ internal sealed class ShowBallContribution : IActionContribution
     public string Preview(IReadOnlyDictionary<string, string> parameters)
     {
         // 契约要求极快：这里只做字符串拼接，不碰窗口、不读设置。
-        TryReadDouble(parameters, "diameter", out double diameter);
-        TryReadDouble(parameters, "opacity", out double opacity);
-
-        if (diameter <= 0) diameter = Defaults.DiameterDiu;
-        if (opacity <= 0) opacity = Defaults.OpacityPercent;
+        TryReadDouble(parameters, "diameter", out double? diameter);
+        TryReadDouble(parameters, "opacity", out double? opacity);
 
         return string.Format(
             CultureInfo.InvariantCulture,
             _context.I18n.T("preview.show-ball", "直径 {0} · 不透明 {1}%"),
-            diameter.ToString("0.##", CultureInfo.InvariantCulture),
-            opacity.ToString("0.##", CultureInfo.InvariantCulture));
+            (diameter ?? Defaults.DiameterDiu).ToString("0.##", CultureInfo.InvariantCulture),
+            (opacity ?? Defaults.OpacityPercent).ToString("0.##", CultureInfo.InvariantCulture));
     }
 
     public async Task<ActionResult> ExecuteAsync(PluginActionInput input, CancellationToken cancellationToken)
@@ -156,15 +155,30 @@ internal sealed class ShowBallContribution : IActionContribution
         return ActionResult.Ok(_context.I18n.T("info.shown", "悬浮球已显示，点它即可呼出轮盘。"), silent: true);
     }
 
-    private static bool TryReadDouble(IReadOnlyDictionary<string, string> parameters, string key, out double value)
+    /// <summary>
+    /// 读一个可选的数值参数。三种结局必须分得开：
+    /// <b>没填</b>（键不存在，或填了空白）→ <paramref name="value"/> 为 <c>null</c>，合法，含义是「用默认值」；
+    /// <b>填了但不是数</b> → 返回 false；<b>填了且是数</b> → 返回 true 并带出值。
+    /// <para>
+    /// 不要退回成「拿 0 当未填」的哨兵写法：那样显式填 0 会溜过范围校验，最后画出一颗直径 0 的隐形球，
+    /// 而 0 恰恰是最该被范围校验拦住的那个输入。真机踩过：缺键被读成 0，于是刚装好的插件
+    /// 在用户一个参数都没填的情况下永远报「直径要在 24 到 160 之间」。
+    /// </para>
+    /// </summary>
+    private static bool TryReadDouble(IReadOnlyDictionary<string, string> parameters, string key, out double? value)
     {
-        value = 0;
-        if (!parameters.TryGetValue(key, out string? raw)) return true;
-        if (string.IsNullOrWhiteSpace(raw)) return true;
+        value = null;
+        if (!parameters.TryGetValue(key, out string? raw) || string.IsNullOrWhiteSpace(raw)) return true;
 
         // 与 PluginActionInput.Double 同一条口径：不变文化。宿主写盘用的就是它。
-        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)) return false;
+        value = parsed;
+        return true;
     }
+
+    /// <summary>只在「真的填了值」时才算越界；<c>null</c>（未填）永远合法，由执行侧回落默认值。</summary>
+    private static bool OutOfRange(double? value, double min, double max) =>
+        value is double v && (v < min || v > max);
 }
 
 /// <summary>
