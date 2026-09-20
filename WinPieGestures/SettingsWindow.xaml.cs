@@ -1517,11 +1517,7 @@ public partial class SettingsWindow : Window
 		if (UpdatePkgStandaloneRadio != null) UpdatePkgStandaloneRadio.IsChecked = isStandalone;
 		if (UpdatePkgLightweightRadio != null) UpdatePkgLightweightRadio.IsChecked = !isStandalone;
 
-		string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig.LastCheckUpdateTime) ? "未检查" : ConfigManager.CurrentConfig.LastCheckUpdateTime;
-		if (UpdateStatusDescText != null)
-		{
-			UpdateStatusDescText.Text = $"当前运行版本: StarPie v{AppVersionInfo.DisplayVersion} (64位)。上次检查: {lastCheck}";
-		}
+		UpdateSoftwareUpdateStatusUi();
 		UpdateOcrBadgeUi();
 		UpdateRollbackBadgeAndCandidates();
 		UpdateLayerSwitchTriggerUi();
@@ -1543,21 +1539,113 @@ public partial class SettingsWindow : Window
 		}
 	}
 
+	private void UpdateSoftwareUpdateStatusUi()
+	{
+		if (UpdateStatusBadgeText == null || UpdateStatusDescText == null) return;
+
+		// 1. 如果已就绪安装（更新包或回退包下载完成）
+		if (UpdateReadyToInstallPanel?.Visibility == Visibility.Visible)
+		{
+			if (UpdateStatusBadge != null)
+			{
+				UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+			}
+			UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+			if (_selectedRollbackRelease != null && (UpdateNewVersionPanel == null || UpdateNewVersionPanel.Visibility != Visibility.Visible))
+			{
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusRollbackComplete");
+			}
+			else
+			{
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusDownloadComplete");
+			}
+			return;
+		}
+
+		// 2. 如果正在下载中，保持当前下载状态
+		if (UpdateDownloadProgressPanel?.Visibility == Visibility.Visible)
+		{
+			return;
+		}
+
+		// 3. 如果在检查更新中
+		if (CheckUpdateNowBtn != null && !CheckUpdateNowBtn.IsEnabled && UpdateStatusBadgeText.Text == I18n.T("UpdateStatusChecking"))
+		{
+			return;
+		}
+
+		// 4. 根据最新 release 信息判断
+		if (_latestReleaseInfo != null)
+		{
+			if (_latestReleaseInfo.IsNewerVersion)
+			{
+				UpdateStatusBadgeText.Text = string.Format(I18n.T("UpdateStatusFoundNew"), _latestReleaseInfo.TagName);
+				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
+				if (UpdateStatusBadge != null)
+				{
+					UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 245, 158, 11));
+				}
+				UpdateStatusDescText.Text = string.Format(I18n.T("UpdateStatusFoundNewDesc"), _latestReleaseInfo.TagName, $"{_latestReleaseInfo.PublishedAt:yyyy-MM-dd HH:mm}");
+
+				if (UpdateNewVersionTagText != null)
+				{
+					UpdateNewVersionTagText.Text = string.Format(I18n.T("UpdateNewVersionTag"), _latestReleaseInfo.TagName);
+				}
+				if (UpdateReleaseChannelTag != null)
+				{
+					UpdateReleaseChannelTag.Text = _latestReleaseInfo.IsPrerelease ? I18n.T("ReleaseChannelBeta") : I18n.T("ReleaseChannelStable");
+				}
+				if (UpdateReleaseDateText != null)
+				{
+					UpdateReleaseDateText.Text = string.Format(I18n.T("UpdateReleaseDateFmt"), $"{_latestReleaseInfo.PublishedAt:yyyy-MM-dd HH:mm}");
+				}
+			}
+			else
+			{
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusUpToDate");
+				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
+				if (UpdateStatusBadge != null)
+				{
+					UpdateStatusBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 16, 185, 129));
+				}
+				UpdateStatusDescText.Text = string.Format(I18n.T("UpdateStatusUpToDateDesc"), AppVersionInfo.DisplayVersion, _latestReleaseInfo.TagName, ConfigManager.CurrentConfig?.LastCheckUpdateTime ?? "");
+			}
+		}
+		else
+		{
+			// 初始默认状态（未在本次运行检查线上版本，使用上次持久化的检查时间）
+			UpdateStatusBadgeText.Text = I18n.T("UpdateStatusLatest");
+			if (UpdateStatusBadge != null)
+			{
+				UpdateStatusBadge.SetResourceReference(Border.BackgroundProperty, "NavTabActiveBgBrush");
+			}
+			UpdateStatusBadgeText.SetResourceReference(TextBlock.ForegroundProperty, "AccentPrimaryBrush");
+
+			string lastCheck = string.IsNullOrEmpty(ConfigManager.CurrentConfig?.LastCheckUpdateTime)
+				? I18n.T("UpdateLastCheckNever")
+				: ConfigManager.CurrentConfig.LastCheckUpdateTime;
+			UpdateStatusDescText.Text = string.Format(I18n.T("UpdateStatusCurrentVerDescFmt"), AppVersionInfo.DisplayVersion, lastCheck);
+		}
+	}
+
 	private void UpdateOcrBadgeUi()
 	{
-		if (Tab4OcrProviderBadge == null) return;
+		if (Tab4OcrProviderBadge == null && FocusOcrStatusText == null) return;
 		OcrSettings cfg = ConfigManager.CurrentConfig?.OcrConfig ?? new OcrSettings();
 		string prov = cfg.Provider switch
 		{
-			"Ai" => $"🤖 AI 视觉大模型 ({cfg.AiModel})",
-			"Custom" => "🌐 自定义 HTTP 微服务",
-			"Cloud" => $"☁️ {cfg.CloudProvider} 云端",
-			_ => "🖥️ Windows 本地离线引擎"
+			"Ai" => string.IsNullOrWhiteSpace(cfg.AiModel) ? I18n.T("OcrProviderAi") : $"{I18n.T("OcrProviderAi")} ({cfg.AiModel})",
+			"Custom" => I18n.T("OcrProviderCustom"),
+			"Cloud" => $"☁️ {cfg.CloudProvider} Cloud OCR",
+			_ => $"🖥️ {I18n.T("OcrBadgeLocalEngine")}"
 		};
-		Tab4OcrProviderBadge.Text = prov;
+		if (Tab4OcrProviderBadge != null)
+		{
+			Tab4OcrProviderBadge.Text = prov;
+		}
 		if (FocusOcrStatusText != null)
 		{
-			FocusOcrStatusText.Text = $"当前识别引擎: {prov} · 点击右侧测试或更换接口";
+			FocusOcrStatusText.Text = string.Format(I18n.T("FocusOcrStatusFmt"), prov);
 		}
 	}
 
@@ -2396,6 +2484,7 @@ public partial class SettingsWindow : Window
 		{
 			CheckUpdateNowBtn.Content = I18n.T("BtnCheckUpdate");
 		}
+		UpdateSoftwareUpdateStatusUi();
 		if (UpdateSilentCheckTitleText != null)
 		{
 			UpdateSilentCheckTitleText.Text = I18n.T("UpdateSilentCheckTitle");
@@ -2473,10 +2562,7 @@ public partial class SettingsWindow : Window
 		{
 			OcrCardDescText.Text = I18n.T("OcrCardDesc");
 		}
-		if (Tab4OcrProviderBadge != null)
-		{
-			Tab4OcrProviderBadge.Text = I18n.T("OcrBadgeLocalEngine");
-		}
+		UpdateOcrBadgeUi();
 		if (Tab4TestOcrBtn != null)
 		{
 			Tab4TestOcrBtn.Content = I18n.T("BtnTestOcr");
@@ -2895,7 +2981,801 @@ public partial class SettingsWindow : Window
 			OlderMilestonesExpander.Header = I18n.T("MilestonesOlderExpander");
 		}
 
+		// --- Phase 1: Sidebar Theme & Buttons ---
+		if (SidebarThemeSystemText != null) SidebarThemeSystemText.Text = I18n.T("SidebarThemeSystem");
+		if (SidebarThemeLightText != null) SidebarThemeLightText.Text = I18n.T("SidebarThemeLight");
+		if (SidebarThemeDarkText != null) SidebarThemeDarkText.Text = I18n.T("SidebarThemeDark");
+		if (SidebarThemeGrayText != null) SidebarThemeGrayText.Text = I18n.T("SidebarThemeGray");
+		if (SidebarThemeCollapsedButton != null) SidebarThemeCollapsedButton.ToolTip = I18n.T("SidebarThemeToggleTip");
+		if (ThemeBtnSystem != null) ThemeBtnSystem.ToolTip = I18n.T("ThemeSystem");
+		if (ThemeBtnLight != null) ThemeBtnLight.ToolTip = I18n.T("ThemeLight");
+		if (ThemeBtnDark != null) ThemeBtnDark.ToolTip = I18n.T("ThemeDark");
+		if (ThemeBtnGray != null) ThemeBtnGray.ToolTip = I18n.T("ThemeGray");
+
+		// --- Phase 1: Trigger Sensitivity & Deadzone ---
+		if (LiveSensorStatusText != null && !_isRecordingTrigger) LiveSensorStatusText.Text = I18n.T("LiveSensorReadyTip");
+		if (Tab0_TriggerThresholdTitleText != null) Tab0_TriggerThresholdTitleText.Text = I18n.T("TriggerThresholdTitle");
+		if (Tab0_TriggerThresholdDescText != null) Tab0_TriggerThresholdDescText.Text = I18n.T("TriggerThresholdDesc");
+		if (Tab0_CoreDeadzoneTitleText != null) Tab0_CoreDeadzoneTitleText.Text = I18n.T("CoreDeadzoneTitle");
+		if (Tab0_CoreDeadzoneDescText != null) Tab0_CoreDeadzoneDescText.Text = I18n.T("CoreDeadzoneDesc");
+
+		// --- Phase 1: Multi-Tier Sub-Wheels ---
+		if (Tab0_MultiTierSectionTitleText != null) Tab0_MultiTierSectionTitleText.Text = I18n.T("MultiTierSectionTitle");
+		if (Tab0_MultiTierDescText != null) Tab0_MultiTierDescText.Text = I18n.T("EnableMultiTierDesc");
+		if (Tab0_SubmenuStyleTitleText != null) Tab0_SubmenuStyleTitleText.Text = I18n.T("SubmenuStyleTitle");
+		if (SubWheelTriggerDistLabel != null) SubWheelTriggerDistLabel.Text = I18n.T("SubWheelTriggerDistLabel");
+		if (SubWheelTriggerDistDesc != null) SubWheelTriggerDistDesc.Text = I18n.T("SubWheelTriggerDistDesc");
+
+		// --- Phase 1: Gesture Direction Items ---
+		if (GestureDirAutoItem != null) GestureDirAutoItem.Content = I18n.T("DirAuto");
+		if (GestureDirUpItem != null) GestureDirUpItem.Content = I18n.T("DirUp");
+		if (GestureDirDownItem != null) GestureDirDownItem.Content = I18n.T("DirDown");
+		if (GestureDirLeftItem != null) GestureDirLeftItem.Content = I18n.T("DirLeft");
+		if (GestureDirRightItem != null) GestureDirRightItem.Content = I18n.T("DirRight");
+		if (GestureDirUpLeftItem != null) GestureDirUpLeftItem.Content = I18n.T("DirUpLeft");
+		if (GestureDirUpRightItem != null) GestureDirUpRightItem.Content = I18n.T("DirUpRight");
+		if (GestureDirDownLeftItem != null) GestureDirDownLeftItem.Content = I18n.T("DirDownLeft");
+		if (GestureDirDownRightItem != null) GestureDirDownRightItem.Content = I18n.T("DirDownRight");
+		if (GestureSensitivitySlider != null) GestureSensitivitySlider.ToolTip = I18n.T("GestureMinSegmentTip");
+		if (AddGestureMappingButton != null) AddGestureMappingButton.Content = I18n.T("BtnAddGestureMapping");
+
+		// --- Phase 1: Animation & Sound Mixer ---
+		if (AnimSpeedCustomRadio != null) AnimSpeedCustomRadio.Content = I18n.T("AnimSpeedCustom");
+		if (SoundPresetMechanicalItem != null) SoundPresetMechanicalItem.Content = I18n.T("SoundPresetMechanical");
+		if (SoundPresetCrispItem != null) SoundPresetCrispItem.Content = I18n.T("SoundPresetCrisp");
+		if (SoundPresetBubbleItem != null) SoundPresetBubbleItem.Content = I18n.T("SoundPresetBubble");
+		if (SoundPresetShortItem != null) SoundPresetShortItem.Content = I18n.T("SoundPresetShort");
+		if (SoundPresetCustomItem != null) SoundPresetCustomItem.Content = I18n.T("SoundPresetCustom");
+		if (Tab0_SoundMixerTitleText != null) Tab0_SoundMixerTitleText.Text = I18n.T("SoundMixerTitle");
+		if (Tab0_SoundMixerBadgeText != null) Tab0_SoundMixerBadgeText.Text = I18n.T("SoundMixerBadge");
+		if (Tab0_SoundMixerDescText != null) Tab0_SoundMixerDescText.Text = I18n.T("SoundMixerDesc");
+		if (CustomSoundNewProfileBtn != null) { CustomSoundNewProfileBtn.Content = I18n.T("BtnNewSoundProfile"); CustomSoundNewProfileBtn.ToolTip = I18n.T("TipNewSoundProfile"); }
+		if (CustomSoundDeleteProfileBtn != null) { CustomSoundDeleteProfileBtn.Content = I18n.T("BtnDeleteSoundProfile"); CustomSoundDeleteProfileBtn.ToolTip = I18n.T("TipDeleteSoundProfile"); }
+		if (CustomSoundImportProfileBtn != null) { CustomSoundImportProfileBtn.Content = I18n.T("BtnImportSoundProfile"); CustomSoundImportProfileBtn.ToolTip = I18n.T("TipImportSoundProfile"); }
+		if (CustomSoundExportProfileBtn != null) { CustomSoundExportProfileBtn.Content = I18n.T("BtnExportSoundProfile"); CustomSoundExportProfileBtn.ToolTip = I18n.T("TipExportSoundProfile"); }
+		if (CustomSoundResetProfileBtn != null) { CustomSoundResetProfileBtn.Content = I18n.T("BtnResetSoundProfile"); CustomSoundResetProfileBtn.ToolTip = I18n.T("TipResetSoundProfile"); }
+		if (CustomSoundOpenEditorWindowBtn != null) { CustomSoundOpenEditorWindowBtn.Content = I18n.T("BtnOpenSoundEditorWindow"); CustomSoundOpenEditorWindowBtn.ToolTip = I18n.T("TipOpenSoundEditorWindow"); }
+		if (Tab0_SoundSelectProfileLabel != null) Tab0_SoundSelectProfileLabel.Text = I18n.T("SoundSelectProfileLabel");
+		if (CustomSoundPlayFlowButton != null) { CustomSoundPlayFlowButton.Content = I18n.T("SoundPlayFlowBtn"); CustomSoundPlayFlowButton.ToolTip = I18n.T("SoundPlayFlowTip"); }
+		if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = I18n.T("SoundFlowReadyStatus");
+		if (Tab0_SoundSynthNoticeText != null) Tab0_SoundSynthNoticeText.Text = I18n.T("SoundSynthNotice");
+		if (SystemAudioWarningText != null) SystemAudioWarningText.Text = I18n.T("SystemAudioWarning");
+		if (RestoreSystemAudioButton != null) RestoreSystemAudioButton.Content = I18n.T("BtnRestoreSystemAudio");
+
+		// --- Phase 1: Outer Escape Cancel Presets & Custom Action ---
+		if (OuterEscapeCheckboxDescText != null) OuterEscapeCheckboxDescText.Text = I18n.T("OuterEscapeCheckboxDesc");
+		if (Tab0_OuterEscapeSilentNoteText != null) Tab0_OuterEscapeSilentNoteText.Text = I18n.T("OuterEscapeSilentNote");
+		if (Tab0_OuterEscapePresetsLabel != null) Tab0_OuterEscapePresetsLabel.Text = I18n.T("OuterEscapePresetsLabel");
+		if (CancelPresetShowDesktopBtn != null) { CancelPresetShowDesktopBtn.Content = I18n.T("PresetShowDesktop"); CancelPresetShowDesktopBtn.ToolTip = I18n.T("PresetShowDesktopTip"); }
+		if (CancelPresetTaskViewBtn != null) { CancelPresetTaskViewBtn.Content = I18n.T("PresetTaskView"); CancelPresetTaskViewBtn.ToolTip = I18n.T("PresetTaskViewTip"); }
+		if (CancelPresetCancelEscBtn != null) { CancelPresetCancelEscBtn.Content = I18n.T("PresetCancelEsc"); CancelPresetCancelEscBtn.ToolTip = I18n.T("PresetCancelEscTip"); }
+		if (CancelPresetScreenSnippingBtn != null) { CancelPresetScreenSnippingBtn.Content = I18n.T("PresetScreenSnipping"); CancelPresetScreenSnippingBtn.ToolTip = I18n.T("PresetScreenSnippingTip"); }
+		if (CancelPresetTileHalfSplitBtn != null) { CancelPresetTileHalfSplitBtn.Content = I18n.T("PresetTileHalfSplit"); CancelPresetTileHalfSplitBtn.ToolTip = I18n.T("PresetTileHalfSplitTip"); }
+		if (CancelPresetStarPieSettingsBtn != null) { CancelPresetStarPieSettingsBtn.Content = I18n.T("PresetStarPieSettings"); CancelPresetStarPieSettingsBtn.ToolTip = I18n.T("PresetStarPieSettingsTip"); }
+		if (Tab0_CancelActionTypeLabel != null) Tab0_CancelActionTypeLabel.Text = I18n.T("ActionFormTypeLabel");
+		if (Tab0_CancelActionNameLabel != null) Tab0_CancelActionNameLabel.Text = I18n.T("ActionFormNameLabel");
+		if (Tab0_CancelActionHotkeysLabel != null) Tab0_CancelActionHotkeysLabel.Text = I18n.T("ActionFormHotkeysLabel");
+		if (Tab0_CancelActionBuildHotkeysBtn != null) { Tab0_CancelActionBuildHotkeysBtn.Content = I18n.T("BtnActionBuildHotkeys"); Tab0_CancelActionBuildHotkeysBtn.ToolTip = I18n.T("TipActionBuildHotkeys"); }
+		if (Tab0_CancelActionAppPathLabel != null) Tab0_CancelActionAppPathLabel.Text = I18n.T("ActionFormAppPathLabel");
+		if (Tab0_CancelActionPickProgramBtn != null) { Tab0_CancelActionPickProgramBtn.Content = I18n.T("BtnActionPickProgram"); Tab0_CancelActionPickProgramBtn.ToolTip = I18n.T("TipActionPickProgram"); }
+		if (Tab0_CancelActionCaptureWindowBtn != null) { Tab0_CancelActionCaptureWindowBtn.Content = I18n.T("BtnActionCaptureWindow"); Tab0_CancelActionCaptureWindowBtn.ToolTip = I18n.T("TipActionCaptureWindow"); }
+		if (Tab0_CancelActionBrowseFileBtn != null) { Tab0_CancelActionBrowseFileBtn.Content = I18n.T("BtnActionBrowseFile"); Tab0_CancelActionBrowseFileBtn.ToolTip = I18n.T("TipActionBrowseFile"); }
+		if (Tab0_CancelActionWebUrlLabel != null) Tab0_CancelActionWebUrlLabel.Text = I18n.T("ActionFormWebUrlLabel");
+		if (Tab0_CancelActionCommonUrlsLabel != null) Tab0_CancelActionCommonUrlsLabel.Text = I18n.T("ActionFormCommonUrlsLabel");
+		if (Tab0_CancelActionFolderPathLabel != null) Tab0_CancelActionFolderPathLabel.Text = I18n.T("ActionFormFolderPathLabel");
+		if (Tab0_CancelActionBrowseFolderBtn != null) { Tab0_CancelActionBrowseFolderBtn.Content = I18n.T("BtnActionBrowseFolder"); Tab0_CancelActionBrowseFolderBtn.ToolTip = I18n.T("TipActionBrowseFolder"); }
+		if (Tab0_CancelActionCmdLabel != null) Tab0_CancelActionCmdLabel.Text = I18n.T("ActionFormCmdLabel");
+		if (Tab0_CancelActionWindowCtrlLabel != null) Tab0_CancelActionWindowCtrlLabel.Text = I18n.T("ActionFormWindowCtrlLabel");
+		if (Tab0_CancelActionSysCmdsLabel != null) Tab0_CancelActionSysCmdsLabel.Text = I18n.T("ActionFormSysCmdsLabel");
+		if (TestCancelActionButton != null) TestCancelActionButton.Content = I18n.T("BtnTestCancelAction");
+		if (CancelActionStatusHint != null) CancelActionStatusHint.Text = I18n.T("CancelActionStatusHint");
+
+		// --- Phase 1: Edge Overflow Protection ---
+		if (Tab0_EdgeOverflowStrategyLabel != null) Tab0_EdgeOverflowStrategyLabel.Text = I18n.T("EdgeOverflowStrategyLabel");
+		if (Tab0_EdgeOverflowStrategyDesc != null) Tab0_EdgeOverflowStrategyDesc.Text = I18n.T("EdgeOverflowStrategyDesc");
+		if (EdgeOverflowAutoItem != null) EdgeOverflowAutoItem.Content = I18n.T("EdgeOverflowStrategyAuto");
+		if (EdgeOverflowCenterItem != null) EdgeOverflowCenterItem.Content = I18n.T("EdgeOverflowStrategyCenter");
+		if (EdgeOverflowNoneItem != null) EdgeOverflowNoneItem.Content = I18n.T("EdgeOverflowStrategyNone");
+		if (Tab0_EdgeOverflowMarginXLabel != null) Tab0_EdgeOverflowMarginXLabel.Text = I18n.T("EdgeOverflowMarginXLabel");
+		if (Tab0_EdgeOverflowMarginXDesc != null) Tab0_EdgeOverflowMarginXDesc.Text = I18n.T("EdgeOverflowMarginXDesc");
+		if (Tab0_EdgeOverflowMarginYLabel != null) Tab0_EdgeOverflowMarginYLabel.Text = I18n.T("EdgeOverflowMarginYLabel");
+		if (Tab0_EdgeOverflowMarginYDesc != null) Tab0_EdgeOverflowMarginYDesc.Text = I18n.T("EdgeOverflowMarginYDesc");
+
+		// --- Phase 1: Process Isolation & Custom Trigger ---
+		if (Tab0_BlacklistModeLabel != null) Tab0_BlacklistModeLabel.Text = I18n.T("BlacklistModeLabel");
+		if (Tab0_BlacklistModeSub != null) Tab0_BlacklistModeSub.Text = I18n.T("BlacklistModeSub");
+		if (Tab0_WhitelistModeLabel != null) Tab0_WhitelistModeLabel.Text = I18n.T("WhitelistModeLabel");
+		if (Tab0_WhitelistModeSub != null) Tab0_WhitelistModeSub.Text = I18n.T("WhitelistModeSub");
+		if (Tab0_ProcessCustomTriggerCardTitle != null) Tab0_ProcessCustomTriggerCardTitle.Text = I18n.T("ProcessCustomTriggerCardTitle");
+		if (CloseProcessTriggerCardBtn != null) CloseProcessTriggerCardBtn.ToolTip = I18n.T("BtnCloseCardTip");
+		if (Tab0_ProcessCustomTriggerCardDesc != null) Tab0_ProcessCustomTriggerCardDesc.Text = I18n.T("ProcessCustomTriggerCardDesc");
+		if (Tab0_ProcessCurrentTriggerLabel != null) Tab0_ProcessCurrentTriggerLabel.Text = I18n.T("ProcessCurrentTriggerLabel");
+		if (RecordProcessTriggerButton != null) RecordProcessTriggerButton.Content = I18n.T("BtnRecordProcessTrigger");
+		if (ResetProcessTriggerButton != null) ResetProcessTriggerButton.Content = I18n.T("BtnResetProcessTrigger");
+		if (ProcessLiveSensorStatusText != null && !_isRecordingProcessTrigger) ProcessLiveSensorStatusText.Text = I18n.T("ProcessSensorReadyTip");
+
+		if (GestureTriggerBtnRightItem != null) GestureTriggerBtnRightItem.Content = I18n.T("TriggerBtnRight");
+		if (GestureTriggerBtnMiddleItem != null) GestureTriggerBtnMiddleItem.Content = I18n.T("TriggerBtnMiddle");
+		if (GestureTriggerBtnX1Item != null) GestureTriggerBtnX1Item.Content = I18n.T("TriggerBtnX1");
+		if (GestureTriggerBtnX2Item != null) GestureTriggerBtnX2Item.Content = I18n.T("TriggerBtnX2");
+		if (Tab0_CancelActionNameTextBox != null) Tab0_CancelActionNameTextBox.ToolTip = I18n.T("ActionFormNameTip");
+		if (Tab0_CancelActionBingPresetBtn != null) Tab0_CancelActionBingPresetBtn.Content = I18n.T("ActionBingSearch");
+		if (Tab0_CancelActionTilePresetCombo != null) Tab0_CancelActionTilePresetCombo.ToolTip = I18n.T("TipGestureTilePreset");
+		if (Tab0_CancelActionTaskbarSlotTextBox != null) Tab0_CancelActionTaskbarSlotTextBox.ToolTip = I18n.T("TipGestureTaskbarSlot");
+		if (Tab0_CancelActionOpacityTextBox != null) Tab0_CancelActionOpacityTextBox.ToolTip = I18n.T("TipGestureOpacity");
+		if (EdgeOverflowTitleText != null) EdgeOverflowTitleText.Text = I18n.T("EdgeOverflowTitle");
+		if (EdgeOverflowDescText != null) EdgeOverflowDescText.Text = I18n.T("EdgeOverflowDesc");
+		if (ProcessCurrentTriggerBadgeText != null && string.IsNullOrEmpty(_recordingProcessName)) ProcessCurrentTriggerBadgeText.Text = I18n.T("ProcessTriggerUnconfigured");
+
+		RefreshGestureMappings();
+		RefreshProcessListUI();
+
 		UpdateFocusActionTypeItemsSource();
+		// --- Phase 2: Tab 1 (Appearance / 外观样式) ---
+		if (AppearancePageHeader != null) AppearancePageHeader.Text = I18n.T("TabAppearance");
+		if (AppearancePageSubheader != null) AppearancePageSubheader.Text = I18n.T("AppearanceSubheader");
+		if (VisualThemeCardTitleText != null) VisualThemeCardTitleText.Text = I18n.T("VisualThemeCardTitle");
+		if (Tab1_UiStyleLabel != null) Tab1_UiStyleLabel.Text = I18n.T("Tab1_UiStyleLabel");
+		if (UiStyleClassicRingItem != null) UiStyleClassicRingItem.Content = I18n.T("UiStyleClassicRing");
+		if (UiStyleCleanSectorsItem != null) UiStyleCleanSectorsItem.Content = I18n.T("UiStyleCleanSectors");
+		if (UiStyleGlassmorphismItem != null) UiStyleGlassmorphismItem.Content = I18n.T("UiStyleGlassmorphism");
+		if (Tab1_ThemePresetLabel != null) Tab1_ThemePresetLabel.Text = I18n.T("Tab1_ThemePresetLabel");
+		if (ThemeItemSystem != null) ThemeItemSystem.Content = I18n.T("ThemeItemSystem");
+		if (ThemeItemDark != null) ThemeItemDark.Content = I18n.T("ThemeItemDark");
+		if (ThemeItemLight != null) ThemeItemLight.Content = I18n.T("ThemeItemLight");
+		if (ThemeItemMatchaForest != null) ThemeItemMatchaForest.Content = I18n.T("ThemeItemMatchaForest");
+		if (ThemeItemGlacialIce != null) ThemeItemGlacialIce.Content = I18n.T("ThemeItemGlacialIce");
+		if (ThemeItemMorandiMuted != null) ThemeItemMorandiMuted.Content = I18n.T("ThemeItemMorandiMuted");
+		if (ThemeCustomItem != null) ThemeCustomItem.Content = I18n.T("ThemeItemCustom");
+		if (NewCustomColorPresetButton != null) { NewCustomColorPresetButton.Content = I18n.T("BtnNewCustomPreset"); NewCustomColorPresetButton.ToolTip = I18n.T("TipNewCustomPreset"); }
+		if (RenameCustomColorPresetButton != null) { RenameCustomColorPresetButton.Content = I18n.T("BtnRenameCustomPreset"); RenameCustomColorPresetButton.ToolTip = I18n.T("TipRenameCustomPreset"); }
+		if (DeleteCustomColorPresetButton != null) { DeleteCustomColorPresetButton.Content = I18n.T("BtnDeleteCustomPreset"); DeleteCustomColorPresetButton.ToolTip = I18n.T("TipDeleteCustomPreset"); }
+		if (CustomColorsExpanderTitleText != null) CustomColorsExpanderTitleText.Text = I18n.T("CustomColorsExpanderTitle");
+		if (CustomColorsExpanderDescText != null) CustomColorsExpanderDescText.Text = I18n.T("CustomColorsExpanderDesc");
+		if (Tab1_CustomColorsSectionLabel != null) Tab1_CustomColorsSectionLabel.Text = I18n.T("Tab1_CustomColorsSectionLabel");
+		if (Tab1_SectorBgLabel != null) Tab1_SectorBgLabel.Text = I18n.T("Tab1_SectorBgLabel");
+		if (PickSectorBgColorBtn != null) PickSectorBgColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSectorBgColorBtn != null) EyedropSectorBgColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_SectorBorderLabel != null) Tab1_SectorBorderLabel.Text = I18n.T("Tab1_SectorBorderLabel");
+		if (PickSectorBorderColorBtn != null) PickSectorBorderColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSectorBorderColorBtn != null) EyedropSectorBorderColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_HighlightBgLabel != null) Tab1_HighlightBgLabel.Text = I18n.T("Tab1_HighlightBgLabel");
+		if (PickHighlightBgColorBtn != null) PickHighlightBgColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropHighlightBgColorBtn != null) EyedropHighlightBgColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_HighlightBorderLabel != null) Tab1_HighlightBorderLabel.Text = I18n.T("Tab1_HighlightBorderLabel");
+		if (PickHighlightBorderColorBtn != null) PickHighlightBorderColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropHighlightBorderColorBtn != null) EyedropHighlightBorderColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_TextColorLabel != null) Tab1_TextColorLabel.Text = I18n.T("Tab1_TextColorLabel");
+		if (PickTextColorBtn != null) PickTextColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropTextColorBtn != null) EyedropTextColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (SavePresetChangesButton != null) { SavePresetChangesButton.Content = I18n.T("BtnSavePresetChanges"); SavePresetChangesButton.ToolTip = I18n.T("TipSavePresetChanges"); }
+		if (SaveAsNewPresetButton != null) { SaveAsNewPresetButton.Content = I18n.T("BtnSaveAsNewPreset"); SaveAsNewPresetButton.ToolTip = I18n.T("TipSaveAsNewPreset"); }
+		if (DeletePresetInPanelButton != null) { DeletePresetInPanelButton.Content = I18n.T("BtnDeletePreset"); DeletePresetInPanelButton.ToolTip = I18n.T("TipDeleteCustomPreset"); }
+		if (Tab1_HighlightGlowModeLabel != null) Tab1_HighlightGlowModeLabel.Text = I18n.T("Tab1_HighlightGlowModeLabel");
+		if (GlowItemFollowHighlight != null) GlowItemFollowHighlight.Content = I18n.T("GlowItemFollowHighlight");
+		if (GlowItemLilacPurple != null) GlowItemLilacPurple.Content = I18n.T("GlowItemLilacPurple");
+		if (GlowItemGlacialBlue != null) GlowItemGlacialBlue.Content = I18n.T("GlowItemGlacialBlue");
+		if (GlowItemEmeraldGreen != null) GlowItemEmeraldGreen.Content = I18n.T("GlowItemEmeraldGreen");
+		if (GlowItemSakuraPink != null) GlowItemSakuraPink.Content = I18n.T("GlowItemSakuraPink");
+		if (GlowItemAmberGold != null) GlowItemAmberGold.Content = I18n.T("GlowItemAmberGold");
+		if (GlowItemCoralRed != null) GlowItemCoralRed.Content = I18n.T("GlowItemCoralRed");
+		if (GlowItemIceWhite != null) GlowItemIceWhite.Content = I18n.T("GlowItemIceWhite");
+		if (GlowItemCustom != null) GlowItemCustom.Content = I18n.T("GlowItemCustom");
+		if (Tab1_GlowColorLabel != null) Tab1_GlowColorLabel.Text = I18n.T("Tab1_GlowColorLabel");
+		if (PickGlowColorBtn != null) PickGlowColorBtn.ToolTip = I18n.T("TipPickGlowColor");
+		if (EyedropGlowColorBtn != null) EyedropGlowColorBtn.ToolTip = I18n.T("TipEyedropGlowColor");
+		if (Tab1_GlowRadiusLabel != null) Tab1_GlowRadiusLabel.Text = I18n.T("Tab1_GlowRadiusLabel");
+		if (Tab1_GlowOpacityLabel != null) Tab1_GlowOpacityLabel.Text = I18n.T("Tab1_GlowOpacityLabel");
+		if (Tier2ThemeExpander != null) Tier2ThemeExpander.Header = I18n.T("Tier2ThemeExpanderHeader");
+		if (Tab1_SubThemeNoticeText != null) Tab1_SubThemeNoticeText.Text = I18n.T("Tab1_SubThemeNotice");
+		if (Tab1_SubUiStyleLabel != null) Tab1_SubUiStyleLabel.Text = I18n.T("Tab1_SubUiStyleLabel");
+		if (SubUiStyleFollowPrimaryItem != null) SubUiStyleFollowPrimaryItem.Content = I18n.T("SubUiStyleItemFollowPrimary");
+		if (SubUiStyleClassicRingItem != null) SubUiStyleClassicRingItem.Content = I18n.T("UiStyleClassicRing");
+		if (SubUiStyleCleanSectorsItem != null) SubUiStyleCleanSectorsItem.Content = I18n.T("UiStyleCleanSectors");
+		if (SubUiStyleGlassmorphismItem != null) SubUiStyleGlassmorphismItem.Content = I18n.T("UiStyleGlassmorphism");
+		if (Tab1_SubThemePresetLabel != null) Tab1_SubThemePresetLabel.Text = I18n.T("Tab1_SubThemePresetLabel");
+		if (SubThemeFollowPrimaryItem != null) SubThemeFollowPrimaryItem.Content = I18n.T("SubThemeItemFollowPrimary");
+		if (SubThemeSystemItem != null) SubThemeSystemItem.Content = I18n.T("ThemeItemSystem");
+		if (SubThemeDarkItem != null) SubThemeDarkItem.Content = I18n.T("ThemeItemDark");
+		if (SubThemeLightItem != null) SubThemeLightItem.Content = I18n.T("ThemeItemLight");
+		if (SubThemeMatchaForestItem != null) SubThemeMatchaForestItem.Content = I18n.T("ThemeItemMatchaForest");
+		if (SubThemeGlacialIceItem != null) SubThemeGlacialIceItem.Content = I18n.T("ThemeItemGlacialIce");
+		if (SubThemeMorandiMutedItem != null) SubThemeMorandiMutedItem.Content = I18n.T("ThemeItemMorandiMuted");
+		if (SubThemeCustomItem != null) SubThemeCustomItem.Content = I18n.T("ThemeItemCustom");
+		if (NewSubCustomColorPresetButton != null) { NewSubCustomColorPresetButton.Content = I18n.T("BtnNewCustomPreset"); NewSubCustomColorPresetButton.ToolTip = I18n.T("TipNewCustomPreset"); }
+		if (RenameSubCustomColorPresetButton != null) { RenameSubCustomColorPresetButton.Content = I18n.T("BtnRenameCustomPreset"); RenameSubCustomColorPresetButton.ToolTip = I18n.T("TipRenameCustomPreset"); }
+		if (DeleteSubCustomColorPresetButton != null) { DeleteSubCustomColorPresetButton.Content = I18n.T("BtnDeleteCustomPreset"); DeleteSubCustomColorPresetButton.ToolTip = I18n.T("TipDeleteCustomPreset"); }
+		if (SubCustomColorsExpanderTitleText != null) SubCustomColorsExpanderTitleText.Text = I18n.T("SubCustomColorsExpanderTitle");
+		if (SubCustomColorsExpanderDescText != null) SubCustomColorsExpanderDescText.Text = I18n.T("SubCustomColorsExpanderDesc");
+		if (Tab1_SubCustomColorsSectionLabel != null) Tab1_SubCustomColorsSectionLabel.Text = I18n.T("Tab1_SubCustomColorsSectionLabel");
+		if (Tab1_SubSectorBgLabel != null) Tab1_SubSectorBgLabel.Text = I18n.T("Tab1_SectorBgLabel");
+		if (PickSubSectorBgColorBtn != null) PickSubSectorBgColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSubSectorBgColorBtn != null) EyedropSubSectorBgColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_SubSectorBorderLabel != null) Tab1_SubSectorBorderLabel.Text = I18n.T("Tab1_SectorBorderLabel");
+		if (PickSubSectorBorderColorBtn != null) PickSubSectorBorderColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSubSectorBorderColorBtn != null) EyedropSubSectorBorderColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_SubHighlightBgLabel != null) Tab1_SubHighlightBgLabel.Text = I18n.T("Tab1_HighlightBgLabel");
+		if (PickSubHighlightBgColorBtn != null) PickSubHighlightBgColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSubHighlightBgColorBtn != null) EyedropSubHighlightBgColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_SubHighlightBorderLabel != null) Tab1_SubHighlightBorderLabel.Text = I18n.T("Tab1_HighlightBorderLabel");
+		if (PickSubHighlightBorderColorBtn != null) PickSubHighlightBorderColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSubHighlightBorderColorBtn != null) EyedropSubHighlightBorderColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_SubTextColorLabel != null) Tab1_SubTextColorLabel.Text = I18n.T("Tab1_TextColorLabel");
+		if (PickSubTextColorBtn != null) PickSubTextColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSubTextColorBtn != null) EyedropSubTextColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (SaveSubPresetChangesButton != null) { SaveSubPresetChangesButton.Content = I18n.T("BtnSavePresetChanges"); SaveSubPresetChangesButton.ToolTip = I18n.T("TipSaveSubPresetChanges"); }
+		if (SaveAsNewSubPresetButton != null) { SaveAsNewSubPresetButton.Content = I18n.T("BtnSaveAsNewPreset"); SaveAsNewSubPresetButton.ToolTip = I18n.T("TipSaveAsNewPreset"); }
+		if (DeleteSubPresetInPanelButton != null) { DeleteSubPresetInPanelButton.Content = I18n.T("BtnDeletePreset"); DeleteSubPresetInPanelButton.ToolTip = I18n.T("TipDeleteCustomPreset"); }
+		if (Tab1_SubHighlightGlowLabel != null) Tab1_SubHighlightGlowLabel.Text = I18n.T("Tab1_SubHighlightGlowLabel");
+		if (SubGlowFollowPrimaryItem != null) SubGlowFollowPrimaryItem.Content = I18n.T("SubGlowItemFollowPrimary");
+		if (SubGlowFollowHighlightItem != null) SubGlowFollowHighlightItem.Content = I18n.T("SubGlowItemFollowHighlight");
+		if (SubGlowLilacPurpleItem != null) SubGlowLilacPurpleItem.Content = I18n.T("GlowItemLilacPurple");
+		if (SubGlowGlacialBlueItem != null) SubGlowGlacialBlueItem.Content = I18n.T("GlowItemGlacialBlue");
+		if (SubGlowEmeraldGreenItem != null) SubGlowEmeraldGreenItem.Content = I18n.T("GlowItemEmeraldGreen");
+		if (SubGlowSakuraPinkItem != null) SubGlowSakuraPinkItem.Content = I18n.T("GlowItemSakuraPink");
+		if (SubGlowAmberGoldItem != null) SubGlowAmberGoldItem.Content = I18n.T("GlowItemAmberGold");
+		if (SubGlowCoralRedItem != null) SubGlowCoralRedItem.Content = I18n.T("GlowItemCoralRed");
+		if (SubGlowIceWhiteItem != null) SubGlowIceWhiteItem.Content = I18n.T("GlowItemIceWhite");
+		if (SubGlowNoneItem != null) SubGlowNoneItem.Content = I18n.T("SubGlowItemNone");
+		if (SubGlowCustomItem != null) SubGlowCustomItem.Content = I18n.T("GlowItemCustom");
+		if (Tab1_SubGlowColorLabel != null) Tab1_SubGlowColorLabel.Text = I18n.T("Tab1_GlowColorLabel");
+		if (PickSubGlowColorBtn != null) PickSubGlowColorBtn.ToolTip = I18n.T("TipPickGlowColor");
+		if (EyedropSubGlowColorBtn != null) EyedropSubGlowColorBtn.ToolTip = I18n.T("TipEyedropGlowColor");
+		if (Tab1_SubGlowRadiusLabel != null) Tab1_SubGlowRadiusLabel.Text = I18n.T("Tab1_GlowRadiusLabel");
+		if (Tab1_SubGlowOpacityLabel != null) Tab1_SubGlowOpacityLabel.Text = I18n.T("Tab1_GlowOpacityLabel");
+		if (ResetSubThemeButton != null) ResetSubThemeButton.Content = I18n.T("BtnResetSubTheme");
+		if (DimensionsCardTitleText != null) DimensionsCardTitleText.Text = I18n.T("DimensionsCardTitle");
+		if (Tab1_SectorCutStyleLabel != null) Tab1_SectorCutStyleLabel.Text = I18n.T("Tab1_SectorCutStyleLabel");
+		if (CutStyleClassicItem != null) CutStyleClassicItem.Content = I18n.T("CutStyleItemClassic");
+		if (CutStyleCirclesItem != null) CutStyleCirclesItem.Content = I18n.T("CutStyleItemCircles");
+		if (CutStyleCapsulesItem != null) CutStyleCapsulesItem.Content = I18n.T("CutStyleItemCapsules");
+		if (CutStyleHexagonsItem != null) CutStyleHexagonsItem.Content = I18n.T("CutStyleItemHexagons");
+		if (Tab1_SectorGapLabel != null) Tab1_SectorGapLabel.Text = I18n.T("Tab1_SectorGapLabel");
+		if (Tab1_SectorCornerRadiusLabel != null) Tab1_SectorCornerRadiusLabel.Text = I18n.T("Tab1_SectorCornerRadiusLabel");
+		if (Tab1_WheelRadiusLabel != null) Tab1_WheelRadiusLabel.Text = I18n.T("Tab1_WheelRadiusLabel");
+		if (Tab1_InnerRadiusLabel != null) Tab1_InnerRadiusLabel.Text = I18n.T("Tab1_InnerRadiusLabel");
+		if (Tab1_CoreRadiusLabel != null) Tab1_CoreRadiusLabel.Text = I18n.T("Tab1_CoreRadiusLabel");
+		if (Tier2DimensionsExpander != null) Tier2DimensionsExpander.Header = I18n.T("Tier2DimensionsExpanderHeader");
+		if (Tab1_SubDimensionsNoticeText != null) Tab1_SubDimensionsNoticeText.Text = I18n.T("Tab1_SubDimensionsNotice");
+		if (Tab1_SubOuterRadiusLabel != null) Tab1_SubOuterRadiusLabel.Text = I18n.T("Tab1_SubOuterRadiusLabel");
+		if (Tab1_SubGapLabel != null) Tab1_SubGapLabel.Text = I18n.T("Tab1_SubGapLabel");
+		if (Tab1_SubCornerRadiusLabel != null) Tab1_SubCornerRadiusLabel.Text = I18n.T("Tab1_SubCornerRadiusLabel");
+		if (Tab1_SubIconSizeLabel != null) Tab1_SubIconSizeLabel.Text = I18n.T("Tab1_SubIconSizeLabel");
+		if (Tab1_SubFontSizeLabel != null) Tab1_SubFontSizeLabel.Text = I18n.T("Tab1_SubFontSizeLabel");
+		if (ResetSubDimensionsButton != null) ResetSubDimensionsButton.Content = I18n.T("BtnResetSubDimensions");
+		if (LayoutOptionsSectionTitle != null) LayoutOptionsSectionTitle.Text = I18n.T("LayoutOptionsSectionTitle");
+		if (LayoutTargetGlobalRadio != null) LayoutTargetGlobalRadio.Content = I18n.T("LayoutTargetGlobal");
+		if (LayoutTargetSlotRadio != null) LayoutTargetSlotRadio.Content = I18n.T("LayoutTargetSlot");
+		if (ClickSectorHintText != null) ClickSectorHintText.Text = I18n.T("ClickSectorHint");
+		if (ResetSlotLayoutButton != null) ResetSlotLayoutButton.Content = I18n.T("ResetSlotLayout");
+		if (IconLayoutModeTitleText != null) IconLayoutModeTitleText.Text = I18n.T("IconLayoutModeTitleText");
+		if (LayoutModeBothItem != null) LayoutModeBothItem.Content = I18n.T("LayoutModeItemBoth");
+		if (LayoutModeIconOnlyItem != null) LayoutModeIconOnlyItem.Content = I18n.T("LayoutModeItemIconOnly");
+		if (LayoutModeTextOnlyItem != null) LayoutModeTextOnlyItem.Content = I18n.T("LayoutModeItemTextOnly");
+		if (WheelFontFamilyTitleText != null) WheelFontFamilyTitleText.Text = I18n.T("WheelFontFamily");
+		if (WheelFontSystemItem != null) WheelFontSystemItem.Content = I18n.T("WheelFontItemSystem");
+		if (WheelFontYaHeiItem != null) WheelFontYaHeiItem.Content = I18n.T("WheelFontItemYaHei");
+		if (WheelFontHarmonyItem != null) WheelFontHarmonyItem.Content = I18n.T("WheelFontItemHarmony");
+		if (WheelFontPingFangItem != null) WheelFontPingFangItem.Content = I18n.T("WheelFontItemPingFang");
+		if (WheelFontMiSansItem != null) WheelFontMiSansItem.Content = I18n.T("WheelFontItemMiSans");
+		if (WheelFontSimHeiItem != null) WheelFontSimHeiItem.Content = I18n.T("WheelFontItemSimHei");
+		if (WheelFontKaiTiItem != null) WheelFontKaiTiItem.Content = I18n.T("WheelFontItemKaiTi");
+		if (WheelFontConsolasItem != null) WheelFontConsolasItem.Content = I18n.T("WheelFontItemConsolas");
+		if (SectorTextColorTitleText != null) SectorTextColorTitleText.Text = I18n.T("SectorTextColor");
+		if (PickSectorTextColorBtn != null) PickSectorTextColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropSectorTextColorBtn != null) EyedropSectorTextColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (SectorIconSizeTitleText != null) SectorIconSizeTitleText.Text = I18n.T("SectorIconSizeTitle");
+		if (SectorFontSizeTitleText != null) SectorFontSizeTitleText.Text = I18n.T("SectorFontSizeTitle");
+		if (SectorTextPlacementTitleText != null) SectorTextPlacementTitleText.Text = I18n.T("SectorTextPlacementTitle");
+		if (ResetTextOffsetBtn != null) { ResetTextOffsetBtn.Content = I18n.T("BtnResetTextOffset"); ResetTextOffsetBtn.ToolTip = I18n.T("TipResetTextOffset"); }
+		if (PlacementBottomItem != null) PlacementBottomItem.Content = I18n.T("PlacementItemBottom");
+		if (PlacementTopItem != null) PlacementTopItem.Content = I18n.T("PlacementItemTop");
+		if (Tab1_TextOffsetXLabel != null) Tab1_TextOffsetXLabel.Text = I18n.T("Tab1_TextOffsetXLabel");
+		if (Tab1_TextOffsetYLabel != null) Tab1_TextOffsetYLabel.Text = I18n.T("Tab1_TextOffsetYLabel");
+		if (CoreSectionTitle != null) CoreSectionTitle.Text = I18n.T("CoreSectionTitle");
+		if (ShowCoreIconCheckBox != null) ShowCoreIconCheckBox.Content = I18n.T("ShowCoreIconTitle");
+		if (Tab1_CorePatternTypeLabel != null) Tab1_CorePatternTypeLabel.Text = I18n.T("Tab1_CorePatternTypeLabel");
+		if (CoreIconExitItem != null) CoreIconExitItem.Content = I18n.T("CorePatternExit");
+		if (CoreIconCrosshairItem != null) CoreIconCrosshairItem.Content = I18n.T("CoreIconTypeItemCrosshair");
+		if (CoreIconWindowsItem != null) CoreIconWindowsItem.Content = I18n.T("CoreIconTypeItemWindows");
+		if (CoreIconBreatheDotItem != null) CoreIconBreatheDotItem.Content = I18n.T("CoreIconTypeItemBreatheDot");
+		if (CoreIconHomeReturnItem != null) CoreIconHomeReturnItem.Content = I18n.T("CoreIconTypeItemHomeReturn");
+		if (CoreIconPowerItem != null) CoreIconPowerItem.Content = I18n.T("CorePatternPower");
+		if (CoreIconCompassStarItem != null) CoreIconCompassStarItem.Content = I18n.T("CoreIconTypeItemCompassStar");
+		if (CoreIconCatPawItem != null) CoreIconCatPawItem.Content = I18n.T("CoreIconTypeItemCatPaw");
+		if (CoreIconVectorItem != null) CoreIconVectorItem.Content = I18n.T("CoreIconTypeItemVector");
+		if (CoreIconCustomImageItem != null) CoreIconCustomImageItem.Content = I18n.T("CoreIconTypeItemCustomImage");
+		if (CustomCoreIconNameLabel != null && CustomCoreIconNameLabel.Text == "未选择图标") CustomCoreIconNameLabel.Text = I18n.T("CustomCoreIconNone");
+		if (PickCoreIconButton != null) PickCoreIconButton.Content = I18n.T("BtnPickCoreIcon");
+		if (CoreImagePathTextBox != null) CoreImagePathTextBox.ToolTip = I18n.T("TipCoreImagePath");
+		if (BrowseCoreImageButton != null) BrowseCoreImageButton.Content = I18n.T("BtnBrowseCoreImage");
+		if (ClearCoreImageButton != null) ClearCoreImageButton.Content = I18n.T("BtnClearCoreImage");
+		if (CoreTransformSectionTitle != null) CoreTransformSectionTitle.Text = I18n.T("CoreTransformSectionTitle");
+		if (CoreIconScaleTitleText != null) CoreIconScaleTitleText.Text = I18n.T("CoreIconScaleTitle");
+		if (CoreImageOffsetXTitleText != null) CoreImageOffsetXTitleText.Text = I18n.T("CoreImageOffsetXTitle");
+		if (CoreImageOffsetYTitleText != null) CoreImageOffsetYTitleText.Text = I18n.T("CoreImageOffsetYTitle");
+		if (ResetCoreTransformButton != null) ResetCoreTransformButton.Content = I18n.T("BtnResetCoreTransform");
+		if (CoreTextOptionsSectionTitle != null) CoreTextOptionsSectionTitle.Text = I18n.T("CoreTextOptionsSectionTitle");
+		if (ShowSelectedActionTextCheckBox != null) ShowSelectedActionTextCheckBox.Content = I18n.T("ShowSelectedActionText");
+		if (CoreFontFamilyTitleText != null) CoreFontFamilyTitleText.Text = I18n.T("CoreFontFamily");
+		if (CoreFontSystemItem != null) CoreFontSystemItem.Content = I18n.T("WheelFontItemSystem");
+		if (CoreFontYaHeiItem != null) CoreFontYaHeiItem.Content = I18n.T("WheelFontItemYaHei");
+		if (CoreFontHarmonyItem != null) CoreFontHarmonyItem.Content = I18n.T("WheelFontItemHarmony");
+		if (CoreFontPingFangItem != null) CoreFontPingFangItem.Content = I18n.T("WheelFontItemPingFang");
+		if (CoreFontMiSansItem != null) CoreFontMiSansItem.Content = I18n.T("WheelFontItemMiSans");
+		if (CoreFontSimHeiItem != null) CoreFontSimHeiItem.Content = I18n.T("WheelFontItemSimHei");
+		if (CoreFontKaiTiItem != null) CoreFontKaiTiItem.Content = I18n.T("WheelFontItemKaiTi");
+		if (CoreFontConsolasItem != null) CoreFontConsolasItem.Content = I18n.T("WheelFontItemConsolas");
+		if (CoreFontSizeTitleText != null) CoreFontSizeTitleText.Text = I18n.T("CoreFontSizeTitle");
+		if (CoreTextColorAutoCheckBox != null) CoreTextColorAutoCheckBox.Content = I18n.T("CoreTextColorAuto");
+		if (CoreTextColorTitleText != null) CoreTextColorTitleText.Text = I18n.T("CoreTextColorTitle");
+		if (PickCoreTextColorBtn != null) PickCoreTextColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropCoreTextColorBtn != null) EyedropCoreTextColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (CoreImagePerformanceTipText != null) CoreImagePerformanceTipText.Text = I18n.T("CoreImagePerformanceTip");
+		if (LayerStyleDarkItem != null) LayerStyleDarkItem.Content = I18n.T("LayerStyleItemDark");
+		if (LayerStyleAuroraBlueItem != null) LayerStyleAuroraBlueItem.Content = I18n.T("LayerStyleItemAuroraBlue");
+		if (LayerStyleObsidianPurpleItem != null) LayerStyleObsidianPurpleItem.Content = I18n.T("LayerStyleItemObsidianPurple");
+		if (LayerStyleLightItem != null) LayerStyleLightItem.Content = I18n.T("LayerStyleItemLight");
+		if (LayerStyleFollowThemeItem != null) LayerStyleFollowThemeItem.Content = I18n.T("LayerStyleItemFollowTheme");
+		if (LayerStyleCustomItem != null) LayerStyleCustomItem.Content = I18n.T("LayerStyleItemCustom");
+		if (LayerIconStarItem != null) LayerIconStarItem.Content = I18n.T("LayerIconItemStar");
+		if (LayerIconSnowflakeItem != null) LayerIconSnowflakeItem.Content = I18n.T("LayerIconItemSnowflake");
+		if (LayerIconGalaxyItem != null) LayerIconGalaxyItem.Content = I18n.T("LayerIconItemGalaxy");
+		if (LayerIconBoltItem != null) LayerIconBoltItem.Content = I18n.T("LayerIconItemBolt");
+		if (LayerIconCrosshairItem != null) LayerIconCrosshairItem.Content = I18n.T("LayerIconItemCrosshair");
+		if (LayerIconGemItem != null) LayerIconGemItem.Content = I18n.T("LayerIconItemGem");
+		if (LayerIconNoneItem != null) LayerIconNoneItem.Content = I18n.T("LayerIconItemNone");
+		if (Tab1_LayerCustomColorsSectionLabel != null) Tab1_LayerCustomColorsSectionLabel.Text = I18n.T("Tab1_LayerCustomColorsSectionLabel");
+		if (Tab1_LayerBgLabel != null) Tab1_LayerBgLabel.Text = I18n.T("Tab1_LayerBgLabel");
+		if (PickLayerBgColorBtn != null) PickLayerBgColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropLayerBgColorBtn != null) EyedropLayerBgColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_LayerBorderLabel != null) Tab1_LayerBorderLabel.Text = I18n.T("Tab1_LayerBorderLabel");
+		if (PickLayerBorderColorBtn != null) PickLayerBorderColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropLayerBorderColorBtn != null) EyedropLayerBorderColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_LayerTextLabel != null) Tab1_LayerTextLabel.Text = I18n.T("Tab1_LayerTextLabel");
+		if (PickLayerTextColorBtn != null) PickLayerTextColorBtn.ToolTip = I18n.T("TipPickColor");
+		if (EyedropLayerTextColorBtn != null) EyedropLayerTextColorBtn.ToolTip = I18n.T("TipEyedropColor");
+		if (Tab1_LivePreviewTitle != null) Tab1_LivePreviewTitle.Text = I18n.T("Tab1_LivePreviewTitle");
+		if (Tab1_LivePreviewBadge != null) Tab1_LivePreviewBadge.Text = I18n.T("Tab1_LivePreviewBadge");
+		if (Tab1_LivePreviewHint != null) Tab1_LivePreviewHint.Text = I18n.T("Tab1_LivePreviewHint");
+		if (Tier1ConfigSegmentRadio != null) Tier1ConfigSegmentRadio.Content = I18n.T("Tier1ConfigSegment");
+		if (Tier2ConfigSegmentRadio != null) Tier2ConfigSegmentRadio.Content = I18n.T("Tier2ConfigSegment");
+		if (PreviewZoomOutBtn != null) PreviewZoomOutBtn.ToolTip = I18n.T("TipPreviewZoomOut");
+		if (PreviewZoomLabel != null) PreviewZoomLabel.ToolTip = I18n.T("TipPreviewZoomReset");
+		if (PreviewZoomInBtn != null) PreviewZoomInBtn.ToolTip = I18n.T("TipPreviewZoomIn");
+		if (PreviewResetViewBtn != null) PreviewResetViewBtn.ToolTip = I18n.T("TipPreviewResetView");
+		if (ResetDimensionsButton != null) ResetDimensionsButton.Content = I18n.T("BtnResetAllGeometry");
+
+
+		// --- Phase 3: Tab 2 (Gestures & Actions / 手势动作) ---
+		// Group 1: Layer Toolbar
+		if (Tab2LayerLabel != null) Tab2LayerLabel.Text = I18n.T("LayerLabel");
+		if (AddLayerBtn != null) { AddLayerBtn.Content = I18n.T("AddLayerBtnText"); AddLayerBtn.ToolTip = I18n.T("AddLayerBtnToolTip"); }
+		if (CopyLayerBtn != null) { CopyLayerBtn.Content = I18n.T("CopyLayerBtnText"); CopyLayerBtn.ToolTip = I18n.T("CopyLayerBtnToolTip"); }
+		if (RenameLayerBtn != null) RenameLayerBtn.ToolTip = I18n.T("RenameLayerBtnToolTip");
+		if (DeleteLayerBtn != null) DeleteLayerBtn.ToolTip = I18n.T("DeleteLayerBtnToolTip");
+		if (LayerSwitchTriggerLabel != null) LayerSwitchTriggerLabel.Text = I18n.T("LayerSwitchTriggerLabel");
+		if (LayerSwitchTriggerComboBox != null) LayerSwitchTriggerComboBox.ToolTip = I18n.T("LayerSwitchTriggerComboBoxToolTip");
+		if (LayerSwitchModeScrollItem != null) LayerSwitchModeScrollItem.Content = I18n.T("LayerSwitchModeScroll");
+		if (LayerSwitchModeTabItem != null) LayerSwitchModeTabItem.Content = I18n.T("LayerSwitchModeTab");
+		if (GesturesPageSubheader != null) GesturesPageSubheader.Text = I18n.T("GesturesPageSubheader");
+		if (MappingsViewModeCanvasRadio != null) MappingsViewModeCanvasRadio.Content = I18n.T("MappingsViewModeCanvasText");
+		if (MappingsViewModeListRadio != null) MappingsViewModeListRadio.Content = I18n.T("MappingsViewModeListText");
+
+		// Group 2: Profile Card
+		if (CurrentProfileLabel != null) CurrentProfileLabel.Text = I18n.T("CurrentProfileLabel");
+		if (AddProfileBtn2 != null) { AddProfileBtn2.Content = I18n.T("AddProfileBtnText"); AddProfileBtn2.ToolTip = I18n.T("AddProfileBtnToolTip"); }
+		if (AddProfileFromProgramMenuItem != null) AddProfileFromProgramMenuItem.Header = I18n.T("AddProfileFromProgram");
+		if (AddProfileCaptureWindowMenuItem != null) AddProfileCaptureWindowMenuItem.Header = I18n.T("AddProfileCaptureWindow");
+		if (AddProfileBrowseExeMenuItem != null) AddProfileBrowseExeMenuItem.Header = I18n.T("AddProfileBrowseExe");
+		if (AddProfileCustomMenuItem != null) AddProfileCustomMenuItem.Header = I18n.T("AddProfileCustom");
+		if (RenameProfileBtn2 != null) { RenameProfileBtn2.Content = I18n.T("RenameProfileBtnText"); RenameProfileBtn2.ToolTip = I18n.T("RenameProfileBtnToolTip"); }
+		if (DeleteProfileBtn2 != null) DeleteProfileBtn2.ToolTip = I18n.T("DeleteProfileBtnToolTip");
+		if (GlobalProfileHintText != null) GlobalProfileHintText.Text = I18n.T("GlobalProfileHint");
+		if (ProfileBoundProcessesLabel != null) ProfileBoundProcessesLabel.Text = I18n.T("ProfileBoundProcessesLabel");
+		if (ProfileBoundProcessesTextBox != null) ProfileBoundProcessesTextBox.ToolTip = I18n.T("ProfileBoundProcessesToolTip");
+		if (ProfileCaptureWindowBtn != null) { ProfileCaptureWindowBtn.Content = I18n.T("ProfileCaptureWindowBtnText"); ProfileCaptureWindowBtn.ToolTip = I18n.T("ProfileCaptureWindowBtnToolTip"); }
+		if (ProfilePickProgramBtn != null) { ProfilePickProgramBtn.Content = I18n.T("ProfilePickProgramBtnText"); ProfilePickProgramBtn.ToolTip = I18n.T("ProfilePickProgramBtnToolTip"); }
+		if (ProfileBrowseExeBtn != null) { ProfileBrowseExeBtn.Content = I18n.T("ProfileBrowseExeBtnText"); ProfileBrowseExeBtn.ToolTip = I18n.T("ProfileBrowseExeBtnToolTip"); }
+		if (ProfileBoundProcessesHintText != null) ProfileBoundProcessesHintText.Text = I18n.T("ProfileBoundProcessesHint");
+		if (SectorCountLabel != null) SectorCountLabel.Text = I18n.T("SectorCountLabel");
+		if (MappingsSectorCount4Radio != null) MappingsSectorCount4Radio.Content = I18n.T("SectorCount4Text");
+		if (MappingsSectorCount8Radio != null) MappingsSectorCount8Radio.Content = I18n.T("SectorCount8Text");
+		if (MappingsSectorCount12Radio != null) MappingsSectorCount12Radio.Content = I18n.T("SectorCount12Text");
+		if (EnableGlobalInheritanceCheckBox != null) { EnableGlobalInheritanceCheckBox.Content = I18n.T("EnableGlobalInheritanceText"); EnableGlobalInheritanceCheckBox.ToolTip = I18n.T("EnableGlobalInheritanceToolTip"); }
+
+		// Group 3: Focus Editor Navigation & Center Core
+		if (FocusSlotInheritedBadge != null) FocusSlotInheritedBadge.ToolTip = I18n.T("FocusSlotInheritedBadgeToolTip");
+		if (FocusSlotInheritedBadgeText != null) FocusSlotInheritedBadgeText.Text = I18n.T("FocusSlotInheritedBadgeText");
+		if (FocusBackToParentBtn != null) FocusBackToParentBtn.Content = I18n.T("FocusBackToParentBtnText");
+		if (FocusPrevSlotBtn != null) FocusPrevSlotBtn.Content = I18n.T("FocusPrevSlotBtnText");
+		if (FocusNextSlotBtn != null) FocusNextSlotBtn.Content = I18n.T("FocusNextSlotBtnText");
+		if (FocusCenterCoreBtn != null) FocusCenterCoreBtn.Content = I18n.T("FocusCenterCoreBtnText");
+		if (EnableCenterActionCheckBox != null) EnableCenterActionCheckBox.Content = I18n.T("EnableCenterActionText");
+		if (CenterDeadzoneReleaseHintText != null) CenterDeadzoneReleaseHintText.Text = I18n.T("CenterDeadzoneReleaseHint");
+		if (CenterPresetsToggleBtn != null) CenterPresetsToggleBtn.Content = I18n.T("CenterPresetsToggleBtnText");
+		if (CenterInfoToggleBtn != null) CenterInfoToggleBtn.Content = I18n.T("CenterInfoToggleBtnText");
+		if (CenterPatternPriorityNoticeText != null) CenterPatternPriorityNoticeText.Text = I18n.T("CenterPatternPriorityNotice");
+		if (CenterPresetFillLabel != null) CenterPresetFillLabel.Text = I18n.T("CenterPresetFillLabel");
+		if (CenterPresetOpenSettingsBtn != null) CenterPresetOpenSettingsBtn.Content = I18n.T("CenterPresetSettings");
+		if (CenterPresetDesktopBtn != null) CenterPresetDesktopBtn.Content = I18n.T("CenterPresetDesktop");
+		if (CenterPresetLockBtn != null) CenterPresetLockBtn.Content = I18n.T("CenterPresetLock");
+		if (CenterPresetWebUrlBtn != null) CenterPresetWebUrlBtn.Content = I18n.T("CenterPresetWebUrl");
+		if (CenterPresetExplorerBtn != null) CenterPresetExplorerBtn.Content = I18n.T("CenterPresetExplorer");
+		if (CenterFlingExplanationText != null) CenterFlingExplanationText.Text = I18n.T("CenterFlingExplanation");
+		if (FocusTier2EmptyTitleText != null) FocusTier2EmptyTitleText.Text = I18n.T("FocusTier2EmptyTitle");
+		if (FocusTier2EmptySubtitleText != null) FocusTier2EmptySubtitleText.Text = I18n.T("FocusTier2EmptySubtitle");
+		if (FocusAddFirstSubActionBtn != null) FocusAddFirstSubActionBtn.Content = I18n.T("FocusAddFirstSubActionText");
+
+		// Group 4: Focus Editor Icon & Name
+		if (FocusPickIconButton != null) FocusPickIconButton.ToolTip = I18n.T("FocusPickIconButtonToolTip");
+		if (FocusIconLabel != null) FocusIconLabel.Text = I18n.T("FocusIconLabel");
+		if (FocusActionNameLabel != null) FocusActionNameLabel.Text = I18n.T("FocusActionNameLabel");
+
+		// Group 5: Focus Editor Action Types & Dynamic Panels
+		if (FocusActionTypeLabel != null) FocusActionTypeLabel.Text = I18n.T("FocusActionTypeLabel");
+		if (FocusRestoreInheritBtn != null) { FocusRestoreInheritBtn.Content = I18n.T("FocusRestoreInheritBtnText"); FocusRestoreInheritBtn.ToolTip = I18n.T("FocusRestoreInheritBtnToolTip"); }
+		if (FocusTestActionBtn != null) FocusTestActionBtn.Content = I18n.T("FocusTestActionBtnText");
+		if (TogglePauseHotkeysBtn != null) { TogglePauseHotkeysBtn.Content = I18n.T("TogglePauseHotkeysBtnText"); TogglePauseHotkeysBtn.ToolTip = I18n.T("TogglePauseHotkeysBtnToolTip"); }
+		if (FocusHotkeyBuilderBtn != null) FocusHotkeyBuilderBtn.Content = I18n.T("FocusHotkeyBuilderBtnText");
+		if (FocusLaunchPathTextBox != null) FocusLaunchPathTextBox.ToolTip = I18n.T("FocusLaunchPathToolTip");
+		if (FocusLaunchPickProgramBtn != null) { FocusLaunchPickProgramBtn.Content = I18n.T("FocusLaunchPickProgramBtnText"); FocusLaunchPickProgramBtn.ToolTip = I18n.T("FocusLaunchPickProgramBtnToolTip"); }
+		if (FocusLaunchCaptureWindowBtn != null) { FocusLaunchCaptureWindowBtn.Content = I18n.T("FocusLaunchCaptureWindowBtnText"); FocusLaunchCaptureWindowBtn.ToolTip = I18n.T("FocusLaunchCaptureWindowBtnToolTip"); }
+		if (FocusLaunchBrowseExeBtn != null) { FocusLaunchBrowseExeBtn.Content = I18n.T("FocusLaunchBrowseExeBtnText"); FocusLaunchBrowseExeBtn.ToolTip = I18n.T("FocusLaunchBrowseExeBtnToolTip"); }
+		if (FocusLaunchArgsLabel != null) FocusLaunchArgsLabel.Text = I18n.T("FocusLaunchArgsLabel");
+		if (FocusLaunchArgsTextBox != null) FocusLaunchArgsTextBox.ToolTip = I18n.T("FocusLaunchArgsToolTip");
+		if (FocusLaunchAsUserTitleText != null) FocusLaunchAsUserTitleText.Text = I18n.T("FocusLaunchAsUserTitle");
+		if (FocusLaunchAsUserSubtitleText != null) FocusLaunchAsUserSubtitleText.Text = I18n.T("FocusLaunchAsUserSubtitle");
+		if (FocusWebUrlTextBox != null) FocusWebUrlTextBox.ToolTip = I18n.T("FocusWebUrlToolTip");
+		if (FocusWebBrowserDefaultItem != null) FocusWebBrowserDefaultItem.Content = I18n.T("BrowserChoiceDefault");
+		if (FocusWebBrowserCustomItem != null) FocusWebBrowserCustomItem.Content = I18n.T("BrowserChoiceCustom");
+		if (FocusCustomBrowserPathTextBox != null) FocusCustomBrowserPathTextBox.ToolTip = I18n.T("FocusCustomBrowserPathToolTip");
+		if (FocusCustomBrowserBrowseBtn != null) FocusCustomBrowserBrowseBtn.Content = I18n.T("FocusCustomBrowserBrowseBtnText");
+		if (FocusWebPresetsLabel != null) FocusWebPresetsLabel.Text = I18n.T("FocusWebPresetsLabel");
+		if (FocusWebPresetBingBtn != null) FocusWebPresetBingBtn.Content = I18n.T("FocusWebPresetBingText");
+		if (FocusFolderPathTextBox != null) FocusFolderPathTextBox.ToolTip = I18n.T("FocusFolderPathToolTip");
+		if (FocusFolderBrowseBtn != null) FocusFolderBrowseBtn.Content = I18n.T("FocusFolderBrowseBtnText");
+		if (FocusFolderPresetsLabel != null) FocusFolderPresetsLabel.Text = I18n.T("FocusFolderPresetsLabel");
+		if (FocusFolderPresetThisPcBtn != null) { FocusFolderPresetThisPcBtn.Content = I18n.T("FocusFolderPresetThisPcText"); FocusFolderPresetThisPcBtn.ToolTip = I18n.T("FocusFolderPresetThisPcToolTip"); }
+		if (FocusFolderPresetRecycleBinBtn != null) { FocusFolderPresetRecycleBinBtn.Content = I18n.T("FocusFolderPresetRecycleBinText"); FocusFolderPresetRecycleBinBtn.ToolTip = I18n.T("FocusFolderPresetRecycleBinToolTip"); }
+		if (FocusFolderPresetDesktopBtn != null) FocusFolderPresetDesktopBtn.Content = I18n.T("FocusFolderPresetDesktopText");
+		if (FocusFolderPresetDownloadsBtn != null) FocusFolderPresetDownloadsBtn.Content = I18n.T("FocusFolderPresetDownloadsText");
+		if (FocusFolderPresetDocumentsBtn != null) FocusFolderPresetDocumentsBtn.Content = I18n.T("FocusFolderPresetDocumentsText");
+		if (FocusCommandTextBox != null) FocusCommandTextBox.ToolTip = I18n.T("FocusCommandToolTip");
+		if (FocusWindowSubModeLabel != null) FocusWindowSubModeLabel.Text = I18n.T("FocusWindowSubModeLabel");
+		if (FocusWindowModeTileItem != null) FocusWindowModeTileItem.Content = I18n.T("WindowModeTile");
+		if (FocusWindowModeCycleItem != null) FocusWindowModeCycleItem.Content = I18n.T("WindowModeCycle");
+		if (FocusWindowModeCycleReverseItem != null) FocusWindowModeCycleReverseItem.Content = I18n.T("WindowModeCycleReverse");
+		if (FocusWindowModeRestoreItem != null) FocusWindowModeRestoreItem.Content = I18n.T("WindowModeRestore");
+		if (FocusWindowModeTopmostItem != null) FocusWindowModeTopmostItem.Content = I18n.T("WindowModeTopmost");
+		if (FocusWindowModeMoveMonitorItem != null) FocusWindowModeMoveMonitorItem.Content = I18n.T("WindowModeMoveMonitor");
+		if (FocusWindowModeOpacityItem != null) FocusWindowModeOpacityItem.Content = I18n.T("WindowModeOpacity");
+		if (FocusWindowModeSwitchItem != null) FocusWindowModeSwitchItem.Content = I18n.T("WindowModeSwitch");
+		if (FocusPopulateTileSubActionsBtn != null) { FocusPopulateTileSubActionsBtn.Content = I18n.T("FocusPopulateTileSubActionsBtnText"); FocusPopulateTileSubActionsBtn.ToolTip = I18n.T("FocusPopulateTileSubActionsBtnToolTip"); }
+		if (FocusTileCommonLayoutsLabel != null) FocusTileCommonLayoutsLabel.Text = I18n.T("FocusTileCommonLayoutsLabel");
+		if (FocusTilePreset2LBtn != null) FocusTilePreset2LBtn.Content = I18n.T("FocusTilePreset2LText");
+		if (FocusTilePreset2TBtn != null) FocusTilePreset2TBtn.Content = I18n.T("FocusTilePreset2TText");
+		if (FocusTilePreset3L12Btn != null) FocusTilePreset3L12Btn.Content = I18n.T("FocusTilePreset3L12Text");
+		if (FocusTilePreset4GBtn != null) FocusTilePreset4GBtn.Content = I18n.T("FocusTilePreset4GText");
+		if (FocusTilePreset3RBtn != null) FocusTilePreset3RBtn.Content = I18n.T("FocusTilePreset3RText");
+		if (FocusTileCycleHintText != null) FocusTileCycleHintText.Text = I18n.T("FocusTileCycleHint");
+		if (FocusTileRestoreHintText != null) FocusTileRestoreHintText.Text = I18n.T("FocusTileRestoreHint");
+		if (FocusTileTopmostHintText != null) FocusTileTopmostHintText.Text = I18n.T("FocusTileTopmostHint");
+		if (FocusTileMoveMonitorHintText != null) FocusTileMoveMonitorHintText.Text = I18n.T("FocusTileMoveMonitorHint");
+		if (FocusTileOpacityLabel != null) FocusTileOpacityLabel.Text = I18n.T("FocusTileOpacityLabel");
+		if (FocusTileOpacityPresetsLabel != null) FocusTileOpacityPresetsLabel.Text = I18n.T("FocusTileOpacityPresetsLabel");
+		if (FocusOpacity70Btn != null) FocusOpacity70Btn.Content = I18n.T("FocusOpacity70Text");
+		if (FocusOpacity80Btn != null) FocusOpacity80Btn.Content = I18n.T("FocusOpacity80Text");
+		if (FocusOpacity90Btn != null) FocusOpacity90Btn.Content = I18n.T("FocusOpacity90Text");
+		if (FocusOpacity100Btn != null) FocusOpacity100Btn.Content = I18n.T("FocusOpacity100Text");
+		if (FocusSwitchWindowIndexLabel != null) FocusSwitchWindowIndexLabel.Text = I18n.T("FocusSwitchWindowIndexLabel");
+		if (FocusSwitchWindowIndexHintText != null) FocusSwitchWindowIndexHintText.Text = I18n.T("FocusSwitchWindowIndexHint");
+		if (FocusSwitchWindowQuickSelectLabel != null) FocusSwitchWindowQuickSelectLabel.Text = I18n.T("FocusSwitchWindowQuickSelectLabel");
+		if (FocusSwitchSlot1Btn != null) FocusSwitchSlot1Btn.Content = I18n.T("FocusSwitchSlot1Text");
+		if (FocusSwitchSlot2Btn != null) FocusSwitchSlot2Btn.Content = I18n.T("FocusSwitchSlot2Text");
+		if (FocusSwitchSlot3Btn != null) FocusSwitchSlot3Btn.Content = I18n.T("FocusSwitchSlot3Text");
+		if (FocusSwitchSlot4Btn != null) FocusSwitchSlot4Btn.Content = I18n.T("FocusSwitchSlot4Text");
+		if (FocusOcrTestScreenshotBtn != null) { FocusOcrTestScreenshotBtn.Content = I18n.T("FocusOcrTestScreenshotBtnText"); FocusOcrTestScreenshotBtn.ToolTip = I18n.T("FocusOcrTestScreenshotBtnToolTip"); }
+		if (FocusOcrConfigBtn != null) { FocusOcrConfigBtn.Content = I18n.T("FocusOcrConfigBtnText"); FocusOcrConfigBtn.ToolTip = I18n.T("FocusOcrConfigBtnToolTip"); }
+		if (FocusPickShellToolBtn != null) { FocusPickShellToolBtn.Content = I18n.T("FocusPickShellToolBtnText"); FocusPickShellToolBtn.ToolTip = I18n.T("FocusPickShellToolBtnToolTip"); }
+		if (FocusInheritIconLabel != null) FocusInheritIconLabel.Text = I18n.T("FocusInheritIconLabel");
+		if (FocusClearInheritedIconBtn != null) { FocusClearInheritedIconBtn.Content = I18n.T("FocusClearInheritedIconBtnText"); FocusClearInheritedIconBtn.ToolTip = I18n.T("FocusClearInheritedIconBtnToolTip"); }
+		if (FocusInheritIconPathTextBox != null) FocusInheritIconPathTextBox.ToolTip = I18n.T("FocusInheritIconPathToolTip");
+		if (FocusInheritIconPickProgramBtn != null) { FocusInheritIconPickProgramBtn.Content = I18n.T("FocusInheritIconPickProgramBtnText"); FocusInheritIconPickProgramBtn.ToolTip = I18n.T("FocusInheritIconPickProgramBtnToolTip"); }
+		if (FocusInheritIconCaptureWindowBtn != null) { FocusInheritIconCaptureWindowBtn.Content = I18n.T("FocusInheritIconCaptureWindowBtnText"); FocusInheritIconCaptureWindowBtn.ToolTip = I18n.T("FocusInheritIconCaptureWindowBtnToolTip"); }
+		if (FocusInheritIconBrowseBtn != null) { FocusInheritIconBrowseBtn.Content = I18n.T("FocusInheritIconBrowseBtnText"); FocusInheritIconBrowseBtn.ToolTip = I18n.T("FocusInheritIconBrowseBtnToolTip"); }
+		if (FocusSubActionsSectionLabel != null) FocusSubActionsSectionLabel.Text = I18n.T("FocusSubActionsSectionLabel");
+		if (FocusAddSubActionBtn != null) FocusAddSubActionBtn.Content = I18n.T("FocusAddSubActionBtnText");
+		if (FocusClearSubActionsBtn != null) FocusClearSubActionsBtn.Content = I18n.T("FocusClearSubActionsBtnText");
+		if (FocusUndoSubActionsBtn != null) { FocusUndoSubActionsBtn.Content = I18n.T("FocusUndoSubActionsBtnText"); FocusUndoSubActionsBtn.ToolTip = I18n.T("FocusUndoSubActionsBtnToolTip"); }
+
+		// Group 6: Batch Mode
+		if (FocusBatchBadgeText != null) FocusBatchBadgeText.Text = I18n.T("FocusBatchBadgeText");
+		if (FocusBatchTitleText != null) FocusBatchTitleText.Text = I18n.T("FocusBatchTitleText");
+		if (FocusBatchSubtitleText != null) FocusBatchSubtitleText.Text = I18n.T("FocusBatchSubtitleText");
+		if (FocusBatchExitBtn != null) FocusBatchExitBtn.Content = I18n.T("FocusBatchExitBtnText");
+		if (BatchLayoutModeHeaderLabel != null) BatchLayoutModeHeaderLabel.Text = I18n.T("BatchLayoutModeLabel");
+		if (BatchLayoutBothBtn != null) { BatchLayoutBothBtn.Content = I18n.T("BatchLayoutBothBtnText"); BatchLayoutBothBtn.ToolTip = I18n.T("BatchLayoutBothBtnToolTip"); }
+		if (BatchLayoutIconOnlyBtn != null) { BatchLayoutIconOnlyBtn.Content = I18n.T("BatchLayoutIconOnlyBtnText"); BatchLayoutIconOnlyBtn.ToolTip = I18n.T("BatchLayoutIconOnlyBtnToolTip"); }
+		if (BatchLayoutTextOnlyBtn != null) { BatchLayoutTextOnlyBtn.Content = I18n.T("BatchLayoutTextOnlyBtnText"); BatchLayoutTextOnlyBtn.ToolTip = I18n.T("BatchLayoutTextOnlyBtnToolTip"); }
+		if (BatchLayoutInheritBtn != null) { BatchLayoutInheritBtn.Content = I18n.T("BatchLayoutInheritBtnText"); BatchLayoutInheritBtn.ToolTip = I18n.T("BatchLayoutInheritBtnToolTip"); }
+		if (BatchFontSizeHeaderLabel != null) BatchFontSizeHeaderLabel.Text = I18n.T("BatchFontSizeLabel");
+		if (BatchIconSizeHeaderLabel != null) BatchIconSizeHeaderLabel.Text = I18n.T("BatchIconSizeLabel");
+		if (BatchTextColorHeaderLabel != null) BatchTextColorHeaderLabel.Text = I18n.T("BatchTextColorLabel");
+		if (BatchTextColorPaletteBtn != null) BatchTextColorPaletteBtn.ToolTip = I18n.T("BatchTextColorPaletteToolTip");
+		if (BatchTextColorEyedropperBtn != null) BatchTextColorEyedropperBtn.ToolTip = I18n.T("BatchTextColorEyedropperToolTip");
+		if (BatchOffsetXHeaderLabel != null) BatchOffsetXHeaderLabel.Text = I18n.T("BatchOffsetXLabel");
+		if (BatchOffsetYHeaderLabel != null) BatchOffsetYHeaderLabel.Text = I18n.T("BatchOffsetYLabel");
+		if (BatchResetCustomHintText != null) BatchResetCustomHintText.Text = I18n.T("BatchResetCustomHint");
+		if (BatchResetCustomBtn != null) BatchResetCustomBtn.Content = I18n.T("BatchResetCustomBtnText");
+
+		// Group 7: Splitter & Canvas
+		if (Tab2GridSplitter != null) Tab2GridSplitter.ToolTip = I18n.T("Tab2GridSplitterToolTip");
+		if (LiveCanvasHeaderTitleText != null) LiveCanvasHeaderTitleText.Text = I18n.T("LiveCanvasHeaderTitle");
+		if (MappingsLinkSubActionsBtn != null) MappingsLinkSubActionsBtn.ToolTip = I18n.T("MappingsLinkSubActionsToolTip");
+		if (MappingsFpsBadgeText != null) MappingsFpsBadgeText.Text = I18n.T("MappingsFpsBadgeText");
+		if (MappingsCanvasInstructionsText != null) MappingsCanvasInstructionsText.Text = I18n.T("MappingsCanvasInstructions");
+		if (MappingsTier1SegmentRadio != null) MappingsTier1SegmentRadio.Content = I18n.T("MappingsTier1SegmentText");
+		if (MappingsTier2SegmentRadio != null) MappingsTier2SegmentRadio.Content = I18n.T("MappingsTier2SegmentText");
+		if (MappingsShowTextToggleBtn != null) { MappingsShowTextToggleBtn.Content = I18n.T("MappingsShowTextToggleBtnText"); MappingsShowTextToggleBtn.ToolTip = I18n.T("MappingsShowTextToggleBtnToolTip"); }
+		if (MappingsZoomOutBtn != null) MappingsZoomOutBtn.ToolTip = I18n.T("MappingsZoomOutBtnToolTip");
+		if (MappingsZoomLabel != null) MappingsZoomLabel.ToolTip = I18n.T("MappingsZoomLabelToolTip");
+		if (MappingsZoomInBtn != null) MappingsZoomInBtn.ToolTip = I18n.T("MappingsZoomInBtnToolTip");
+		if (MappingsResetViewBtn != null) MappingsResetViewBtn.ToolTip = I18n.T("MappingsResetViewBtnToolTip");
+		if (MappingsSaveNoticeText != null) MappingsSaveNoticeText.Text = I18n.T("MappingsSaveNotice");
+
+		// Group 8: Compact List Headers
+		if (ListModeProfileHeaderTitle != null) ListModeProfileHeaderTitle.Text = I18n.T("ListModeProfileHeaderTitle");
+		if (ListModeProfileHeaderDesc != null) ListModeProfileHeaderDesc.Text = I18n.T("ListModeProfileHeaderDesc");
+		if (ListModeSectorHeaderTitle != null) ListModeSectorHeaderTitle.Text = I18n.T("ListModeSectorHeaderTitle");
+		if (ListModeSectorHeaderDesc != null) ListModeSectorHeaderDesc.Text = I18n.T("ListModeSectorHeaderDesc");
+		if (ListModeActionListHeaderTitle != null) ListModeActionListHeaderTitle.Text = I18n.T("ListModeActionListHeaderTitle");
+		if (ListModeActionListHeaderDesc1 != null) ListModeActionListHeaderDesc1.Text = I18n.T("ListModeActionListHeaderDesc1");
+		if (ListModeActionListHeaderDesc2 != null) ListModeActionListHeaderDesc2.Text = I18n.T("ListModeActionListHeaderDesc2");
+
+		// Group 10: Tile Settings Expander
+		if (TileExcludeMinimizedHintText != null) TileExcludeMinimizedHintText.Text = I18n.T("TileExcludeMinimizedHint");
+		if (TileCaptureExcludeProcessBtn != null) { TileCaptureExcludeProcessBtn.Content = I18n.T("TileCaptureExcludeProcessBtnText"); TileCaptureExcludeProcessBtn.ToolTip = I18n.T("TileCaptureExcludeProcessBtnToolTip"); }
+		if (TileMarginTopTextBox != null) TileMarginTopTextBox.ToolTip = I18n.T("TileMarginTopToolTip");
+		if (TileMarginBottomTextBox != null) TileMarginBottomTextBox.ToolTip = I18n.T("TileMarginBottomToolTip");
+		if (TileMarginLeftTextBox != null) TileMarginLeftTextBox.ToolTip = I18n.T("TileMarginLeftToolTip");
+		if (TileMarginRightTextBox != null) TileMarginRightTextBox.ToolTip = I18n.T("TileMarginRightToolTip");
+		if (TileGapTextBox != null) TileGapTextBox.ToolTip = I18n.T("TileGapToolTip");
+		if (TilePresetClassic4Btn != null) { TilePresetClassic4Btn.Content = I18n.T("TilePresetClassic4BtnText"); TilePresetClassic4Btn.ToolTip = I18n.T("TilePresetClassic4BtnToolTip"); }
+		if (TileMoveLayoutUpBtn != null) TileMoveLayoutUpBtn.ToolTip = I18n.T("TileMoveLayoutUpToolTip");
+		if (TileMoveLayoutDownBtn != null) TileMoveLayoutDownBtn.ToolTip = I18n.T("TileMoveLayoutDownToolTip");
+		if (TileSelectAllLayoutsBtn != null) { TileSelectAllLayoutsBtn.Content = I18n.T("TileSelectAllLayoutsBtnText"); TileSelectAllLayoutsBtn.ToolTip = I18n.T("TileSelectAllLayoutsBtnToolTip"); }
+		if (TileClearAllLayoutsBtn != null) { TileClearAllLayoutsBtn.Content = I18n.T("TileClearAllLayoutsBtnText"); TileClearAllLayoutsBtn.ToolTip = I18n.T("TileClearAllLayoutsBtnToolTip"); }
+
+		// --- Phase 4: Tab 3 (System & Advanced / 高级系统) ---
+		if (UpdateChannelStableItem != null) UpdateChannelStableItem.Content = I18n.T("UpdateChannelStable");
+		if (UpdateChannelBetaItem != null) UpdateChannelBetaItem.Content = I18n.T("UpdateChannelBeta");
+		if (UpdateProxyGhfastItem != null) UpdateProxyGhfastItem.Content = I18n.T("UpdateProxyGhproxy");
+		if (UpdateProxyGhproxyItem != null) UpdateProxyGhproxyItem.Content = I18n.T("UpdateProxyMoeyy");
+		if (UpdateProxyMirrorItem != null) UpdateProxyMirrorItem.Content = I18n.T("UpdateProxyAkams");
+		if (UpdateProxyDirectItem != null) UpdateProxyDirectItem.Content = I18n.T("UpdateProxyDirect");
+
+		if (ContributorsRefreshText != null) ContributorsRefreshText.ToolTip = I18n.T("ContributorsRefreshTip");
+		if (ViewReleasesWebBtn != null) { ViewReleasesWebBtn.Content = I18n.T("ViewReleasesWebBtnText"); ViewReleasesWebBtn.ToolTip = I18n.T("ViewReleasesWebBtnToolTip"); }
+		if (StartDownloadUpdateBtn != null) StartDownloadUpdateBtn.Content = I18n.T("StartDownloadUpdateBtnText");
+		if (OpenWebReleaseBtn != null) OpenWebReleaseBtn.Content = I18n.T("OpenWebReleaseBtnText");
+		if (UpdateDownloadPkgLabel != null) UpdateDownloadPkgLabel.Text = I18n.T("UpdateDownloadPkgLabel");
+		if (UpdatePkgStandaloneRadio != null) UpdatePkgStandaloneRadio.Content = I18n.T("UpdatePkgStandaloneRadioText");
+		if (UpdatePkgLightweightRadio != null) UpdatePkgLightweightRadio.Content = I18n.T("UpdatePkgLightweightRadioText");
+		if (UpdateChangelogLabel != null) UpdateChangelogLabel.Text = I18n.T("UpdateChangelogLabel");
+		if (CancelDownloadBtn != null) CancelDownloadBtn.Content = I18n.T("CancelDownloadBtnText");
+		if (UpdateReadyTitleText != null) UpdateReadyTitleText.Text = I18n.T("UpdateReadyTitleText");
+		if (UpdateReadyDescText != null) UpdateReadyDescText.Text = I18n.T("UpdateReadyDescText");
+		if (ApplyRestartUpdateBtn != null) ApplyRestartUpdateBtn.Content = I18n.T("ApplyRestartUpdateBtnText");
+		if (OpenUpdateFolderBtn != null) OpenUpdateFolderBtn.Content = I18n.T("OpenUpdateFolderBtnText");
+		if (UpdateAdvancedOptionsBadge != null) UpdateAdvancedOptionsBadge.Text = I18n.T("UpdateAdvancedOptionsBadge");
+		if (ChinaFastDownloadBadge != null) ChinaFastDownloadBadge.Text = I18n.T("ChinaFastDownloadBadge");
+		if (RollbackPackageArchLabel != null) RollbackPackageArchLabel.Text = I18n.T("RollbackPackageArchLabel");
+		if (RollbackChangelogHeaderLabel != null) RollbackChangelogHeaderLabel.Text = I18n.T("RollbackChangelogHeaderLabel");
+		if (LanguageAutoItem != null) LanguageAutoItem.Content = I18n.T("LanguageFollowSystem");
+		if (UpdateDownloadSpeedText != null && (UpdateDownloadSpeedText.Text.Contains("计算中") || UpdateDownloadSpeedText.Text.Contains("Calculating") || UpdateDownloadSpeedText.Text.Contains("計算中")))
+		{
+			UpdateDownloadSpeedText.Text = I18n.T("UpdateDownloadSpeedCalculating");
+		}
+		if (UpdateDownloadSpeedText != null && (UpdateDownloadSpeedText.Text.Contains("连接下载源") || UpdateDownloadSpeedText.Text.Contains("Connecting") || UpdateDownloadSpeedText.Text.Contains("連線下載") || UpdateDownloadSpeedText.Text.Contains("接続中")))
+		{
+			UpdateDownloadSpeedText.Text = I18n.T("UpdateDownloadSpeedConnecting");
+		}
+		if (FocusShellToolTitleText != null && (FocusShellToolTitleText.Text == "未挑选功能 (点击右侧挑选)" || FocusShellToolTitleText.Text == I18n.T("FocusShellToolDefaultTitle") || string.IsNullOrEmpty(FocusShellToolTitleText.Text)))
+		{
+			FocusShellToolTitleText.Text = I18n.T("FocusShellToolDefaultTitle");
+		}
+		if (FocusShellToolDescText != null && (FocusShellToolDescText.Text == "从系统原生增强与右键扩展中选择常用高频功能" || FocusShellToolDescText.Text == I18n.T("FocusShellToolDefaultDesc") || string.IsNullOrEmpty(FocusShellToolDescText.Text)))
+		{
+			FocusShellToolDescText.Text = I18n.T("FocusShellToolDefaultDesc");
+		}
+
+		// Tab 3 ToolTips
+		if (Tab4TestOcrBtn != null) Tab4TestOcrBtn.ToolTip = I18n.T("TipTestOcr");
+		if (Tab4ConfigOcrBtn != null) Tab4ConfigOcrBtn.ToolTip = I18n.T("TipConfigOcr");
+		if (TrimMemoryButton != null) TrimMemoryButton.ToolTip = I18n.T("TipTrimMemory");
+		if (SaveNewProfileBtn != null) SaveNewProfileBtn.ToolTip = I18n.T("TipSaveNewProfile");
+		if (RenameProfileBtn != null) RenameProfileBtn.ToolTip = I18n.T("TipRenameProfile");
+		if (DeleteProfileBtn != null) DeleteProfileBtn.ToolTip = I18n.T("TipDeleteProfile");
+		if (ImportConfigButton != null) ImportConfigButton.ToolTip = I18n.T("TipImportConfig");
+		if (ExportConfigButton != null) ExportConfigButton.ToolTip = I18n.T("TipExportConfig");
+		if (ResetDefaultConfigBtn != null) ResetDefaultConfigBtn.ToolTip = I18n.T("TipResetConfig");
+		if (OpenLogFolderButton != null) OpenLogFolderButton.ToolTip = I18n.T("TipOpenLogFolder");
+		if (ViewTodayLogButton != null) ViewTodayLogButton.ToolTip = I18n.T("TipViewTodayLog");
+
+		// --- Phase 5: Tab 4 (About & Milestones / 关于与版本演进) ---
+		if (AboutCheckUpdateBtn != null) AboutCheckUpdateBtn.Content = I18n.T("BtnCheckUpdate");
+		if (OpenChangelogButton != null) OpenChangelogButton.Content = I18n.T("BtnViewChangelog");
+		if (OlderMilestonesExpander != null) OlderMilestonesExpander.Header = I18n.T("MilestonesOlderExpander");
+		if (Tab4_AboutTitleText != null) Tab4_AboutTitleText.Text = I18n.T("Tab4_AboutTitleText");
+		if (Tab4_AboutDescText != null) Tab4_AboutDescText.Text = I18n.T("Tab4_AboutDescText");
+		if (Tab4_AppSloganText != null) Tab4_AppSloganText.Text = I18n.T("Tab4_AppSloganText");
+		if (Tab4_MilestonesHeaderTitle != null) Tab4_MilestonesHeaderTitle.Text = I18n.T("Tab4_MilestonesHeaderTitle");
+		if (Tab4_Ms_180b1_Title != null) Tab4_Ms_180b1_Title.Text = I18n.T("Tab4_Ms_180b1_Title");
+		if (Tab4_Ms_180b1_P1 != null) Tab4_Ms_180b1_P1.Text = I18n.T("Tab4_Ms_180b1_P1");
+		if (Tab4_Ms_180b1_P2 != null) Tab4_Ms_180b1_P2.Text = I18n.T("Tab4_Ms_180b1_P2");
+		if (Tab4_Ms_180b1_P3 != null) Tab4_Ms_180b1_P3.Text = I18n.T("Tab4_Ms_180b1_P3");
+		if (Tab4_Ms_180b1_P4 != null) Tab4_Ms_180b1_P4.Text = I18n.T("Tab4_Ms_180b1_P4");
+		if (Tab4_Ms_174_Title != null) Tab4_Ms_174_Title.Text = I18n.T("Tab4_Ms_174_Title");
+		if (Tab4_Ms_174_P1 != null) Tab4_Ms_174_P1.Text = I18n.T("Tab4_Ms_174_P1");
+		if (Tab4_Ms_174_P2 != null) Tab4_Ms_174_P2.Text = I18n.T("Tab4_Ms_174_P2");
+		if (Tab4_Ms_174_P3 != null) Tab4_Ms_174_P3.Text = I18n.T("Tab4_Ms_174_P3");
+		if (Tab4_Ms_174_P4 != null) Tab4_Ms_174_P4.Text = I18n.T("Tab4_Ms_174_P4");
+		if (Tab4_Ms_174b4_Title != null) Tab4_Ms_174b4_Title.Text = I18n.T("Tab4_Ms_174b4_Title");
+		if (Tab4_Ms_174b4_P1 != null) Tab4_Ms_174b4_P1.Text = I18n.T("Tab4_Ms_174b4_P1");
+		if (Tab4_Ms_174b4_P2 != null) Tab4_Ms_174b4_P2.Text = I18n.T("Tab4_Ms_174b4_P2");
+		if (Tab4_Ms_174b4_P3 != null) Tab4_Ms_174b4_P3.Text = I18n.T("Tab4_Ms_174b4_P3");
+		if (Tab4_Ms_174b4_P4 != null) Tab4_Ms_174b4_P4.Text = I18n.T("Tab4_Ms_174b4_P4");
+		if (Tab4_Ms_174b3_Title != null) Tab4_Ms_174b3_Title.Text = I18n.T("Tab4_Ms_174b3_Title");
+		if (Tab4_Ms_174b3_P1 != null) Tab4_Ms_174b3_P1.Text = I18n.T("Tab4_Ms_174b3_P1");
+		if (Tab4_Ms_174b3_P2 != null) Tab4_Ms_174b3_P2.Text = I18n.T("Tab4_Ms_174b3_P2");
+		if (Tab4_Ms_174b3_P3 != null) Tab4_Ms_174b3_P3.Text = I18n.T("Tab4_Ms_174b3_P3");
+		if (Tab4_Ms_174b2_Title != null) Tab4_Ms_174b2_Title.Text = I18n.T("Tab4_Ms_174b2_Title");
+		if (Tab4_Ms_174b2_P1 != null) Tab4_Ms_174b2_P1.Text = I18n.T("Tab4_Ms_174b2_P1");
+		if (Tab4_Ms_174b2_P2 != null) Tab4_Ms_174b2_P2.Text = I18n.T("Tab4_Ms_174b2_P2");
+		if (Tab4_Ms_174b2_P3 != null) Tab4_Ms_174b2_P3.Text = I18n.T("Tab4_Ms_174b2_P3");
+		if (Tab4_Ms_174b2_P4 != null) Tab4_Ms_174b2_P4.Text = I18n.T("Tab4_Ms_174b2_P4");
+		if (Tab4_Ms_174b1_Title != null) Tab4_Ms_174b1_Title.Text = I18n.T("Tab4_Ms_174b1_Title");
+		if (Tab4_Ms_174b1_P1 != null) Tab4_Ms_174b1_P1.Text = I18n.T("Tab4_Ms_174b1_P1");
+		if (Tab4_Ms_174b1_P2 != null) Tab4_Ms_174b1_P2.Text = I18n.T("Tab4_Ms_174b1_P2");
+		if (Tab4_Ms_174b1_P3 != null) Tab4_Ms_174b1_P3.Text = I18n.T("Tab4_Ms_174b1_P3");
+		if (Tab4_Ms_174b1_P4 != null) Tab4_Ms_174b1_P4.Text = I18n.T("Tab4_Ms_174b1_P4");
+		if (Tab4_Ms_173_Title != null) Tab4_Ms_173_Title.Text = I18n.T("Tab4_Ms_173_Title");
+		if (Tab4_Ms_173_P1 != null) Tab4_Ms_173_P1.Text = I18n.T("Tab4_Ms_173_P1");
+		if (Tab4_Ms_173_P2 != null) Tab4_Ms_173_P2.Text = I18n.T("Tab4_Ms_173_P2");
+		if (Tab4_Ms_173_P3 != null) Tab4_Ms_173_P3.Text = I18n.T("Tab4_Ms_173_P3");
+		if (Tab4_Ms_173_P4 != null) Tab4_Ms_173_P4.Text = I18n.T("Tab4_Ms_173_P4");
+		if (Tab4_Ms_173_P5 != null) Tab4_Ms_173_P5.Text = I18n.T("Tab4_Ms_173_P5");
+		if (Tab4_Ms_173b8_Title != null) Tab4_Ms_173b8_Title.Text = I18n.T("Tab4_Ms_173b8_Title");
+		if (Tab4_Ms_173b8_P1 != null) Tab4_Ms_173b8_P1.Text = I18n.T("Tab4_Ms_173b8_P1");
+		if (Tab4_Ms_173b8_P2 != null) Tab4_Ms_173b8_P2.Text = I18n.T("Tab4_Ms_173b8_P2");
+		if (Tab4_Ms_173b8_P3 != null) Tab4_Ms_173b8_P3.Text = I18n.T("Tab4_Ms_173b8_P3");
+		if (Tab4_Ms_173b8_P4 != null) Tab4_Ms_173b8_P4.Text = I18n.T("Tab4_Ms_173b8_P4");
+		if (Tab4_Ms_173b8_P5 != null) Tab4_Ms_173b8_P5.Text = I18n.T("Tab4_Ms_173b8_P5");
+		if (Tab4_Ms_173b7_Title != null) Tab4_Ms_173b7_Title.Text = I18n.T("Tab4_Ms_173b7_Title");
+		if (Tab4_Ms_173b7_P1 != null) Tab4_Ms_173b7_P1.Text = I18n.T("Tab4_Ms_173b7_P1");
+		if (Tab4_Ms_173b7_P2 != null) Tab4_Ms_173b7_P2.Text = I18n.T("Tab4_Ms_173b7_P2");
+		if (Tab4_Ms_173b7_P3 != null) Tab4_Ms_173b7_P3.Text = I18n.T("Tab4_Ms_173b7_P3");
+		if (Tab4_Ms_173b7_P4 != null) Tab4_Ms_173b7_P4.Text = I18n.T("Tab4_Ms_173b7_P4");
+		if (Tab4_Ms_173b6_Title != null) Tab4_Ms_173b6_Title.Text = I18n.T("Tab4_Ms_173b6_Title");
+		if (Tab4_Ms_173b6_P1 != null) Tab4_Ms_173b6_P1.Text = I18n.T("Tab4_Ms_173b6_P1");
+		if (Tab4_Ms_173b6_P2 != null) Tab4_Ms_173b6_P2.Text = I18n.T("Tab4_Ms_173b6_P2");
+		if (Tab4_Ms_173b5_Title != null) Tab4_Ms_173b5_Title.Text = I18n.T("Tab4_Ms_173b5_Title");
+		if (Tab4_Ms_173b5_P1 != null) Tab4_Ms_173b5_P1.Text = I18n.T("Tab4_Ms_173b5_P1");
+		if (Tab4_Ms_173b5_P2 != null) Tab4_Ms_173b5_P2.Text = I18n.T("Tab4_Ms_173b5_P2");
+		if (Tab4_Ms_173b5_P3 != null) Tab4_Ms_173b5_P3.Text = I18n.T("Tab4_Ms_173b5_P3");
+		if (Tab4_Ms_173b5_P4 != null) Tab4_Ms_173b5_P4.Text = I18n.T("Tab4_Ms_173b5_P4");
+		if (Tab4_Ms_173b4_Title != null) Tab4_Ms_173b4_Title.Text = I18n.T("Tab4_Ms_173b4_Title");
+		if (Tab4_Ms_173b4_P1 != null) Tab4_Ms_173b4_P1.Text = I18n.T("Tab4_Ms_173b4_P1");
+		if (Tab4_Ms_173b4_P2 != null) Tab4_Ms_173b4_P2.Text = I18n.T("Tab4_Ms_173b4_P2");
+		if (Tab4_Ms_173b4_P3 != null) Tab4_Ms_173b4_P3.Text = I18n.T("Tab4_Ms_173b4_P3");
+		if (Tab4_Ms_173b4_P4 != null) Tab4_Ms_173b4_P4.Text = I18n.T("Tab4_Ms_173b4_P4");
+		if (Tab4_Ms_173b3_Title != null) Tab4_Ms_173b3_Title.Text = I18n.T("Tab4_Ms_173b3_Title");
+		if (Tab4_Ms_173b3_Desc != null) Tab4_Ms_173b3_Desc.Text = I18n.T("Tab4_Ms_173b3_Desc");
+		if (Tab4_Ms_173b2_Title != null) Tab4_Ms_173b2_Title.Text = I18n.T("Tab4_Ms_173b2_Title");
+		if (Tab4_Ms_173b2_Desc != null) Tab4_Ms_173b2_Desc.Text = I18n.T("Tab4_Ms_173b2_Desc");
+		if (Tab4_Ms_172b5_Title != null) Tab4_Ms_172b5_Title.Text = I18n.T("Tab4_Ms_172b5_Title");
+		if (Tab4_Ms_172b5_Desc != null) Tab4_Ms_172b5_Desc.Text = I18n.T("Tab4_Ms_172b5_Desc");
+		if (Tab4_Ms_172b2_Title != null) Tab4_Ms_172b2_Title.Text = I18n.T("Tab4_Ms_172b2_Title");
+		if (Tab4_Ms_172b2_Desc != null) Tab4_Ms_172b2_Desc.Text = I18n.T("Tab4_Ms_172b2_Desc");
+		if (Tab4_Ms_171_Title != null) Tab4_Ms_171_Title.Text = I18n.T("Tab4_Ms_171_Title");
+		if (Tab4_Ms_171_Desc != null) Tab4_Ms_171_Desc.Text = I18n.T("Tab4_Ms_171_Desc");
+		if (Tab4_Ms_170_Title != null) Tab4_Ms_170_Title.Text = I18n.T("Tab4_Ms_170_Title");
+		if (Tab4_Ms_170_Desc != null) Tab4_Ms_170_Desc.Text = I18n.T("Tab4_Ms_170_Desc");
+		if (Tab4_Ms_169_Title != null) Tab4_Ms_169_Title.Text = I18n.T("Tab4_Ms_169_Title");
+		if (Tab4_Ms_169_Desc != null) Tab4_Ms_169_Desc.Text = I18n.T("Tab4_Ms_169_Desc");
+		if (Tab4_Ms_168_Title != null) Tab4_Ms_168_Title.Text = I18n.T("Tab4_Ms_168_Title");
+		if (Tab4_Ms_168_Desc != null) Tab4_Ms_168_Desc.Text = I18n.T("Tab4_Ms_168_Desc");
+		if (Tab4_Ms_167_Title != null) Tab4_Ms_167_Title.Text = I18n.T("Tab4_Ms_167_Title");
+		if (Tab4_Ms_167_Desc != null) Tab4_Ms_167_Desc.Text = I18n.T("Tab4_Ms_167_Desc");
+		if (Tab4_Ms_158_Title != null) Tab4_Ms_158_Title.Text = I18n.T("Tab4_Ms_158_Title");
+		if (Tab4_Ms_158_Desc != null) Tab4_Ms_158_Desc.Text = I18n.T("Tab4_Ms_158_Desc");
+		if (Tab4_Ms_157_Title != null) Tab4_Ms_157_Title.Text = I18n.T("Tab4_Ms_157_Title");
+		if (Tab4_Ms_157_Desc != null) Tab4_Ms_157_Desc.Text = I18n.T("Tab4_Ms_157_Desc");
+		if (Tab4_Ms_156_Title != null) Tab4_Ms_156_Title.Text = I18n.T("Tab4_Ms_156_Title");
+		if (Tab4_Ms_156_Desc != null) Tab4_Ms_156_Desc.Text = I18n.T("Tab4_Ms_156_Desc");
+		if (Tab4_Ms_145_Title != null) Tab4_Ms_145_Title.Text = I18n.T("Tab4_Ms_145_Title");
+		if (Tab4_Ms_145_Desc != null) Tab4_Ms_145_Desc.Text = I18n.T("Tab4_Ms_145_Desc");
+		if (Tab4_Ms_144_Title != null) Tab4_Ms_144_Title.Text = I18n.T("Tab4_Ms_144_Title");
+		if (Tab4_Ms_144_Desc != null) Tab4_Ms_144_Desc.Text = I18n.T("Tab4_Ms_144_Desc");
+		if (Tab4_Ms_139_Title != null) Tab4_Ms_139_Title.Text = I18n.T("Tab4_Ms_139_Title");
+		if (Tab4_Ms_139_Desc != null) Tab4_Ms_139_Desc.Text = I18n.T("Tab4_Ms_139_Desc");
+		if (Tab4_Ms_138_Title != null) Tab4_Ms_138_Title.Text = I18n.T("Tab4_Ms_138_Title");
+		if (Tab4_Ms_138_Desc != null) Tab4_Ms_138_Desc.Text = I18n.T("Tab4_Ms_138_Desc");
+		if (Tab4_Ms_134_Title != null) Tab4_Ms_134_Title.Text = I18n.T("Tab4_Ms_134_Title");
+		if (Tab4_Ms_134_Desc != null) Tab4_Ms_134_Desc.Text = I18n.T("Tab4_Ms_134_Desc");
+		if (Tab4_Ms_133_Title != null) Tab4_Ms_133_Title.Text = I18n.T("Tab4_Ms_133_Title");
+		if (Tab4_Ms_133_Desc != null) Tab4_Ms_133_Desc.Text = I18n.T("Tab4_Ms_133_Desc");
+		if (Tab4_Ms_132_Title != null) Tab4_Ms_132_Title.Text = I18n.T("Tab4_Ms_132_Title");
+		if (Tab4_Ms_132_Desc != null) Tab4_Ms_132_Desc.Text = I18n.T("Tab4_Ms_132_Desc");
+		if (Tab4_Ms_131_Title != null) Tab4_Ms_131_Title.Text = I18n.T("Tab4_Ms_131_Title");
+		if (Tab4_Ms_131_Desc != null) Tab4_Ms_131_Desc.Text = I18n.T("Tab4_Ms_131_Desc");
+		if (Tab4_Ms_130_Title != null) Tab4_Ms_130_Title.Text = I18n.T("Tab4_Ms_130_Title");
+		if (Tab4_Ms_130_Desc != null) Tab4_Ms_130_Desc.Text = I18n.T("Tab4_Ms_130_Desc");
+
+		if (OpenCustomSoundConfigButton != null) OpenCustomSoundConfigButton.ToolTip = I18n.T("TipToggleCustomSoundConfig");
+		if (SoundPreviewButton != null) SoundPreviewButton.ToolTip = I18n.T("TipSoundPreview");
+		if (BrowseBlacklistButton != null) BrowseBlacklistButton.ToolTip = I18n.T("TipBrowseBlacklist");
+		if (AddBlacklistButton != null) AddBlacklistButton.ToolTip = I18n.T("TipAddBlacklist");
+		if (DuplicateProfileBtn != null) DuplicateProfileBtn.ToolTip = I18n.T("TipDuplicateProfile");
+		if (AddProfileButton != null) AddProfileButton.ToolTip = I18n.T("TipAddProfile");
+		if (AddCustomProfileButton != null) AddCustomProfileButton.ToolTip = I18n.T("TipAddCustomProfile");
+
+		SetTileSettingsExpanded(TileSettingsContentPanel?.Visibility == Visibility.Visible);
+		UpdateLinkSubActionsButtonUi();
+		RefreshSlots();
+		RenderMappingsWheelPreview();
+
+		UpdateFocusEditorUi();
+		RenderLiveWheelPreview();
+
+		// --- Dynamic ComboBoxes Multi-Language Hot Refresh ---
+		RefreshLayoutOptionsUi();
+		UpdateFocusActionTypeItemsSource(force: true);
+		if (FocusTileLayoutComboBox != null)
+		{
+			var selVal = FocusTileLayoutComboBox.SelectedValue;
+			FocusTileLayoutComboBox.ItemsSource = null;
+			FocusTileLayoutComboBox.ItemsSource = SlotViewModel.StaticTileLayoutOptions;
+			if (selVal != null) FocusTileLayoutComboBox.SelectedValue = selVal;
+		}
+		if (FocusCommandTerminalComboBox != null)
+		{
+			var selVal = FocusCommandTerminalComboBox.SelectedValue;
+			FocusCommandTerminalComboBox.ItemsSource = null;
+			FocusCommandTerminalComboBox.ItemsSource = SlotViewModel.LocalizedTerminals;
+			if (selVal != null) FocusCommandTerminalComboBox.SelectedValue = selVal;
+		}
+		if (FocusSystemPresetComboBox != null)
+		{
+			var selVal = FocusSystemPresetComboBox.SelectedValue;
+			FocusSystemPresetComboBox.ItemsSource = null;
+			FocusSystemPresetComboBox.ItemsSource = SlotViewModel.SystemPresetList;
+			if (selVal != null) FocusSystemPresetComboBox.SelectedValue = selVal;
+		}
+		if (MappingsProfileComboBox != null)
+		{
+			var curProf = _selectedProfile;
+			MappingsProfileComboBox.ItemsSource = null;
+			MappingsProfileComboBox.ItemsSource = ConfigManager.CurrentConfig?.Profiles;
+			MappingsProfileComboBox.SelectedItem = curProf;
+		}
+		if (ProfilesListBox != null)
+		{
+			var curProf = _selectedProfile;
+			ProfilesListBox.ItemsSource = null;
+			ProfilesListBox.ItemsSource = ConfigManager.CurrentConfig?.Profiles;
+			ProfilesListBox.SelectedItem = curProf;
+		}
+		if (LayerSelectComboBox != null && _selectedProfile?.Layers != null)
+		{
+			int curLayerIdx = LayerSelectComboBox.SelectedIndex;
+			LayerSelectComboBox.ItemsSource = null;
+			LayerSelectComboBox.ItemsSource = _selectedProfile.Layers;
+			LayerSelectComboBox.SelectedIndex = curLayerIdx >= 0 ? curLayerIdx : 0;
+		}
+		RefreshConfigProfilesUi();
+		ReloadThemePresets();
 
 		// 动作编辑面板的文案是**代码拼串**（不是 XAML 字面量），所以它只在被**重建**时才换语言。
 		// 这里必须补一次重渲染，否则切完语言会得到「同一个窗口里两种语言并存」：
@@ -5320,13 +6200,13 @@ public partial class SettingsWindow : Window
 				// Center Core
 				if (FocusSlotBadgeBorder != null) FocusSlotBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
 				if (FocusSlotBadgeText != null) FocusSlotBadgeText.Text = "🎯";
-				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = "中心核心圆动作 (Center Core)";
-				if (FocusSlotTagText != null) FocusSlotTagText.Text = "核心圆";
+				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = I18n.T("FocusSlotCenterCoreTitle");
+				if (FocusSlotTagText != null) FocusSlotTagText.Text = I18n.T("FocusSlotCenterCoreTag");
 				if (FocusSlotSubtitleText != null)
 				{
 					FocusSlotSubtitleText.Text = isInherited
-						? $"💡 专属方案未配置中心动作，已自动继承全局方案「{displayItem.Name}」"
-						: "在开启外甩脱离取消时，鼠标在中心内径死区内松开即可触发";
+						? string.Format(I18n.T("FocusSlotCenterCoreSubtitleInherited"), displayItem.Name)
+						: I18n.T("FocusSlotCenterCoreSubtitleDefault");
 				}
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Collapsed;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Visible;
@@ -5347,9 +6227,9 @@ public partial class SettingsWindow : Window
 				if (FocusSlotBadgeBorder != null) FocusSlotBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
 				if (FocusSlotBadgeText != null) FocusSlotBadgeText.Text = "🌟";
 				string parentDir = (_selectedSlotIndex >= 0 && _selectedSlotIndex < directions.Length) ? directions[_selectedSlotIndex] : $"{_selectedSlotIndex + 1}";
-				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = $"扇区 {_selectedSlotIndex + 1} [{parentDir}] 级联子动作";
-				if (FocusSlotTagText != null) FocusSlotTagText.Text = "二级级联 (未添加)";
-				if (FocusSlotSubtitleText != null) FocusSlotSubtitleText.Text = "当前扇区尚未配置二级级联子动作，点击【➕ 添加第 1 个二级子动作】以创建";
+				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = string.Format(I18n.T("FocusSlotTier2EmptyTitleFormat"), _selectedSlotIndex + 1, parentDir);
+				if (FocusSlotTagText != null) FocusSlotTagText.Text = I18n.T("FocusSlotTier2EmptyTag");
+				if (FocusSlotSubtitleText != null) FocusSlotSubtitleText.Text = I18n.T("FocusSlotTier2EmptySubtitle");
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Visible;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
 				if (CenterPatternPriorityTip != null) CenterPatternPriorityTip.Visibility = Visibility.Collapsed;
@@ -5367,9 +6247,9 @@ public partial class SettingsWindow : Window
 				if (FocusSlotBadgeBorder != null) FocusSlotBadgeBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
 				if (FocusSlotBadgeText != null) FocusSlotBadgeText.Text = "🌟";
 				string parentDir = (_selectedSlotIndex >= 0 && _selectedSlotIndex < directions.Length) ? directions[_selectedSlotIndex] : $"{_selectedSlotIndex + 1}";
-				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = $"二级动作 [{displayItem.Name}]";
-				if (FocusSlotTagText != null) FocusSlotTagText.Text = $"所属父级: 扇区 {_selectedSlotIndex + 1} [{parentDir}]";
-				if (FocusSlotSubtitleText != null) FocusSlotSubtitleText.Text = "向外划动二级扇区即可触发此动作";
+				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = string.Format(I18n.T("FocusSlotTier2SubActionTitleFormat"), displayItem.Name);
+				if (FocusSlotTagText != null) FocusSlotTagText.Text = string.Format(I18n.T("FocusSlotTier2SubActionTagFormat"), _selectedSlotIndex + 1, parentDir);
+				if (FocusSlotSubtitleText != null) FocusSlotSubtitleText.Text = I18n.T("FocusSlotTier2SubActionSubtitle");
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Visible;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
 				if (CenterPatternPriorityTip != null) CenterPatternPriorityTip.Visibility = Visibility.Collapsed;
@@ -5385,13 +6265,13 @@ public partial class SettingsWindow : Window
 				string dirName = (_selectedSlotIndex >= 0 && _selectedSlotIndex < directions.Length) ? directions[_selectedSlotIndex] : $"{_selectedSlotIndex + 1}";
 				string badgeChar = dirName.Length > 0 ? dirName.Substring(0, 1) : $"{_selectedSlotIndex + 1}";
 				if (FocusSlotBadgeText != null) FocusSlotBadgeText.Text = badgeChar;
-				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = $"扇区 {_selectedSlotIndex + 1} [{dirName}]";
-				if (FocusSlotTagText != null) FocusSlotTagText.Text = "一级主扇区";
+				if (FocusSlotTitleText != null) FocusSlotTitleText.Text = string.Format(I18n.T("FocusSlotPrimaryTitleFormat"), _selectedSlotIndex + 1, dirName);
+				if (FocusSlotTagText != null) FocusSlotTagText.Text = I18n.T("FocusSlotPrimaryTag");
 				if (FocusSlotSubtitleText != null)
 				{
 					FocusSlotSubtitleText.Text = isInherited
-						? $"💡 专属方案未配置本槽位，已自动继承全局方案「{displayItem.Name}」"
-						: "点击右侧轮盘直接选中扇区，或在下方配置动作与级联子菜单";
+						? string.Format(I18n.T("FocusSlotPrimarySubtitleInherited"), displayItem.Name)
+						: I18n.T("FocusSlotPrimarySubtitleDefault");
 				}
 				if (FocusBackToParentBtn != null) FocusBackToParentBtn.Visibility = Visibility.Collapsed;
 				if (FocusCenterCoreBanner != null) FocusCenterCoreBanner.Visibility = Visibility.Collapsed;
@@ -5515,8 +6395,8 @@ public partial class SettingsWindow : Window
 							FocusShellToolIconText.FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Symbol, Segoe UI");
 							FocusShellToolIconText.Foreground = (Brush)FindResource("AccentPrimaryBrush");
 						}
-						if (FocusShellToolTitleText != null) FocusShellToolTitleText.Text = string.IsNullOrEmpty(param) ? "未挑选功能 (点击右侧挑选)" : param;
-						if (FocusShellToolDescText != null) FocusShellToolDescText.Text = "从系统原生增强与右键扩展中选择常用高频功能";
+						if (FocusShellToolTitleText != null) FocusShellToolTitleText.Text = string.IsNullOrEmpty(param) ? I18n.T("FocusShellToolDefaultTitle") : param;
+						if (FocusShellToolDescText != null) FocusShellToolDescText.Text = I18n.T("FocusShellToolDefaultDesc");
 					}
 				}
 			}
@@ -5537,7 +6417,7 @@ public partial class SettingsWindow : Window
 					}
 					if (FocusInheritIconStatusLabel != null)
 					{
-						FocusInheritIconStatusLabel.Text = hasInherit ? $"已关联: {System.IO.Path.GetFileName(displayItem.InheritAppIconPath)}" : "未关联 (显示默认动作图标)";
+						FocusInheritIconStatusLabel.Text = hasInherit ? string.Format(I18n.T("FocusInheritIconLinkedFormat"), System.IO.Path.GetFileName(displayItem.InheritAppIconPath)) : I18n.T("FocusInheritIconUnlinked");
 						FocusInheritIconStatusLabel.Foreground = hasInherit ? System.Windows.Media.Brushes.MediumSpringGreen : (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
 					}
 					if (FocusClearInheritedIconBtn != null)
@@ -5675,7 +6555,7 @@ public partial class SettingsWindow : Window
 
 		if (FocusSubActionsCountLabel != null)
 		{
-			FocusSubActionsCountLabel.Text = isUsingInheritedSubs ? $"({count} 项 - 全局继承)" : $"({count} 项)";
+			FocusSubActionsCountLabel.Text = isUsingInheritedSubs ? $"({count} 项 - 全局继承)" : string.Format(I18n.T("FocusSubActionsCountFormat"), count);
 		}
 
 		if (subActions == null || subActions.Count == 0)
@@ -7157,7 +8037,7 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private void UpdateFocusActionTypeItemsSource(string? currentTag = null)
+	private void UpdateFocusActionTypeItemsSource(string? currentTag = null, bool force = false)
 	{
 		if (FocusActionTypeComboBox == null) return;
 		bool isSimple = string.Equals(ConfigManager.CurrentConfig?.ConfigMode, "Simple", StringComparison.OrdinalIgnoreCase);
@@ -7175,7 +8055,7 @@ public partial class SettingsWindow : Window
 			targetList = allTypes;
 		}
 
-		if (FocusActionTypeComboBox.ItemsSource is List<ActionTypeItem> currentList &&
+		if (!force && FocusActionTypeComboBox.ItemsSource is List<ActionTypeItem> currentList &&
 			currentList.Count == targetList.Count &&
 			currentList.Select(x => x.Tag).SequenceEqual(targetList.Select(x => x.Tag)))
 		{
@@ -7187,6 +8067,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			_isUpdatingFocusUi = true;
+			FocusActionTypeComboBox.ItemsSource = null;
 			FocusActionTypeComboBox.ItemsSource = targetList;
 			if (prevSelectedTag != null)
 			{
@@ -9112,25 +9993,25 @@ public partial class SettingsWindow : Window
 			{
 				if (_selectedMultiSlots.Count > 1)
 				{
-					MappingsCurrentEditIndicator.Text = $"🎯 批量修改模式 (已多选 {_selectedMultiSlots.Count} 个扇区)";
+					MappingsCurrentEditIndicator.Text = string.Format(I18n.T("MappingsEditIndicatorBatch"), _selectedMultiSlots.Count);
 					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
 				}
 				else if (_selectedSlotIndex == -1)
 				{
-					MappingsCurrentEditIndicator.Text = "🎯 正在编辑: 中心核心圆动作";
+					MappingsCurrentEditIndicator.Text = I18n.T("MappingsEditIndicatorCenter");
 					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
 				}
 				else if (_selectedSubActionIndex.HasValue)
 				{
 					ActionItem? parent = (profile.Actions != null && _selectedSlotIndex < profile.Actions.Count) ? profile.Actions[_selectedSlotIndex] : null;
 					string subName = (parent?.SubActions != null && _selectedSubActionIndex.Value < parent.SubActions.Count) ? parent.SubActions[_selectedSubActionIndex.Value].Name : "";
-					MappingsCurrentEditIndicator.Text = $"🌟 正在编辑: 二级动作 [{subName}]";
+					MappingsCurrentEditIndicator.Text = string.Format(I18n.T("MappingsEditIndicatorSub"), subName);
 					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(168, 85, 247));
 				}
 				else
 				{
 					string dirName = (_selectedSlotIndex >= 0 && _selectedSlotIndex < directions.Length) ? directions[_selectedSlotIndex] : $"{_selectedSlotIndex + 1}";
-					MappingsCurrentEditIndicator.Text = $"🎯 正在编辑: 扇区 {_selectedSlotIndex + 1} [{dirName}]";
+					MappingsCurrentEditIndicator.Text = string.Format(I18n.T("MappingsEditIndicatorPrimary"), _selectedSlotIndex + 1, dirName);
 					MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
 				}
 			}
@@ -9627,7 +10508,7 @@ public partial class SettingsWindow : Window
 		}
 		if (MappingsLinkSubActionsText != null)
 		{
-			MappingsLinkSubActionsText.Text = isLinked ? "一二级链接: 开启" : "一二级链接: 关闭";
+			MappingsLinkSubActionsText.Text = isLinked ? I18n.T("MappingsLinkSubActionsOn") : I18n.T("MappingsLinkSubActionsOff");
 			MappingsLinkSubActionsText.Foreground = (Brush)(TryFindResource(isLinked ? "AccentPrimaryBrush" : "TextSecondaryBrush") 
 				?? (isLinked ? Brushes.SkyBlue : Brushes.Gray));
 		}
@@ -9706,7 +10587,7 @@ public partial class SettingsWindow : Window
 		}
 		if (FocusBatchTagText != null)
 		{
-			FocusBatchTagText.Text = $"已多选 {count} 个扇区";
+			FocusBatchTagText.Text = string.Format(I18n.T("FocusBatchTagFormat"), count);
 		}
 		if (FocusBatchTitleText != null)
 		{
@@ -9719,7 +10600,7 @@ public partial class SettingsWindow : Window
 		}
 		if (MappingsCurrentEditIndicator != null)
 		{
-			MappingsCurrentEditIndicator.Text = $"🎯 批量修改模式 (已多选 {count} 个扇区)";
+			MappingsCurrentEditIndicator.Text = string.Format(I18n.T("MappingsEditIndicatorBatch"), count);
 			MappingsCurrentEditIndicator.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
 		}
 		SyncBatchControlsFromFirstSelected();
@@ -9999,8 +10880,12 @@ public partial class SettingsWindow : Window
 		}
 	}
 
-	private string FormatTriggerDisplay(TriggerConfig trigger)
+	public static string FormatTriggerDisplay(TriggerConfig? trigger)
 	{
+		if (trigger == null)
+		{
+			return I18n.T("TriggerBtnRight");
+		}
 		string text = "";
 		if (trigger.RequireCtrl)
 		{
@@ -10020,46 +10905,30 @@ public partial class SettingsWindow : Window
 		}
 		if (trigger.TriggerType == "Keyboard")
 		{
-			string text2 = trigger.Key;
-			if (trigger.VkCode == 20 || text2 == "Capital")
-			{
-				text2 = "CapsLock (大写锁定)";
-			}
-			else if (trigger.VkCode == 192 || text2 == "Oem3" || text2 == "OemTilde")
-			{
-				text2 = "~ (波浪键)";
-			}
-			else if (trigger.VkCode == 32 || text2 == "Space")
-			{
-				text2 = "Space (空格)";
-			}
-			else if (trigger.VkCode == 9 || text2 == "Tab")
-			{
-				text2 = "Tab (制表键)";
-			}
-			else if (text2 == "None" || string.IsNullOrEmpty(text2))
+			string keyName = I18n.FormatKeyName(trigger.Key, trigger.VkCode);
+			if (string.IsNullOrEmpty(keyName) || trigger.Key == "None")
 			{
 				if (!string.IsNullOrEmpty(text))
 				{
-					return "⌨️ " + text.TrimEnd(' ', '+') + " (长按 / 拖动)";
+					return "⌨️ " + text.TrimEnd(' ', '+') + " " + I18n.T("TriggerHoldOrDrag");
 				}
-				return "🖱️ 鼠标右键 (Right Button)";
+				return I18n.T("TriggerBtnRight");
 			}
-			return text + "⌨️ " + text2 + " (长按 / 拖动)";
+			return text + "⌨️ " + keyName + " " + I18n.T("TriggerHoldOrDrag");
 		}
-		string text3 = trigger.MouseButton switch
+		string mouseText = trigger.MouseButton switch
 		{
-			"MiddleButton" => "\ud83d\uddb1\ufe0f 鼠标中键 / 滚轮按压 (Middle Button)", 
-			"XButton1" => "\ud83d\uddb1\ufe0f 鼠标侧键 1 / 后退键 (XButton 1 / Back)", 
-			"XButton2" => "\ud83d\uddb1\ufe0f 鼠标侧键 2 / 前进键 (XButton 2 / Forward)", 
-			"LeftButton" => "\ud83d\uddb1\ufe0f 鼠标左键 (Left Button)", 
-			_ => "\ud83d\uddb1\ufe0f 鼠标右键 (Right Button) [推荐 / 默认]", 
+			"MiddleButton" => I18n.T("TriggerBtnMiddle"), 
+			"XButton1" => I18n.T("TriggerBtnX1"), 
+			"XButton2" => I18n.T("TriggerBtnX2"), 
+			"LeftButton" => I18n.T("TriggerBtnLeftOnly"), 
+			_ => I18n.T("TriggerBtnRight"), 
 		};
 		if (!string.IsNullOrEmpty(text))
 		{
-			return text + text3;
+			return text + mouseText;
 		}
-		return text3;
+		return mouseText;
 	}
 
 	private void RecordTriggerButton_Click(object sender, RoutedEventArgs e)
@@ -10079,12 +10948,12 @@ public partial class SettingsWindow : Window
 		_isRecordingTrigger = true;
 		if (RecordTriggerButton != null)
 		{
-			RecordTriggerButton.Content = "⚡ 正在监听... 请按下任意按键 / 组合键 (ESC取消)";
+			RecordTriggerButton.Content = I18n.T("BtnRecordTriggerListening");
 			RecordTriggerButton.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF4444"));
 		}
 		if (LiveSensorStatusText != null)
 		{
-			LiveSensorStatusText.Text = "\ud83d\udd34 录制模式中：请直接按下你想作为轮盘唤醒键的鼠标按键、键盘按键或组合键（按 ESC 键取消录制）...";
+			LiveSensorStatusText.Text = I18n.T("LiveSensorRecordingModeTip");
 		}
 		if (LiveSensorDot != null)
 		{
@@ -10097,7 +10966,7 @@ public partial class SettingsWindow : Window
 		_isRecordingTrigger = false;
 		if (RecordTriggerButton != null)
 		{
-			RecordTriggerButton.Content = "\ud83d\udd34 点击录制触发键 / 组合键";
+			RecordTriggerButton.Content = I18n.T("BtnRecordTrigger");
 			((DependencyObject)RecordTriggerButton).ClearValue(System.Windows.Controls.Control.BackgroundProperty);
 		}
 		if (LiveSensorStatusText != null)
@@ -10111,11 +10980,11 @@ public partial class SettingsWindow : Window
 				                  ConfigManager.CurrentConfig?.Trigger?.RequireWin != true;
 				LiveSensorStatusText.Text = isPureLeft
 					? I18n.T("TriggerLeftButtonRecordedTip")
-					: "\ud83d\udfe2 触发按键录制成功并已保存！";
+					: I18n.T("LiveSensorSavedTip");
 			}
 			else
 			{
-				LiveSensorStatusText.Text = "\ud83d\udca1 硬件感知器已就绪：随时按下鼠标任意侧键、中键或键盘按键，此处将实时高亮反馈对应按键与键码。";
+				LiveSensorStatusText.Text = I18n.T("LiveSensorReadyTip");
 			}
 		}
 		if (LiveSensorDot != null)
@@ -10129,18 +10998,19 @@ public partial class SettingsWindow : Window
 	{
 		if (ConfigManager.CurrentConfig != null)
 		{
-			ConfigManager.CurrentConfig.Trigger = new TriggerConfig
+			var defaultTrigger = new TriggerConfig
 			{
 				TriggerType = "Mouse",
-				MouseButton = "RightButton",
-				DisplayText = "\ud83d\uddb1\ufe0f 鼠标右键 (Right Button)"
+				MouseButton = "RightButton"
 			};
+			defaultTrigger.DisplayText = FormatTriggerDisplay(defaultTrigger);
+			ConfigManager.CurrentConfig.Trigger = defaultTrigger;
 			ConfigManager.CurrentConfig.TriggerButton = "RightButton";
 			StopTriggerRecording(saved: true);
 			ScheduleAutoSave();
 			if (LiveSensorStatusText != null)
 			{
-				LiveSensorStatusText.Text = "\ud83d\udfe2 已恢复默认触发按键：\ud83d\uddb1\ufe0f 鼠标右键 (Right Button)";
+				LiveSensorStatusText.Text = string.Format(I18n.T("LiveSensorResetDefaultFmt"), I18n.T("TriggerBtnRight"));
 			}
 		}
 	}
@@ -10149,13 +11019,13 @@ public partial class SettingsWindow : Window
 	{
 		if ((base.IsVisible || _isRecordingTrigger || _isRecordingProcessTrigger) && ConfigManager.CurrentConfig != null)
 		{
-			string text = mouseButton switch
+			string mouseDisplayName = mouseButton switch
 			{
-				"MiddleButton" => "\ud83d\uddb1\ufe0f 鼠标中键 / 滚轮按压 (Middle Button)", 
-				"XButton1" => "\ud83d\uddb1\ufe0f 鼠标侧键 1 / 后退键 (XButton 1 / Back)", 
-				"XButton2" => "\ud83d\uddb1\ufe0f 鼠标侧键 2 / 前进键 (XButton 2 / Forward)", 
-				"LeftButton" => "\ud83d\uddb1\ufe0f 鼠标左键 (Left Button)", 
-				_ => "\ud83d\uddb1\ufe0f 鼠标右键 (Right Button)", 
+				"MiddleButton" => I18n.T("TriggerBtnMiddle"), 
+				"XButton1" => I18n.T("TriggerBtnX1"), 
+				"XButton2" => I18n.T("TriggerBtnX2"), 
+				"LeftButton" => I18n.T("TriggerBtnLeftOnly"), 
+				_ => I18n.T("TriggerBtnRight"), 
 			};
 			ModifierKeys currentModifiers = KeyboardHook.GetCurrentModifiers();
 			string text2 = "";
@@ -10175,9 +11045,10 @@ public partial class SettingsWindow : Window
 			{
 				text2 += "Win + ";
 			}
+			string fullInputDesc = text2 + mouseDisplayName;
 			if (LiveSensorStatusText != null && !_isRecordingProcessTrigger)
 			{
-				LiveSensorStatusText.Text = "\ud83d\udfe2 实时捕获输入: " + text2 + text + " | 状态: 硬件信号正常响应";
+				LiveSensorStatusText.Text = string.Format(I18n.T("LiveSensorMouseFmt"), fullInputDesc);
 			}
 			if (LiveSensorDot != null && !_isRecordingProcessTrigger)
 			{
@@ -10185,7 +11056,7 @@ public partial class SettingsWindow : Window
 			}
 			if (ProcessLiveSensorStatusText != null && _isRecordingProcessTrigger)
 			{
-				ProcessLiveSensorStatusText.Text = "实时捕获输入: " + text2 + text + " | 状态: 硬件信号正常响应";
+				ProcessLiveSensorStatusText.Text = string.Format(I18n.T("ProcessSensorMouseFmt"), fullInputDesc);
 			}
 			if (ProcessLiveSensorDot != null && _isRecordingProcessTrigger)
 			{
@@ -10257,23 +11128,7 @@ public partial class SettingsWindow : Window
 			StopTriggerRecording(saved: false);
 			return;
 		}
-		string value = ((object)e.Key/*cast due to constrained. prefix*/).ToString();
-		if (e.VkCode == 20)
-		{
-			value = "CapsLock (大写锁定)";
-		}
-		else if (e.VkCode == 192)
-		{
-			value = "~ (波浪键)";
-		}
-		else if (e.VkCode == 32)
-		{
-			value = "Space (空格)";
-		}
-		else if (e.VkCode == 9)
-		{
-			value = "Tab (制表键)";
-		}
+		string value = I18n.FormatKeyName(((object)e.Key/*cast due to constrained. prefix*/).ToString(), e.VkCode);
 		ModifierKeys modifiers = e.Modifiers;
 		string text = "";
 		if (((((int)modifiers & 2))) != 0 && (int)e.Key != 118 && (int)e.Key != 119)
@@ -10292,9 +11147,10 @@ public partial class SettingsWindow : Window
 		{
 			text += "Win + ";
 		}
+		string keyInputDesc = $"{text}⌨️ {value}";
 		if (LiveSensorStatusText != null && !_isRecordingProcessTrigger)
 		{
-			LiveSensorStatusText.Text = $"\ud83d\udfe2 实时捕获键盘输入: {text}⌨\ufe0f {value} | 虚拟键码 VkCode: 0x{e.VkCode:X2}";
+			LiveSensorStatusText.Text = string.Format(I18n.T("LiveSensorKeyboardFmt"), keyInputDesc, e.VkCode);
 		}
 		if (LiveSensorDot != null && !_isRecordingProcessTrigger)
 		{
@@ -10302,7 +11158,7 @@ public partial class SettingsWindow : Window
 		}
 		if (ProcessLiveSensorStatusText != null && _isRecordingProcessTrigger)
 		{
-			ProcessLiveSensorStatusText.Text = $"实时捕获键盘输入: {text}⌨\ufe0f {value} | 虚拟键码 VkCode: 0x{e.VkCode:X2}";
+			ProcessLiveSensorStatusText.Text = string.Format(I18n.T("ProcessSensorKeyboardFmt"), keyInputDesc, e.VkCode);
 		}
 		if (ProcessLiveSensorDot != null && _isRecordingProcessTrigger)
 		{
@@ -10953,7 +11809,7 @@ public partial class SettingsWindow : Window
 				{
 					ComboBoxItem comboBoxItem3 = new ComboBoxItem
 					{
-						Content = "\ud83c\udfa8 " + customColorPreset.Name + " (自定义预设)",
+						Content = "\ud83c\udfa8 " + customColorPreset.Name + " " + I18n.T("CustomPresetSuffix"),
 						Tag = "CustomPreset_" + customColorPreset.Id
 					};
 					if (num >= 0)
@@ -10991,7 +11847,7 @@ public partial class SettingsWindow : Window
 			{
 				ComboBoxItem newItem = new ComboBoxItem
 				{
-					Content = "\ud83c\udfa8 " + customColorPreset2.Name + " (自定义预设)",
+					Content = "\ud83c\udfa8 " + customColorPreset2.Name + " " + I18n.T("CustomPresetSuffix"),
 					Tag = "CustomPreset_" + customColorPreset2.Id
 				};
 				SubWheelThemeComboBox.Items.Add(newItem);
@@ -12448,23 +13304,23 @@ public partial class SettingsWindow : Window
 		{
 			IconLayoutModeComboBox.Items.Add(new ComboBoxItem
 			{
-				Content = "跟随全局默认 (Inherit Global)",
+				Content = I18n.T("LayoutModeItemInherit"),
 				Tag = "Inherit"
 			});
 		}
 		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
 		{
-			Content = "图标 + 文字 (双行居中)",
+			Content = I18n.T("LayoutModeItemBoth"),
 			Tag = "IconAndText"
 		});
 		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
 		{
-			Content = "仅显示图标 (极大化居中)",
+			Content = I18n.T("LayoutModeItemIconOnly"),
 			Tag = "IconOnly"
 		});
 		IconLayoutModeComboBox.Items.Add(new ComboBoxItem
 		{
-			Content = "仅显示文字 (纯文字居中)",
+			Content = I18n.T("LayoutModeItemTextOnly"),
 			Tag = "TextOnly"
 		});
 	}
@@ -12556,36 +13412,36 @@ public partial class SettingsWindow : Window
 					if (_selectedMultiSlots.Count > 1)
 					{
 						string slotNames = string.Join(", ", _selectedMultiSlots.Select(s => (s + 1).ToString()));
-						CurrentTargetSlotLabel.Text = $"🎯 批量修改模式 (已多选 {_selectedMultiSlots.Count} 个扇区: {slotNames})";
+						CurrentTargetSlotLabel.Text = string.Format(I18n.T("CustomizingBatchFormat") ?? "🎯 批量修改模式 (已多选 {0} 个扇区: {1})", _selectedMultiSlots.Count, slotNames);
 						if (ClickSectorHintText != null)
 						{
-							ClickSectorHintText.Text = "💡 按住 Ctrl 点击可继续增减选择；下方选项将统一批量应用至全部选中扇区";
+							ClickSectorHintText.Text = I18n.T("BatchLayoutHint") ?? "💡 按住 Ctrl 点击可继续增减选择；下方选项将统一批量应用至全部选中扇区";
 						}
 						if (ResetSlotLayoutButton != null)
 						{
-							ResetSlotLayoutButton.Content = "🔄 批量恢复继承全局";
+							ResetSlotLayoutButton.Content = I18n.T("BtnResetSlotLayoutBatch") ?? "🔄 批量恢复继承全局";
 						}
 					}
 					else
 					{
-						string tierName = (_selectedLayoutTier == 2) ? "二级级联轮盘" : "一级主轮盘";
+						string tierName = (_selectedLayoutTier == 2) ? (I18n.T("Tier2SubWheel") ?? "二级级联轮盘") : (I18n.T("Tier1MainWheel") ?? "一级主轮盘");
 						string slotDirName = GetDirectionDisplayName(_selectedLayoutSlotIndex, profile?.SectorCount ?? 8);
-						string actName = action?.Name ?? "未设置动作";
+						string actName = action?.Name ?? (I18n.T("ActionNotConfigured") ?? "未设置动作");
 						if (_selectedLayoutTier == 2 && _selectedLayoutSubSlotIndex >= 0)
 						{
-							CurrentTargetSlotLabel.Text = $"📍 正在定制: {tierName} [{slotDirName}] -> 子项 {_selectedLayoutSubSlotIndex + 1}: {actName}";
+							CurrentTargetSlotLabel.Text = string.Format(I18n.T("CustomizingSubSlotFormat") ?? "📍 正在定制: {0} [{1}] -> 子项 {2}: {3}", tierName, slotDirName, _selectedLayoutSubSlotIndex + 1, actName);
 						}
 						else
 						{
-							CurrentTargetSlotLabel.Text = $"📍 正在定制: {tierName} - 扇区 {_selectedLayoutSlotIndex + 1} [{slotDirName}]: {actName}";
+							CurrentTargetSlotLabel.Text = string.Format(I18n.T("CustomizingSlotFormat") ?? "📍 正在定制: {0} - 扇区 {1} [{2}]: {3}", tierName, _selectedLayoutSlotIndex + 1, slotDirName, actName);
 						}
 						if (ClickSectorHintText != null)
 						{
-							ClickSectorHintText.Text = "💡 提示：在右侧画布中点击任意扇区可直接切换选中";
+							ClickSectorHintText.Text = I18n.T("ClickSectorHint");
 						}
 						if (ResetSlotLayoutButton != null)
 						{
-							ResetSlotLayoutButton.Content = "🔄 恢复继承全局";
+							ResetSlotLayoutButton.Content = I18n.T("ResetSlotLayout") ?? "🔄 恢复继承全局";
 						}
 					}
 				}
@@ -12823,30 +13679,38 @@ public partial class SettingsWindow : Window
 		ScheduleAutoSave();
 	}
 
+	private static List<(string, string)> GetStandardFontFamilies()
+	{
+		return new List<(string, string)>
+		{
+			(I18n.T("FontSystemDefault"), "Microsoft YaHei UI, Segoe UI"),
+			(I18n.T("FontMicrosoftYaHei"), "Microsoft YaHei UI"),
+			(I18n.T("FontSegoeUI"), "Segoe UI"),
+			(I18n.T("FontHarmonyOS"), "HarmonyOS Sans SC"),
+			(I18n.T("FontPingFang"), "PingFang SC"),
+			(I18n.T("FontMiSans"), "MiSans"),
+			(I18n.T("FontSourceHanSans"), "Source Han Sans SC"),
+			(I18n.T("FontInter"), "Inter"),
+			(I18n.T("FontArial"), "Arial"),
+			(I18n.T("FontSimHei"), "SimHei"),
+			(I18n.T("FontKaiTi"), "KaiTi"),
+			(I18n.T("FontFangSong"), "FangSong"),
+			(I18n.T("FontMonospace"), "Consolas, Cascadia Code"),
+			(I18n.T("FontJetBrainsMono"), "JetBrains Mono, Consolas")
+		};
+	}
+
 	private void PopulateWheelFontFamilies()
 	{
 		if (WheelFontFamilyComboBox == null)
 		{
 			return;
 		}
+		string currentTag = (WheelFontFamilyComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()
+			?? ConfigManager.CurrentConfig?.WheelFontFamily
+			?? "Microsoft YaHei UI, Segoe UI";
 		WheelFontFamilyComboBox.Items.Clear();
-		List<(string, string)> obj = new List<(string, string)>
-		{
-			("\ud83d\udda5\ufe0f 系统默认 (Microsoft YaHei UI / Segoe UI)", "Microsoft YaHei UI, Segoe UI"),
-			("\ud83d\udd24 微软雅黑 (Microsoft YaHei UI)", "Microsoft YaHei UI"),
-			("\ud83d\udd24 Segoe UI (Windows Fluent)", "Segoe UI"),
-			("\ud83d\udd24 鸿蒙字体 (HarmonyOS Sans SC)", "HarmonyOS Sans SC"),
-			("\ud83d\udd24 苹方字体 (PingFang SC)", "PingFang SC"),
-			("\ud83d\udd24 小米兰亭 (MiSans)", "MiSans"),
-			("\ud83d\udd24 思源黑体 (Source Han Sans SC)", "Source Han Sans SC"),
-			("\ud83d\udd24 Inter (Modern Sans)", "Inter"),
-			("\ud83d\udd24 Arial", "Arial"),
-			("\ud83d\udd24 黑体 (SimHei)", "SimHei"),
-			("\ud83d\udd24 楷体 (KaiTi)", "KaiTi"),
-			("\ud83d\udd24 仿宋 (FangSong)", "FangSong"),
-			("\ud83d\udd24 等宽代码体 (Consolas / Cascadia)", "Consolas, Cascadia Code"),
-			("\ud83d\udd24 JetBrains Mono", "JetBrains Mono, Consolas")
-		};
+		List<(string, string)> obj = GetStandardFontFamilies();
 		HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (var item2 in obj)
 		{
@@ -12883,6 +13747,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
+		SetComboBoxSelectedValue(WheelFontFamilyComboBox, currentTag);
 	}
 
 	private void PopulateCoreFontFamilies()
@@ -12891,24 +13756,11 @@ public partial class SettingsWindow : Window
 		{
 			return;
 		}
+		string currentTag = (CoreFontFamilyComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()
+			?? ConfigManager.CurrentConfig?.CoreFontFamily
+			?? "Microsoft YaHei UI, Segoe UI";
 		CoreFontFamilyComboBox.Items.Clear();
-		List<(string, string)> obj = new List<(string, string)>
-		{
-			("\ud83d\udda5\ufe0f 系统默认 (Microsoft YaHei UI / Segoe UI)", "Microsoft YaHei UI, Segoe UI"),
-			("\ud83d\udd24 微软雅黑 (Microsoft YaHei UI)", "Microsoft YaHei UI"),
-			("\ud83d\udd24 Segoe UI (Windows Fluent)", "Segoe UI"),
-			("\ud83d\udd24 鸿蒙字体 (HarmonyOS Sans SC)", "HarmonyOS Sans SC"),
-			("\ud83d\udd24 苹方字体 (PingFang SC)", "PingFang SC"),
-			("\ud83d\udd24 小米兰亭 (MiSans)", "MiSans"),
-			("\ud83d\udd24 思源黑体 (Source Han Sans SC)", "Source Han Sans SC"),
-			("\ud83d\udd24 Inter (Modern Sans)", "Inter"),
-			("\ud83d\udd24 Arial", "Arial"),
-			("\ud83d\udd24 黑体 (SimHei)", "SimHei"),
-			("\ud83d\udd24 楷体 (KaiTi)", "KaiTi"),
-			("\ud83d\udd24 仿宋 (FangSong)", "FangSong"),
-			("\ud83d\udd24 等宽代码体 (Consolas / Cascadia)", "Consolas, Cascadia Code"),
-			("\ud83d\udd24 JetBrains Mono", "JetBrains Mono, Consolas")
-		};
+		List<(string, string)> obj = GetStandardFontFamilies();
 		HashSet<string> hashSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (var item2 in obj)
 		{
@@ -12945,6 +13797,7 @@ public partial class SettingsWindow : Window
 		catch
 		{
 		}
+		SetComboBoxSelectedValue(CoreFontFamilyComboBox, currentTag);
 	}
 
 	private static string GetFontDisplayName(System.Windows.Media.FontFamily font)
@@ -13619,7 +14472,7 @@ public partial class SettingsWindow : Window
 			totalLayers = config.Profiles[0].Layers.Count;
 		}
 		int showLayer = Math.Min(2, Math.Max(1, totalLayers));
-		PreviewLayerIndicatorText.Text = $"第 {showLayer} 层 ({showLayer}/{Math.Max(2, totalLayers)})";
+		PreviewLayerIndicatorText.Text = string.Format(I18n.T("PreviewLayerFormat") ?? "第 {0} 层 ({0}/{1})", showLayer, Math.Max(2, totalLayers));
 
 		if (string.Equals(config.LayerIndicatorStyle, "FollowTheme", StringComparison.OrdinalIgnoreCase))
 		{
@@ -14968,12 +15821,12 @@ public partial class SettingsWindow : Window
 			{
 				string name = tag.ToLowerInvariant() switch
 				{
-					"light" => "极简纯白",
-					"dark" => "极夜曜黑",
-					"titaniumgray" => "钛金深灰",
-					_ => "跟随系统"
+					"light" => I18n.T("SidebarThemeLight"),
+					"dark" => I18n.T("SidebarThemeDark"),
+					"titaniumgray" => I18n.T("SidebarThemeGray"),
+					_ => I18n.T("SidebarThemeSystem")
 				};
-				SidebarThemeCollapsedButton.ToolTip = $"当前界面主题: {name} (点击快速循环切换)";
+				SidebarThemeCollapsedButton.ToolTip = I18n.T("SidebarThemeToggleTip") + ": " + name;
 			}
 		}
 		finally
@@ -15190,7 +16043,7 @@ public partial class SettingsWindow : Window
 		{
 			if (ProcessCurrentTriggerBadgeText != null)
 			{
-				ProcessCurrentTriggerBadgeText.Text = "🎯 " + (string.IsNullOrWhiteSpace(trigger.DisplayText) ? FormatTriggerDisplay(trigger) : trigger.DisplayText);
+				ProcessCurrentTriggerBadgeText.Text = "🎯 " + FormatTriggerDisplay(trigger);
 				ProcessCurrentTriggerBadgeText.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"));
 			}
 			if (ProcessCurrentTriggerBadgeBorder != null)
@@ -15207,7 +16060,7 @@ public partial class SettingsWindow : Window
 		{
 			if (ProcessCurrentTriggerBadgeText != null)
 			{
-				ProcessCurrentTriggerBadgeText.Text = "🚫 未配置 (完全放行右键)";
+				ProcessCurrentTriggerBadgeText.Text = "🚫 " + I18n.T("ProcessTriggerDefaultPass");
 				ProcessCurrentTriggerBadgeText.Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#94A3B8"));
 			}
 			if (ProcessCurrentTriggerBadgeBorder != null)
@@ -15243,12 +16096,12 @@ public partial class SettingsWindow : Window
 		_isRecordingProcessTrigger = true;
 		if (RecordProcessTriggerButton != null)
 		{
-			RecordProcessTriggerButton.Content = "⚡ 正在监听... 请按专属键 (ESC取消)";
+			RecordProcessTriggerButton.Content = I18n.T("BtnRecordProcessTriggerListening");
 			RecordProcessTriggerButton.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EF4444"));
 		}
 		if (ProcessLiveSensorStatusText != null)
 		{
-			ProcessLiveSensorStatusText.Text = $"正在监听 [{_recordingProcessName}] 专属呼出键：请直接按下你想作为该程序呼出键的鼠标按键（如中键/侧键）或键盘按键（按 ESC 取消）...";
+			ProcessLiveSensorStatusText.Text = string.Format(I18n.T("ProcessSensorListeningFmt"), _recordingProcessName);
 		}
 		if (ProcessLiveSensorDot != null)
 		{
@@ -15261,18 +16114,18 @@ public partial class SettingsWindow : Window
 		_isRecordingProcessTrigger = false;
 		if (RecordProcessTriggerButton != null)
 		{
-			RecordProcessTriggerButton.Content = "🔴 点击录制专属按键 / 组合键";
+			RecordProcessTriggerButton.Content = I18n.T("BtnRecordProcessTrigger");
 			((DependencyObject)RecordProcessTriggerButton).ClearValue(System.Windows.Controls.Control.BackgroundProperty);
 		}
 		if (ProcessLiveSensorStatusText != null)
 		{
 			if (saved)
 			{
-				ProcessLiveSensorStatusText.Text = $"[{_recordingProcessName}] 专属触发键录制成功并已保存！";
+				ProcessLiveSensorStatusText.Text = string.Format(I18n.T("ProcessSensorSavedFmt"), _recordingProcessName);
 			}
 			else
 			{
-				ProcessLiveSensorStatusText.Text = "硬件感知器已就绪：点击上方录制按钮后，按下你想作为该程序呼出键的鼠标按键（如中键/侧键）或键盘按键...";
+				ProcessLiveSensorStatusText.Text = I18n.T("ProcessSensorReadyTip");
 			}
 		}
 		if (ProcessLiveSensorDot != null)
@@ -15292,7 +16145,7 @@ public partial class SettingsWindow : Window
 			StopProcessTriggerRecording(saved: false);
 			if (ProcessLiveSensorStatusText != null)
 			{
-				ProcessLiveSensorStatusText.Text = $"已恢复 [{_recordingProcessName}] 默认设置：完全放行鼠标右键";
+				ProcessLiveSensorStatusText.Text = string.Format(I18n.T("ProcessSensorResetFmt"), _recordingProcessName);
 			}
 			UpdateProcessTriggerCardVisual();
 			RefreshProcessListUI();
@@ -15421,11 +16274,11 @@ public partial class SettingsWindow : Window
 			if (CheckUpdateNowBtn != null)
 			{
 				CheckUpdateNowBtn.IsEnabled = false;
-				CheckUpdateNowBtn.Content = "⏳ 正在检查...";
+				CheckUpdateNowBtn.Content = I18n.T("BtnCheckingUpdate");
 			}
 			if (UpdateStatusBadgeText != null)
 			{
-				UpdateStatusBadgeText.Text = "正在检查更新...";
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusChecking");
 				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(59, 130, 246));
 			}
 			if (UpdateStatusBadge != null)
@@ -15456,7 +16309,7 @@ public partial class SettingsWindow : Window
 
 				if (UpdateStatusBadgeText != null)
 				{
-					UpdateStatusBadgeText.Text = $"发现新版本 {rel.TagName}";
+					UpdateStatusBadgeText.Text = string.Format(I18n.T("UpdateStatusFoundNew"), rel.TagName);
 					UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11));
 				}
 				if (UpdateStatusBadge != null)
@@ -15465,24 +16318,24 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"检测到更高版本 {rel.TagName} 可供升级！发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm}。";
+					UpdateStatusDescText.Text = string.Format(I18n.T("UpdateStatusFoundNewDesc"), rel.TagName, $"{rel.PublishedAt:yyyy-MM-dd HH:mm}");
 				}
 
 				if (UpdateNewVersionTagText != null)
 				{
-					UpdateNewVersionTagText.Text = $"🎉 发现新版本 {rel.TagName}";
+					UpdateNewVersionTagText.Text = string.Format(I18n.T("UpdateNewVersionTag"), rel.TagName);
 				}
 				if (UpdateReleaseChannelTag != null)
 				{
-					UpdateReleaseChannelTag.Text = rel.IsPrerelease ? "尝鲜测试版 (Pre-release)" : "正式稳定版 (Stable)";
+					UpdateReleaseChannelTag.Text = rel.IsPrerelease ? I18n.T("ReleaseChannelBeta") : I18n.T("ReleaseChannelStable");
 				}
 				if (UpdateReleaseDateText != null)
 				{
-					UpdateReleaseDateText.Text = $"发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm} · GitHub Releases";
+					UpdateReleaseDateText.Text = string.Format(I18n.T("UpdateReleaseDateFmt"), $"{rel.PublishedAt:yyyy-MM-dd HH:mm}");
 				}
 				if (UpdateChangelogTextBlock != null)
 				{
-					UpdateChangelogTextBlock.Text = string.IsNullOrWhiteSpace(rel.Body) ? "作者暂未提供更新日志说明。" : rel.Body;
+					UpdateChangelogTextBlock.Text = string.IsNullOrWhiteSpace(rel.Body) ? I18n.T("NoChangelogAvailable") : rel.Body;
 				}
 
 				if (UpdateNewVersionPanel != null)
@@ -15503,7 +16356,7 @@ public partial class SettingsWindow : Window
 				_latestReleaseInfo = rel;
 				if (UpdateStatusBadgeText != null)
 				{
-					UpdateStatusBadgeText.Text = "当前已是最新版本";
+					UpdateStatusBadgeText.Text = I18n.T("UpdateStatusUpToDate");
 					UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
 				}
 				if (UpdateStatusBadge != null)
@@ -15512,7 +16365,7 @@ public partial class SettingsWindow : Window
 				}
 				if (UpdateStatusDescText != null)
 				{
-					UpdateStatusDescText.Text = $"当前运行版本: StarPie v{AppVersionInfo.DisplayVersion} (64位)。线上最新版本: {rel.TagName}。上次检查: {ConfigManager.CurrentConfig?.LastCheckUpdateTime}";
+					UpdateStatusDescText.Text = string.Format(I18n.T("UpdateStatusUpToDateDesc"), AppVersionInfo.DisplayVersion, rel.TagName, ConfigManager.CurrentConfig?.LastCheckUpdateTime ?? "");
 				}
 				if (UpdateNewVersionPanel != null)
 				{
@@ -15525,7 +16378,7 @@ public partial class SettingsWindow : Window
 				{
 					if (UpdateStatusBadgeText != null)
 					{
-						UpdateStatusBadgeText.Text = "检查更新受阻";
+						UpdateStatusBadgeText.Text = I18n.T("UpdateStatusError");
 						UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 68, 68));
 					}
 					if (UpdateStatusBadge != null)
@@ -15534,7 +16387,7 @@ public partial class SettingsWindow : Window
 					}
 					if (UpdateStatusDescText != null)
 					{
-						UpdateStatusDescText.Text = "未能从 GitHub 自动获取到 Release 数据，可点击右侧「🌐 网页发布页」手动前往查看。";
+						UpdateStatusDescText.Text = I18n.T("UpdateStatusErrorDesc");
 					}
 				}
 			}
@@ -15548,7 +16401,7 @@ public partial class SettingsWindow : Window
 			if (CheckUpdateNowBtn != null)
 			{
 				CheckUpdateNowBtn.IsEnabled = true;
-				CheckUpdateNowBtn.Content = "🔄 立即检查更新";
+				CheckUpdateNowBtn.Content = I18n.T("BtnCheckUpdate");
 			}
 		}
 	}
@@ -15581,10 +16434,10 @@ public partial class SettingsWindow : Window
 		if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Collapsed;
 		if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Visible;
 
-		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = $"正在高速下载 {fileName}...";
+		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = string.Format(I18n.T("UpdateDownloadingFmt"), fileName);
 		if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = "0%";
 		if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = 0;
-		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = "⚡ 连接下载源中...";
+		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = I18n.T("UpdateDownloadSpeedConnecting");
 
 		_downloadCts?.Dispose();
 		_downloadCts = new CancellationTokenSource();
@@ -15606,7 +16459,7 @@ public partial class SettingsWindow : Window
 
 			if (UpdateStatusBadgeText != null)
 			{
-				UpdateStatusBadgeText.Text = "下载完成 · 就绪安装";
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusDownloadComplete");
 				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
 			}
 			if (UpdateStatusBadge != null)
@@ -15789,7 +16642,7 @@ public partial class SettingsWindow : Window
 		if (RollbackDetailTagText != null) RollbackDetailTagText.Text = rel.TagName;
 		if (RollbackDetailChannelText != null)
 		{
-			RollbackDetailChannelText.Text = rel.IsPrerelease ? "尝鲜测试版 (Pre-release)" : "正式稳定版 (Stable)";
+			RollbackDetailChannelText.Text = rel.IsPrerelease ? I18n.T("ReleaseChannelBeta") : I18n.T("ReleaseChannelStable");
 		}
 		if (RollbackDetailChannelBorder != null)
 		{
@@ -15799,17 +16652,17 @@ public partial class SettingsWindow : Window
 		}
 		if (RollbackDetailDateText != null)
 		{
-			RollbackDetailDateText.Text = $"· 发布于 {rel.PublishedAt:yyyy-MM-dd HH:mm}";
+			RollbackDetailDateText.Text = string.Format(I18n.T("RollbackDetailDateFmt"), $"{rel.PublishedAt:yyyy-MM-dd HH:mm}");
 		}
 		if (RollbackInstallTypeText != null)
 		{
 			RollbackInstallTypeText.Text = UpdateManager.Instance.IsCurrentInstallationStandalone()
-				? "独立免安装单文件版 (Standalone)"
-				: "依赖 .NET 运行时轻量版 (Lightweight)";
+				? I18n.T("RollbackArchStandalone")
+				: I18n.T("RollbackArchLightweight");
 		}
 		if (RollbackChangelogText != null)
 		{
-			RollbackChangelogText.Text = string.IsNullOrWhiteSpace(rel.Body) ? "作者暂未提供此历史版本更新日志说明。" : rel.Body;
+			RollbackChangelogText.Text = string.IsNullOrWhiteSpace(rel.Body) ? I18n.T("NoChangelogAvailable") : rel.Body;
 		}
 	}
 
@@ -15848,10 +16701,10 @@ public partial class SettingsWindow : Window
 		if (UpdateReadyToInstallPanel != null) UpdateReadyToInstallPanel.Visibility = Visibility.Collapsed;
 		if (UpdateDownloadProgressPanel != null) UpdateDownloadProgressPanel.Visibility = Visibility.Visible;
 
-		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = $"正在高速下载历史版本 {fileName}...";
+		if (UpdateDownloadingTitleText != null) UpdateDownloadingTitleText.Text = string.Format(I18n.T("RollbackDownloadingFmt"), fileName);
 		if (UpdateDownloadPercentText != null) UpdateDownloadPercentText.Text = "0%";
 		if (UpdateDownloadProgressBar != null) UpdateDownloadProgressBar.Value = 0;
-		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = "⚡ 连接下载源中...";
+		if (UpdateDownloadSpeedText != null) UpdateDownloadSpeedText.Text = I18n.T("UpdateDownloadSpeedConnecting");
 
 		_downloadCts?.Dispose();
 		_downloadCts = new CancellationTokenSource();
@@ -15873,7 +16726,7 @@ public partial class SettingsWindow : Window
 
 			if (UpdateStatusBadgeText != null)
 			{
-				UpdateStatusBadgeText.Text = "回退包下载完成 · 就绪安装";
+				UpdateStatusBadgeText.Text = I18n.T("UpdateStatusRollbackComplete");
 				UpdateStatusBadgeText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(16, 185, 129));
 			}
 			if (UpdateStatusBadge != null)
@@ -16153,29 +17006,84 @@ public partial class SettingsWindow : Window
 		App.RestartElevated();
 	}
 
+	public class ConfigProfileDisplayItem
+	{
+		public string Name { get; set; } = string.Empty;
+		public string DisplayName { get; set; } = string.Empty;
+		public override string ToString() => DisplayName;
+	}
+
+	private string GetSelectedConfigProfileName()
+	{
+		return ConfigProfilesComboBox?.SelectedValue as string
+			?? (ConfigProfilesComboBox?.SelectedItem as ConfigProfileDisplayItem)?.Name
+			?? ConfigProfilesComboBox?.SelectedItem as string
+			?? ConfigManager.CurrentConfig?.ActiveConfigProfileName
+			?? "默认配置";
+	}
+
+	private readonly List<ConfigProfileDisplayItem> _cachedProfileDisplayItems = new();
+
 	private void RefreshConfigProfilesUi()
 	{
 		if (ConfigProfilesComboBox == null) return;
-		var profiles = ConfigManager.GetSavedConfigNames();
+		var rawProfiles = ConfigManager.GetSavedConfigNames();
 		string active = ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+
+		string defaultLabel = I18n.T("DefaultConfigProfile");
+
+		while (_cachedProfileDisplayItems.Count > rawProfiles.Count)
+		{
+			_cachedProfileDisplayItems.RemoveAt(_cachedProfileDisplayItems.Count - 1);
+		}
+		for (int i = 0; i < rawProfiles.Count; i++)
+		{
+			string p = rawProfiles[i];
+			string disp = (string.Equals(p, "默认配置", StringComparison.OrdinalIgnoreCase) || string.Equals(p, "Default", StringComparison.OrdinalIgnoreCase))
+				? defaultLabel
+				: p;
+
+			if (i < _cachedProfileDisplayItems.Count)
+			{
+				_cachedProfileDisplayItems[i].Name = p;
+				_cachedProfileDisplayItems[i].DisplayName = disp;
+			}
+			else
+			{
+				_cachedProfileDisplayItems.Add(new ConfigProfileDisplayItem
+				{
+					Name = p,
+					DisplayName = disp
+				});
+			}
+		}
 
 		bool wasUpdating = _isUpdatingUi;
 		_isUpdatingUi = true;
 		try
 		{
 			ConfigProfilesComboBox.ItemsSource = null;
-			ConfigProfilesComboBox.ItemsSource = profiles;
-			int idx = profiles.FindIndex(p => string.Equals(p, active, StringComparison.OrdinalIgnoreCase));
-			ConfigProfilesComboBox.SelectedIndex = idx >= 0 ? idx : 0;
+			ConfigProfilesComboBox.SelectedValuePath = "Name";
+			ConfigProfilesComboBox.DisplayMemberPath = "DisplayName";
+			ConfigProfilesComboBox.ItemsSource = _cachedProfileDisplayItems;
+			ConfigProfilesComboBox.SelectedValue = active;
+			if (ConfigProfilesComboBox.SelectedIndex < 0 && _cachedProfileDisplayItems.Count > 0)
+			{
+				ConfigProfilesComboBox.SelectedIndex = 0;
+			}
+
+			string displayActive = (string.Equals(active, "默认配置", StringComparison.OrdinalIgnoreCase) || string.Equals(active, "Default", StringComparison.OrdinalIgnoreCase))
+				? defaultLabel
+				: active;
 
 			if (ActiveProfileBadgeText != null)
 			{
-				ActiveProfileBadgeText.Text = $"当前方案: {active}";
+				ActiveProfileBadgeText.Text = $"{I18n.T("ActiveProfilePrefix")}{displayActive}";
 			}
 
 			if (DeleteProfileBtn != null)
 			{
-				DeleteProfileBtn.IsEnabled = profiles.Count > 1;
+				DeleteProfileBtn.IsEnabled = _cachedProfileDisplayItems.Count > 1;
 			}
 		}
 		finally
@@ -16187,7 +17095,10 @@ public partial class SettingsWindow : Window
 	private void ConfigProfilesComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
 		if (_isUpdatingUi || ConfigProfilesComboBox == null) return;
-		if (ConfigProfilesComboBox.SelectedItem is string selectedName)
+		string? selectedName = ConfigProfilesComboBox.SelectedValue as string
+			?? (ConfigProfilesComboBox.SelectedItem as ConfigProfileDisplayItem)?.Name
+			?? ConfigProfilesComboBox.SelectedItem as string;
+		if (!string.IsNullOrEmpty(selectedName))
 		{
 			if (string.Equals(selectedName, ConfigManager.CurrentConfig?.ActiveConfigProfileName, StringComparison.OrdinalIgnoreCase))
 			{
@@ -16263,7 +17174,7 @@ public partial class SettingsWindow : Window
 
 	private void RenameProfileBtn_Click(object sender, RoutedEventArgs e)
 	{
-		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		string currentName = GetSelectedConfigProfileName();
 		var list = ConfigManager.GetSavedConfigNames();
 		InputDialog inputDialog = new InputDialog(
 			"重命名配置方案",
@@ -16301,7 +17212,7 @@ public partial class SettingsWindow : Window
 
 	private void DeleteProfileBtn_Click(object sender, RoutedEventArgs e)
 	{
-		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		string currentName = GetSelectedConfigProfileName();
 		var list = ConfigManager.GetSavedConfigNames();
 		if (list.Count <= 1)
 		{
@@ -16350,7 +17261,7 @@ public partial class SettingsWindow : Window
 
 	private void ExportConfigButton_Click(object sender, RoutedEventArgs e)
 	{
-		string targetProfile = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		string targetProfile = GetSelectedConfigProfileName();
 		Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog
 		{
 			Filter = "JSON 配置文件 (*.json)|*.json",
@@ -16441,7 +17352,7 @@ public partial class SettingsWindow : Window
 
 	private void ResetDefaultConfigBtn_Click(object sender, RoutedEventArgs e)
 	{
-		string currentName = ConfigProfilesComboBox?.SelectedItem as string ?? ConfigManager.CurrentConfig?.ActiveConfigProfileName ?? "默认配置";
+		string currentName = GetSelectedConfigProfileName();
 		var res = System.Windows.MessageBox.Show(
 			this,
 			$"确定要将当前激活的方案「{currentName}」恢复为初始默认配置吗？\n该操作将重置手势动作与轮盘外观为初始推荐状态，其他已保存方案不受影响。",
@@ -19053,11 +19964,11 @@ public partial class SettingsWindow : Window
 		}
 		if (TileSettingsStatusText != null)
 		{
-			TileSettingsStatusText.Text = isExpanded ? "已展开" : "已收纳 (点击展开)";
+			TileSettingsStatusText.Text = isExpanded ? I18n.T("TileSettingsExpanded") : I18n.T("TileSettingsCollapsed");
 		}
 		if (TileSettingsToggleLabel != null)
 		{
-			TileSettingsToggleLabel.Text = isExpanded ? "收起配置" : "展开配置";
+			TileSettingsToggleLabel.Text = isExpanded ? I18n.T("TileSettingsToggleCollapse") : I18n.T("TileSettingsToggleExpand");
 		}
 		if (TileSettingsExpandArrow != null)
 		{

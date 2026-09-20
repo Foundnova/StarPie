@@ -19,8 +19,80 @@ public class WheelLayer : INotifyPropertyChanged
 			{
 				_name = value;
 				OnPropertyChanged(nameof(Name));
+				OnPropertyChanged(nameof(DisplayName));
 			}
 		}
+	}
+
+	/// <summary>
+	/// UI 层展示名称（若为默认 "第 N 层" / "Layer N" 则依据当前语言本地化，若为用户自定义名称则保持原样）
+	/// </summary>
+	[System.Text.Json.Serialization.JsonIgnore]
+	public string DisplayName
+	{
+		get
+		{
+			if (string.IsNullOrWhiteSpace(_name))
+			{
+				return _name;
+			}
+			if (TryParseDefaultLayerNumber(_name, out string? numStr))
+			{
+				return string.Format(I18n.T("WheelLayerFmt"), numStr);
+			}
+			return _name;
+		}
+	}
+
+	private static bool TryParseDefaultLayerNumber(string name, out string? numberStr)
+	{
+		numberStr = null;
+		ReadOnlySpan<char> span = name.AsSpan().Trim();
+		if (span.IsEmpty) return false;
+
+		// 1. "第" ... "层/層"
+		if (span.StartsWith("第", StringComparison.Ordinal) && (span.EndsWith("层", StringComparison.Ordinal) || span.EndsWith("層", StringComparison.Ordinal)) && span.Length >= 3)
+		{
+			ReadOnlySpan<char> inner = span.Slice(1, span.Length - 2).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		// 2. "Layer" ...
+		if (span.StartsWith("Layer", StringComparison.OrdinalIgnoreCase) && span.Length >= 6)
+		{
+			ReadOnlySpan<char> inner = span.Slice(5).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		// 3. "レイヤー" ...
+		if (span.StartsWith("レイヤー", StringComparison.Ordinal) && span.Length >= 5)
+		{
+			ReadOnlySpan<char> inner = span.Slice(4).Trim();
+			if (!inner.IsEmpty && IsAllDigits(inner))
+			{
+				numberStr = inner.ToString();
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static bool IsAllDigits(ReadOnlySpan<char> span)
+	{
+		for (int i = 0; i < span.Length; i++)
+		{
+			if (!char.IsDigit(span[i])) return false;
+		}
+		return true;
 	}
 
 	public int SectorCount { get; set; } = 8;
