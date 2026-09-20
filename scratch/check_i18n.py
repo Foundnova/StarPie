@@ -11,17 +11,42 @@ src = root / "WinPieGestures"
 i18n = (src / "I18n.cs").read_text(encoding="utf-8")
 
 # 1) 解析词条定义
-defs = {}
-order = []
-dup = []
-pattern = re.compile(
+#
+# 两种写法都要认，因为它们在历史上都真实存在过：
+#   旧：dictionary["Key"] = new Dictionary<LanguageCode, string> { [LanguageCode.ZhCn] = "…" … };
+#   新：Add("Key", "…", "…", "…", "…");   —— 自 `perf(core): I18n 扁平值类型重构` 起
+# 只认其中一种的代价是**静默的全绿**：整份词表解析成 0 条，于是「缺语言分支」「空值」
+# 「占位符不一致」全部无从可判，而「引用但未定义」会一次性报出上千条 —— 那反而显眼。
+# 真正致命的是反过来：某次重构只改写了**一部分**定义写法时，脚本仍然出数，
+# 只是把没认出来的那些键悄悄算成「没人引用」。
+LEGACY_PATTERN = re.compile(
     r'dictionary\["(?P<key>[^"]+)"\]\s*=\s*new Dictionary<LanguageCode,\s*string>\s*\{(?P<body>.*?)\n\t\t\};',
     re.S,
 )
-for m in pattern.finditer(i18n):
-    key, body = m.group("key"), m.group("body")
-    langs = dict(re.findall(r"\[LanguageCode\.(\w+)\]\s*=\s*(.*?)(?=\n\s*\[LanguageCode\.|\Z)", body, re.S))
-    langs = {k: v.strip().rstrip(",").strip() for k, v in langs.items()}
+# 行首刻意写成「任意空白」而不是「恰好两个制表符」：那 1600 多条 `Add(` 的缩进并不齐，
+# 按缩进过滤会把几十条真词条当成没定义，报出一串查不出来源的「引用但未定义」假阳性。
+FLAT_PATTERN = re.compile(r'^[ \t]*Add\(\s*"(?P<key>[^"]+)",(?P<rest>.*?)\);[ \t]*$', re.M)
+# C# 字符串字面量：含转义（\" 与 \\ 都要吃掉，否则引号计数会错位）
+CS_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
+LANG_ORDER = ["ZhCn", "ZhTw", "En", "Ja"]
+
+
+def parse_defs(text):
+    """返回 (定义列表, 键→各语言字面量)。列表按文件中出现的顺序，用于数重复定义。"""
+    items = []
+    for m in LEGACY_PATTERN.finditer(text):
+        langs = dict(re.findall(r"\[LanguageCode\.(\w+)\]\s*=\s*(.*?)(?=\n\s*\[LanguageCode\.|\Z)", m.group("body"), re.S))
+        items.append((m.group("key"), {k: v.strip().rstrip(",").strip() for k, v in langs.items()}))
+    for m in FLAT_PATTERN.finditer(text):
+        literals = CS_STRING.findall(m.group("rest"))
+        items.append((m.group("key"), dict(zip(LANG_ORDER, literals))))
+    return items
+
+
+defs = {}
+order = []
+dup = []
+for key, langs in parse_defs(i18n):
     if key in defs:
         dup.append(key)
     defs[key] = langs
@@ -85,7 +110,7 @@ def keys_at(ref):
         ).stdout
     except Exception:
         return set()
-    return set(re.findall(r'dictionary\["([^"]+)"\]\s*=\s*new Dictionary', blob))
+    return {k for k, _ in parse_defs(blob)}
 
 base = keys_at(since)
 new_keys = sorted(set(defs) - base) if base else []
