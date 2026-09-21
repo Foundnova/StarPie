@@ -33,6 +33,17 @@ public interface IPluginContext
     /// <summary>注册矢量图标。</summary>
     IIconRegistry Icons { get; }
 
+    /// <summary>
+    /// 声明插件级参数页（SDK 1.6 起）。
+    /// <para>
+    /// 与 <see cref="Actions"/> 的区别：这里的字段属于<b>插件整体</b>，值落在
+    /// <see cref="Settings"/> 的同一命名空间里，由宿主在插件管理卡片上统一渲染。
+    /// 纯声明式，不需要任何能力位 —— 宿主只是用 SDK 类型画了个表单，
+    /// 既不接管用户点击，也不起进程。
+    /// </para>
+    /// </summary>
+    ISettingsPageRegistry SettingsPage { get; }
+
     /// <summary>宿主已验证的动作能力（发快捷键 / 启程序 / 剪贴板 / 开网址）。</summary>
     IHostActionInvoker Host { get; }
 

@@ -3987,6 +3987,19 @@
                       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                         <CheckBox Content="{Binding PreloadText}" Tag="{Binding PluginId}" IsChecked="{Binding IsPreload, Mode=OneWay}" Click="PluginRowPreloadCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
                         <CheckBox Content="{Binding EnableText}" Tag="{Binding PluginId}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Click="PluginRowEnabledCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <!-- 「设置」只在插件自己声明了参数页时出现：可见性由 HasSettingsPage 驱动，
+                             而不是让按钮灰着——灰按钮点不开，用户只会以为程序卡住。 -->
+                        <Button Content="{Binding SettingsText}" Tag="{Binding PluginId}" Click="PluginRowSettingsButton_Click" Height="26" Padding="8,0" Margin="10,0,0,0" FontSize="11">
+                          <Button.Style>
+                            <Style TargetType="{x:Type Button}" BasedOn="{StaticResource ModernButtonStyle}">
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSettingsPage}" Value="False">
+                                  <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                        </Button>
                         <Button Content="{Binding UninstallText}" Tag="{Binding PluginId}" Click="UninstallPluginButton_Click" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" Margin="10,0,0,0" FontSize="11" />
                       </StackPanel>
                     </Grid>

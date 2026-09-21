@@ -1726,14 +1726,14 @@ internal static class PluginSelfTest
 
         // ---- 3f 插件管理页卡片文案 ----
         //
-        // 卡片在 ListBox.ItemTemplate 里，两个按钮的文字绑在 PluginListItem 上，所以
+        // 卡片在 ListBox.ItemTemplate 里，三个按钮的文字绑在 PluginListItem 上，所以
         // 「卡片文案翻没翻」没法靠按键名取控件来查 —— 只能真的构建一次卡片再看结果。
         // Build() 因此被放在 PluginListItem 里而不是窗口类里：窗口类里的私有方法自检够不着。
         //
         // 这一段刻意放在 [4] 之前：--skip-invoke 会在 [4] 开头提前 return，
         // 放到 [4] 之后等于日常回归里根本不会执行（那正是 [5b] 曾经踩过的坑）。
         line("");
-        line("[3f] 插件管理页卡片文案（状态名 / 摘要 / 两个按钮，且整卡随语言切换）");
+        line("[3f] 插件管理页卡片文案（状态名 / 摘要 / 三个按钮，且整卡随语言切换）");
 
         // ① 状态名逐个成员核对。I18n.T 取不到键时**原样返回键名** —— 既不空白也不像错的，
         //    只有逐条比对才看得见。这里直接按「值」驱动，所以 9 个成员一个都不会漏。
@@ -1825,6 +1825,7 @@ internal static class PluginSelfTest
                      {
                          ("状态徽标", enCard.StateText),
                          ("启用按钮", enCard.EnableText),
+                         ("设置按钮", enCard.SettingsText),
                          ("卸载按钮", enCard.UninstallText),
                          ("摘要（宿主部分）", StripPluginData(enCard.SummaryText)),
                          ("详情（宿主部分）", StripPluginData(enCard.DetailText)),
@@ -2015,6 +2016,218 @@ internal static class PluginSelfTest
         finally
         {
             I18n.CurrentLanguage = panelOriginalLanguage;
+        }
+
+        // ---- 3h 插件级参数页（SDK 1.6）----
+        //
+        // 这一段管的是「声明出来的东西到底能不能用」：入口判据、字段面是否与声明一致、
+        // 标签是否真的走词条、声明的取值范围是否被同一条校验链读过、宿主写进去的键
+        // 插件那一侧读不读得回来。
+        //
+        // 全部只走 PluginSettingsPageService 的静态面，**不建窗口**：一建窗口这些断言
+        // 就退化成「得有人去点一下」，而回归恰恰坏在没人点的时候。
+        line("");
+        line("[3h] 插件级参数页（入口 / 字段面 / 词条 / 校验 / 读写往返）");
+
+        PluginSettingsPageRegistration? declaredPage = PluginHost.Catalog.TryGetSettingsPage(pluginId);
+        if (declaredPage == null)
+        {
+            // 未声明也要留一条断言：入口判据若在「拿不到页」时返回真，卡片上就会出现一个
+            // 点开的空按钮 —— 那个判据存在的全部意义就是不让它出现。
+            if (PluginSettingsPageService.HasPage(pluginId))
+            {
+                return "[3h] 贡献点表里没有该插件的参数页，HasPage 却判为有 —— 卡片上会出现点开的空按钮。";
+            }
+            if (PluginSettingsPageService.Open(pluginId) != null)
+            {
+                return "[3h] 未声明参数页的插件竟然能 Open 出一张页。";
+            }
+            line("  本插件未声明参数页：入口判据一致返回「无」 ✓");
+        }
+        else
+        {
+            PluginSettingsPageService.Page? page = PluginSettingsPageService.Open(pluginId);
+            if (page == null)
+            {
+                return "[3h] 声明了参数页却 Open 不出来 —— 写读目标（插件的 settings 实例）没接上。";
+            }
+
+            // ① 字段面逐位核对。渲染读的是 Page.Fields，它与声明差一个键，
+            //    就意味着「用户看到的表」和「插件以为的表」不再是同一张 —— 那种偏差会表现为
+            //    用户填了、插件读不到，而两边都没有任何报错。
+            if (page.Fields.Count != declaredPage.Fields.Count)
+            {
+                return $"[3h] 参数字段数不一致：声明 {declaredPage.Fields.Count} 个 / 渲染 {page.Fields.Count} 个。";
+            }
+            for (int i = 0; i < page.Fields.Count; i++)
+            {
+                if (!string.Equals(page.Fields[i].Key, declaredPage.Fields[i].Key, StringComparison.Ordinal))
+                {
+                    return $"[3h] 第 {i} 个字段的键不匹配：声明「{declaredPage.Fields[i].Key}」/ 渲染「{page.Fields[i].Key}」。";
+                }
+            }
+
+            // ② 标题与字段标签在**每一种语言**下都得解析得开。
+            //    判据不是「等于我期望的译文」而是「等于词条里那个值」—— 宿主不认识插件写的文案，
+            //    只能核对标签真的取自词条表。这抓的正是历史上踩过的那类缺陷：键的前缀换算写错，
+            //    于是永远静默退回字面中文，英文界面要到用户切语言才暴露。
+            LanguageCode pageOriginalLanguage = I18n.CurrentLanguage;
+            try
+            {
+                foreach (LanguageCode language in Enum.GetValues<LanguageCode>())
+                {
+                    I18n.CurrentLanguage = language;
+                    PluginSettingsPageService.Page titled = PluginSettingsPageService.Open(pluginId)!;
+
+                    if (string.IsNullOrWhiteSpace(titled.Title))
+                    {
+                        return $"[3h] {language} 下参数页标题是空的。";
+                    }
+                    if (titled.Title.StartsWith(PluginApi.I18nKeyPrefix, StringComparison.Ordinal))
+                    {
+                        return $"[3h] {language} 下参数页标题是裸键名「{titled.Title}」—— TitleKey 写错了。";
+                    }
+                    // 标题也要和字段标签同一条判据核对「等于词条里那个值」。只查空与裸键名的话，
+                    // 键前缀换算写错会静默退回插件给的字面中文 —— 而中文标题在英文界面上不违反
+                    // 上面任何一条，正是 ResolveStagedDisplayNames 那次补丁记录过的同一个坑。
+                    if (!string.IsNullOrWhiteSpace(declaredPage.TitleKey))
+                    {
+                        string fullTitleKey = $"{PluginApi.I18nKeyPrefix}{pluginId}.{declaredPage.TitleKey!.Trim()}";
+                        string titleFromTable = I18n.GetString(fullTitleKey);
+                        if (!string.Equals(titleFromTable, fullTitleKey, StringComparison.Ordinal) &&
+                            !string.Equals(titled.Title, titleFromTable, StringComparison.Ordinal))
+                        {
+                            return $"[3h] {language} 下参数页标题显示成「{titled.Title}」，而词条里是「{titleFromTable}」—— 标题没走词条。";
+                        }
+                    }
+
+                    foreach (ParameterField field in titled.Fields)
+                    {
+                        string label = PluginI18n.ResolveLabel(pluginId, field.LabelKey, field.Label);
+                        if (string.IsNullOrWhiteSpace(label))
+                        {
+                            return $"[3h] {language} 下字段「{field.Key}」没有标签 —— 界面上会出现一行空白。";
+                        }
+                        if (label.StartsWith(PluginApi.I18nKeyPrefix, StringComparison.Ordinal))
+                        {
+                            return $"[3h] {language} 下字段「{field.Key}」的标签是裸键名「{label}」—— LabelKey 写错了。";
+                        }
+                        if (string.IsNullOrWhiteSpace(field.LabelKey)) continue;
+
+                        string fullKey = $"{PluginApi.I18nKeyPrefix}{pluginId}.{field.LabelKey!.Trim()}";
+                        string fromTable = I18n.GetString(fullKey);
+                        if (!string.Equals(fromTable, fullKey, StringComparison.Ordinal) &&
+                            !string.Equals(label, fromTable, StringComparison.Ordinal))
+                        {
+                            return $"[3h] {language} 下字段「{field.Key}」显示成「{label}」，而词条里是「{fromTable}」—— 标签没走词条。";
+                        }
+                    }
+                }
+                line($"    标题与 {declaredPage.Fields.Count} 个字段标签：{Enum.GetValues<LanguageCode>().Length} 种语言全部走词条 ✓");
+            }
+            finally
+            {
+                I18n.CurrentLanguage = pageOriginalLanguage;
+            }
+
+            // ③ 声明里的取值范围必须被真校验读过。用户在设置页填 9999 而界面一声不吭，
+            //    比报错更难排查 —— 他会以为范围提示是装饰。
+            //    探针打在 page.Fields 上而不是 declaredPage.Fields：窗口渲染读的就是那一份，
+            //    校验声明本体只会证明 PluginParameterValidator 自己没坏（那件事 [3b] 已经管了），
+            //    证明不了「注册链交出来的字段面」还带着范围。
+            ParameterField? ranged = null;
+            foreach (ParameterField field in declaredPage.Fields)
+            {
+                if (field.Type == ParameterFieldType.Number && (field.Min.HasValue || field.Max.HasValue))
+                {
+                    ranged = field;
+                    break;
+                }
+            }
+            if (ranged != null)
+            {
+                double beyond = (ranged.Max ?? ranged.Min ?? 0) + 100_000;
+                var probeValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [ranged.Key] = beyond.ToString("0.##", CultureInfo.InvariantCulture),
+                };
+                List<PluginParameterIssue> issues = PluginParameterValidator.Validate(page.Fields, probeValues);
+                bool flagged = issues.Exists(issue =>
+                    string.Equals(issue.Key, ranged!.Key, StringComparison.OrdinalIgnoreCase));
+                if (!flagged)
+                {
+                    return $"[3h] 字段「{ranged.Key}」填了 {beyond}（范围之外）却没被拦 —— 声明的 Min/Max 是装饰。";
+                }
+                line($"    数字字段「{ranged.Key}」的 Min/Max 在渲染面上依然生效 ✓");
+            }
+            else
+            {
+                line("  本插件参数页没有带范围约束的数字字段，Min/Max 断言跳过。");
+            }
+
+            // ④ 读写往返。四步各自抓一个不同的坑，缺一步就有一条路没人看过。
+            IPluginContext? pluginContext = cardInstance.ContextForSelfTest;
+            if (pluginContext == null)
+            {
+                return "[3h] 拿不到插件上下文 —— 上一段应当已经把它启用。";
+            }
+
+            ParameterField firstField = declaredPage.Fields[0];
+            string probeValue = "selftest-" + Guid.NewGuid().ToString("N");
+
+            page.Target.Write(firstField.Key, probeValue);
+            PluginSettingsPageService.Persist(page);
+
+            if (!string.Equals(cardInstance.Settings.Get(firstField.Key), probeValue, StringComparison.Ordinal))
+            {
+                return "[3h] 宿主写进参数页的值没落到插件的 settings.json（或写到了别的键上）。";
+            }
+            if (!string.Equals(pluginContext.SettingsPage.GetValue(firstField.Key), probeValue, StringComparison.Ordinal))
+            {
+                return "[3h] 插件一侧 SettingsPage.GetValue 读回来的不是宿主写进去的那个值 —— 接缝断了。";
+            }
+
+            // 清空 → 键被删 → 读回声明的默认值。「清空即未填写」这条语义要是变成「清空即写入空串」，
+            // 插件读到的就是 ""，解析成 0，于是一颗直径 0 的球会在下一次显示时消失。
+            page.Target.Write(firstField.Key, "");
+            PluginSettingsPageService.Persist(page);
+
+            if (cardInstance.Settings.Get(firstField.Key) != null)
+            {
+                return "[3h] 清空字段后配置里仍留着这个键 —— 「未填写」在配置里就有了两种表示。";
+            }
+            string? afterClear = pluginContext.SettingsPage.GetValue(firstField.Key);
+            string expectedDefault = firstField.DefaultValue ?? "";
+            if (!string.Equals(afterClear ?? "", expectedDefault, StringComparison.Ordinal))
+            {
+                return $"[3h] 清空后插件读回「{afterClear ?? "(null)"}」，声明的默认值是「{expectedDefault}」—— 回落没生效，" +
+                       "插件会把自己的默认值写第二遍。";
+            }
+            line("    读写往返：宿主写→插件读同值；清空→键被删→读回声明的默认值 ✓");
+
+            // ⑤ 契约边界：一个插件一页，重复注册当场拒绝。放到提交时才判的话，
+            //    前一次声明已经被覆盖，插件作者只会看到「我写的页没出现」而看不到原因。
+            PluginRegistrationSession gateSession = PluginHost.Catalog.BeginSession(pluginId);
+            var gateRegistry = new PluginSettingsPageRegistry(gateSession, pluginId, cardInstance.Settings);
+            gateRegistry.Register(new SettingsPageDescriptor
+            {
+                Title = "自检页",
+                Fields = new List<ParameterField> { new() { Key = "selftest.gate", Label = "自检" } },
+            });
+            try
+            {
+                gateRegistry.Register(new SettingsPageDescriptor
+                {
+                    Title = "第二页",
+                    Fields = new List<ParameterField> { new() { Key = "selftest.gate2", Label = "自检" } },
+                });
+                return "[3h] 同一插件重复注册参数页没按契约拒绝 —— 后一页会静默盖掉前一页。";
+            }
+            catch (PluginContractException)
+            {
+                gateSession.Discard();
+            }
+            line("    重复注册按契约拒绝，暂存已丢弃（真实贡献点表未被污染）✓");
         }
 
         // ---- 4 调用 ----

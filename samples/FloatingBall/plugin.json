@@ -10,7 +10,7 @@
   "license": "MIT",
   "version": "1.0.0",
 
-  "apiVersion": "1.5",
+  "apiVersion": "1.6",
   "minHostVersion": "1.8.0",
 
   "targetFramework": "net8.0-windows",

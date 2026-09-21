@@ -59,6 +59,34 @@ internal sealed class PluginIconRegistration
 }
 
 /// <summary>
+/// 插件级参数页（SDK 1.6）。一个插件至多一页，键就是插件 ID。
+/// <para>
+/// 这里<b>不存 <see cref="SettingsPageDescriptor"/> 对象本身</b>，只存拆出来的字段并把字段表复制成
+/// <c>ParameterField[]</c>：描述符是插件 <c>new</c> 的，它的 <c>Fields</c> 也可能是插件自己实现的
+/// <c>IReadOnlyList</c> 类型 —— 那个类型的程序集属于插件 ALC，长期表里留着它，插件停用后
+/// 收集上下文就再也回收不掉（卸载判定的头号杀手，实测见 <c>--plugin-selftest</c>）。
+/// </para>
+/// <para>
+/// 标题与说明的<b>译文不在这里存</b>：注册时词条还在暂存区，此刻解析必然落空
+/// （见 <see cref="ResolveStagedDisplayNames"/> 记的那个坑）。渲染时才解析，天然拿到已提交的词条。
+/// </para>
+/// </summary>
+internal sealed class PluginSettingsPageRegistration
+{
+    public string PluginId { get; init; } = "";
+
+    public string Title { get; init; } = "";
+
+    public string? TitleKey { get; init; }
+
+    public string Description { get; init; } = "";
+
+    public string? DescriptionKey { get; init; }
+
+    public IReadOnlyList<ParameterField> Fields { get; init; } = Array.Empty<ParameterField>();
+}
+
+/// <summary>
 /// 贡献点注册表 —— 插件系统与主程序之间**唯一**的接缝。
 /// <para>
 /// 设计要点：
@@ -75,6 +103,9 @@ internal sealed class PluginCatalog
     private readonly Dictionary<string, PluginActionRegistration> _actions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, PluginIconRegistration> _icons = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, PluginI18nRegistration> _i18n = new(StringComparer.Ordinal);
+
+    /// <summary>插件级参数页，键为插件 ID（一个插件一页，故不需要复合键）。</summary>
+    private readonly Dictionary<string, PluginSettingsPageRegistration> _settingsPages = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>注册阶段收集到的冲突描述。非空即表示整个插件注册失败。</summary>
     private readonly List<string> _stagedErrors = new();
@@ -132,6 +163,14 @@ internal sealed class PluginCatalog
                 }
             }
 
+            // 设置页按插件 ID 存放，所以「冲突」只会是同一枚插件被重复启用（例如实例泄漏），
+            // 而不是两枚不同插件撞名 —— 后者在结构上不可能发生。
+            if (session.StagedSettingsPage != null &&
+                _settingsPages.ContainsKey(session.StagedSettingsPage.PluginId))
+            {
+                conflicts.Add($"设置页冲突：{session.StagedSettingsPage.PluginId} 已声明过参数页。");
+            }
+
             if (conflicts.Count > 0)
             {
                 error = string.Join("；", conflicts);
@@ -152,6 +191,11 @@ internal sealed class PluginCatalog
             {
                 _i18n[i18n.FullKey] = i18n;
                 I18n.RegisterExternal(i18n.FullKey, i18n.Values);
+            }
+
+            if (session.StagedSettingsPage != null)
+            {
+                _settingsPages[session.StagedSettingsPage.PluginId] = session.StagedSettingsPage;
             }
 
             ResolveStagedDisplayNames(session);
@@ -200,6 +244,7 @@ internal sealed class PluginCatalog
             session.StagedActions.Clear();
             session.StagedIcons.Clear();
             session.StagedI18n.Clear();
+            session.StagedSettingsPage = null;
         }
     }
 
@@ -234,6 +279,10 @@ internal sealed class PluginCatalog
                 _i18n.Remove(key);
                 I18n.UnregisterExternal(key);
             }
+
+            // 设置页必须一起撤：否则插件停用后卡片上仍留着「设置」按钮，
+            // 点开是一张已经没有主人的表单，改了值也没人读。
+            _settingsPages.Remove(pluginId);
         }
     }
 
@@ -288,6 +337,34 @@ internal sealed class PluginCatalog
         }
     }
 
+    /// <summary>取某插件声明的参数页；未声明（或插件未加载）时返回 null。</summary>
+    public PluginSettingsPageRegistration? TryGetSettingsPage(string pluginId)
+    {
+        if (string.IsNullOrEmpty(pluginId)) return null;
+        lock (_gate)
+        {
+            return _settingsPages.TryGetValue(pluginId, out PluginSettingsPageRegistration? page) ? page : null;
+        }
+    }
+
+    /// <summary>撤销某插件的参数页（注册 token 释放时走这里）。</summary>
+    public bool RemoveSettingsPage(string pluginId)
+    {
+        lock (_gate)
+        {
+            return _settingsPages.Remove(pluginId ?? "");
+        }
+    }
+
+    /// <summary>当前声明了参数页的插件 ID 快照（自检与调试用）。</summary>
+    public List<string> SnapshotSettingsPagePluginIds()
+    {
+        lock (_gate)
+        {
+            return new List<string>(_settingsPages.Keys);
+        }
+    }
+
     public int ActionCount
     {
         get { lock (_gate) return _actions.Count; }
@@ -301,6 +378,11 @@ internal sealed class PluginCatalog
     public int I18nCount
     {
         get { lock (_gate) return _i18n.Count; }
+    }
+
+    public int SettingsPageCount
+    {
+        get { lock (_gate) return _settingsPages.Count; }
     }
 }
 
@@ -318,6 +400,9 @@ internal sealed class PluginRegistrationSession
     internal readonly List<PluginCatalog.PluginI18nRegistration> StagedI18n = new();
     internal readonly List<string> Errors = new();
 
+    /// <summary>参数页是「一个插件一页」，所以暂存位是单个而不是列表。</summary>
+    internal PluginSettingsPageRegistration? StagedSettingsPage;
+
     internal PluginRegistrationSession(PluginCatalog catalog, string pluginId)
     {
         _catalog = catalog;
@@ -330,9 +415,12 @@ internal sealed class PluginRegistrationSession
 
     public void StageI18n(PluginCatalog.PluginI18nRegistration registration) => StagedI18n.Add(registration);
 
+    public void StageSettingsPage(PluginSettingsPageRegistration registration) => StagedSettingsPage = registration;
+
     public void Report(string error) => Errors.Add(error);
 
-    public int StagedCount => StagedActions.Count + StagedIcons.Count + StagedI18n.Count;
+    public int StagedCount =>
+        StagedActions.Count + StagedIcons.Count + StagedI18n.Count + (StagedSettingsPage == null ? 0 : 1);
 
     public bool Commit(out string error) => _catalog.Commit(this, out error);
 

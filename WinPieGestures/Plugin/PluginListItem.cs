@@ -53,6 +53,19 @@ internal sealed class PluginListItem
     /// <summary>卡片上「开机预加载」复选框的文字。同 <see cref="EnableText"/> 的绑定理由。</summary>
     public string PreloadText { get; init; } = "";
 
+    /// <summary>卡片上「设置」按钮的文字。同 <see cref="EnableText"/> 的绑定理由。</summary>
+    public string SettingsText { get; init; } = "";
+
+    /// <summary>
+    /// 该插件是否声明了插件级参数页（SDK 1.6）。为假时卡片上不出现「设置」按钮。
+    /// <para>
+    /// 判据来自<b>贡献点表</b>，因此它天然只对本会话真正加载过的插件为真：
+    /// 未启用 / 加载失败的插件既没有声明，也没有可读写值的 <c>settings.json</c> 实例，
+    /// 与其给一个点开是空表的按钮，不如不出现。
+    /// </para>
+    /// </summary>
+    public bool HasSettingsPage { get; init; }
+
     /// <summary>错误详情。为空表示健康。</summary>
     public string ErrorText { get; init; } = "";
 
@@ -132,6 +145,8 @@ internal sealed class PluginListItem
             EnableText = I18n.T("PluginsCardEnableCheckBox"),
             UninstallText = I18n.T("PluginsCardUninstallButton"),
             PreloadText = I18n.T("PluginsCardPreloadCheckBox"),
+            SettingsText = I18n.T("PluginsCardSettingsButton"),
+            HasSettingsPage = PluginSettingsPageService.HasPage(instance.PluginId),
             ErrorText = errorText,
             IsEnabled = entry.Enabled,
             IsPreload = entry.Preload,

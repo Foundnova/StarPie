@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using StarPie.Plugin;
@@ -58,11 +59,32 @@ internal sealed class PluginSettings : IPluginSettings
     public bool GetBool(string key, bool defaultValue = false) =>
         bool.TryParse(Get(key), out bool value) ? value : defaultValue;
 
+    /// <summary>
+    /// 按<b>不变文化</b>解析整数。
+    /// <para>
+    /// 宿主写进这里的数字（参数表单与插件级设置页都做了归一化）永远是不变文化字面量；
+    /// 不指定文化就会在逗号作小数点的区域设置上出问题，也与
+    /// <see cref="StarPie.Plugin.PluginActionInput.Int"/> 的既有口径不一致。
+    /// </para>
+    /// </summary>
     public int GetInt(string key, int defaultValue = 0) =>
-        int.TryParse(Get(key), out int value) ? value : defaultValue;
+        int.TryParse(Get(key), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : defaultValue;
 
+    /// <summary>同 <see cref="GetInt"/>，必须用不变文化。</summary>
     public double GetDouble(string key, double defaultValue = 0) =>
-        double.TryParse(Get(key), out double value) ? value : defaultValue;
+        double.TryParse(Get(key), NumberStyles.Float, CultureInfo.InvariantCulture, out double value) ? value : defaultValue;
+
+    /// <summary>
+    /// 当前内存取值的快照。宿主侧渲染设置页时用它回填。
+    /// <para>返回的是拷贝，调用方改不动内部字典 —— 写必须走 <see cref="Set"/>，才能保住长度上限与删除语义。</para>
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Snapshot()
+    {
+        lock (_gate)
+        {
+            return new Dictionary<string, string>(_values, StringComparer.Ordinal);
+        }
+    }
 
     public void Save()
     {
