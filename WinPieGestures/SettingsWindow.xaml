@@ -691,9 +691,9 @@
           </Border>
 
           <!-- 底部版本与版权信息 (折叠态自动居中展示) -->
-          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.8.0-beta.1&#x0a;© 2026 StarPie">
+          <StackPanel Name="SidebarFooterPanel" Margin="0,0,0,5" ToolTip="StarPie v1.8.0-beta.2&#x0a;© 2026 StarPie">
             <Border Name="SidebarVersionBadge" Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,3" HorizontalAlignment="Left" Margin="0,0,0,4">
-              <TextBlock Name="SidebarVersionText" Text="v1.8.0-beta.1" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
+              <TextBlock Name="SidebarVersionText" Text="v1.8.0-beta.2" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" />
             </Border>
             <TextBlock Name="SidebarCopyrightText" Text="© 2026 StarPie" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel>
@@ -3835,7 +3835,7 @@
                 </StackPanel>
                 <Button Name="RefreshOfficialPluginsButton" Grid.Column="1" Content="🌐 刷新目录" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" FontSize="11" VerticalAlignment="Center" Click="RefreshOfficialPluginsButton_Click" />
               </Grid>
-              <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <ScrollViewer Name="OfficialPluginsScrollViewer" MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                 <ItemsControl Name="OfficialPluginItemsControl">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -3890,7 +3890,7 @@
                 </StackPanel>
                 <Button Name="OpenPluginScanFolderButton" Grid.Column="1" Content="📂 打开扫描目录" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" FontSize="11" VerticalAlignment="Center" Click="OpenPluginScanFolderButton_Click" />
               </Grid>
-              <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <ScrollViewer Name="PluginCandidateScrollViewer" MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="NestedScrollViewer_PreviewMouseWheel">
                 <ItemsControl Name="PluginCandidateItemsControl">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -3944,8 +3944,13 @@
           </Border>
 
           <!-- 插件列表 -->
-          <Grid Grid.Row="4">
-            <ListBox Name="PluginListBox" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <Grid Grid.Row="4" Background="Transparent" PreviewMouseWheel="PluginListContainer_PreviewMouseWheel">
+            <ListBox Name="PluginListBox" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="PluginListContainer_PreviewMouseWheel">
+              <ListBox.Template>
+                <ControlTemplate TargetType="ListBox">
+                  <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                </ControlTemplate>
+              </ListBox.Template>
               <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                   <Setter Property="Padding" Value="0" />
@@ -4098,7 +4103,7 @@
                           <TextBlock Name="UpdateStatusBadgeText" Text="已是最新版本" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                         </Border>
                       </StackPanel>
-                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.8.0-beta.1 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                      <TextBlock Name="UpdateStatusDescText" Text="当前运行版本: StarPie v1.8.0-beta.2 (64位)。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                       <Button Name="CheckUpdateNowBtn" Content="🔄 立即检查更新" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="14,0" Margin="0,0,8,0" VerticalAlignment="Center" Click="CheckUpdateNowBtn_Click" />
@@ -4573,7 +4578,7 @@
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="StarPie" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
                       <Border Background="{DynamicResource NavTabActiveBgBrush}" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Name="AboutVersionBadgeText" Text="v1.8.0-beta.1" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
+                        <TextBlock Name="AboutVersionBadgeText" Text="v1.8.0-beta.2" FontWeight="Bold" Foreground="{DynamicResource AccentPrimaryBrush}" FontSize="11" />
                       </Border>
                     </StackPanel>
                     <TextBlock Name="Tab4_AppSloganText" Text="高质感、极速现代 Windows 鼠标轮盘笔势工具" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0" />
@@ -4583,6 +4588,18 @@
                     <Button Name="OpenChangelogButton" Content="查看完整 CHANGELOG" Style="{StaticResource ModernButtonStyle}" Height="34" Padding="12,0" Click="OpenChangelogButton_Click" />
                   </WrapPanel>
                 </Grid>
+              </Border>
+              <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
+                <UIElement.Effect>
+                  <StaticResource ResourceKey="CardShadowEffect" />
+                </UIElement.Effect>
+                <StackPanel>
+                  <TextBlock Name="Tab4_Ms_180b2_Title" Text="v1.8.0-beta.2 全控制台四语系深度本土化 &amp; LocalizedString 扁平零堆分配 &amp; 交互防残留校验" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                  <TextBlock Name="Tab4_Ms_180b2_P1" Text="• 🌐 【全设置控制台 100% 四语系本土化】：全面覆盖触发设置、外观样式、手势动作、系统设置、关于软件全量标签页，重构 OCR 配置与结果浮窗为完整国际化与主题联动；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Name="Tab4_Ms_180b2_P2" Text="• ⚡ 【LocalizedString 扁平结构与零堆分配】：I18n 核心字典重构为 16 字节只读紧凑结构体，彻底消除动态切语言时的 GC 抖动与内存碎片，实现毫秒级即时热刷新；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Name="Tab4_Ms_180b2_P3" Text="• 🎛️ 【侧边栏 2x2 主题矩阵与动态下拉框热刷新】：侧边栏主题切换升级为 2x2 胶囊矩阵；全量动态下拉框 ComboBox 支持四语系即时热刷新与状态持久化；" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                  <TextBlock Name="Tab4_Ms_180b2_P4" Text="• 🛡️ 【Tab 4 里程碑规范与防残留校验机制】：建立 XAML、C# 与 I18n 三方严格一致性自动化校验机制，杜绝界面死链与孤儿残留词条。" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
               </Border>
               <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,14" SnapsToDevicePixels="True" UseLayoutRounding="True" RenderOptions.ClearTypeHint="Enabled">
                 <UIElement.Effect>

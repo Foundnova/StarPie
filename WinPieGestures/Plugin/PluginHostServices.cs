@@ -77,9 +77,8 @@ internal sealed class PluginHostInfo : IHostInfo
         {
             try
             {
-                // 单文件发布形态下 Assembly.Location 为空，此时回退到进程主模块路径
-                string? location = typeof(PluginHostInfo).Assembly.Location;
-                return string.IsNullOrEmpty(location) ? Environment.ProcessPath ?? "" : location;
+                // 单文件发布形态下使用 Environment.ProcessPath / AppContext.BaseDirectory
+                return Environment.ProcessPath ?? AppContext.BaseDirectory;
             }
             catch
             {
