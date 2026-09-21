@@ -8498,7 +8498,7 @@ public partial class SettingsWindow : Window
 		ActionItem? item = GetCurrentFocusActionItem();
 		if (item != null)
 		{
-			ActionExecutor.Execute(item);
+			ActionExecutor.ExecuteForTesting(item);
 		}
 	}
 
@@ -17543,7 +17543,7 @@ public partial class SettingsWindow : Window
 	{
 		if (sender is FrameworkElement { DataContext: SlotViewModel dataContext })
 		{
-			ActionExecutor.Execute(dataContext.Action);
+			ActionExecutor.ExecuteForTesting(dataContext.Action);
 		}
 	}
 
@@ -19722,7 +19722,7 @@ public partial class SettingsWindow : Window
 	{
 		if (sender is FrameworkElement fe && fe.DataContext is GestureMappingViewModel vm)
 		{
-			ActionExecutor.Execute(vm.Mapping.Action);
+			ActionExecutor.ExecuteForTesting(vm.Mapping.Action);
 		}
 	}
 
@@ -19765,7 +19765,7 @@ public partial class SettingsWindow : Window
 	{
 		if (ConfigManager.CurrentConfig?.CancelAction != null)
 		{
-			ActionExecutor.Execute(ConfigManager.CurrentConfig.CancelAction);
+			ActionExecutor.ExecuteForTesting(ConfigManager.CurrentConfig.CancelAction);
 		}
 	}
 

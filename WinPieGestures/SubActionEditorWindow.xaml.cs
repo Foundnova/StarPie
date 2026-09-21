@@ -144,7 +144,7 @@ public partial class SubActionEditorWindow : Window
 	{
 		if (sender is FrameworkElement { DataContext: SubSlotViewModel vm })
 		{
-			ActionExecutor.Execute(vm.Action);
+			ActionExecutor.ExecuteForTesting(vm.Action);
 		}
 	}
 
