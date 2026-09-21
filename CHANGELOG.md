@@ -6,6 +6,20 @@
 
 ## [未发布] - 2026-09-20
 
+插件页新增了两个入口，把「开机预加载」这条早就存在但只有手改 JSON 才够得着的链路接到用户面前。
+
+### 🔌 插件管理页接入「开机预加载」开关（总开关 + 每插件勾选，勾选当场生效）
+
+预加载链路（`SchedulePreload` → `Entry.Preload` → `Runtime.EnsurePluginLoaded(StartupPreload)`）早已存在，但**两个入口都到不了用户手里**：`PreloadOnStartup` 只活在 config.json 里、设置页没有任何控件；`Entry.Preload` 全仓唯一写入点在官方在线安装，`PluginRegistryStore.SetPreload` 是**零调用方的死接口**。结果是「需要常驻的插件」（如悬浮球类）对社区用户只能靠手改两个 JSON 文件才能开机出现 —— 一个文档里都不存在的隐藏仪式。
+
+- **总开关**（插件页「启用插件系统」旁新增复选框，接 `Plugins.PreloadOnStartup`）：用 `Click` 而非 `Checked/Unchecked`（与 `PluginSystemEnabledCheckBox` 同一理由：赋 `IsChecked` 也会触发后者，刷新即误写配置）。打开时调 `PluginHost.RequestPreloadSweep()` 立即补跑一轮扫描，条件与启动路径一致（非安全模式且开关已开）。
+- **每卡片「开机预加载」勾选**（`ItemTemplate` 内，只能 `{Binding PreloadText}` / `{Binding IsPreload}`，理由同「启用」「卸载」两处 —— `Name` 对模板内元素无效）：写 `registry.json` 的 `Entry.Preload`；勾选时调新增的 `PluginHost.PreloadNow(pluginId, out error)` **当场拉起**，用户不必重启就能看到插件生效。
+- **失败不改写偏好**：`PreloadNow` 失败（安全模式 / 加载异常）只弹提示、勾选保留 —— 下次启动仍会重试；一个瞬时失败就把用户配置反选掉，是最容易被当成 bug 的行为。取消勾选只影响下一次扫描，本次运行内已加载插件保持加载（与「是否加载由路径决定」的既有语义一致）。
+- **`PreloadNow` / `RequestPreloadSweep` 刻意放 `PluginHost`**：它是主程序唯一插件接缝（§3.7），设置页不直接触碰 `PluginRuntime` 与激活协调器。
+- **词条 6 个 × 4 语言**：`PluginsPreloadCheckBox` / `PluginsPreloadCheckBoxToolTip` / `PluginsCardPreloadCheckBox` / `PluginsPreloadFailed`，简中值与 XAML 设计期占位逐字一致 ⇒ **简中界面一字不变**。另有 `PluginsPreloadBlockedSystemOff` / `PluginsPreloadBlockedSafeMode` 两条短文案：`PreloadNow` 的失败原因会作为 `{1}` 拼进上面那条用户可见提示，所以它不能是宿主里写死的中文 —— 第一版就是写死的，换基时收进词条。
+
+**验证**：`dotnet build WinPieGestures -c Release -t:Rebuild`（全量重建）→ 0 警告 0 错误；`--plugin-selftest StarPie.Plugin.HelloAction.dll`（全量，不 skip-invoke）→ `PASS —— 全链路可用`，段落号集合与改前一致（`[3f]` 卡片护栏对新增的 `PreloadText` 字段照常通过）；`scratch/check_i18n.py` → 新增 6 键全部「引用=是、语言=4」、插件页漏接具名控件 0。**换基到 main 后按同一脚本复跑过一遍**：该脚本在词表改扁平格式后曾一度静默空转，已由另一笔修好，重跑结论不变（相对基线新增 6 键、语言分支与占位符一致性全绿）。**UI 回归（`tests/test_plugins.py` 弹 GUI）按约定由维护者本地手动跑，本笔未跑，不冒充已做。**
+
 ### 🐛 修：设置页点「测试」必报「执行超时（3s）」，而同一个动作从轮盘上触发完全正常
 
 - **症状与误导方向**：设置页里点「测试」，3 秒后弹出「执行超时（3s）」；把同一个动作挂到扇区上经手势触发则一切正常。这看起来像插件写坏了，实际是宿主把自己锁死了 —— 设置页的 5 个「测试」按钮都在 **UI 线程**上同步调用 `ActionExecutor.Execute`，而插件动作那条路上 `PluginInvoker` 用 `task.Wait(超时)` 等结果。任何 `await Dispatcher.InvokeAsync(…)` 的插件（也就是要画窗口的那一类）都会让 UI 线程等一个「要等 UI 线程空出来才能完成」的任务，必然耗满超时。

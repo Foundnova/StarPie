@@ -50,6 +50,9 @@ internal sealed class PluginListItem
     /// <summary>卡片上「卸载」按钮的文字。同 <see cref="EnableText"/> 的绑定理由。</summary>
     public string UninstallText { get; init; } = "";
 
+    /// <summary>卡片上「开机预加载」复选框的文字。同 <see cref="EnableText"/> 的绑定理由。</summary>
+    public string PreloadText { get; init; } = "";
+
     /// <summary>错误详情。为空表示健康。</summary>
     public string ErrorText { get; init; } = "";
 
@@ -58,6 +61,9 @@ internal sealed class PluginListItem
 
     /// <summary>是否已启用（登记态，不是运行态）。</summary>
     public bool IsEnabled { get; init; }
+
+    /// <summary>是否登记了「开机预加载」（偏好态；是否真的预加载还受总开关与安全模式约束）。</summary>
+    public bool IsPreload { get; init; }
 
     /// <summary>
     /// 把运行时实例翻译成列表项。所有面向用户的文案都在这里，且全部走 <see cref="I18n"/>。
@@ -125,8 +131,10 @@ internal sealed class PluginListItem
             StatusGlyph = glyph,
             EnableText = I18n.T("PluginsCardEnableCheckBox"),
             UninstallText = I18n.T("PluginsCardUninstallButton"),
+            PreloadText = I18n.T("PluginsCardPreloadCheckBox"),
             ErrorText = errorText,
             IsEnabled = entry.Enabled,
+            IsPreload = entry.Preload,
         };
     }
 
