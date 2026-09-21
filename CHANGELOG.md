@@ -6,6 +6,46 @@
 
 ## [未发布] - 2026-09-20
 
+本次更新给插件 SDK 开了一条新接缝（`IHostWheelService`），并带上它的第一个真实用户：常驻悬浮球示例。
+
+### 🛞 SDK 1.5：`IHostWheelService` —— 常驻形态的插件不必再复刻一个轮盘
+悬浮球这类形态要能用轮盘，而轮盘的呈现（`RadialWindow`）与配置（profile / 扇区动作）全在宿主内部，插件既拿不到也不该拿 —— 让它自己画一个假盘，得到的是一个与用户配置、体积、多屏 DPI 全都脱钩的第二套轮盘。所以这次动的是 SDK：**插件负责「何时唤」，宿主负责「唤出来是哪个盘」**。
+- **SDK**：新增 `PluginCapability.Wheel`（取 `1 << 11`，按「只取新位、不插中间」的约定排在 `InputSimulation` 之后）与 `IHostWheelService`（`ShowWheel` / `DismissWheel`），装配到 `IPluginContext.Wheel`。坐标是**物理像素的虚拟屏幕坐标**，与插件拿到的光标坐标同一坐标系，不让它去猜 WPF 的 DIU 换算。`ShowWheel` 返回 `true` 的语义是「宿主已受理并排队呈现」，不是「轮盘已经出现」 —— 沿用 `ActivateTaskbarSlot` 那条纪律。
+- **宿主**：新增 `Plugin/StickyWheelSession.cs`。它只复用轮盘的**呈现**（`RadialWindow.Present` / `Dismiss` / `HighlightSector` / `SetOuterEscapeState` 本来只吃坐标 + profile + 版本号，不校验物理按键，长按唤盘就是先例），输入换成一个全屏遮罩窗的普通 WPF 鼠标事件 —— **全程不进鼠标钩子、不进手势状态机**，钩子路径零污染。遮罩带 `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`（收点击但绝不抢前台，否则快捷键类动作会打进错误窗口），背景 `alpha=1`（肉眼不可见，而 WPF 命中要求非全零）。盘窗与遮罩窗**跨会话复用**，反复建销透明 HWND 会引入 DWM 旧帧闪烁。
+- **交互**：光标完全自由（不像手势那样把指针钉在圆心）；**只有按下驱动执行，抬起一律忽略** —— 所以发起呼出的那一次点击的抬起不会被吞掉。点盘外与点中心 = 外甩 / 中心动作语义，右 / 中键 = 取消。
+- **未抽公共命中函数**（刻意）。`GestureController.ProcessMove` 的命中与实例态强耦合（蜂窝扇迟滞锁定、音量拖距接管、外甩 flick 都是「拖拽」这个语义的组成部分），抽出来要么把这些状态一起搬过去、要么在拖拽路径上留下一个只服务点击的分支。会话内独立实现的是核心几何（死区、极角扇区、环带上界、二级扇区），并在注释里逐段锚定 `ProcessMove` 的行号；不搬的两处（迟滞锁定、`OuterEscapeDistance`）同样写明理由 —— 取消判据改用可见盘缘，因为点击式没有「拖拽中途」。
+- **互斥是不对称的**：粘滞期内真手势被 `GestureController` 的两处激活点用 `StickyWheelSession.IsActive` 拦下（判据在**受理时**置位，闭掉 `BeginInvoke` 那几毫秒的窗口期，否则两个轮盘会同屏）；反向在手势进行中 `Show` 直接拒绝。会话**不绑属主生命周期**：扇区执行的是用户配置的动作、走 `ActionExecutor` 正常队列，插件不在调用栈上，因此无需调用租约，插件停用也不该收走用户正在用的盘。
+- **`Wheel` 不与 `Ui` 合并**：勾了 `Ui` 只代表允许插件画自己的窗口；轮盘执行的是用户配置的动作、且显示期间接管全部点击，这两条后果都必须让用户在安装前看见。新增词条 `PluginCapabilityWheel` ×4 语言，安装确认页由 `PluginCapabilityLabels` 自动带出。
+- **`[3j]` 新增 5 条断言**：两条拒绝探针（`None` / 只声明 `Process` 的插件调 `ShowWheel`）、两条 `DismissWheel` 拒绝、一条「已声明 Wheel：放行」。全部用 **NaN 坐标** —— 参数校验必拦，任何运行模式下都不可能真成盘。
+- **修掉一处会说谎的绿**：`PluginApi` 的版本是 `ApiVersionMinor` 与 `ApiVersion` 字符串**两处手写**，初次只改了一处，自检当场报 FAIL —— 这条护栏值回票价，注释已标出「两处同改」。
+**验证**：`dotnet build WinPieGestures -c Release -t:Rebuild` → **0 警告 0 错误**；`--plugin-selftest` → **PASS —— 全链路可用**，`[3j]` 轮盘断言全绿、能力位 12 项位值两两不重复、能力文案 12 项全覆盖；段落号集合与 HEAD 逐字一致（`AGENTS.md` §5.1）；`check_i18n.py` → 相对基线新增键 1 个，`PluginCapabilityWheel` 引用=是(三元拼接)、语言=4，缺语言分支 / 空值 / 占位符不一致均为 0；**变异测试**：把 `PluginWheelService.ShowWheel` 的 `RequireCapability()` 注释掉，构建仍 0 警告 0 错误（编译器抓不到），自检当场报 2 条 `[FAIL]`（「未声明 Wheel…没有被正确拒绝」「只声明了 Process 的插件调用 Wheel.ShowWheel 竟然被放行」）并结论 FAIL，还原后复跑回到 PASS。
+**已知未覆盖（登记，不冒充已做）**：轮盘的 UI 回归（遮罩实际点击手感、混合 DPI 多屏下的铺满与命中）需要人手动跑，本轮只做了构建期与自检期验证；`Esc` 取消**刻意不做** —— 遮罩 `ShowActivated=false`，为一个按键去抢焦点会把前台窗口换掉；配置在轮盘显示期间被改（改扇区 / 切 per-app profile）不会重绘当前会话，收摊后下一次呼出才是新配置。
+
+### ⚪ 新增示例插件 `samples/FloatingBall/`：SDK 1.5 那条接缝的第一个真实用户
+`IHostWheelService` 落地之后，「常驻球 + 点球唤盘」这个形态第一次可以在插件侧写出来。它同时补上了示例层的第三类形态：`HelloAction` 是入门模板、`ScreenBrightness` 是互操作压力样本，而这两枚都是「被触发一次就结束」——**没有任何一枚示范过常驻窗口该怎么活**。
+- **分工与 SDK 一致**：球由插件画（`Ui`），点球之后由宿主呼出**用户配置的**轮盘（`Wheel`）。插件全程不认识轮盘的外观、扇区、命中与配置，也不做「再点一下收盘」的开关 —— 全屏遮罩盖住球之后，第二次点击必然先被遮罩吃掉，那条分支不可达，写出来只是死代码加一个假承诺。
+- **单位策略**：位置走物理像素（`GetWindowRect` / `SetWindowPos`，按虚拟屏 `SM_*VIRTUALSCREEN` 夹取），直径按 DIU 声明、落位时乘**球心所在显示器**的 `GetDpiForMonitor(MDT_EFFECTIVE_DPI)`。位置不能用 WPF 的 `Left`/`Top`（DIU 且相对当前显示器），否则混合 DPI 多屏下会得到「球在副屏看着对，点它轮盘跑到主屏」；按球心而不是左上角取屏，是为了贴边放置时不按另一块屏算尺寸。
+- **外观走动作参数**（`diameter` / `opacity` / `color`），不做插件设置窗 —— 宿主根本不给插件设置页，`ParameterField` 由主程序统一渲染。球实例**不可变**：改外观 = 带着旧位置重建，少掉三个 setter 就少掉三类「参数改了视觉没跟上」的漂移。
+- **拖动与点击共用一次按下**：位移超过 4 个物理像素算拖动（松手落盘一次），否则算点击（呼盘）。`WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` 与宿主轮盘同一条纪律 —— 收点击但绝不抢前台，Alt+Tab 里也不许多出一项「球」。
+- **⚠️ 踩到并修掉一个只有自检能抓到的坑**：`Shutdown` 里那句「投递关窗」即使**没有窗口要关**也会把插件闭包留在 UI 线程的 `DispatcherOperation` 队列里，宿主的 ALC 卸载探针因此三轮判定都回收不掉 —— 现象是 `[5]` 报「释放租约后插件仍未停止」、`[6]` 卸载失败、`[3d]` 连带判成「已安装」，而构建始终 0 警告 0 错误。改为**投递前先判断有没有活要干**（关窗前看窗口真的存在、开机恢复前先看设置开关），实测 `[5]` 从 `RequiresRestart` 变回「延迟判定：插件程序集已成功回收」。这条纪律已写进 `AGENTS.md` §3.7。
+- **顺带修一处真实过期**：`samples/HelloAction/plugin.schema.json` 的 `capabilities` 枚举停在 8 项，缺 `WindowControl` / `ScreenCapture` / `InputSimulation` / `Wheel` —— 插件作者照 schema 写清单会被 IDE 判成非法值。**单独一次提交**，与新增示例无关。
+- 另按 §3.7 的熔断纪律改了一处返回码：装机时用户不勾 `Ui` 属于「环境不具备」，原来返回 `Fail` 会让用户连点五次就把一枚正常插件判成「已隔离」，现改为 `Ok(说明, silent: false)`。
+**验证**：`dotnet build samples/FloatingBall -c Release` → **0 警告 0 错误**；`--plugin-selftest samples/FloatingBall/.../StarPie.Plugin.FloatingBall.dll --skip-invoke` → **PASS —— 全链路可用**（识别 `Ui, Wheel` / 启用后注册 2 动作 1 图标 19 词条 / `[3b]` 参数面 `diameter` 24~160、`opacity` 20~100、`color` 四项校验全过 / `[3c]` 选择器分组与写读往返 / `[5]` 租约与异步停用 / `[6]` 卸载 / `[3j]` 轮盘门禁与「已声明 Wheel：放行」）；同一条命令对 `HelloAction` 复跑作为基线，同样 PASS。**没有跑真实调用**（`--skip-invoke`）：`showBall` 一旦真执行就会在屏幕上放出一颗球，那属于要人看的界面回归。
+**已知未覆盖（登记，不冒充已做）**：球的实际观感、拖动手感、混合 DPI 双屏下的落位与命中、点球出盘的全链路，都要人手动跑一次（装 dll → 启用 → 把「显示悬浮球」挂到扇区或开开机预加载）；`[3d]` 的候选扫描断言在插件卸载失败时会连带变红，读报告时别把它当成第二个缺陷。
+
+### 🐛 修 `FloatingBall`：用户一个参数都没填时，动作 100% 失败
+上一节那句「`[3b]` 参数面…四项校验全过」**结论不成立** —— 它测的是按默认值填满的那一份输入。真机上把这个样本装进部署版（v1.8.0-beta.1）之后，日志里连着 7 次：
+```
+[2026-09-20 12:41:17] [WARN] [StarPie.ActionExecutor] Plugin action failed: com.example.floatingball.showBall,
+Reason='显示悬浮球 参数不合法：直径要在 24 到 160 之间。'   ← 12:41:17 / 21 / 22 / 24 / 29 / 30 / 31 共 7 次
+```
+- **根因**：`Actions.cs` 的 `TryReadDouble` 把「键不存在」和「填了空白」都读成 `0` 并返回「成功」，紧接着的范围校验于是拿 `0` 去比 `24~160` —— 声明里没有必填项，宿主那一层放行，插件自己那一层拒绝。用户刚装上、什么都没配，点哪都失败。
+- **改法**：可选数值参数改成三态（未提供 / 提供了但非法 / 提供了且合法，`out double?` ＋ `OutOfRange(double?, min, max)`），范围校验只在**真的填了值**时执行；`Preview` 的回落随之从「`<= 0` 就当没填」改成 `??`。没有采用「`value > 0 &&` 短路」那种写法 —— 它会把**显式填的 0** 当成没填，那是另一个方向的错判。
+- **顺手补护栏**（`[3b] ①b`）：把同一份全空输入再走一遍统一校验入口（`PluginHost.ValidateActionParameters`，会连带调插件自己的 `Validate`），声明层放行而插件层拒绝时**判 FAIL**。探针刻意手搓 `ActionItem` ＋ 空 `ExtensionData`，因为 `PluginHost.CreateActionItem` 会用默认值把参数表填满、空输入根本传不进去 —— 这也是 ④ 看不见该缺陷的根因。
+- **验证**：`dotnet build`（宿主 + 样本）→ **0 警告 0 错误**；新自检 ×**修好前那份 dll**（`a2527edb…`）→ `[FAIL] 「showBall」的声明校验放行全空输入，插件自己的校验却拒绝（直径要在 24 到 160 之间。）`，报出的正是真机那条用户可见文案；新自检 ×**修好后** → ①b 通过、整体 **PASS**。段落号集合前后一致（`[3b]` 内新增子项，未新增段）。
+- **另记一条与本 PR 无关的宿主既有缺陷**：设置页「测试」按钮在 UI 线程上同步执行动作，`PluginInvoker` 又用 `task.Wait` 阻塞同一条线程，于是任何 `await Dispatcher.InvokeAsync` 的插件一点「测试」必报「执行超时（3s）」（本机 12:41:41→45 复现）。真实手势走 `StarPie.ActionExecutor` 后台线程，所以不受影响。**该缺陷已由 `fix/plugin-test-action` 单独修掉**，不在本 PR 内。
+**已知未覆盖（登记，不冒充已做）**：本轮只补了「全空输入」这一格。②～④ 仍然只喂按默认值填满的那一份，**「用户填了一部分」的组合没有被任何一层断言覆盖**；此外这条护栏只在插件被自检加载时生效，宿主自身对空输入的行为靠 `[3b]` ①。
+
 ### 🔧 维护性修复
 
 1. **`scratch/check_i18n.py` 恢复生效：词表格式漂移导致护栏静默空转**

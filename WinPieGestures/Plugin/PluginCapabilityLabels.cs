@@ -63,6 +63,9 @@ internal static class PluginCapabilityLabels
         (PluginCapability.WindowControl, "PluginCapabilityWindowControl"),
         (PluginCapability.ScreenCapture, "PluginCapabilityScreenCapture"),
         (PluginCapability.InputSimulation, "PluginCapabilityInputSimulation"),
+
+        // 轮盘上跑的全是用户自己配的动作，措辞要点破两件事：会「接管点击」，且「按下即执行配置」。
+        (PluginCapability.Wheel, "PluginCapabilityWheel"),
     };
 
     /// <summary>把一组能力位拼成确认页上的多行文本；没有任何能力时返回「（无）」（同样走词条）。</summary>

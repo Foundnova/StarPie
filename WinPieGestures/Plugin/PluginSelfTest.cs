@@ -675,7 +675,7 @@ internal static class PluginSelfTest
             }
 
             Line("");
-            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取 / 系统功能）");
+            Line("[3j] 宿主服务面与能力门禁（命令 / Shell 动词 / 窗口控制 / 屏幕截取 / 系统功能 / 轮盘呼出）");
 
             // ① 类型关系：拒绝异常刻意不继承 PluginContractException。
             //
@@ -695,6 +695,7 @@ internal static class PluginSelfTest
             var deniedWindowService = new PluginWindowService(gateProbePluginId, PluginCapability.None);
             var deniedCaptureService = new PluginScreenCaptureService(gateProbePluginId, PluginCapability.None);
             var deniedSystemService = new PluginSystemService(gateProbePluginId, PluginCapability.None);
+            var deniedWheelService = new PluginWheelService(gateProbePluginId, PluginCapability.None);
 
             // ② 未声明所需能力：必须拒绝。
             //
@@ -788,6 +789,37 @@ internal static class PluginSelfTest
                     $"未声明 InputSimulation 的插件调用 System.RunPreset 没有被正确拒绝：{systemGateDetail}");
             }
 
+            // 轮盘服务的两条拒绝探针都用 <b>NaN 坐标 / 无会话状态</b>：门禁若真漏了，
+            // 参数校验也会当场拦下 —— 自检绝不可能因为探针写错而弹出一个全屏遮罩。
+            (bool wheelShowDenied, string wheelShowGateDetail) =
+                ProbeCapabilityGate(() => deniedWheelService.ShowWheel(double.NaN, double.NaN), PluginCapability.Wheel);
+
+            if (wheelShowDenied)
+            {
+                Line($"  Wheel.ShowWheel：{wheelShowGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 Wheel 的插件调用 Wheel.ShowWheel 没有被正确拒绝：{wheelShowGateDetail}");
+            }
+
+            // Dismiss 单独也有一条：每个方法都得自己过门禁，<b>不能蹭同门的 ShowWheel</b>。
+            // 这条是防复制粘贴事故的：将来加第三个方法时，漏写 RequireCapability 的
+            // 「收盘」会把属主校验之后的会话替别人收掉 —— ShowWheel 的断言对此全绿。
+            (bool wheelDismissDenied, string wheelDismissGateDetail) =
+                ProbeCapabilityGate(() => deniedWheelService.DismissWheel(), PluginCapability.Wheel);
+
+            if (wheelDismissDenied)
+            {
+                Line($"  Wheel.DismissWheel：{wheelDismissGateDetail} ✓");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    $"未声明 Wheel 的插件调用 Wheel.DismissWheel 没有被正确拒绝：{wheelDismissGateDetail}");
+            }
+
             // ③ 声明了所需能力：同一个调用必须放行。
             //
             // 少了这一半，把门禁写成「永远拒绝」也能通过上面全部断言 ——
@@ -869,6 +901,25 @@ internal static class PluginSelfTest
                     $"后者是往用户正在打字的窗口里按键。{processOnlyDetail}");
             }
 
+            // 轮盘服务的跨能力探针：只声明 Process 调不动轮盘。轮盘上跑的动作
+            // <b>很多确实就是起进程</b> —— 这个「认错能力」在这里同样是最有诱惑力的错法，
+            // 与系统服务那段并排，两个都是「顺手的标志恰好覆盖了真正的后果」。
+            var processOnlyWheelService = new PluginWheelService(gateProbePluginId, PluginCapability.Process);
+
+            (bool wheelCrossDenied, string wheelCrossDetail) =
+                ProbeCapabilityGate(() => processOnlyWheelService.ShowWheel(double.NaN, double.NaN), PluginCapability.Wheel);
+
+            if (wheelCrossDenied)
+            {
+                Line($"  跨能力：只声明 Process 调用轮盘服务仍被拒绝 ✓（{wheelCrossDetail}）");
+            }
+            else
+            {
+                Fail("能力门禁",
+                    "只声明了 Process 的插件调用 Wheel.ShowWheel 竟然被放行 —— 轮盘上点的每个扇区" +
+                    $"执行的都是用户配置的动作，「会起进程」不等于「可以呼轮盘」。{wheelCrossDetail}");
+            }
+
             // ③c 窗口服务声明了对应能力：同样必须放行。
             var allowedWindowService = new PluginWindowService(
                 gateProbePluginId, PluginCapability.WindowControl);
@@ -922,6 +973,37 @@ internal static class PluginSelfTest
             catch (Exception gateError)
             {
                 Fail("能力门禁", $"已声明 InputSimulation 的调用抛出异常：{gateError}");
+            }
+
+            // 轮盘服务声明了 Wheel 就必须放行。放行后的两道短路让这一半<b>零副作用</b>：
+            // ShowWheel 走 NaN 坐标（参数校验必拦，任何运行模式下都不可能成盘），
+            // DismissWheel 在没有会话时是无害空操作 —— 两条都只该拿到 false，拿到 true 才是新闻。
+            var allowedWheelService = new PluginWheelService(gateProbePluginId, PluginCapability.Wheel);
+
+            try
+            {
+                bool nanShowResult = allowedWheelService.ShowWheel(double.NaN, double.NaN);
+                bool emptyDismissResult = allowedWheelService.DismissWheel();
+
+                if (nanShowResult || emptyDismissResult)
+                {
+                    Fail("能力门禁",
+                        $"已声明 Wheel 的探针调用竟然被受理（Show(NaN)={nanShowResult}, Dismiss={emptyDismissResult}）—— " +
+                        "参数校验或空会话短路失效，自检环境里会弹出全屏遮罩");
+                }
+                else
+                {
+                    Line("  已声明 Wheel：放行 ✓（NaN 坐标与无会话空操作，未呼出任何轮盘）");
+                }
+            }
+            catch (PluginCapabilityDeniedException denied)
+            {
+                Fail("能力门禁",
+                    $"已声明 Wheel 却被拒绝（{denied.Capability}）—— 门禁判据写错了，正常插件会全部废掉");
+            }
+            catch (Exception gateError)
+            {
+                Fail("能力门禁", $"已声明 Wheel 的调用抛出异常：{gateError}");
             }
 
             // ④ 能力位本身的形状：两两不重复。
@@ -1337,6 +1419,53 @@ internal static class PluginSelfTest
                 if (hasRequired && emptyIssues.Count == 0)
                 {
                     return $"「{candidate.ShortId}」声明了必填参数，但全空输入未被拦下 —— 空值会直接存进配置。";
+                }
+
+                // ①b 同一份全空输入再走一遍「统一校验入口」（声明约束 + 插件自定义 Validate）。
+                // 这一条判失败，不像 ④ 那样只警告。
+                //
+                // 存在理由是「一个参数都没填」才是插件真实面对的第一种状态，而 ②③④ 喂的全是
+                // 按默认值填满的那一份 —— 于是留下「自检一路绿、用户装上点哪都失败」的空档。
+                // 真机踩过：FloatingBall 的声明里没有必填项（① 因此放行），而插件自己的 Validate
+                // 把缺键读成 0 再判成越界，用户 7 次触发全部失败。
+                //
+                // 敢判失败，是因为空输入上没有 ④ 那种「规则与默认值互斥」的正当借口：
+                // 声明层放行、插件层拒绝只有两种解释 —— 该字段本就该标 Required（声明写漏），
+                // 或插件把「未填」当成了非法值（读值写错）。两种都是作者当场改得掉的问题。
+                //
+                // 这里刻意不用 PluginHost.CreateActionItem 造探针：它会用声明的默认值把参数表填满
+                // （见其「用参数默认值填充」一段），空输入根本传不进去 —— ④ 看不见这类缺陷的根因
+                // 就在这。手搓 ActionItem 才等价于「用户把一个没填过参数的扇区切成了插件动作」。
+                if (emptyIssues.Count == 0)
+                {
+                    ActionItem emptyProbe = new()
+                    {
+                        Type = PluginApi.ActionTypeName,
+                        Name = candidate.DisplayName,
+                        PluginActionRef = new PluginActionRef
+                        {
+                            PluginId = candidate.PluginId,
+                            ContributionId = candidate.ShortId,
+                        },
+                        ExtensionData = new Dictionary<string, string>(),
+                    };
+
+                    PluginActionValidation emptyUnified =
+                        PluginHost.ValidateActionParameters(emptyProbe);
+
+                    line("    ①b 同一份全空输入走统一入口 → " +
+                         (emptyUnified.IsValid ? "通过" : "不通过"));
+
+                    if (!emptyUnified.IsValid)
+                    {
+                        return $"「{candidate.ShortId}」的声明校验放行全空输入，插件自己的校验却拒绝" +
+                               $"（{emptyUnified.Describe()}）—— 用户装上插件后一个参数都不填就会点哪都失败。" +
+                               "要么该字段应声明 Required，要么插件要把「未填」和「填了非法值」分开判。";
+                    }
+                }
+                else
+                {
+                    line("    ①b 跳过：声明层已经拦下全空输入，插件层是否也拒绝不再影响用户。");
                 }
 
                 // ②③④ 都需要一份「除被测字段外其余都合法」的基线。

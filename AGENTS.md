@@ -118,7 +118,8 @@ g:\Users\2 Better\Desktop\design\
 │   └── PluginApi.cs               # 契约常量（ApiVersion / 前缀 / 上限）
 ├── samples/                       # ★ 社区插件示例（可直接构建为可分发的插件目录）
 │   ├── HelloAction/               # 参考模板，演示 SDK 全部可做之事（Text/Bool/Enum/Folder 参数）
-│   └── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
+│   ├── ScreenBrightness/          # 压力测试样本：P/Invoke + COM 互操作 + 耗时 IO（Number/Bool 参数）
+│   └── FloatingBall/              # 常驻形态样本：插件自画 WPF 球窗 + 经 IHostWheelService 呼出宿主轮盘
 ├── releases/                      # 正式发行包构建归档目录
 │   └── vX.Y.Z/
 │       ├── Lightweight/           # 依赖运行时的轻量绿色包 (~2.5MB)
@@ -230,7 +231,7 @@ g:\Users\2 Better\Desktop\design\
 - **三层分界，任何一层都不许越界**：
   - **SDK 契约层** `StarPie.Plugin.Abstractions/`（独立程序集，插件唯一允许引用的 StarPie 程序集）。改动它等于改公共契约，只增不改；
   - **宿主实现层** `WinPieGestures/Plugin/`（`PluginHost` 是主程序唯一的调用接缝）；
-  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本）。
+  - **示例层** `samples/`（`HelloAction` 是社区参考模板，`ScreenBrightness` 是 P/Invoke + COM + 耗时 IO 的压力测试样本，`FloatingBall` 是常驻形态样本 —— 插件自己画窗口、自己从动作参数取外观、经宿主服务呼出轮盘）。
 - **插件工程的四条硬约束**（改错任一条都会导致加载失败或类型身份分裂）：
   1. `TargetFramework` 不得高于宿主（`net8.0-windows` / `net8.0-windows10.0.19041.0`），宿主直接读 `TargetFrameworkAttribute` 核对；
   2. `ProjectReference` 必须带 `<Private>false</Private>`，否则产物里会多出一份 `StarPie.Plugin.Abstractions.dll`，出现两份 `IStarPiePlugin` 类型身份，强转全部失败；
@@ -244,7 +245,8 @@ g:\Users\2 Better\Desktop\design\
   - `Bool` 字段未填视为 `false`，**不算必填失败**，也不要「空值即删除」——取消勾选必须显式落盘 `false`，否则插件读到的会是它自己的兜底值（可能为 `true`），表现为「取消勾选没生效」。
   - 数值参数一律用 `InvariantCulture` 读写（宿主侧与 `PluginActionInput.Int/Double` 都是），否则德法等以逗号作小数点的区域会把 `0.5` 解析失败并静默退回默认值。
 - **动作调度类别 `ActionKind`**：`Sequential` 占用唯一的动作线程，**任何可能上百毫秒的操作（DDC/CI、网络、目录遍历）都必须声明为 `Background`**，否则用户会明显感到「触发后轮盘卡一下」，直接违背零延迟红线。
-- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。
+- **熔断与「伪失败」**：宿主对连续失败 5 次的动作会判定为插件缺陷并自动 `Quarantined`。因此**环境不具备条件不是插件失败**（如显示器未开启 DDC/CI），必须返回 `ActionResult.Ok(..., silent: false)` 并说明原因；返回 `Fail` 会让用户连点几次就把一个正常插件弄成「已隔离」。装机时用户可以在确认页上不勾某项能力，所以「清单没勾 → 干不了活」也走这条，不是 `Fail`。
+- **⚠️ 会画窗口的插件：`Dispatcher.Post` 只在真有活要干时投**：宿主的 ALC 卸载探针靠 `WeakReference` 判定，而一次投递会在 UI 线程队列里留下一个握着插件闭包的 `DispatcherOperation` —— **即使那个闭包什么也不做**。实测现象就是 `--plugin-selftest` 的 `[5]` 报「释放租约后插件仍未停止」、`[6]` 卸载失败、`[3d]` 连带判成已安装。所以恢复窗口之前先读一次设置开关、关闭窗口之前先确认窗口真的存在，别把判断整个塞进闭包里。
 - **界面接缝：动作类型下拉「收敛成一个类型 + 一个子下拉」**：插件动作在数据模型上仍是 `ActionItem.Type = "Plugin"` + `PluginActionRef`（`PluginId` + `ContributionId` + `FullId`），但界面上**类型下拉只承载一个选项**「插件动作」，具体是哪个动作由紧随其后的子下拉决定。因此：
   - 类型下拉的 `Tag` 就是**裸 `Plugin`**，不需要也不应该编码身份（历史上有过 `Plugin:<贡献点全ID>` 的编码与配套的 `TryParseTag`/`ProjectTag` 退化逻辑，收敛后全部成了死代码，已删除）；
   - 子下拉用 `ListCollectionView` + `PropertyGroupDescription(GroupName)` 按插件名分组，分组头不是 `ComboBoxItem`，**天然不可选中** —— 从结构上排除「选中了插件名却不是一个动作」这种非法状态；
@@ -265,22 +267,22 @@ g:\Users\2 Better\Desktop\design\
   - 保留 ID 前缀只在官方在线安装和已登记官方模块的装载路径放行；社区手动安装必须拒绝保留 ID。
   - 认领类型的宿主裸字段仍通过 `ActionParameterProjection` 以显式白名单投影为参数字典；不投影外观字段。
 - **派发顺序不可改变**：`ActionExecutor` 固定按「内建 Hotkey → 官方类型认领 → 普通 `Type="Plugin"`」执行；已完成官方插件交割的类型不再进入历史 switch，历史裸字段只通过对应官方插件路由。
-- **能力门禁（Capability Gate）：五个服务面、四个能力位，每一位都对应一个真实强制点**：
-  - 带门禁的是五个「产生不可忽略后果」的服务：`IHostCommandService.Run`（命令）与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）挂 `Process`；`IHostWindowService` 的五个执行方法（挪走 / 置顶 / 改透明度 / 切走用户正在用的窗口）挂 `WindowControl`；`IHostScreenCaptureService.CaptureAndRecognize`（会抓走用户整个屏幕的内容）挂 `ScreenCapture`；`IHostSystemService.RunPreset`（系统控制既起进程也发按键）挂 `InputSimulation`。清单未声明对应能力时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
-  - **每个服务认自己那项能力，不复用别人的**。`WindowControl` 刻意不与 `Process` 合并：安装确认页上展示的能力必须对应一个真实后果，用户看到「进程」想的是「它要启动程序」，而实际后果是他的窗口被挪走 —— 那是标签名不副实。`Ui` 同样不符（它的语义是「打开自己的窗口」）。`InputSimulation` 也刻意不与 `Process` 合并，虽然「系统控制」里两者都会发生：`Process` 的后果是**多出一个后台进程**，`InputSimulation` 的后果是**往用户正在打字的那个窗口里按键** —— 用户能接受前者不代表能接受后者。五个服务的门禁实现共用一个基类（`PluginGatedService`），所以**复制粘贴时把 required 传错不会有任何编译错误** —— 自检 `[3j]` 用「只声明 A 的插件调 B 的服务」这一组交叉断言守它，否则「认错能力标志」会让上面那些断言照样全绿。
+- **能力门禁（Capability Gate）：六个服务面、五个能力位，每一位都对应一个真实强制点**：
+  - 带门禁的是六个「产生不可忽略后果」的服务：`IHostCommandService.Run`（命令）与 `IHostShellService.Invoke`（Shell 动词里有 UAC 提权的 `Windows.RunAs`、清空回收站这类不可撤销操作）挂 `Process`；`IHostWindowService` 的五个执行方法（挪走 / 置顶 / 改透明度 / 切走用户正在用的窗口）挂 `WindowControl`；`IHostScreenCaptureService.CaptureAndRecognize`（会抓走用户整个屏幕的内容）挂 `ScreenCapture`；`IHostSystemService.RunPreset`（系统控制既起进程也发按键）挂 `InputSimulation`；`IHostWheelService.ShowWheel`（呼出的是**用户配置的**轮盘，且显示期间由全屏遮罩接管全部点击）挂 `Wheel`。清单未声明对应能力时直接抛 `PluginCapabilityDeniedException`，**绝不静默降级**。
+  - **每个服务认自己那项能力，不复用别人的**。`WindowControl` 刻意不与 `Process` 合并：安装确认页上展示的能力必须对应一个真实后果，用户看到「进程」想的是「它要启动程序」，而实际后果是他的窗口被挪走 —— 那是标签名不副实。`Ui` 同样不符，而且它比 `Process` 更容易被误当成够了 —— 它的语义是「打开自己的窗口」，而 `Wheel` 唤起的是宿主渲染的轮盘、扇区执行的是用户配置的动作，用户在盘上点下去的每一个扇区都不是插件自己的代码；勾了 `Ui` 就允许接管点击，等于把「它能画窗口」偷换成「它能替你做决定」。`InputSimulation` 也刻意不与 `Process` 合并，虽然「系统控制」里两者都会发生：`Process` 的后果是**多出一个后台进程**，`InputSimulation` 的后果是**往用户正在打字的那个窗口里按键** —— 用户能接受前者不代表能接受后者。六个服务的门禁实现共用一个基类（`PluginGatedService`），所以**复制粘贴时把 required 传错不会有任何编译错误** —— 自检 `[3j]` 用「只声明 A 的插件调 B 的服务」这一组交叉断言守它，否则「认错能力标志」会让上面那些断言照样全绿。
   - **门禁必须在 `Guard` 之外**。若挪进 `Guard` 里，异常会被吞掉、转成一个 `false` 返回值，用户看到的是「命令没执行」而不是「本插件缺少「进程」能力」—— 前者会被当成软件 bug 反复报，后者才指向真正该改的地方。
   - **元数据（`Terminals` / `Verbs` / `Layouts` / `OpacityMinPercent` …）刻意不受门禁约束**：插件的 `Parameters` 是属性、声明期（注册前）就要读这几份清单，在那里抛异常会让一个「忘了声明能力」的插件在注册阶段整个崩掉 —— 而它其实只是不能在运行时干活而已。**门禁拦的是「产生后果」的调用**。
   - **`PluginCapabilityDeniedException` 刻意不继承 `PluginContractException`**：后者的语义是「违反注册契约」，宿主会因此把插件整体标记为加载失败并卸载；而「清单里漏了一行能力声明」远不到那个程度。真继承上去，用户看到的是「插件突然坏了 / 被系统禁用了」，排查方向会完全跑偏。
   - **必须说清它换来的不是安全**：进程内插件本来就能自己 `Process.Start` / P/Invoke `SetWindowPos`，SDK 拦不住。门禁换到的是「安装确认页上展示的能力真的对应一个后果」—— 漏掉它，那个勾选在运行时没有任何对应物，才是真正骗人的地方。
   - **只能加在新接口上**。`IHostActionInvoker` 的七个方法是既有契约，补门禁会让已发布、未声明该能力的插件突然失败（破坏性变更）。
   - **新增能力项要一次只加「有强制点的那一项」**。S3a 只加了 `WindowControl`（同时落地了它的门禁），`ScreenCapture` / `InputSimulation` 各自等 `IHostScreenCaptureService`（S4a）/ `IHostSystemService`（S4b）落地时再加（均已落地）—— 提前加会出现「安装确认页展示了这个能力、运行时却没有任何对应物」，正是上面那条要消除的东西。**配套纪律**：确认页能力文案集中在 `PluginCapabilityLabels`，枚举每加一个非空能力位必须同步加文案，自检 `[3j]` 有机器护栏 —— 文案缺失的症状是用户在确认页看到一个勾选项却读不到它意味着什么。表里存的是**词条键**而不是文案（存文案的话，`static readonly` 只在类型初始化时求值一次，切完语言确认页还是旧语言）；键名写错时 `I18n.T` 会原样返回键名 ⇒ 界面上出现一行裸键名，既不空白也不像错的，`[3j]` 专门判了这一种；英文页漏翻由自检 `[3e]` 守（见 §5.1）。
-  - **选探针时用「注定无副作用」的调用**：`[3j]` 验门禁一律传空参数（空命令 / 空动词 / 空布局码）。这样即使门禁真的写错了、调用被放行，也只会撞上服务内部的空值短路并返回 `false`，**不会动到自检者自己的窗口或起一个真进程** —— 否则门禁一错，自检就会顺手改掉用户窗口的状态，而那时所有人都在看报错，没人会想到这个附加副作用。
+  - **选探针时用「注定无副作用」的调用**：`[3j]` 验门禁一律传空参数（空命令 / 空动词 / 空布局码 / 空预设键），验 `Wheel` 时传 `NaN` 坐标。这样即使门禁真的写错了、调用被放行，也只会撞上服务内部的空值短路或会话入口的坐标有限性检查并返回 `false`，**不会动到自检者自己的窗口、起一个真进程，也不会在屏幕上摆出一个真的轮盘等人去点** —— 否则门禁一错，自检就会顺手改掉用户窗口的状态、甚至弹出一个挡住全屏的遮罩，而那时所有人都在看报错，没人会想到这个附加副作用。
 - **宿主服务面的元数据必须只有一份来源**：`PluginCommandService.Terminals` 是终端清单的**唯一事实来源**（外移后的「运行命令」动作直接读它，不在插件里另抄一份），所以不存在「宿主改了下拉、插件没跟上」的漂移。**每次访问都重取词条、不缓存** —— `I18n` 的当前语言可以在运行时切换，缓存住的话用户切到英文之后下拉里还是中文。
   - 同理 `PluginShellService.Verbs` 取 `ShellToolItem.Id`（`copy_path`）而不是 `Verb`（`Windows.CopyAsPath`）：用户配置里存的是短 ID，而 `Verb` 是执行体 `switch` 里的规范名。**传错这一个字段，动作会静默无效** —— 因为 `ExecuteShellTool` 的 `default` 分支是空的。
   - 同理 `PluginWindowService.Layouts` 由 `WindowTiler.LayoutKeys` + `LayoutDisplayName` 现取，三个标记（`Cycle` / `CycleBack` / `Restore`）与透明度范围（`MinOpacityPercent` / `MaxOpacityPercent`）也一律转发宿主常量。**这些值写死在插件里必然漂**：宿主加一个布局、或把透明度上界从 100 调到 90，插件那份会继续把旧范围展示给用户并据此判断合法性。自检 `[3j]` 用 `SequenceEqual` 逐项比对（连顺序都比 —— 顺序即下拉顺序）。
   - **`Verbs` 不是白名单**：`ExecuteShellTool` 的每个功能同时接受 `Id` 与 `Verb` 两套命名，按清单校验会把另一套命名的老配置整体判死。它只用来做下拉与展示。
   - **ShellTool 的参数刻意声明成自由文本而不是 `Enum`**：它的正式入口是带搜索/分类的 `ShellActionPickerWindow`，压进通用下拉是体验降级、还会让清单出现两份；而执行体接受两套命名，按清单校验会判死老配置。
-- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。**当前契约版本 1.4**，演进清单以 `PluginApi.ApiVersionMinor` 的注释为准（1.1 新增能力门禁 + `IHostCommandService` / `IHostShellService` / `IHostInfo.HasCapability`；1.2 新增 `IHostWindowService` + `WindowControl`；1.3 新增 `IHostScreenCaptureService` + `ScreenCapture`；1.4 新增 `IHostSystemService` + `InputSimulation`）。**每加一个服务面就在那份注释里补一条，别只改数字。**
+- **`PluginApi.ApiVersion` 那处重复无法用语言特性消除**：`public const string ApiVersion = $"{ApiVersionMajor}.{ApiVersionMinor}"` 编译不过（CS0133 —— C# 的常量插值只对 `string` 常量成立，这两个组成部分是 `int`）。所以它手写在 `PluginApi` 里，改版时必须两处同改，由自检 `[3j]` 断言两者一致。**当前契约版本 1.5**，演进清单以 `PluginApi.ApiVersionMinor` 的注释为准（1.1 新增能力门禁 + `IHostCommandService` / `IHostShellService` / `IHostInfo.HasCapability`；1.2 新增 `IHostWindowService` + `WindowControl`；1.3 新增 `IHostScreenCaptureService` + `ScreenCapture`；1.4 新增 `IHostSystemService` + `InputSimulation`；1.5 新增 `IHostWheelService` + `Wheel`）。**每加一个服务面就在那份注释里补一条，别只改数字。**
 
 ---
 
@@ -327,6 +329,11 @@ g:\Users\2 Better\Desktop\design\
   - **`[3e]` 守「确认页整页随语言切换」**（2026-09-19 加）。安装确认页是最不能含糊的一页（用户在这里决定要不要让这段代码在自己电脑上跑），而它的正文里唯一的非词条来源是清单字段与文件路径 —— 所以自检用**合成**的扫描结果（全 ASCII）构造正文，逐语言断言：① 无未替换的 `{n}` 占位符；② **英文页里一个方块字、假名或全角标点都不许有**；③ 四种语言产生四份互不相同的正文；④ 关键字段真的拼进去了；⑤ 两种「装完是否立即启用」产生不同正文。另有一条守「每个状态位都有安装后果文案」，判据写成「共用兜底措辞的状态集合正好是哪几个」—— 新增状态位忘了配文案时会落进那个集合，断言随即变红（写成列举式的话，新状态位根本没机会被这条断言看见）。
     - **这条断言上线当天就抓到一个真实漏翻**：能力位说明（`PluginCapabilityLabels`）整块是硬编码中文，且**能力连接符是写死的顿号**。它藏在「已经接好 i18n 的确认页」内部 —— 只读那页的代码、或只看词表覆盖率，都发现不了；只有真的切到英文才会看见「This plugin declares the following capabilities: · 启动进程 / 执行命令」。**教训**：`string.Join("、", …)` 这类「分隔符也算文案」的漏翻，是 i18n 审查最稳定的盲区（`PluginScanFailureSeparator` 当初就是为同一件事建的）。
     - 能写出来是因为正文被搬进了 `PluginInstallConfirmationText`（纯函数、不碰控件不弹窗）。**留在 `SettingsWindow` 里的话，无界面自检根本碰不到它** —— 这就是「可测性」与「机器护栏」之间那条直接通路。
+  - **`[3b] ①b` 守「两道校验不许对『什么都没填』给出相反结论」**（2026-09-20 加，起因是一起真机事故）。本仓自带的 `samples/FloatingBall` 在**用户一个参数都没填**的情况下 7 次触发全部失败，报「直径要在 24 到 160 之间」：它的 `TryReadDouble` 把「键不存在」读成 `0` 再交给范围校验，而宿主侧的 `PluginParameterValidator` 因为没有必填项放了行。而**自检当时是 PASS 的** —— 「自检绿、真机红」是这套验证手段最坏的失效形态，所以这条断言的优先级高于它的篇幅。
+    - **`[3b]` 原有的 ④ 为什么看不见它**：④ 确实走的是统一校验入口（`PluginHost.ValidateActionParameters`，会连带调插件自己的 `Validate`），但它喂的是**按声明默认值填满**的那一份输入，而缺陷只在**键缺失**时显形。更根本的一层是 `PluginHost.CreateActionItem` 会主动用 `ParameterField.DefaultValue` 填充参数表 —— 于是「传一个空字典进去」这种写法会**静默地变成「传默认值进去」**，探针看着像空输入、其实不是（第一版就是这么写的，跑出来照旧绿）。要造真实的空输入必须**手搓** `ActionItem`＋`ExtensionData = new Dictionary<…>()` 绕开它。**教训**：借别人造好的构造函数做探针，得先确认那个构造函数会不会替你做「贴心」的补齐 —— 补齐动作在探针眼里会让断言变成空转。
+    - **①b 判失败、④ 只警告，这个不对称是有依据的**：④ 那种「规则与默认值互斥」（起止时间默认相同）在空输入上不成立 —— 声明层放行、插件层拒绝只有两种解释（该字段本该 `Required`，或插件把「未填」当成了非法值），两种都是插件作者当场改得掉的。所以判据写成「仅当 `emptyIssues.Count == 0`（声明层放行）时才要求插件层也放行」，声明层本来就拦住的场合跳过（前者先拦，用户看不到后者）。
+    - **变异测试**（按上面「新增断言要自证有效」的规矩）：拿改动前那份坏 dll（`a2527edb…`，部署在 `plugin\` 里）喂给新自检 ⇒ `[FAIL] 「showBall」的声明校验放行全空输入，插件自己的校验却拒绝（直径要在 24 到 160 之间。）`，报出的正是真机那条用户可见文案；换成修好的 dll ⇒ ①b 通过、整体 PASS。两个方向都验过，才算这条护栏成立。
+    - **插件侧的写法约定：不要用 `0` 当「未填」的哨兵**。可选数值参数应当返回「未提供 / 提供了但非法 / 提供了且合法」三态（本仓样本用 `out double?` ＋一个 `OutOfRange(double?, min, max)`），范围校验只在真的填了值时执行。反过来拿 `value > 0 &&` 短路也不行 —— 那会把**显式填的 0** 当成没填，校验放行后画出一颗直径 0 的隐形球。
 
 ### 5.2 标准构建与发布命令集
 ```powershell

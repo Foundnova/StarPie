@@ -138,7 +138,11 @@
           "Registry",
           "GlobalHook",
           "Ui",
-          "Admin"
+          "Admin",
+          "WindowControl",
+          "ScreenCapture",
+          "InputSimulation",
+          "Wheel"
         ]
       },
       "default": []

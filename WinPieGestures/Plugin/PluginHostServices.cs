@@ -666,6 +666,44 @@ internal sealed class PluginSystemService : PluginGatedService, IHostSystemServi
 }
 
 /// <summary>
+/// 轮盘呼出服务实现。门禁是 <see cref="PluginCapability.Wheel"/>：呼出轮盘期间一层全屏遮罩
+/// 接管所有鼠标点击、且点下去执行的是<b>用户配置在轮盘上的动作</b> —— 后果既不属于「弹自己的窗」
+/// （<c>Ui</c>）也不属于任何既有能力位，必须单独让用户看见。
+/// <para>
+/// <b>两个方法都把门禁排在参数校验之前</b>（同 <c>RunPreset</c> 的纪律）：
+/// 未声明能力的插件连 <c>ShowWheel(0, 0)</c> 这种必然失败的坐标都调不动，
+/// 自检的拒绝探针与「声明后放行」探针因此共用同一组廉价参数。
+/// </para>
+/// <para>
+/// 执行体 <see cref="StickyWheelSession"/> 全程在宿主侧：它不回调插件（选盘动作走
+/// <c>ActionExecutor</c> 正常队列），所以本服务无需活动调用租约 —— 插件停用时已呼出的
+/// 轮盘照常可用，理由见该类的说明。
+/// </para>
+/// </summary>
+internal sealed class PluginWheelService : PluginGatedService, IHostWheelService
+{
+    private readonly string _pluginId;
+
+    public PluginWheelService(string pluginId, PluginCapability capabilities)
+        : base(pluginId, capabilities, PluginCapability.Wheel, nameof(IHostWheelService))
+    {
+        _pluginId = pluginId;
+    }
+
+    public bool ShowWheel(double physicalCenterX, double physicalCenterY)
+    {
+        RequireCapability();
+        return Guard(nameof(ShowWheel), () => StickyWheelSession.Show(_pluginId, physicalCenterX, physicalCenterY));
+    }
+
+    public bool DismissWheel()
+    {
+        RequireCapability();
+        return Guard(nameof(DismissWheel), () => StickyWheelSession.Dismiss(_pluginId));
+    }
+}
+
+/// <summary>
 /// 宿主事件订阅实现。
 /// <para>
 /// <b>所有订阅都必须返回可释放 token</b>，因为订阅链是「宿主静态事件 → 插件实例」，
