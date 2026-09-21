@@ -3611,6 +3611,11 @@ public partial class SettingsWindow : Window
 		if (Tab4_AboutDescText != null) Tab4_AboutDescText.Text = I18n.T("Tab4_AboutDescText");
 		if (Tab4_AppSloganText != null) Tab4_AppSloganText.Text = I18n.T("Tab4_AppSloganText");
 		if (Tab4_MilestonesHeaderTitle != null) Tab4_MilestonesHeaderTitle.Text = I18n.T("Tab4_MilestonesHeaderTitle");
+		if (Tab4_Ms_180b2_Title != null) Tab4_Ms_180b2_Title.Text = I18n.T("Tab4_Ms_180b2_Title");
+		if (Tab4_Ms_180b2_P1 != null) Tab4_Ms_180b2_P1.Text = I18n.T("Tab4_Ms_180b2_P1");
+		if (Tab4_Ms_180b2_P2 != null) Tab4_Ms_180b2_P2.Text = I18n.T("Tab4_Ms_180b2_P2");
+		if (Tab4_Ms_180b2_P3 != null) Tab4_Ms_180b2_P3.Text = I18n.T("Tab4_Ms_180b2_P3");
+		if (Tab4_Ms_180b2_P4 != null) Tab4_Ms_180b2_P4.Text = I18n.T("Tab4_Ms_180b2_P4");
 		if (Tab4_Ms_180b1_Title != null) Tab4_Ms_180b1_Title.Text = I18n.T("Tab4_Ms_180b1_Title");
 		if (Tab4_Ms_180b1_P1 != null) Tab4_Ms_180b1_P1.Text = I18n.T("Tab4_Ms_180b1_P1");
 		if (Tab4_Ms_180b1_P2 != null) Tab4_Ms_180b1_P2.Text = I18n.T("Tab4_Ms_180b1_P2");
@@ -7783,6 +7788,40 @@ public partial class SettingsWindow : Window
 		{
 			System.Windows.MessageBox.Show(this, I18n.TF("PluginsOpenScanFolderFailed", ex.Message),
 				I18n.T("PluginsMsgTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+		}
+	}
+
+	private void PluginListContainer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+	{
+		if (e.Handled) return;
+		if (PluginsSettingsGrid == null) return;
+
+		double lines = SystemParameters.WheelScrollLines;
+		if (lines <= 0) lines = 3;
+		double scrollAmount = (e.Delta / 120.0) * (lines * 16.0);
+		PluginsSettingsGrid.ScrollToVerticalOffset(PluginsSettingsGrid.VerticalOffset - scrollAmount);
+		e.Handled = true;
+	}
+
+	private void NestedScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+	{
+		if (e.Handled) return;
+		if (sender is not System.Windows.Controls.ScrollViewer scroller) return;
+
+		bool scrollingUp = e.Delta > 0;
+		bool canScrollUp = scroller.VerticalOffset > 0.0001;
+		bool canScrollDown = scroller.VerticalOffset < (scroller.ScrollableHeight - 0.0001);
+
+		if ((scrollingUp && !canScrollUp) || (!scrollingUp && !canScrollDown))
+		{
+			if (PluginsSettingsGrid != null)
+			{
+				double lines = SystemParameters.WheelScrollLines;
+				if (lines <= 0) lines = 3;
+				double scrollAmount = (e.Delta / 120.0) * (lines * 16.0);
+				PluginsSettingsGrid.ScrollToVerticalOffset(PluginsSettingsGrid.VerticalOffset - scrollAmount);
+				e.Handled = true;
+			}
 		}
 	}
 

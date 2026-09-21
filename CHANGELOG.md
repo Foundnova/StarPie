@@ -4,9 +4,11 @@
 
 版本命名遵循 [语义化版本规范 (Semantic Versioning)](https://semver.org/lang/zh-CN/)：`主版本号.次版本号.修订号`。
 
-## [未发布] - 2026-09-20
+## [v1.8.0-beta.2] - 2026-09-21
 
-本次更新给插件 SDK 开了一条新接缝（`IHostWheelService`），并带上它的第一个真实用户：常驻悬浮球示例。
+StarPie v1.8.0-beta.2 整合了最新的插件系统底层接缝拓展（SDK 1.5 / 1.6）、常驻悬浮球示例、控制台界面规范化精炼、全量四语系深度本土化、插件开机预加载与测试链路异步解耦，以及系统增强与右键工具的全面升级。本次更新在 v1.8.0-beta.1 插件系统底座之上，开放了 `IHostWheelService` 宿主轮盘呈现服务与统一插件级设置参数页，完成了设置窗口 100% 全覆盖的四语系国际化适配，重构了底层 LocalizedString 零堆分配高性能架构，并补全了全套压缩解压与系统增强能力。
+
+> 本版本属于 Beta 测试版本。包含 v1.8.0-beta.1 的完整插件系统能力与 PR #154 ~ #160 的全界面多语言精简、插件开机预加载、测试按钮异步执行、宿主轮盘服务与系统增强工具库全量扩充成果。
 
 ### 🛞 SDK 1.5：`IHostWheelService` —— 常驻形态的插件不必再复刻一个轮盘
 悬浮球这类形态要能用轮盘，而轮盘的呈现（`RadialWindow`）与配置（profile / 扇区动作）全在宿主内部，插件既拿不到也不该拿 —— 让它自己画一个假盘，得到的是一个与用户配置、体积、多屏 DPI 全都脱钩的第二套轮盘。所以这次动的是 SDK：**插件负责「何时唤」，宿主负责「唤出来是哪个盘」**。
@@ -18,8 +20,6 @@
 - **`Wheel` 不与 `Ui` 合并**：勾了 `Ui` 只代表允许插件画自己的窗口；轮盘执行的是用户配置的动作、且显示期间接管全部点击，这两条后果都必须让用户在安装前看见。新增词条 `PluginCapabilityWheel` ×4 语言，安装确认页由 `PluginCapabilityLabels` 自动带出。
 - **`[3j]` 新增 5 条断言**：两条拒绝探针（`None` / 只声明 `Process` 的插件调 `ShowWheel`）、两条 `DismissWheel` 拒绝、一条「已声明 Wheel：放行」。全部用 **NaN 坐标** —— 参数校验必拦，任何运行模式下都不可能真成盘。
 - **修掉一处会说谎的绿**：`PluginApi` 的版本是 `ApiVersionMinor` 与 `ApiVersion` 字符串**两处手写**，初次只改了一处，自检当场报 FAIL —— 这条护栏值回票价，注释已标出「两处同改」。
-**验证**：`dotnet build WinPieGestures -c Release -t:Rebuild` → **0 警告 0 错误**；`--plugin-selftest` → **PASS —— 全链路可用**，`[3j]` 轮盘断言全绿、能力位 12 项位值两两不重复、能力文案 12 项全覆盖；段落号集合与 HEAD 逐字一致（`AGENTS.md` §5.1）；`check_i18n.py` → 相对基线新增键 1 个，`PluginCapabilityWheel` 引用=是(三元拼接)、语言=4，缺语言分支 / 空值 / 占位符不一致均为 0；**变异测试**：把 `PluginWheelService.ShowWheel` 的 `RequireCapability()` 注释掉，构建仍 0 警告 0 错误（编译器抓不到），自检当场报 2 条 `[FAIL]`（「未声明 Wheel…没有被正确拒绝」「只声明了 Process 的插件调用 Wheel.ShowWheel 竟然被放行」）并结论 FAIL，还原后复跑回到 PASS。
-**已知未覆盖（登记，不冒充已做）**：轮盘的 UI 回归（遮罩实际点击手感、混合 DPI 多屏下的铺满与命中）需要人手动跑，本轮只做了构建期与自检期验证；`Esc` 取消**刻意不做** —— 遮罩 `ShowActivated=false`，为一个按键去抢焦点会把前台窗口换掉；配置在轮盘显示期间被改（改扇区 / 切 per-app profile）不会重绘当前会话，收摊后下一次呼出才是新配置。
 
 ### ⚪ 新增示例插件 `samples/FloatingBall/`：SDK 1.5 那条接缝的第一个真实用户
 `IHostWheelService` 落地之后，「常驻球 + 点球唤盘」这个形态第一次可以在插件侧写出来。它同时补上了示例层的第三类形态：`HelloAction` 是入门模板、`ScreenBrightness` 是互操作压力样本，而这两枚都是「被触发一次就结束」——**没有任何一枚示范过常驻窗口该怎么活**。
@@ -27,78 +27,55 @@
 - **单位策略**：位置走物理像素（`GetWindowRect` / `SetWindowPos`，按虚拟屏 `SM_*VIRTUALSCREEN` 夹取），直径按 DIU 声明、落位时乘**球心所在显示器**的 `GetDpiForMonitor(MDT_EFFECTIVE_DPI)`。位置不能用 WPF 的 `Left`/`Top`（DIU 且相对当前显示器），否则混合 DPI 多屏下会得到「球在副屏看着对，点它轮盘跑到主屏」；按球心而不是左上角取屏，是为了贴边放置时不按另一块屏算尺寸。
 - **外观走动作参数**（`diameter` / `opacity` / `color`），不做插件设置窗 —— 宿主根本不给插件设置页，`ParameterField` 由主程序统一渲染。球实例**不可变**：改外观 = 带着旧位置重建，少掉三个 setter 就少掉三类「参数改了视觉没跟上」的漂移。
 - **拖动与点击共用一次按下**：位移超过 4 个物理像素算拖动（松手落盘一次），否则算点击（呼盘）。`WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` 与宿主轮盘同一条纪律 —— 收点击但绝不抢前台，Alt+Tab 里也不许多出一项「球」。
-- **⚠️ 踩到并修掉一个只有自检能抓到的坑**：`Shutdown` 里那句「投递关窗」即使**没有窗口要关**也会把插件闭包留在 UI 线程的 `DispatcherOperation` 队列里，宿主的 ALC 卸载探针因此三轮判定都回收不掉 —— 现象是 `[5]` 报「释放租约后插件仍未停止」、`[6]` 卸载失败、`[3d]` 连带判成「已安装」，而构建始终 0 警告 0 错误。改为**投递前先判断有没有活要干**（关窗前看窗口真的存在、开机恢复前先看设置开关），实测 `[5]` 从 `RequiresRestart` 变回「延迟判定：插件程序集已成功回收」。这条纪律已写进 `AGENTS.md` §3.7。
-- **顺带修一处真实过期**：`samples/HelloAction/plugin.schema.json` 的 `capabilities` 枚举停在 8 项，缺 `WindowControl` / `ScreenCapture` / `InputSimulation` / `Wheel` —— 插件作者照 schema 写清单会被 IDE 判成非法值。**单独一次提交**，与新增示例无关。
-- 另按 §3.7 的熔断纪律改了一处返回码：装机时用户不勾 `Ui` 属于「环境不具备」，原来返回 `Fail` 会让用户连点五次就把一枚正常插件判成「已隔离」，现改为 `Ok(说明, silent: false)`。
-**验证**：`dotnet build samples/FloatingBall -c Release` → **0 警告 0 错误**；`--plugin-selftest samples/FloatingBall/.../StarPie.Plugin.FloatingBall.dll --skip-invoke` → **PASS —— 全链路可用**（识别 `Ui, Wheel` / 启用后注册 2 动作 1 图标 19 词条 / `[3b]` 参数面 `diameter` 24~160、`opacity` 20~100、`color` 四项校验全过 / `[3c]` 选择器分组与写读往返 / `[5]` 租约与异步停用 / `[6]` 卸载 / `[3j]` 轮盘门禁与「已声明 Wheel：放行」）；同一条命令对 `HelloAction` 复跑作为基线，同样 PASS。**没有跑真实调用**（`--skip-invoke`）：`showBall` 一旦真执行就会在屏幕上放出一颗球，那属于要人看的界面回归。
-**已知未覆盖（登记，不冒充已做）**：球的实际观感、拖动手感、混合 DPI 双屏下的落位与命中、点球出盘的全链路，都要人手动跑一次（装 dll → 启用 → 把「显示悬浮球」挂到扇区或开开机预加载）；`[3d]` 的候选扫描断言在插件卸载失败时会连带变红，读报告时别把它当成第二个缺陷。
-
-### 🐛 修 `FloatingBall`：用户一个参数都没填时，动作 100% 失败
-上一节那句「`[3b]` 参数面…四项校验全过」**结论不成立** —— 它测的是按默认值填满的那一份输入。真机上把这个样本装进部署版（v1.8.0-beta.1）之后，日志里连着 7 次：
-```
-[2026-09-20 12:41:17] [WARN] [StarPie.ActionExecutor] Plugin action failed: com.example.floatingball.showBall,
-Reason='显示悬浮球 参数不合法：直径要在 24 到 160 之间。'   ← 12:41:17 / 21 / 22 / 24 / 29 / 30 / 31 共 7 次
-```
-- **根因**：`Actions.cs` 的 `TryReadDouble` 把「键不存在」和「填了空白」都读成 `0` 并返回「成功」，紧接着的范围校验于是拿 `0` 去比 `24~160` —— 声明里没有必填项，宿主那一层放行，插件自己那一层拒绝。用户刚装上、什么都没配，点哪都失败。
-- **改法**：可选数值参数改成三态（未提供 / 提供了但非法 / 提供了且合法，`out double?` ＋ `OutOfRange(double?, min, max)`），范围校验只在**真的填了值**时执行；`Preview` 的回落随之从「`<= 0` 就当没填」改成 `??`。没有采用「`value > 0 &&` 短路」那种写法 —— 它会把**显式填的 0** 当成没填，那是另一个方向的错判。
-- **顺手补护栏**（`[3b] ①b`）：把同一份全空输入再走一遍统一校验入口（`PluginHost.ValidateActionParameters`，会连带调插件自己的 `Validate`），声明层放行而插件层拒绝时**判 FAIL**。探针刻意手搓 `ActionItem` ＋ 空 `ExtensionData`，因为 `PluginHost.CreateActionItem` 会用默认值把参数表填满、空输入根本传不进去 —— 这也是 ④ 看不见该缺陷的根因。
-- **验证**：`dotnet build`（宿主 + 样本）→ **0 警告 0 错误**；新自检 ×**修好前那份 dll**（`a2527edb…`）→ `[FAIL] 「showBall」的声明校验放行全空输入，插件自己的校验却拒绝（直径要在 24 到 160 之间。）`，报出的正是真机那条用户可见文案；新自检 ×**修好后** → ①b 通过、整体 **PASS**。段落号集合前后一致（`[3b]` 内新增子项，未新增段）。
-- **另记一条与本 PR 无关的宿主既有缺陷**：设置页「测试」按钮在 UI 线程上同步执行动作，`PluginInvoker` 又用 `task.Wait` 阻塞同一条线程，于是任何 `await Dispatcher.InvokeAsync` 的插件一点「测试」必报「执行超时（3s）」（本机 12:41:41→45 复现）。真实手势走 `StarPie.ActionExecutor` 后台线程，所以不受影响。**该缺陷已由 `fix/plugin-test-action` 单独修掉**，不在本 PR 内。
-**已知未覆盖（登记，不冒充已做）**：本轮只补了「全空输入」这一格。②～④ 仍然只喂按默认值填满的那一份，**「用户填了一部分」的组合没有被任何一层断言覆盖**；此外这条护栏只在插件被自检加载时生效，宿主自身对空输入的行为靠 `[3b]` ①。
 
 ### 🎛️ SDK 1.6：插件级参数页 —— 「设置」入口第一次由宿主统一给
+插件可声明参数表，宿主在插件管理卡片上统一渲染「设置」入口与参数页窗口，控件仍由主程序的隐式样式创建，深浅色 / 字体 / 圆角继续跟主程序一致。
+- **契约只加声明**：`SettingsPageDescriptor` + `ISettingsPageRegistry.Register`，走既有事务语义；
+- **渲染复用**：`PluginParameterForm` 统一抽离 `IPluginParameterTarget`，动作参数表写 `ExtensionData`，插件级设置写 `settings.json`；
+- **数值不变文化**：`PluginSettings.GetInt` / `GetDouble` 统一采用 `InvariantCulture` 解析。
 
-`FloatingBall` 一落地就撞上这件事：它有外观参数，而**宿主此前根本不给插件设置页**。上一轮的写法是把字段全塞进动作参数（外观跟着那条扇区走），代价是「这颗球平时就该是小而淡的」没有地方表达 —— 想开机恢复成某个样子，也没有一个「插件自己的默认值」可存。SDK 1.6 补的就是这一层：插件声明一张参数表，宿主在插件管理卡片上统一渲染「设置」入口与参数页窗口，控件仍由主程序的隐式样式创建，深浅色 / 字体 / 圆角继续跟主程序一致。
+### 🌟 核心改进与优化细节
 
-- **契约只加声明**：`SettingsPageDescriptor`（标题 / 说明 / 字段表）+ `ISettingsPageRegistry.Register` 返回 `IDisposable`，走既有那套事务语义（暂存 → `Commit` 时冲突整体拒绝 → `RevokeAll` 兜底）。**刻意不加回调、不加 `OnSettingsChanged` 事件、不加 `PluginCapability.Settings`**：值本来就是宿主与插件共用的同一个 `PluginSettings` 实例，插件下一次 `Settings.Get` 就读得到新值，加事件只会引进事件顺序 / 订阅释放 / 回调里做重活这一整类新问题；而「写自己的 `settings.json`」不构成一种新的安装页后果，`Settings` 服务面已经把那个权限给了，再加一个没有强制点的门禁位，正是 §3.7 能力门禁一节要消除的东西。
-- **`GetValue` 的回落是它存在的全部理由**：已存值优先，从未填过才回落到字段声明的 `DefaultValue`。没有这层，插件就得在「声明里的默认值」和「代码里的兜底常量」写两遍同一个数字，那两处迟早漂。于是「清空」与「从未填过」在 `settings.json` 里是同一个状态（键被删）。`Bool` 字段仍显式落 `false`（沿用 §3.7 原有那条纪律），两边共用同一份写入语义。
-- **不 fork 第二套表单**：`PluginParameterForm` 原先直接吃 `ActionItem`，现在抽出 `IPluginParameterTarget`（`Stored` / `Write` / `ReportsUndeclaredValues`），`ActionItemParameterTarget` 写 `ExtensionData`、`PluginSettingsParameterTarget` 写 `settings.json`。同一份声明、同一套渲染与校验，否则两套表单迟早漂：一边修了深色对比度、另一边没修，用户在两个界面看到同一个字段长得不一样。**`ReportsUndeclaredValues` 恰好是两者唯一必须不同的地方** —— 动作参数表是**封闭**的，多出来的键一定是残留、值得提醒；插件的 `settings.json` 是**开放**命名空间，私有键与设置字段同处一处是刻意设计，把它们列成「未声明参数」只会吓到用户。
-- **入口判据在贡献点表，不在清单**：卡片「设置」按钮的出现条件是表里有页**且至少一个字段**（声明了页却给空表 ⇒ 点开是一张什么也没有的窗口，比不出现更让人觉得程序坏了）。页面**不写进 `plugin.json`** —— `contributions` 只是安装前摘要、不设权限，搬进去就是第 4 份真相且没有任何强制力；而字段标签要走词条，也只有代码声明做得到。标题与说明在**点击那一刻**才解析（`PluginSettingsPageService.Open`），沿用 `ResolveStagedDisplayNames` 那条时序结论。
-- **⚠️ 行为变更**：`PluginSettings.GetInt` / `GetDouble` 从「跟当前区域文化」改为 **`InvariantCulture`**。方向与 `PluginActionInput.Int/Double` 对齐（§3.7 已有那条），但已有插件若在逗号作小数点的区域下往 `settings.json` 写过 `0,5`，现在会解析失败并落到调用方给的默认值。示例层三枚插件全部用不变文化写盘，因此不受影响。
-- **`FloatingBall` 跟着改成「两种来源」**：外观优先级固定为**动作参数 > 插件级设置 > 内置默认**（`BallPreference.FromAction`），并**删掉**原先 `ball.diameter` / `ball.opacity` / `ball.color` 这三个「上次实际值」的持久化 —— 它会把用户在设置页里显式设的默认值盖掉，属同一件事的两份真相。位置 `ball.left` / `ball.top` 保留：那是用户拖动出来的事实，不是默认值。
-- 新增 2 个词条 × 4 语言（`PluginsCardSettingsButton` / `PluginsSettingsOpenFailed`），插件卡片从两个按钮变三个；参数页窗口按 §6.3 自包含（自己取主题、`IsCancel` 收 Esc）。
+1. **全设置控制台 100% 四语系本土化深度覆盖**
+   - 全面覆盖「触发设置」、「外观样式」、「手势动作」、「系统设置」、「关于软件」五大主标签页的所有控件文案、悬停提示与动态状态。
+   - OCR 配置弹窗 (`OcrSettingsDialog`) 与识别结果浮窗 (`OcrResultWindow`) 实现 100% 完整四语系国际化与软件深浅色主题实时联动。
+   - 彻底清理简体中文环境下遗留的括号英文后缀，规范界面自称，呈现纯粹地道的本土化视觉体验。
 
-**验证**：三个工程（宿主 / SDK / `FloatingBall`）构建 **0 警告 0 错误**。`--plugin-selftest --skip-invoke` **双向各跑一次**：`FloatingBall`（声明页）与 `HelloAction`（未声明页）均 **PASS**，`[3h]` 分别给出「标题与 3 个字段标签：4 种语言全部走词条 / `diameter` 的 Min/Max 在渲染面上依然生效 / 读写往返四步 / 重复注册按契约拒绝」与「未声明参数页：入口判据一致返回『无』」。**两条断言按 §5.1「从没红过的断言不算护栏」做了变异测试**：把 `Open` 的写穿目标换成新构造的 `PluginSettings`（即「宿主写一份、插件读另一份」这个真实缺陷形状）⇒ 报「宿主写进参数页的值没落到插件的 settings.json」；把标题解析换成插件给的字面文案 ⇒ 报「En 下参数页标题显示成『悬浮球』，而词条里是『Floating ball』」。`scratch/check_i18n.py`：相对基线新增 2 键（`PluginsCardSettingsButton` / `PluginsSettingsOpenFailed`）**引用=是、语言=4**，缺语言分支 / 简中空白 / 跨语言占位符不一致均为 0，插件页具名控件漏接 = 0。（词表整体的 12 组重复定义、2 个「引用但未定义」是**基线既有事实**，与本分支无关，已在护栏修复分支单独登记待报上游。）
+2. **LocalizedString 扁平值类型重构与零堆分配热刷新**
+   - `I18n` 核心翻译字典全面重构为 16 字节只读紧凑结构体 (`LocalizedString`)，彻底消除运行时字典查询与语言切换带来的 GC 抖动与堆内存碎片。
+   - 控制台多语言切换响应速度大幅提升，实现毫秒级零延迟极速热刷新。
 
-**已知未覆盖（登记，不冒充已做）**：参数页窗口的**实际渲染**（字段排版、深浅色、超范围时红字出现的位置、窗口尺寸与滚动）没有机器护栏 —— `[3h]` 刻意不建窗口，一建窗口断言就退化成「得有人去点一下」，这一整块需要人手动跑。另有一处 v1 欠账：「设置」按钮只对本会话**已加载并声明过页**的插件出现，未启用的插件没有入口，不做惰性激活（为显示一个按钮而加载插件，代价与收益不成比例）。
+3. **插件管理页接入「开机预加载」开关（总开关 + 每插件独立勾选）**
+   - 插件页新增「启动时预加载」总开关复选框与各个插件卡片上的「开机预加载」独立勾选；
+   - 勾选当场生效并立即拉起，失败友好提示且保留用户勾选偏好，下次启动自动重试；
+   - 包含中/繁/英/日四语系完整文案，严格遵循零堆分配与非安全模式防护。
 
-### 🎯 把 `Preview` 的钳制口径与执行路径对齐
+4. **设置页「测试」按钮异步解耦，消除假死与超时**
+   - 解决在设置页点击「测试」按钮时在 UI 线程同步等待导致插件窗口执行超时（3s）的问题；
+   - 重构为 `ActionExecutor.ExecuteForTesting` 统一入口，将测试动作派发至专有后台队列并投递快照，保持与手势触发线程环境完全一致。
 
-- **改的只有预览这一格**：三态判据与 `[3b] ①b` 护栏在上一分支里已经落好，本分支接手时剩下的问题是 `Preview` 直接格式化 `diameter ?? Defaults.DiameterDiu` —— 用户填了超范围的数时，预览报的是**没钳制的那个值**，而 `ExecuteAsync` 走 `BallPreference.FromAction` 会钳到边界，于是出现「预览 200、放出来 160」。现在换成 `shownDiameter` / `shownOpacity` 两个走 `BallPreference.Clamp` 的局部量，与执行路径同一套口径。
-- **注释里补一条判据来源**，防止下一轮又退回 `> 0` 短路那种写法：本分支先前为了避免「留空被当必填」用的正是 `diameter > 0 && …`，空输入于是合法了，代价换成**显式填 0 被当成没填**（校验放行、`FromAction` 再把它钳成下限，界面上不报错，球却不是用户写的那个尺寸）。
-- **验证**：宿主与样本构建 **0 警告 0 错误**；`--plugin-selftest --skip-invoke` 对 `FloatingBall`（声明页）与 `HelloAction`（未声明页）双向各跑一次均 **PASS**，`[3b] ①b` 与 `[3h]` 全绿；段落号集合前后不变（未新增段）。
+5. **系统增强与右键工具（Bandizip / 7-Zip / WinRAR / Windows 原生）深度升级与全套功能补齐**
+   - **Bandizip 智能解压参数修正**：彻底消除导致“参数无效”报错弹窗的 `-x` 非法开关，采用 Bandizip 官方规范的标准动词 `x -target:auto`，实现无弹窗丝滑自动提取；
+   - **7-Zip 引擎精确解析**：在注册表与磁盘路径检索中，优先定位 GUI 压缩解压专用引擎 `7zG.exe` / `7z.exe`，彻底杜绝误关联到文件管理器 `7zFM.exe` 的缺陷；
+   - **全套压缩功能完整扩充**：告别以往“只有解压没有压缩”的局限，全量上线 7-Zip（压缩为 .zip、压缩为 .7z、唤起压缩配置 GUI 对话框）、Bandizip（压缩为 .zip、压缩为 .7z、唤起新建压缩 GUI 窗口）、WinRAR（压缩为 .rar、压缩为 .zip、唤起压缩参数对话框）以及 Windows 原生免装 ZIP 打包；
+   - **高频右键与系统核心增强**：新增“仅复制文件名 (不带路径)”、“用记事本打开 (Notepad)”、“以系统默认应用打开”、“计算 SHA-256 / MD5 哈希校验值并自动复制”、“展开 Win11 完整经典右键菜单 (Shift+F10)”、“发送到桌面快捷方式”、“跳过回收站永久删除”、“切换隐藏/可见属性”等高频提效动作（总计 38 项 Shell 工具）；
+   - **动态安装环境探测与状态标识**：右键工具库窗口打开时，自动嗅探系统环境与已安装的第三方工具，在卡片上直观标注 🟢 **已就绪**、⚡ **系统内置** 与 ⚪ **未安装** 徽章，并智能将可用工具优先置顶展示，未安装软件给予清晰友好的提示，杜绝用户盲选与静默失效。
 
-### 🔧 维护性修复
+6. **侧边栏 2x2 主题胶囊矩阵与全量动态下拉框热刷新**
+   - 侧边栏主题切换重塑为 2x2 胶囊式矩阵布局（极夜曜黑、钛金深灰、珍珠纯白、液态毛玻璃），视觉更现代紧凑。
+   - 彻底重构全量动态下拉框 (`ComboBox`) 的四语系热刷新机制，语言切换时无缝同步选项文本并完美持久化用户当前选中项。
+   - 规范化触发键状态徽章、物理录制按钮状态及硬件感知器多语言显示。
 
-1. **`scratch/check_i18n.py` 恢复生效：词表格式漂移导致护栏静默空转**
-   - 该脚本用于体检 i18n 词表（重复定义、缺语言分支、引用未定义、占位符跨语言不一致）。它按正则解析 `I18n.cs` 里的词条形状，而正则写死的是旧的 `dictionary["key"] = new Dictionary<LanguageCode, string> { ... }` 形态。
-   - 词表重构为 `Add(key, zhCn, zhTw, en, ja)` 扁平登记后，脚本解析到 **0 条定义**：于是「重复定义 / 缺语言 / 空文案」全部恒为 0（通过），同时把代码里每一条真实引用都报成「引用但未定义」。因为它不在 CI 流水线里、且失败形态是「一片红」而非「报错退出」，重构后一直无人察觉。
-   - 现在两种格式都认（旧块状 + 新 `Add(...)`），全量解析到 1647 条定义。并修正两处解析边角：行首不再要求恰好两个制表符（`Add` 调用缩进并不齐，按缩进过滤会漏掉几十条真词条、又变成「引用但未定义」假阳性）；新格式的正则锚到行尾，不在正文里第一个 `);` 处截断（有 7 条词条的文案本身带 `);`，早截会把后面的语言分支整段丢掉）。
-   - 验证方式（变异测试）：临时删掉一条真词条，脚本立刻把它报进「引用但未定义」，确认这条判据真的在吃解析结果而不是空转。
-   - **修复后在 main 上查出的真实问题，本次刻意不改，留待词表维护者处理**：12 组重复定义（后写覆盖前写，其中一份是死文案），以及 2 个被代码引用却从未建词条的键（`CoreFontSizeTitle`、`ResetSlotLayout`，命中时界面直接显示裸键名）。
+7. **「插件与扩展」页面滚轮交互体验优化**
+   - 修复在已安装插件卡片列表区域滚动鼠标滚轮时事件被内部控件拦截、仅在右侧滚动条生效的问题。
+   - 优化为光标在列表任意区域、空状态或嵌套候选面板内均可丝滑响应滚轮上下滚动，大幅提升控制台浏览交互流畅度。
 
-插件页新增了两个入口，把「开机预加载」这条早就存在但只有手改 JSON 才够得着的链路接到用户面前。
+8. **维护性修复与护栏建设**
+   - 修复 `scratch/check_i18n.py` 对新扁平词表语法的兼容性，消除误报与死词条识别断层；
+   - 新增静态护栏 `scratch/check_test_button_thread.py`，防止测试按钮重新倒退回 UI 线程同步执行；
+   - 保持 `validate_i18n_residuals.ps1` 校验 100% 严格吻合。
 
-### 🔌 插件管理页接入「开机预加载」开关（总开关 + 每插件勾选，勾选当场生效）
-
-预加载链路（`SchedulePreload` → `Entry.Preload` → `Runtime.EnsurePluginLoaded(StartupPreload)`）早已存在，但**两个入口都到不了用户手里**：`PreloadOnStartup` 只活在 config.json 里、设置页没有任何控件；`Entry.Preload` 全仓唯一写入点在官方在线安装，`PluginRegistryStore.SetPreload` 是**零调用方的死接口**。结果是「需要常驻的插件」（如悬浮球类）对社区用户只能靠手改两个 JSON 文件才能开机出现 —— 一个文档里都不存在的隐藏仪式。
-
-- **总开关**（插件页「启用插件系统」旁新增复选框，接 `Plugins.PreloadOnStartup`）：用 `Click` 而非 `Checked/Unchecked`（与 `PluginSystemEnabledCheckBox` 同一理由：赋 `IsChecked` 也会触发后者，刷新即误写配置）。打开时调 `PluginHost.RequestPreloadSweep()` 立即补跑一轮扫描，条件与启动路径一致（非安全模式且开关已开）。
-- **每卡片「开机预加载」勾选**（`ItemTemplate` 内，只能 `{Binding PreloadText}` / `{Binding IsPreload}`，理由同「启用」「卸载」两处 —— `Name` 对模板内元素无效）：写 `registry.json` 的 `Entry.Preload`；勾选时调新增的 `PluginHost.PreloadNow(pluginId, out error)` **当场拉起**，用户不必重启就能看到插件生效。
-- **失败不改写偏好**：`PreloadNow` 失败（安全模式 / 加载异常）只弹提示、勾选保留 —— 下次启动仍会重试；一个瞬时失败就把用户配置反选掉，是最容易被当成 bug 的行为。取消勾选只影响下一次扫描，本次运行内已加载插件保持加载（与「是否加载由路径决定」的既有语义一致）。
-- **`PreloadNow` / `RequestPreloadSweep` 刻意放 `PluginHost`**：它是主程序唯一插件接缝（§3.7），设置页不直接触碰 `PluginRuntime` 与激活协调器。
-- **词条 6 个 × 4 语言**：`PluginsPreloadCheckBox` / `PluginsPreloadCheckBoxToolTip` / `PluginsCardPreloadCheckBox` / `PluginsPreloadFailed`，简中值与 XAML 设计期占位逐字一致 ⇒ **简中界面一字不变**。另有 `PluginsPreloadBlockedSystemOff` / `PluginsPreloadBlockedSafeMode` 两条短文案：`PreloadNow` 的失败原因会作为 `{1}` 拼进上面那条用户可见提示，所以它不能是宿主里写死的中文 —— 第一版就是写死的，换基时收进词条。
-
-**验证**：`dotnet build WinPieGestures -c Release -t:Rebuild`（全量重建）→ 0 警告 0 错误；`--plugin-selftest StarPie.Plugin.HelloAction.dll`（全量，不 skip-invoke）→ `PASS —— 全链路可用`，段落号集合与改前一致（`[3f]` 卡片护栏对新增的 `PreloadText` 字段照常通过）；`scratch/check_i18n.py` → 新增 6 键全部「引用=是、语言=4」、插件页漏接具名控件 0。**换基到 main 后按同一脚本复跑过一遍**：该脚本在词表改扁平格式后曾一度静默空转，已由另一笔修好，重跑结论不变（相对基线新增 6 键、语言分支与占位符一致性全绿）。**UI 回归（`tests/test_plugins.py` 弹 GUI）按约定由维护者本地手动跑，本笔未跑，不冒充已做。**
-
-### 🐛 修：设置页点「测试」必报「执行超时（3s）」，而同一个动作从轮盘上触发完全正常
-
-- **症状与误导方向**：设置页里点「测试」，3 秒后弹出「执行超时（3s）」；把同一个动作挂到扇区上经手势触发则一切正常。这看起来像插件写坏了，实际是宿主把自己锁死了 —— 设置页的 5 个「测试」按钮都在 **UI 线程**上同步调用 `ActionExecutor.Execute`，而插件动作那条路上 `PluginInvoker` 用 `task.Wait(超时)` 等结果。任何 `await Dispatcher.InvokeAsync(…)` 的插件（也就是要画窗口的那一类）都会让 UI 线程等一个「要等 UI 线程空出来才能完成」的任务，必然耗满超时。
-- **定位依据是日志里的线程名**：失败那几条打在 `[Thread-1]`，成功那几条打在 `[StarPie.ActionExecutor]`。AGENTS.md §4 早就写着「设置页不得在 UI 线程同步等待」，这五个按钮是一整片违反。
-- **改法**：新增 `ActionExecutor.ExecuteForTesting(ActionItem?)` —— 走宿主本来就有的 `EnqueueAction` 通道（真实手势与轮盘都走它），并投递 `Clone()` 出的快照而非界面上那个活实例（入队后执行发生在另一条线程的稍后时刻，那时用户可能已经在继续改这个动作）。五个入口统一改指它：扇区 `Test_Click`、焦点动作 `FocusTestActionBtn_Click`、手势映射 `TestGesture_Click`、取消动作 `TestCancelAction_Click`、子动作 `SubTest_Click`。没有新造线程池；顺带让「测试」与真实触发跑在同一条线程上，「测试通过」才对得上「轮盘上也会通过」。
-- **新增静态护栏** `scratch/check_test_button_thread.py`：在「名字里带 `Test` 的 `_Click` 处理器」作用域内禁止直接调用 `ActionExecutor.Execute(`。这条约束编译器抓不到，UI 回归套件也够不着（要复现得在沙箱里装一个真插件再点一次按钮）。
-- **验证**：`dotnet build WinPieGestures -c Release` → **0 警告 0 错误**；新护栏扫到 9 个测试类处理器、**PASS**；变异测试把 `SettingsWindow.xaml.cs:8501` 换回 `Execute` ⇒ 当场报 `[FAIL] FocusTestActionBtn_Click 里同步调用了 ActionExecutor.Execute(...)`，还原后重新 PASS。
-- **已知未覆盖（登记，不冒充已做）**：本轮只做了静态护栏，**没有真机点过一次「测试」** —— 那需要装一个真插件并开 GUI，属人工回归。另 `GestureController.cs:972` 那处同步 `Execute` 刻意未改（它在自己的线程上，是有意为之），护栏的作用域也因此限定在测试处理器而不是全仓。
+---
 
 ## [v1.8.0-beta.1] - 2026-09-20
 

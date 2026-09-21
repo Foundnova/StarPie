@@ -1,4 +1,4 @@
-# validate_i18n_residuals.ps1
+﻿# validate_i18n_residuals.ps1
 # 校验 SettingsWindow.xaml、SettingsWindow.xaml.cs 与 I18n.cs 中 Tab4_Ms_* 控件与词条的一致性
 
 $repoRoot = Resolve-Path "$PSScriptRoot\.."

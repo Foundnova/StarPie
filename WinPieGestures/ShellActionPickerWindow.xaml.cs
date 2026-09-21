@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +24,10 @@ public class ShellToolItem
 
 	public string Name => Title;
 	public string IconKey => DefaultIconKey;
+
+	public bool IsAvailable { get; set; } = true;
+	public string StatusBadge { get; set; } = "就绪";
+	public string StatusBadgeType { get; set; } = "Ready"; // "Builtin", "Ready", "Missing"
 }
 
 public partial class ShellActionPickerWindow : Window
@@ -36,7 +41,7 @@ public partial class ShellActionPickerWindow : Window
 
 	private static readonly List<ShellToolItem> PredefinedShellTools = new()
 	{
-		// 1. 系统与常用增强
+		// 1. 系统与文件常用增强 (System & Explorer)
 		new ShellToolItem
 		{
 			Id = "copy_path",
@@ -47,8 +52,47 @@ public partial class ShellActionPickerWindow : Window
 			Verb = "Windows.CopyAsPath",
 			TargetType = "任意文件 / 文件夹",
 			Requirement = "前台选中文件或当前目录",
-			Description = "将资源管理器中当前选中对象或当前打开目录的完整路径直接复制入系统剪贴板",
+			Description = "将资源管理器中当前选中对象或当前打开目录的完整绝对路径复制进系统剪贴板",
 			DefaultIconKey = "Copy"
+		},
+		new ShellToolItem
+		{
+			Id = "copy_filename",
+			Title = "复制文件名 (不带路径)",
+			Provider = "Windows 原生增强",
+			Category = "System",
+			Icon = "📄",
+			Verb = "Windows.CopyFileName",
+			TargetType = "任意文件 / 文件夹",
+			Requirement = "前台选中对象 (支持多选)",
+			Description = "仅提取选中文件或文件夹的名称（多选时自动换行），方便引用或重命名",
+			DefaultIconKey = "Copy"
+		},
+		new ShellToolItem
+		{
+			Id = "open_with_notepad",
+			Title = "用记事本打开 (Notepad)",
+			Provider = "Windows 原生增强",
+			Category = "System",
+			Icon = "📝",
+			Verb = "Windows.OpenWithNotepad",
+			TargetType = "任意文本 / 代码 / 日志文件",
+			Requirement = "选中文件",
+			Description = "无论文件扩展名，快速以 Windows 系统记事本直接打开查看和编辑",
+			DefaultIconKey = "Code"
+		},
+		new ShellToolItem
+		{
+			Id = "open_with_default",
+			Title = "以系统默认应用打开 (Shell Open)",
+			Provider = "Windows 原生增强",
+			Category = "System",
+			Icon = "📂",
+			Verb = "Windows.OpenWithDefault",
+			TargetType = "任意文件",
+			Requirement = "选中文件",
+			Description = "模拟鼠标双击行为，以系统关联的默认程序快速打开选中的文件",
+			DefaultIconKey = "Folder"
 		},
 		new ShellToolItem
 		{
@@ -56,7 +100,7 @@ public partial class ShellActionPickerWindow : Window
 			Title = "StarPie 屏幕 OCR 快速识字",
 			Provider = "Windows 10/11 WinRT 原生引擎",
 			Category = "System",
-			Icon = "📝",
+			Icon = "🔍",
 			Verb = "StarPie.Builtin.ScreenOCR",
 			TargetType = "全屏幕任意区域",
 			Requirement = "全局可用 (无需选文件)",
@@ -130,16 +174,81 @@ public partial class ShellActionPickerWindow : Window
 		},
 		new ShellToolItem
 		{
-			Id = "lock_screen",
-			Title = "快速锁定电脑屏幕 (Win+L)",
-			Provider = "Windows 系统安全",
+			Id = "classic_context_menu",
+			Title = "展开 Win11 完整经典右键菜单 (Shift+F10)",
+			Provider = "Windows 11 增强",
+			Category = "System",
+			Icon = "📑",
+			Verb = "Windows.ClassicContextMenu",
+			TargetType = "文件 / 目录 / 桌面",
+			Requirement = "资源管理器或桌面",
+			Description = "跳过 Windows 11 折叠的二级菜单，直接就地呼出全量经典右键菜单",
+			DefaultIconKey = "Settings"
+		},
+		new ShellToolItem
+		{
+			Id = "send_to_desktop",
+			Title = "发送到桌面快捷方式",
+			Provider = "Windows 原生增强",
+			Category = "System",
+			Icon = "🖥️",
+			Verb = "Windows.SendToDesktop",
+			TargetType = "任意文件 / 文件夹",
+			Requirement = "选中文件或文件夹",
+			Description = "一键为当前选中的文件或文件夹在桌面上快速生成快捷方式 (.lnk)",
+			DefaultIconKey = "ShowDesktop"
+		},
+		new ShellToolItem
+		{
+			Id = "compute_sha256",
+			Title = "计算文件 SHA-256 哈希校验值",
+			Provider = "Windows 安全校验",
 			Category = "System",
 			Icon = "🔒",
-			Verb = "Windows.Lock",
-			TargetType = "系统级",
-			Requirement = "全局可用",
-			Description = "立即锁定当前 Windows 桌面会话，保护个人隐私",
+			Verb = "Windows.ComputeSha256",
+			TargetType = "文件",
+			Requirement = "选中文件",
+			Description = "快速计算选中文件的 SHA-256 哈希校验码，自动复制到剪贴板并提示结果",
 			DefaultIconKey = "Lock"
+		},
+		new ShellToolItem
+		{
+			Id = "compute_md5",
+			Title = "计算文件 MD5 哈希校验值",
+			Provider = "Windows 安全校验",
+			Category = "System",
+			Icon = "🔑",
+			Verb = "Windows.ComputeMd5",
+			TargetType = "文件",
+			Requirement = "选中文件",
+			Description = "快速计算选中文件的 MD5 哈希校验值，自动写入剪贴板便于对比核验",
+			DefaultIconKey = "Lock"
+		},
+		new ShellToolItem
+		{
+			Id = "toggle_hidden",
+			Title = "切换选中项隐藏/可见属性",
+			Provider = "Windows 文件系统",
+			Category = "System",
+			Icon = "👁️",
+			Verb = "Windows.ToggleHidden",
+			TargetType = "文件 / 文件夹",
+			Requirement = "选中对象",
+			Description = "快速切换选中对象的 Hidden 文件隐藏属性，便于管理私密文件",
+			DefaultIconKey = "Settings"
+		},
+		new ShellToolItem
+		{
+			Id = "permanent_delete",
+			Title = "永久删除 (Shift+Delete)",
+			Provider = "Windows 文件系统",
+			Category = "System",
+			Icon = "💥",
+			Verb = "Windows.PermanentDelete",
+			TargetType = "文件 / 文件夹",
+			Requirement = "选中对象",
+			Description = "跳过系统回收站彻底永久删除选中项（附带系统原生确认提示）",
+			DefaultIconKey = "Delete"
 		},
 		new ShellToolItem
 		{
@@ -151,11 +260,25 @@ public partial class ShellActionPickerWindow : Window
 			Verb = "Windows.EmptyRecycleBin",
 			TargetType = "系统级",
 			Requirement = "全局可用",
-			Description = "一键彻底清空桌面回收站中所有已删除的项目，释放磁盘存储",
+			Description = "一键彻底清空桌面回收站中所有已删除的项目，释放磁盘存储空间",
 			DefaultIconKey = "Delete"
 		},
+		new ShellToolItem
+		{
+			Id = "lock_screen",
+			Title = "快速锁定电脑屏幕 (Win+L)",
+			Provider = "Windows 系统安全",
+			Category = "System",
+			Icon = "🔒",
+			Verb = "Windows.Lock",
+			TargetType = "系统级",
+			Requirement = "全局可用",
+			Description = "立即锁定当前 Windows 桌面会话，保护个人隐私",
+			DefaultIconKey = "Lock"
+		},
 
-		// 2. 压缩与解压缩扩展
+		// 2. 压缩与解压缩扩展 (Compress & Extract)
+		// --- 7-Zip ---
 		new ShellToolItem
 		{
 			Id = "7z_extract_here",
@@ -164,7 +287,7 @@ public partial class ShellActionPickerWindow : Window
 			Category = "Compress",
 			Icon = "📦",
 			Verb = "7-Zip.ExtractHere",
-			TargetType = "压缩包 (*.zip, *.7z, *.rar, *.tar)",
+			TargetType = "压缩包 (*.zip, *.7z, *.rar, *.tar...)",
 			Requirement = "选中压缩包文件",
 			Description = "在当前所在目录下就地提取解压选中的压缩包文件",
 			DefaultIconKey = "Folder"
@@ -184,17 +307,99 @@ public partial class ShellActionPickerWindow : Window
 		},
 		new ShellToolItem
 		{
+			Id = "7z_compress_zip",
+			Title = "7-Zip: 压缩为同名 .zip",
+			Provider = "7-Zip Shell Extension",
+			Category = "Compress",
+			Icon = "🗜️",
+			Verb = "7-Zip.CompressZip",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 7-Zip 将选中的文件或文件夹极速压缩为通用的同名 .zip 压缩包",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "7z_compress_7z",
+			Title = "7-Zip: 压缩为同名 .7z",
+			Provider = "7-Zip Shell Extension",
+			Category = "Compress",
+			Icon = "📦",
+			Verb = "7-Zip.Compress7z",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 7-Zip 将选中的文件或文件夹以高压缩率打包为同名 .7z 归档",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "7z_compress_gui",
+			Title = "7-Zip: 添加到压缩包... (配置窗口)",
+			Provider = "7-Zip Shell Extension",
+			Category = "Compress",
+			Icon = "⚙️",
+			Verb = "7-Zip.CompressGui",
+			TargetType = "文件 / 文件夹",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "唤起 7-Zip 图形化压缩配置对话框，自定义格式、加密密码与分卷设置",
+			DefaultIconKey = "Settings"
+		},
+
+		// --- Bandizip ---
+		new ShellToolItem
+		{
 			Id = "bandizip_extract",
 			Title = "Bandizip: 智能自动解压",
 			Provider = "Bandizip Shell Extension",
 			Category = "Compress",
-			Icon = "🗜️",
+			Icon = "⚡",
 			Verb = "Bandizip.AutoExtract",
 			TargetType = "压缩包文件",
 			Requirement = "选中压缩包文件",
-			Description = "智能判断结构：单文件包就地解压，多文件包自动新建子目录归类",
+			Description = "智能判断结构：单文件包就地解压，多文件包自动新建同名目录归类",
 			DefaultIconKey = "Folder"
 		},
+		new ShellToolItem
+		{
+			Id = "bandizip_compress_zip",
+			Title = "Bandizip: 压缩为同名 .zip",
+			Provider = "Bandizip Shell Extension",
+			Category = "Compress",
+			Icon = "🗜️",
+			Verb = "Bandizip.CompressZip",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 Bandizip 快速将选中的项目打包为同名 .zip 压缩文件",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "bandizip_compress_7z",
+			Title = "Bandizip: 压缩为同名 .7z",
+			Provider = "Bandizip Shell Extension",
+			Category = "Compress",
+			Icon = "📦",
+			Verb = "Bandizip.Compress7z",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 Bandizip 快速将选中的项目打包为同名 .7z 高压归档",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "bandizip_compress_gui",
+			Title = "Bandizip: 添加到压缩包... (配置窗口)",
+			Provider = "Bandizip Shell Extension",
+			Category = "Compress",
+			Icon = "⚙️",
+			Verb = "Bandizip.CompressGui",
+			TargetType = "文件 / 文件夹",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "呼出 Bandizip 新建压缩文件图形对话框，支持设置密码、分卷和压缩级别",
+			DefaultIconKey = "Settings"
+		},
+
+		// --- WinRAR ---
 		new ShellToolItem
 		{
 			Id = "winrar_extract",
@@ -208,8 +413,75 @@ public partial class ShellActionPickerWindow : Window
 			Description = "调用 WinRAR 将选中的压缩文件就地解压至当前所在目录",
 			DefaultIconKey = "Folder"
 		},
+		new ShellToolItem
+		{
+			Id = "winrar_compress_rar",
+			Title = "WinRAR: 压缩为同名 .rar",
+			Provider = "WinRAR Shell Extension",
+			Category = "Compress",
+			Icon = "📚",
+			Verb = "WinRAR.CompressRar",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 WinRAR 将选中的项目压缩为经典的同名 .rar 归档文件",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "winrar_compress_zip",
+			Title = "WinRAR: 压缩为同名 .zip",
+			Provider = "WinRAR Shell Extension",
+			Category = "Compress",
+			Icon = "🗜️",
+			Verb = "WinRAR.CompressZip",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "调用 WinRAR 将选中的项目压缩为标准的同名 .zip 压缩包",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "winrar_compress_gui",
+			Title = "WinRAR: 添加到压缩文件... (配置窗口)",
+			Provider = "WinRAR Shell Extension",
+			Category = "Compress",
+			Icon = "⚙️",
+			Verb = "WinRAR.CompressGui",
+			TargetType = "文件 / 文件夹",
+			Requirement = "选中要压缩的文件或目录",
+			Description = "打开 WinRAR 压缩文件参数设置界面，可配置锁定、恢复记录及密码",
+			DefaultIconKey = "Settings"
+		},
 
-		// 3. 开发者与高效办公
+		// --- Windows 原生免装 ---
+		new ShellToolItem
+		{
+			Id = "windows_compress_zip",
+			Title = "Windows 原生: 压缩为 ZIP 文件 (免装第三方)",
+			Provider = "Windows 原生引擎",
+			Category = "Compress",
+			Icon = "📦",
+			Verb = "Windows.CompressZip",
+			TargetType = "文件 / 文件夹 (支持多选)",
+			Requirement = "选中任意文件或目录",
+			Description = "纯基于 Windows 内置压缩引擎，无需安装任何 7-Zip 或 Bandizip 即可一键打包",
+			DefaultIconKey = "Folder"
+		},
+		new ShellToolItem
+		{
+			Id = "windows_extract",
+			Title = "Windows 原生: 全部解压缩 (免装第三方)",
+			Provider = "Windows 原生引擎",
+			Category = "Compress",
+			Icon = "📂",
+			Verb = "Windows.ExtractHere",
+			TargetType = "ZIP 压缩包",
+			Requirement = "选中 ZIP 压缩包",
+			Description = "纯基于 Windows 内置引擎，就地解压所选压缩包到同名子目录",
+			DefaultIconKey = "Folder"
+		},
+
+		// 3. 开发者与高效办公 (Developer & Power Tools)
 		new ShellToolItem
 		{
 			Id = "vscode_open",
@@ -282,13 +554,80 @@ public partial class ShellActionPickerWindow : Window
 		InitializeComponent();
 		AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 
+		// 动态检测系统环境与已安装工具状态
+		DetectToolAvailability();
+
 		if (!string.IsNullOrEmpty(currentVerb))
 		{
-			_currentSelection = PredefinedShellTools.FirstOrDefault(t => string.Equals(t.Verb, currentVerb, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Id, currentVerb, StringComparison.OrdinalIgnoreCase));
+			_currentSelection = PredefinedShellTools.FirstOrDefault(t =>
+				string.Equals(t.Verb, currentVerb, StringComparison.OrdinalIgnoreCase) ||
+				string.Equals(t.Id, currentVerb, StringComparison.OrdinalIgnoreCase));
 		}
 
 		UpdateCategoryButtonsUi();
 		RefreshActionItemsList();
+	}
+
+	private static void DetectToolAvailability()
+	{
+		bool has7z = ActionExecutor.Find7ZipExecutable() != null;
+		bool hasBandizip = ActionExecutor.FindBandizipExecutable() != null;
+		bool hasWinRar = ActionExecutor.FindWinRarExecutable() != null;
+		bool hasVsCode = ActionExecutor.FindExecutableInPath("code") != null ||
+		                 ActionExecutor.FindExecutableInPath("code.cmd") != null;
+		bool hasGit = ActionExecutor.FindExecutableInPath("git-bash.exe") != null ||
+		              File.Exists(@"C:\Program Files\Git\git-bash.exe") ||
+		              File.Exists(@"C:\Program Files (x86)\Git\git-bash.exe") ||
+		              File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\Git\git-bash.exe"));
+		bool hasWt = ActionExecutor.FindExecutableInPath("wt.exe") != null ||
+		             File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\WindowsApps\wt.exe"));
+
+		foreach (var tool in PredefinedShellTools)
+		{
+			if (tool.Id.StartsWith("7z_") || tool.Provider.Contains("7-Zip"))
+			{
+				tool.IsAvailable = has7z;
+				tool.StatusBadge = has7z ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = has7z ? "Ready" : "Missing";
+			}
+			else if (tool.Id.StartsWith("bandizip_") || tool.Provider.Contains("Bandizip"))
+			{
+				tool.IsAvailable = hasBandizip;
+				tool.StatusBadge = hasBandizip ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = hasBandizip ? "Ready" : "Missing";
+			}
+			else if (tool.Id.StartsWith("winrar_") || tool.Provider.Contains("WinRAR"))
+			{
+				tool.IsAvailable = hasWinRar;
+				tool.StatusBadge = hasWinRar ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = hasWinRar ? "Ready" : "Missing";
+			}
+			else if (tool.Id.StartsWith("vscode_") || tool.Provider.Contains("VS Code"))
+			{
+				tool.IsAvailable = hasVsCode;
+				tool.StatusBadge = hasVsCode ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = hasVsCode ? "Ready" : "Missing";
+			}
+			else if (tool.Id.StartsWith("git_") || tool.Provider.Contains("Git"))
+			{
+				tool.IsAvailable = hasGit;
+				tool.StatusBadge = hasGit ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = hasGit ? "Ready" : "Missing";
+			}
+			else if (tool.Id.StartsWith("windows_terminal"))
+			{
+				tool.IsAvailable = hasWt;
+				tool.StatusBadge = hasWt ? "🟢 已就绪" : "⚪ 未安装";
+				tool.StatusBadgeType = hasWt ? "Ready" : "Missing";
+			}
+			else
+			{
+				// Windows 原生增强 / 系统内置
+				tool.IsAvailable = true;
+				tool.StatusBadge = "⚡ 内置";
+				tool.StatusBadgeType = "Builtin";
+			}
+		}
 	}
 
 	private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -352,11 +691,17 @@ public partial class ShellActionPickerWindow : Window
 			return matchCat && matchKey;
 		}).ToList();
 
-		if (filtered.Count == 0)
+		// 动态排序：已就绪与系统内置工具优先展示，未安装的排在后面
+		var sorted = filtered
+			.OrderByDescending(item => item.IsAvailable)
+			.ThenByDescending(item => item.StatusBadgeType == "Ready")
+			.ToList();
+
+		if (sorted.Count == 0)
 		{
 			TextBlock emptyLabel = new TextBlock
 			{
-				Text = "未找到匹配的右键或系统扩展功能，试试搜索 7-Zip、路径、OCR 或 终端",
+				Text = "未找到匹配的右键或系统扩展功能，试试搜索 压缩、7-Zip、路径、OCR 或 终端",
 				Foreground = (Brush)FindResource("TextSecondaryBrush"),
 				FontSize = 12,
 				HorizontalAlignment = HorizontalAlignment.Center,
@@ -366,7 +711,7 @@ public partial class ShellActionPickerWindow : Window
 			return;
 		}
 
-		foreach (ShellToolItem tool in filtered)
+		foreach (ShellToolItem tool in sorted)
 		{
 			ActionItemsPanel.Children.Add(CreateActionCard(tool));
 		}
@@ -464,6 +809,7 @@ public partial class ShellActionPickerWindow : Window
 		};
 		titleRow.Children.Add(titleText);
 
+		// Provider Badge
 		Border providerBadge = new Border
 		{
 			CornerRadius = new CornerRadius(4),
@@ -482,6 +828,43 @@ public partial class ShellActionPickerWindow : Window
 		};
 		providerBadge.Child = providerText;
 		titleRow.Children.Add(providerBadge);
+
+		// Dynamic Status Badge (已就绪 / 系统内置 / 未安装)
+		Border statusBadge = new Border
+		{
+			CornerRadius = new CornerRadius(4),
+			BorderThickness = new Thickness(1),
+			Padding = new Thickness(6, 1, 6, 1),
+			Margin = new Thickness(6, 0, 0, 0),
+			VerticalAlignment = VerticalAlignment.Center
+		};
+		TextBlock statusText = new TextBlock
+		{
+			Text = item.StatusBadge,
+			FontSize = 10,
+			FontWeight = FontWeights.Medium
+		};
+
+		if (item.StatusBadgeType == "Ready")
+		{
+			statusBadge.Background = new SolidColorBrush(Color.FromArgb(28, 46, 204, 113));
+			statusBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(90, 46, 204, 113));
+			statusText.Foreground = new SolidColorBrush(Color.FromArgb(255, 46, 204, 113));
+		}
+		else if (item.StatusBadgeType == "Builtin")
+		{
+			statusBadge.Background = (Brush)FindResource("SubtleCardBrush");
+			statusBadge.BorderBrush = (Brush)FindResource("CardBorderBrush");
+			statusText.Foreground = (Brush)FindResource("AccentPrimaryBrush");
+		}
+		else
+		{
+			statusBadge.Background = (Brush)FindResource("SubtleCardBrush");
+			statusBadge.BorderBrush = (Brush)FindResource("CardBorderBrush");
+			statusText.Foreground = (Brush)FindResource("TextMutedBrush");
+		}
+		statusBadge.Child = statusText;
+		titleRow.Children.Add(statusBadge);
 
 		infoPanel.Children.Add(titleRow);
 
@@ -566,7 +949,14 @@ public partial class ShellActionPickerWindow : Window
 	private void SelectTool(ShellToolItem tool)
 	{
 		_currentSelection = tool;
-		SelectedItemLabel.Text = $"{tool.Icon} {tool.Title} ({tool.Provider})";
+		if (!tool.IsAvailable)
+		{
+			SelectedItemLabel.Text = $"{tool.Icon} {tool.Title} ({tool.Provider}) - ⚠️ 本机尚未检测到该工具，请确保已安装";
+		}
+		else
+		{
+			SelectedItemLabel.Text = $"{tool.Icon} {tool.Title} ({tool.Provider}) - {tool.StatusBadge}";
+		}
 		ConfirmBtn.IsEnabled = true;
 		RefreshActionItemsList();
 	}

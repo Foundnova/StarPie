@@ -2,12 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Windows;
+using Microsoft.Win32;
 
 namespace WinPieGestures;
 
@@ -171,6 +175,9 @@ public static class ActionExecutor
 
 	[DllImport("user32.dll")]
 	private static extern nint GetForegroundWindow();
+
+	[DllImport("user32.dll", ExactSpelling = true)]
+	private static extern nint GetAncestor(nint hwnd, uint gaFlags);
 
 	[DllImport("user32.dll")]
 	private static extern bool SetForegroundWindow(nint hWnd);
@@ -982,9 +989,23 @@ public static class ActionExecutor
 			case "7z_extract_here":
 			{
 				var (folder, selected) = GetActiveExplorerContext();
-				string sevenZipExe = Find7ZipExecutable();
 				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
-				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(sevenZipExe))
+				if (string.IsNullOrEmpty(targetArchive))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"7-Zip 解压",
+						"未选中压缩包文件：请先在文件资源管理器或桌面上选中要解压的压缩包。");
+					break;
+				}
+				string? sevenZipExe = Find7ZipExecutable();
+				if (string.IsNullOrEmpty(sevenZipExe))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"7-Zip 解压",
+						"未检测到 7-Zip 安装路径，请确认是否已安装 7-Zip。");
+					break;
+				}
+				try
 				{
 					Process.Start(new ProcessStartInfo
 					{
@@ -994,15 +1015,34 @@ public static class ActionExecutor
 						WorkingDirectory = folder
 					});
 				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError($"7-Zip extract failed for '{targetArchive}'", ex);
+					Plugins.PluginHost.NotifyUser("7-Zip 解压失败", ex.Message);
+				}
 				break;
 			}
 			case "7-Zip.ExtractToFolder":
 			case "7z_extract_folder":
 			{
 				var (folder, selected) = GetActiveExplorerContext();
-				string sevenZipExe = Find7ZipExecutable();
 				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
-				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(sevenZipExe))
+				if (string.IsNullOrEmpty(targetArchive))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"7-Zip 解压",
+						"未选中压缩包文件：请先在文件资源管理器或桌面上选中要解压的压缩包。");
+					break;
+				}
+				string? sevenZipExe = Find7ZipExecutable();
+				if (string.IsNullOrEmpty(sevenZipExe))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"7-Zip 解压",
+						"未检测到 7-Zip 安装路径，请确认是否已安装 7-Zip。");
+					break;
+				}
+				try
 				{
 					string outFolder = Path.Combine(folder, Path.GetFileNameWithoutExtension(targetArchive));
 					Process.Start(new ProcessStartInfo
@@ -1013,23 +1053,52 @@ public static class ActionExecutor
 						WorkingDirectory = folder
 					});
 				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError($"7-Zip extract failed for '{targetArchive}'", ex);
+					Plugins.PluginHost.NotifyUser("7-Zip 解压失败", ex.Message);
+				}
 				break;
 			}
 			case "Bandizip.AutoExtract":
 			case "bandizip_extract":
 			{
 				var (folder, selected) = GetActiveExplorerContext();
-				string bzExe = FindBandizipExecutable();
 				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
-				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(bzExe))
+				if (string.IsNullOrEmpty(targetArchive))
 				{
+					Plugins.PluginHost.NotifyUser(
+						"Bandizip 智能解压",
+						"未选中压缩包文件：请先在文件资源管理器或桌面上选中要解压的压缩包。");
+					break;
+				}
+				string? bzExe = FindBandizipExecutable();
+				if (string.IsNullOrEmpty(bzExe))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"Bandizip 智能解压",
+						"未检测到 Bandizip 安装路径，请确认是否已安装 Bandizip。");
+					break;
+				}
+				try
+				{
+					// Bandizip 官方规范：解压动词为 x，-target:auto 为智能解压模式
+					string bzArgs = bzExe.EndsWith("bz.exe", StringComparison.OrdinalIgnoreCase)
+						? $"x -y -target:auto -o:\"{folder}\" \"{targetArchive}\""
+						: $"x -target:auto -o:\"{folder}\" \"{targetArchive}\"";
+
 					Process.Start(new ProcessStartInfo
 					{
 						FileName = bzExe,
-						Arguments = $"x -y -o:\"{folder}\" \"{targetArchive}\"",
+						Arguments = bzArgs,
 						UseShellExecute = true,
 						WorkingDirectory = folder
 					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError($"Bandizip extract failed for '{targetArchive}'", ex);
+					Plugins.PluginHost.NotifyUser("Bandizip 解压失败", ex.Message);
 				}
 				break;
 			}
@@ -1037,9 +1106,23 @@ public static class ActionExecutor
 			case "winrar_extract":
 			{
 				var (folder, selected) = GetActiveExplorerContext();
-				string winrarExe = FindWinRarExecutable();
 				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
-				if (!string.IsNullOrEmpty(targetArchive) && !string.IsNullOrEmpty(winrarExe))
+				if (string.IsNullOrEmpty(targetArchive))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"WinRAR 解压",
+						"未选中压缩包文件：请先在文件资源管理器或桌面上选中要解压的压缩包。");
+					break;
+				}
+				string? winrarExe = FindWinRarExecutable();
+				if (string.IsNullOrEmpty(winrarExe))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"WinRAR 解压",
+						"未检测到 WinRAR 安装路径，请确认是否已安装 WinRAR。");
+					break;
+				}
+				try
 				{
 					Process.Start(new ProcessStartInfo
 					{
@@ -1048,6 +1131,572 @@ public static class ActionExecutor
 						UseShellExecute = true,
 						WorkingDirectory = folder
 					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError($"WinRAR extract failed for '{targetArchive}'", ex);
+					Plugins.PluginHost.NotifyUser("WinRAR 解压失败", ex.Message);
+				}
+				break;
+			}
+			case "Windows.ExtractHere":
+			case "windows_extract":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				string targetArchive = selected.FirstOrDefault(s => IsArchive(s)) ?? "";
+				if (string.IsNullOrEmpty(targetArchive))
+				{
+					Plugins.PluginHost.NotifyUser(
+						"Windows 原生解压",
+						"未选中压缩包文件：请先在文件资源管理器或桌面上选中要解压的压缩包。");
+					break;
+				}
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					try
+					{
+						string outDir = Path.Combine(folder, Path.GetFileNameWithoutExtension(targetArchive));
+						Directory.CreateDirectory(outDir);
+						ZipFile.ExtractToDirectory(targetArchive, outDir, overwriteFiles: true);
+						Plugins.PluginHost.NotifyUser("解压完成", $"已成功解压至：{Path.GetFileName(outDir)}");
+					}
+					catch (Exception ex)
+					{
+						AppLogger.LogError($"Windows.ExtractHere failed for '{targetArchive}'", ex);
+						Plugins.PluginHost.NotifyUser("Windows 原生解压失败", ex.Message);
+					}
+				});
+				break;
+			}
+
+			// --- 压缩扩展 (Compression) ---
+			case "7-Zip.CompressZip":
+			case "7z_compress_zip":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? sevenZipExe = Find7ZipExecutable();
+				if (string.IsNullOrEmpty(sevenZipExe))
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "未检测到 7-Zip 安装路径。");
+					break;
+				}
+				try
+				{
+					string targetZip = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".zip"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = sevenZipExe,
+						Arguments = $"a -tzip \"{targetZip}\" {itemsArg} -y",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("7-Zip compress zip failed", ex);
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "7-Zip.Compress7z":
+			case "7z_compress_7z":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? sevenZipExe = Find7ZipExecutable();
+				if (string.IsNullOrEmpty(sevenZipExe))
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "未检测到 7-Zip 安装路径。");
+					break;
+				}
+				try
+				{
+					string target7z = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".7z"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = sevenZipExe,
+						Arguments = $"a -t7z \"{target7z}\" {itemsArg} -y",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("7-Zip compress 7z failed", ex);
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "7-Zip.CompressGui":
+			case "7z_compress_gui":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? sevenZipExe = Find7ZipExecutable();
+				if (string.IsNullOrEmpty(sevenZipExe))
+				{
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩", "未检测到 7-Zip 安装路径。");
+					break;
+				}
+				try
+				{
+					string target7z = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".7z"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = sevenZipExe,
+						Arguments = $"a -ad \"{target7z}\" -- {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("7-Zip compress GUI failed", ex);
+					Plugins.PluginHost.NotifyUser("7-Zip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "Bandizip.CompressZip":
+			case "bandizip_compress_zip":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? bzExe = FindBandizipExecutable();
+				if (string.IsNullOrEmpty(bzExe))
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "未检测到 Bandizip 安装路径。");
+					break;
+				}
+				try
+				{
+					string targetZip = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".zip"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = bzExe,
+						Arguments = $"c -y -fmt:zip \"{targetZip}\" {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("Bandizip compress zip failed", ex);
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "Bandizip.Compress7z":
+			case "bandizip_compress_7z":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? bzExe = FindBandizipExecutable();
+				if (string.IsNullOrEmpty(bzExe))
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "未检测到 Bandizip 安装路径。");
+					break;
+				}
+				try
+				{
+					string target7z = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".7z"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = bzExe,
+						Arguments = $"c -y -fmt:7z \"{target7z}\" {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("Bandizip compress 7z failed", ex);
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "Bandizip.CompressGui":
+			case "bandizip_compress_gui":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? bzExe = FindBandizipExecutable();
+				if (string.IsNullOrEmpty(bzExe))
+				{
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩", "未检测到 Bandizip 安装路径。");
+					break;
+				}
+				try
+				{
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = bzExe,
+						Arguments = $"cd {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("Bandizip compress GUI failed", ex);
+					Plugins.PluginHost.NotifyUser("Bandizip 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "WinRAR.CompressRar":
+			case "winrar_compress_rar":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? winrarExe = FindWinRarExecutable();
+				if (string.IsNullOrEmpty(winrarExe))
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "未检测到 WinRAR 安装路径。");
+					break;
+				}
+				try
+				{
+					string targetRar = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".rar"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = winrarExe,
+						Arguments = $"a -ibck -r \"{targetRar}\" {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("WinRAR compress rar failed", ex);
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "WinRAR.CompressZip":
+			case "winrar_compress_zip":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? winrarExe = FindWinRarExecutable();
+				if (string.IsNullOrEmpty(winrarExe))
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "未检测到 WinRAR 安装路径。");
+					break;
+				}
+				try
+				{
+					string targetZip = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".zip"));
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = winrarExe,
+						Arguments = $"a -afzip -ibck -r \"{targetZip}\" {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("WinRAR compress zip failed", ex);
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "WinRAR.CompressGui":
+			case "winrar_compress_gui":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string? winrarExe = FindWinRarExecutable();
+				if (string.IsNullOrEmpty(winrarExe))
+				{
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩", "未检测到 WinRAR 安装路径。");
+					break;
+				}
+				try
+				{
+					string itemsArg = string.Join(" ", selected.Select(s => $"\"{s}\""));
+					Process.Start(new ProcessStartInfo
+					{
+						FileName = winrarExe,
+						Arguments = $"a {itemsArg}",
+						UseShellExecute = true,
+						WorkingDirectory = folder
+					});
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("WinRAR compress GUI failed", ex);
+					Plugins.PluginHost.NotifyUser("WinRAR 压缩失败", ex.Message);
+				}
+				break;
+			}
+			case "Windows.CompressZip":
+			case "windows_compress_zip":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("Windows 原生压缩", "请先在资源管理器或桌面上选中要压缩的文件或文件夹。");
+					break;
+				}
+				string targetZip = GetUniqueArchiveDestination(GenerateArchiveDestination(folder, selected, ".zip"));
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					try
+					{
+						if (selected.Count == 1 && Directory.Exists(selected[0]))
+						{
+							ZipFile.CreateFromDirectory(selected[0], targetZip, CompressionLevel.Optimal, false);
+						}
+						else
+						{
+							using var zip = ZipFile.Open(targetZip, ZipArchiveMode.Create);
+							foreach (var item in selected)
+							{
+								if (File.Exists(item))
+								{
+									zip.CreateEntryFromFile(item, Path.GetFileName(item));
+								}
+								else if (Directory.Exists(item))
+								{
+									string rootDirName = Path.GetFileName(item.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+									foreach (var file in Directory.EnumerateFiles(item, "*", SearchOption.AllDirectories))
+									{
+										string rel = Path.GetRelativePath(item, file);
+										zip.CreateEntryFromFile(file, Path.Combine(rootDirName, rel));
+									}
+								}
+							}
+						}
+						Plugins.PluginHost.NotifyUser("Windows 原生压缩完成", $"已成功生成：{Path.GetFileName(targetZip)}");
+					}
+					catch (Exception ex)
+					{
+						AppLogger.LogError($"Windows.CompressZip failed for '{targetZip}'", ex);
+						Plugins.PluginHost.NotifyUser("Windows 原生压缩失败", ex.Message);
+					}
+				});
+				break;
+			}
+
+			// --- 高频右键与系统扩展 (Explorer & System Essentials) ---
+			case "Windows.CopyFileName":
+			case "copy_filename":
+			{
+				var (_, selected) = GetActiveExplorerContext();
+				if (selected.Count > 0)
+				{
+					SafeSetClipboardText(string.Join(Environment.NewLine, selected.Select(s => Path.GetFileName(s.TrimEnd('\\', '/')))));
+				}
+				break;
+			}
+			case "Windows.OpenWithNotepad":
+			case "open_with_notepad":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count > 0)
+				{
+					foreach (var s in selected)
+					{
+						Process.Start(new ProcessStartInfo("notepad.exe", $"\"{s}\"") { UseShellExecute = true, WorkingDirectory = folder });
+					}
+				}
+				else
+				{
+					Process.Start(new ProcessStartInfo("notepad.exe") { UseShellExecute = true });
+				}
+				break;
+			}
+			case "Windows.OpenWithDefault":
+			case "open_with_default":
+			{
+				var (folder, selected) = GetActiveExplorerContext();
+				if (selected.Count > 0)
+				{
+					foreach (var s in selected)
+					{
+						Process.Start(new ProcessStartInfo(s) { UseShellExecute = true, WorkingDirectory = folder });
+					}
+				}
+				break;
+			}
+			case "Windows.ComputeSha256":
+			case "compute_sha256":
+			{
+				var (_, selected) = GetActiveExplorerContext();
+				string targetFile = selected.FirstOrDefault(File.Exists) ?? "";
+				if (string.IsNullOrEmpty(targetFile))
+				{
+					Plugins.PluginHost.NotifyUser("SHA-256 计算", "请先在资源管理器中选中一个文件。");
+					break;
+				}
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					try
+					{
+						using var stream = File.OpenRead(targetFile);
+						using var sha256 = SHA256.Create();
+						byte[] hashBytes = sha256.ComputeHash(stream);
+						string hashStr = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+						SafeSetClipboardText(hashStr);
+						Plugins.PluginHost.NotifyUser("SHA-256 计算完成已复制", $"{Path.GetFileName(targetFile)}:\n{hashStr}");
+					}
+					catch (Exception ex)
+					{
+						Plugins.PluginHost.NotifyUser("SHA-256 计算失败", ex.Message);
+					}
+				});
+				break;
+			}
+			case "Windows.ComputeMd5":
+			case "compute_md5":
+			{
+				var (_, selected) = GetActiveExplorerContext();
+				string targetFile = selected.FirstOrDefault(File.Exists) ?? "";
+				if (string.IsNullOrEmpty(targetFile))
+				{
+					Plugins.PluginHost.NotifyUser("MD5 计算", "请先在资源管理器中选中一个文件。");
+					break;
+				}
+				System.Threading.Tasks.Task.Run(() =>
+				{
+					try
+					{
+						using var stream = File.OpenRead(targetFile);
+						using var md5 = MD5.Create();
+						byte[] hashBytes = md5.ComputeHash(stream);
+						string hashStr = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+						SafeSetClipboardText(hashStr);
+						Plugins.PluginHost.NotifyUser("MD5 计算完成已复制", $"{Path.GetFileName(targetFile)}:\n{hashStr}");
+					}
+					catch (Exception ex)
+					{
+						Plugins.PluginHost.NotifyUser("MD5 计算失败", ex.Message);
+					}
+				});
+				break;
+			}
+			case "Windows.ClassicContextMenu":
+			case "classic_context_menu":
+			{
+				ExecuteHotkey("Shift+F10");
+				break;
+			}
+			case "Windows.PermanentDelete":
+			case "permanent_delete":
+			{
+				ExecuteHotkey("Shift+Delete");
+				break;
+			}
+			case "Windows.SendToDesktop":
+			case "send_to_desktop":
+			{
+				var (_, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("发送到桌面快捷方式", "请先在资源管理器中选中要发送的文件或文件夹。");
+					break;
+				}
+				try
+				{
+					string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+					Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+					if (shellType != null)
+					{
+						dynamic? wsh = Activator.CreateInstance(shellType);
+						if (wsh != null)
+						{
+							foreach (var item in selected)
+							{
+								string itemName = Path.GetFileName(item.TrimEnd('\\', '/'));
+								string linkPath = Path.Combine(desktopPath, $"{itemName} - 快捷方式.lnk");
+								dynamic shortcut = wsh.CreateShortcut(linkPath);
+								shortcut.TargetPath = item;
+								shortcut.WorkingDirectory = Directory.Exists(item) ? item : (Path.GetDirectoryName(item) ?? "");
+								shortcut.Save();
+							}
+							Plugins.PluginHost.NotifyUser("创建快捷方式成功", "已成功在桌面上创建快捷方式。");
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("Send to desktop failed", ex);
+					Plugins.PluginHost.NotifyUser("创建快捷方式失败", ex.Message);
+				}
+				break;
+			}
+			case "Windows.ToggleHidden":
+			case "toggle_hidden":
+			{
+				var (_, selected) = GetActiveExplorerContext();
+				if (selected.Count == 0)
+				{
+					Plugins.PluginHost.NotifyUser("切换隐藏属性", "请先选中要切换属性的文件或文件夹。");
+					break;
+				}
+				try
+				{
+					foreach (var item in selected)
+					{
+						var attr = File.GetAttributes(item);
+						if ((attr & FileAttributes.Hidden) == FileAttributes.Hidden)
+						{
+							File.SetAttributes(item, attr & ~FileAttributes.Hidden);
+						}
+						else
+						{
+							File.SetAttributes(item, attr | FileAttributes.Hidden);
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					AppLogger.LogError("Toggle hidden attribute failed", ex);
 				}
 				break;
 			}
@@ -1064,6 +1713,8 @@ public static class ActionExecutor
 		try
 		{
 			nint fgHwnd = GetForegroundWindow();
+			nint rootHwnd = fgHwnd != IntPtr.Zero ? GetAncestor(fgHwnd, 2 /* GA_ROOT */) : IntPtr.Zero;
+
 			Type? shellType = Type.GetTypeFromProgID("Shell.Application");
 			if (shellType != null)
 			{
@@ -1072,6 +1723,9 @@ public static class ActionExecutor
 				{
 					dynamic windows = shell.Windows();
 					int count = windows.Count;
+					dynamic? bestFallbackDoc = null;
+
+					// 1. 遍历打开的资源管理器窗口与标签页
 					for (int i = 0; i < count; i++)
 					{
 						try
@@ -1079,24 +1733,74 @@ public static class ActionExecutor
 							dynamic item = windows.Item(i);
 							if (item == null) continue;
 							long hwnd = item.HWND;
-							if ((nint)hwnd == fgHwnd)
+							nint itemHwnd = (nint)hwnd;
+
+							// 匹配当前活动窗口或其根窗口句柄
+							if (itemHwnd == fgHwnd || (rootHwnd != IntPtr.Zero && itemHwnd == rootHwnd))
 							{
 								dynamic doc = item.Document;
 								if (doc != null)
 								{
-									folder = doc.Folder?.Self?.Path ?? "";
 									dynamic sel = doc.SelectedItems();
-									if (sel != null)
+									if (sel != null && sel.Count > 0)
 									{
+										// 找到了包含选中项的活动标签页，优先采纳！
+										folder = doc.Folder?.Self?.Path ?? "";
 										int selCount = sel.Count;
 										for (int j = 0; j < selCount; j++)
 										{
 											string p = sel.Item(j)?.Path ?? "";
 											if (!string.IsNullOrEmpty(p)) selected.Add(p);
 										}
+										if (selected.Count > 0)
+										{
+											break;
+										}
+									}
+									else if (bestFallbackDoc == null)
+									{
+										bestFallbackDoc = doc;
 									}
 								}
-								break;
+							}
+						}
+						catch { }
+					}
+
+					// 如果在匹配窗口中没有选中文件，使用其目录作为工作目录
+					if (selected.Count == 0 && bestFallbackDoc != null)
+					{
+						try
+						{
+							folder = bestFallbackDoc.Folder?.Self?.Path ?? "";
+						}
+						catch { }
+					}
+
+					// 2. 桌面场景探测：如果前面没取到任何选中文件，检查 Windows 桌面选中项
+					if (selected.Count == 0)
+					{
+						try
+						{
+							// Shell.Application.Windows().Item() 无参调用返回桌面的 ShellFolderView
+							dynamic? desk = windows.Item();
+							if (desk != null && desk.Document != null)
+							{
+								string deskFolder = desk.Document.Folder?.Self?.Path ?? "";
+								dynamic deskSel = desk.Document.SelectedItems();
+								if (deskSel != null && deskSel.Count > 0)
+								{
+									int dCount = deskSel.Count;
+									for (int j = 0; j < dCount; j++)
+									{
+										string p = deskSel.Item(j)?.Path ?? "";
+										if (!string.IsNullOrEmpty(p)) selected.Add(p);
+									}
+									if (selected.Count > 0 && !string.IsNullOrEmpty(deskFolder))
+									{
+										folder = deskFolder;
+									}
+								}
 							}
 						}
 						catch { }
@@ -1117,40 +1821,291 @@ public static class ActionExecutor
 	{
 		if (string.IsNullOrEmpty(path)) return false;
 		string ext = Path.GetExtension(path).ToLowerInvariant();
-		return ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".tar" || ext == ".gz" || ext == ".bz2" || ext == ".xz" || ext == ".iso";
+		return ext is ".zip" or ".7z" or ".rar" or ".tar" or ".gz" or ".bz2" or ".xz" or ".iso"
+			or ".tgz" or ".tbz" or ".tbz2" or ".txz" or ".zst" or ".zstd" or ".cab" or ".wim"
+			or ".apk" or ".jar" or ".lzma" or ".lz4" or ".001";
 	}
 
-	private static string Find7ZipExecutable()
+	private static string GenerateArchiveDestination(string folder, List<string> selected, string extension)
 	{
-		string[] paths = new[]
+		if (selected.Count == 1)
 		{
-			@"C:\Program Files\7-Zip\7zG.exe",
-			@"C:\Program Files\7-Zip\7z.exe",
-			@"C:\Program Files (x86)\7-Zip\7zG.exe",
-			@"C:\Program Files (x86)\7-Zip\7z.exe"
-		};
-		return paths.FirstOrDefault(File.Exists) ?? "7zG.exe";
+			string item = selected[0];
+			string baseName = Directory.Exists(item)
+				? Path.GetFileName(item.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+				: Path.GetFileNameWithoutExtension(item);
+			if (string.IsNullOrEmpty(baseName)) baseName = "Archive";
+			return Path.Combine(folder, baseName + extension);
+		}
+		else if (selected.Count > 1)
+		{
+			string firstItem = selected[0];
+			string baseName = Directory.Exists(firstItem)
+				? Path.GetFileName(firstItem.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+				: Path.GetFileNameWithoutExtension(firstItem);
+			if (string.IsNullOrEmpty(baseName)) baseName = "Archive";
+			return Path.Combine(folder, $"{baseName}_等{selected.Count}项" + extension);
+		}
+		else
+		{
+			string folderName = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+			if (string.IsNullOrEmpty(folderName)) folderName = "Archive";
+			return Path.Combine(folder, folderName + extension);
+		}
 	}
 
-	private static string FindBandizipExecutable()
+	private static string GetUniqueArchiveDestination(string targetArchive)
 	{
-		string[] paths = new[]
+		if (!File.Exists(targetArchive)) return targetArchive;
+		string dir = Path.GetDirectoryName(targetArchive) ?? "";
+		string name = Path.GetFileNameWithoutExtension(targetArchive);
+		string ext = Path.GetExtension(targetArchive);
+		int counter = 1;
+		while (File.Exists(Path.Combine(dir, $"{name} ({counter}){ext}")))
 		{
-			@"C:\Program Files\Bandizip\Bandizip.exe",
-			@"C:\Program Files\Bandizip\bz.exe",
-			@"C:\Program Files (x86)\Bandizip\Bandizip.exe"
-		};
-		return paths.FirstOrDefault(File.Exists) ?? "Bandizip.exe";
+			counter++;
+		}
+		return Path.Combine(dir, $"{name} ({counter}){ext}");
 	}
 
-	private static string FindWinRarExecutable()
+	private static string? _cachedBandizipExe;
+	private static string? _cached7ZipExe;
+	private static string? _cachedWinRarExe;
+
+	public static string? FindBandizipExecutable()
 	{
-		string[] paths = new[]
+		if (!string.IsNullOrEmpty(_cachedBandizipExe) && File.Exists(_cachedBandizipExe))
 		{
-			@"C:\Program Files\WinRAR\WinRAR.exe",
-			@"C:\Program Files (x86)\WinRAR\WinRAR.exe"
-		};
-		return paths.FirstOrDefault(File.Exists) ?? "WinRAR.exe";
+			return _cachedBandizipExe;
+		}
+
+		string? found = QueryAppPathFromRegistry("Bandizip.exe", new[]
+		{
+			@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Bandizip.exe",
+			@"SOFTWARE\Bandisoft\Bandizip",
+			@"SOFTWARE\WOW6432Node\Bandisoft\Bandizip"
+		});
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = ScanDrivesForExecutable(new[]
+			{
+				@"Program Files\Bandizip\Bandizip.exe",
+				@"Program Files\Bandizip\bz.exe",
+				@"Program Files (x86)\Bandizip\Bandizip.exe",
+				@"Program Files (x86)\Bandizip\bz.exe",
+				@"Bandzip\Bandizip\Bandizip.exe",
+				@"Bandzip\Bandizip\bz.exe",
+				@"Bandizip\Bandizip.exe",
+				@"Bandizip\bz.exe"
+			});
+		}
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = FindExecutableInPath("Bandizip.exe") ?? FindExecutableInPath("bz.exe");
+		}
+
+		if (!string.IsNullOrEmpty(found) && File.Exists(found))
+		{
+			_cachedBandizipExe = found;
+			return found;
+		}
+
+		return null;
+	}
+
+	public static string? Find7ZipExecutable()
+	{
+		if (!string.IsNullOrEmpty(_cached7ZipExe) && File.Exists(_cached7ZipExe))
+		{
+			return _cached7ZipExe;
+		}
+
+		string? found = QueryAppPathFromRegistry("7zG.exe", new[]
+		{
+			@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\7zFM.exe",
+			@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\7z.exe",
+			@"SOFTWARE\7-Zip",
+			@"SOFTWARE\WOW6432Node\7-Zip"
+		});
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = ScanDrivesForExecutable(new[]
+			{
+				@"Program Files\7-Zip-Zstandard\7zG.exe",
+				@"Program Files\7-Zip-Zstandard\7z.exe",
+				@"Program Files\7-Zip\7zG.exe",
+				@"Program Files\7-Zip\7z.exe",
+				@"Program Files (x86)\7-Zip\7zG.exe",
+				@"Program Files (x86)\7-Zip\7z.exe",
+				@"7-Zip\7zG.exe",
+				@"7-Zip\7z.exe"
+			});
+		}
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = FindExecutableInPath("7zG.exe") ?? FindExecutableInPath("7z.exe");
+		}
+
+		if (!string.IsNullOrEmpty(found) && File.Exists(found))
+		{
+			_cached7ZipExe = found;
+			return found;
+		}
+
+		return null;
+	}
+
+	public static string? FindWinRarExecutable()
+	{
+		if (!string.IsNullOrEmpty(_cachedWinRarExe) && File.Exists(_cachedWinRarExe))
+		{
+			return _cachedWinRarExe;
+		}
+
+		string? found = QueryAppPathFromRegistry("WinRAR.exe", new[]
+		{
+			@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\WinRAR.exe",
+			@"SOFTWARE\WinRAR",
+			@"SOFTWARE\WOW6432Node\WinRAR"
+		});
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = ScanDrivesForExecutable(new[]
+			{
+				@"Program Files\WinRAR\WinRAR.exe",
+				@"Program Files (x86)\WinRAR\WinRAR.exe",
+				@"WinRAR\WinRAR.exe"
+			});
+		}
+
+		if (string.IsNullOrEmpty(found) || !File.Exists(found))
+		{
+			found = FindExecutableInPath("WinRAR.exe");
+		}
+
+		if (!string.IsNullOrEmpty(found) && File.Exists(found))
+		{
+			_cachedWinRarExe = found;
+			return found;
+		}
+
+		return null;
+	}
+
+	private static string? QueryAppPathFromRegistry(string targetFileName, string[] subKeys)
+	{
+		RegistryKey[] roots = new[] { Registry.CurrentUser, Registry.LocalMachine };
+		string[] valueNames = new[] { "", "Path", "InstallLocation", "exe64", "exe32" };
+
+		foreach (var root in roots)
+		{
+			foreach (var subKey in subKeys)
+			{
+				try
+				{
+					using var key = root.OpenSubKey(subKey);
+					if (key == null) continue;
+
+					foreach (var valName in valueNames)
+					{
+						object? val = key.GetValue(valName);
+						if (val is string str && !string.IsNullOrWhiteSpace(str))
+						{
+							string candidate = str.Trim('\"', ' ');
+							if (File.Exists(candidate))
+							{
+								if (targetFileName.Equals("7zG.exe", StringComparison.OrdinalIgnoreCase) &&
+								    !candidate.EndsWith("7zG.exe", StringComparison.OrdinalIgnoreCase))
+								{
+									string dir = Path.GetDirectoryName(candidate) ?? "";
+									string gPath = Path.Combine(dir, "7zG.exe");
+									if (File.Exists(gPath)) return gPath;
+									string cPath = Path.Combine(dir, "7z.exe");
+									if (File.Exists(cPath)) return cPath;
+								}
+								if (targetFileName.Equals("Bandizip.exe", StringComparison.OrdinalIgnoreCase) &&
+								    !candidate.EndsWith("Bandizip.exe", StringComparison.OrdinalIgnoreCase))
+								{
+									string dir = Path.GetDirectoryName(candidate) ?? "";
+									string bzPath = Path.Combine(dir, "Bandizip.exe");
+									if (File.Exists(bzPath)) return bzPath;
+									string cPath = Path.Combine(dir, "bz.exe");
+									if (File.Exists(cPath)) return cPath;
+								}
+								return candidate;
+							}
+							if (Directory.Exists(candidate))
+							{
+								string full = Path.Combine(candidate, targetFileName);
+								if (File.Exists(full)) return full;
+								if (targetFileName.Equals("7zG.exe", StringComparison.OrdinalIgnoreCase))
+								{
+									string alt = Path.Combine(candidate, "7z.exe");
+									if (File.Exists(alt)) return alt;
+								}
+								if (targetFileName.Equals("Bandizip.exe", StringComparison.OrdinalIgnoreCase))
+								{
+									string alt = Path.Combine(candidate, "bz.exe");
+									if (File.Exists(alt)) return alt;
+								}
+							}
+						}
+					}
+				}
+				catch { }
+			}
+		}
+		return null;
+	}
+
+	private static string? ScanDrivesForExecutable(string[] relativePaths)
+	{
+		try
+		{
+			var drives = DriveInfo.GetDrives();
+			foreach (var drive in drives)
+			{
+				if (!drive.IsReady) continue;
+				foreach (var rel in relativePaths)
+				{
+					try
+					{
+						string full = Path.Combine(drive.RootDirectory.FullName, rel);
+						if (File.Exists(full)) return full;
+					}
+					catch { }
+				}
+			}
+		}
+		catch { }
+		return null;
+	}
+
+	public static string? FindExecutableInPath(string fileName)
+	{
+		try
+		{
+			string? pathEnv = Environment.GetEnvironmentVariable("PATH");
+			if (string.IsNullOrEmpty(pathEnv)) return null;
+
+			string[] dirs = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+			foreach (var dir in dirs)
+			{
+				try
+				{
+					string full = Path.Combine(dir.Trim('\"', ' '), fileName);
+					if (File.Exists(full)) return full;
+				}
+				catch { }
+			}
+		}
+		catch { }
+		return null;
 	}
 
 	internal static void ExecuteFolder(string folderPath)
