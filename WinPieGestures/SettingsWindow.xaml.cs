@@ -203,6 +203,8 @@ public partial class SettingsWindow : Window
 
 	private int _lastHoveredSubIndex = -2;
 
+	private long _canvasSessionId = 0L;
+
 	private ReleaseInfo? _latestReleaseInfo = null;
 	private List<ReleaseInfo>? _allFetchedReleases = null;
 	private ReleaseInfo? _selectedRollbackRelease = null;
@@ -4235,6 +4237,11 @@ public partial class SettingsWindow : Window
 			e.Cancel = true;
 			SyncUiToConfigAndSave();
 			ShowInTaskbar = false;
+			if (_canvasSessionId != 0L)
+			{
+				SoundEffectManager.EndSession(SoundSessionSource.SettingsPreview, _canvasSessionId, allowTerminalFeedback: false);
+				_canvasSessionId = 0L;
+			}
 			Hide();
 			Opacity = 1.0;
 			ScheduleDeferredClose();
@@ -12168,7 +12175,8 @@ public partial class SettingsWindow : Window
 			if (enabled)
 			{
 				SoundEffectManager.Initialize(ConfigManager.CurrentConfig.SoundTheme, ConfigManager.CurrentConfig.SoundVolume);
-				SoundEffectManager.PlayPreview(SoundType.SectorHover);
+				long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview, isSingleAudition: true);
+				SoundEffectManager.PlayPreview(SoundType.SectorHover, SoundSessionSource.SettingsPreview, auditionSess);
 			}
 			else
 			{
@@ -12197,7 +12205,8 @@ public partial class SettingsWindow : Window
 			if (ConfigManager.CurrentConfig.EnableSoundEffects)
 			{
 				SoundEffectManager.Initialize(theme, ConfigManager.CurrentConfig.SoundVolume);
-				SoundEffectManager.PlayPreview(SoundType.SectorHover);
+				long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview, isSingleAudition: true);
+				SoundEffectManager.PlayPreview(SoundType.SectorHover, SoundSessionSource.SettingsPreview, auditionSess);
 			}
 			SyncUiToConfigAndSave();
 		}
@@ -12224,7 +12233,8 @@ public partial class SettingsWindow : Window
 				if (now - _lastVolumePreviewTick >= 120L)
 				{
 					_lastVolumePreviewTick = now;
-					SoundEffectManager.PlayPreview(SoundType.SectorHover);
+					long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview, isSingleAudition: true);
+					SoundEffectManager.PlayPreview(SoundType.SectorHover, SoundSessionSource.SettingsPreview, auditionSess);
 				}
 			}
 
@@ -12235,20 +12245,30 @@ public partial class SettingsWindow : Window
 	private async void SoundPreviewButton_Click(object sender, RoutedEventArgs e)
 	{
 		CheckAndDisplaySystemAudioState();
+		bool cancelledByUser = false;
+		long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview);
 		try
 		{
-			SoundEffectManager.PlayPreview(SoundType.WheelPopup);
+			SoundEffectManager.PlayPreview(SoundType.WheelPopup, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(200);
-			SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			SoundEffectManager.PlayPreview(SoundType.SectorHover, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(160);
-			SoundEffectManager.PlayPreview(SoundType.SubmenuExpand);
+			SoundEffectManager.PlayPreview(SoundType.SubmenuExpand, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(200);
-			SoundEffectManager.PlayPreview(SoundType.ActionExecute);
+			SoundEffectManager.PlayPreview(SoundType.ActionExecute, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(220);
-			SoundEffectManager.PlayPreview(SoundType.GestureCancel);
+			SoundEffectManager.PlayPreview(SoundType.GestureCancel, SoundSessionSource.SettingsPreview, auditionSess);
+		}
+		catch (OperationCanceledException)
+		{
+			cancelledByUser = true;
 		}
 		catch
 		{
+		}
+		finally
+		{
+			SoundEffectManager.EndSession(SoundSessionSource.SettingsPreview, auditionSess, allowTerminalFeedback: !cancelledByUser);
 		}
 	}
 
@@ -12294,7 +12314,8 @@ public partial class SettingsWindow : Window
 			{
 				SystemAudioWarningBorder.Visibility = Visibility.Collapsed;
 			}
-			SoundEffectManager.PlayPreview(SoundType.SectorHover);
+			long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview, isSingleAudition: true);
+			SoundEffectManager.PlayPreview(SoundType.SectorHover, SoundSessionSource.SettingsPreview, auditionSess);
 		}
 		catch (Exception ex)
 		{
@@ -12707,7 +12728,8 @@ public partial class SettingsWindow : Window
 		auditionBtn.Click += async (_, _) =>
 		{
 			auditionBtn.Content = "🔊 ...";
-			SoundEffectManager.PlayCustomEventPreview(ev);
+			long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview, isSingleAudition: true);
+			SoundEffectManager.PlayCustomEventPreview(ev, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(250);
 			auditionBtn.Content = "▶ 试听";
 		};
@@ -12926,6 +12948,8 @@ public partial class SettingsWindow : Window
 	{
 		if (CustomSoundPlayFlowButton == null) return;
 		CustomSoundPlayFlowButton.IsEnabled = false;
+		bool cancelledByUser = false;
+		long auditionSess = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview);
 		try
 		{
 			var p = _currentCustomSoundProfile;
@@ -12936,26 +12960,31 @@ public partial class SettingsWindow : Window
 			var evCancel = p?.Events.FirstOrDefault(x => x.EventType == SoundType.GestureCancel);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "🌟 正在唤出轮盘...";
-			if (evPopup != null) SoundEffectManager.PlayCustomEventPreview(evPopup);
+			if (evPopup != null) SoundEffectManager.PlayCustomEventPreview(evPopup, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(220);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "🎯 正在划过扇区...";
-			if (evHover != null) SoundEffectManager.PlayCustomEventPreview(evHover);
+			if (evHover != null) SoundEffectManager.PlayCustomEventPreview(evHover, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(180);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "🌿 正在展开二级级联...";
-			if (evExpand != null) SoundEffectManager.PlayCustomEventPreview(evExpand);
+			if (evExpand != null) SoundEffectManager.PlayCustomEventPreview(evExpand, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(220);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "⚡ 正在确认触发动作...";
-			if (evExec != null) SoundEffectManager.PlayCustomEventPreview(evExec);
+			if (evExec != null) SoundEffectManager.PlayCustomEventPreview(evExec, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(240);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "↩️ 正在顺势外甩脱离...";
-			if (evCancel != null) SoundEffectManager.PlayCustomEventPreview(evCancel);
+			if (evCancel != null) SoundEffectManager.PlayCustomEventPreview(evCancel, null, SoundSessionSource.SettingsPreview, auditionSess);
 			await System.Threading.Tasks.Task.Delay(200);
 
 			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "✅ 完整交互手势音效流演示完毕";
+		}
+		catch (OperationCanceledException)
+		{
+			cancelledByUser = true;
+			if (CustomSoundFlowStatusText != null) CustomSoundFlowStatusText.Text = "已取消";
 		}
 		catch
 		{
@@ -12963,6 +12992,7 @@ public partial class SettingsWindow : Window
 		}
 		finally
 		{
+			SoundEffectManager.EndSession(SoundSessionSource.SettingsPreview, auditionSess, allowTerminalFeedback: !cancelledByUser);
 			CustomSoundPlayFlowButton.IsEnabled = true;
 		}
 	}
@@ -19429,9 +19459,20 @@ public partial class SettingsWindow : Window
 			int prevSub = _lastHoveredSubIndex;
 			_lastHoveredSector = num15;
 			_lastHoveredSubIndex = num16;
-			if ((num15 != prevSec && num15 >= 0) || (num16 != prevSub && num16 >= 0))
+			if (num15 >= 0)
 			{
-				SoundEffectManager.Play(SoundType.SectorHover);
+				if (_canvasSessionId == 0L || !SoundEffectManager.HasSession(_canvasSessionId))
+				{
+					_canvasSessionId = SoundEffectManager.BeginSession(SoundSessionSource.SettingsPreview);
+				}
+				int lvl = num16 >= 0 ? 1 : 0;
+				int parent = num16 >= 0 ? num15 : -1;
+				int sub = num16 >= 0 ? num16 : num15;
+				SoundEffectManager.ReportHover(SoundSessionSource.SettingsPreview, _canvasSessionId, lvl, parent, sub);
+			}
+			else
+			{
+				SoundEffectManager.CancelHover(SoundSessionSource.SettingsPreview, _canvasSessionId);
 			}
 			UpdatePreviewCoreSelection(num15, num16, wheelProfile);
 
@@ -19578,6 +19619,12 @@ public partial class SettingsWindow : Window
 	{
 		try
 		{
+			if (_canvasSessionId != 0L)
+			{
+				SoundEffectManager.CancelHover(SoundSessionSource.SettingsPreview, _canvasSessionId);
+				SoundEffectManager.EndSession(SoundSessionSource.SettingsPreview, _canvasSessionId, allowTerminalFeedback: false);
+				_canvasSessionId = 0L;
+			}
 			_lastHoveredSector = -2;
 			_lastHoveredSubIndex = -2;
 			UpdatePreviewCoreSelection(-1, -1, _selectedProfile ?? ConfigManager.CurrentConfig?.Profiles.FirstOrDefault());

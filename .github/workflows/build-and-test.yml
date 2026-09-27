@@ -71,7 +71,8 @@ jobs:
         $buildRoots = @(
           'StarPie.Plugin.Abstractions/',
           'installer/',
-          'WinPieGestures/'
+          'WinPieGestures/',
+          'scratch/'
         )
         $requiresBuild = $false
         $ignoredFiles = [System.Collections.Generic.List[string]]::new()
@@ -123,3 +124,9 @@ jobs:
     - name: Build Solution (Release)
       if: steps.changes.outputs.requires_build == 'true'
       run: dotnet build WinPieGestures/WinPieGestures.csproj -c Release --nologo
+
+    - name: Build and Run Sound Forensics Suite
+      if: steps.changes.outputs.requires_build == 'true'
+      run: |
+        dotnet build scratch/test_sound_forensics.csproj -c Release --nologo
+        dotnet run --project scratch/test_sound_forensics.csproj -c Release --no-build -- --test-instance

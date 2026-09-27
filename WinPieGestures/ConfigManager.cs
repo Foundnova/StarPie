@@ -125,17 +125,20 @@ public static class ConfigManager
 			MarkConfigurationChanged();
 			EnsureConfigsFolder();
 			// 启动性能优化：自启同步完全移出启动关键路径，后台延迟 4 秒执行，消除开机时的阻塞
-			_ = System.Threading.Tasks.Task.Run(async () =>
+			if (!DisableAutoStartSync && !IsTestInstanceMode())
 			{
-				try
+				_ = System.Threading.Tasks.Task.Run(async () =>
 				{
-					await System.Threading.Tasks.Task.Delay(4000).ConfigureAwait(false);
-					EnsureAutoStartRegistryUpToDate();
-				}
-				catch
-				{
-				}
-			});
+					try
+					{
+						await System.Threading.Tasks.Task.Delay(4000).ConfigureAwait(false);
+						EnsureAutoStartRegistryUpToDate();
+					}
+					catch
+					{
+					}
+				});
+			}
 		}
 		catch (Exception ex)
 		{
