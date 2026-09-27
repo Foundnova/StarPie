@@ -32,7 +32,7 @@ $totalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 for ($i = 1; $i -le 10; $i++) {
     Write-Host "`n>>> [Cycle $i/10] Starting test execution..."
     $cycleSw = [System.Diagnostics.Stopwatch]::StartNew()
-    
+
     & dotnet run --project scratch/test_sound_forensics.csproj -c Release --no-build -- --test-instance
     $cycleSw.Stop()
 
