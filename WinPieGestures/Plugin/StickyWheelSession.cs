@@ -190,7 +190,8 @@ internal static class StickyWheelSession
             wheel.SetMousePassThrough(true);
 
             session.Live = true;
-            SoundEffectManager.Play(SoundType.WheelPopup);
+            session.SoundSessionId = SoundEffectManager.BeginSession(SoundSessionSource.StickyWheel);
+            SoundEffectManager.Play(SoundType.WheelPopup, SoundSessionSource.StickyWheel, session.SoundSessionId);
 
             // 光标可能已经停在某个扇区上（比如球就压在轮盘边缘位置），立刻补一次高亮。
             HandlePointer();
@@ -233,19 +234,39 @@ internal static class StickyWheelSession
         // 音效与 QueueHighlightUpdate 同一组转移规则，反馈语汇保持一致。
         if (!prevEscaped && hit.Escaped)
         {
-            SoundEffectManager.Play(SoundType.GestureCancel);
+            SoundEffectManager.CancelHover(SoundSessionSource.StickyWheel, session.SoundSessionId);
+            SoundEffectManager.Play(SoundType.GestureCancel, SoundSessionSource.StickyWheel, session.SoundSessionId);
         }
         else if (!prevShowSub && hit.ShowSub)
         {
-            SoundEffectManager.Play(SoundType.SubmenuExpand);
+            SoundEffectManager.CancelHover(SoundSessionSource.StickyWheel, session.SoundSessionId);
+            SoundEffectManager.Play(SoundType.SubmenuExpand, SoundSessionSource.StickyWheel, session.SoundSessionId);
         }
-        else if (hit.ShowSub && prevSub != hit.Sub && hit.Sub >= 0)
+        else if (hit.Escaped)
         {
-            SoundEffectManager.Play(SoundType.SectorHover);
+            SoundEffectManager.CancelHover(SoundSessionSource.StickyWheel, session.SoundSessionId);
         }
-        else if (prevSector != hit.Sector && hit.Sector >= 0)
+        else if (hit.ShowSub)
         {
-            SoundEffectManager.Play(SoundType.SectorHover);
+            if (hit.Sub >= 0)
+            {
+                SoundEffectManager.ReportHover(SoundSessionSource.StickyWheel, session.SoundSessionId, level: 1, parentIndex: hit.Sector, subIndex: hit.Sub);
+            }
+            else
+            {
+                SoundEffectManager.CancelHover(SoundSessionSource.StickyWheel, session.SoundSessionId);
+            }
+        }
+        else
+        {
+            if (hit.Sector >= 0)
+            {
+                SoundEffectManager.ReportHover(SoundSessionSource.StickyWheel, session.SoundSessionId, level: 0, parentIndex: -1, subIndex: hit.Sector);
+            }
+            else
+            {
+                SoundEffectManager.CancelHover(SoundSessionSource.StickyWheel, session.SoundSessionId);
+            }
         }
 
         QueueHighlight(session, hit);
@@ -321,6 +342,7 @@ internal static class StickyWheelSession
                 : session.Profile?.GetEffectiveAction(hit.Sector, hit.Sub);
             if (target != null)
             {
+                SoundEffectManager.Play(SoundType.ActionExecute, SoundSessionSource.StickyWheel, session.SoundSessionId);
                 ActionExecutor.EnqueueAction(target);
             }
         }
@@ -333,6 +355,7 @@ internal static class StickyWheelSession
     private static void CloseUi(Session session)
     {
         session.Live = false;
+        SoundEffectManager.EndSession(SoundSessionSource.StickyWheel, session.SoundSessionId, allowTerminalFeedback: true);
         try
         {
             session.Wheel?.Dismiss(session.Version);
@@ -593,6 +616,7 @@ internal static class StickyWheelSession
         public double DpiX { get; set; } = 1.0;
         public double DpiY { get; set; } = 1.0;
         public bool Live { get; set; }
+        public long SoundSessionId { get; set; }
         public bool BackdropBound { get; set; }
 
         public bool HighlightScheduled { get; set; }
