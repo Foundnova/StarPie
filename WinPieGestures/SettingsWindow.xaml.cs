@@ -42,6 +42,8 @@ public partial class SettingsWindow : Window
 	private bool _isSidebarCollapsed = false;
 
 	private OfficialPluginCatalog? _officialPluginCatalog;
+	private DateTimeOffset? _officialCatalogCachedAt;
+	private bool _officialCatalogCacheLoaded;
 	private bool _officialPluginsLoading;
 	/// <summary>上次拉取官方 catalog 的失败原因。留着是为了切换语言时能把进度行按当前语言重渲染。</summary>
 	private string? _officialPluginsError;
@@ -487,6 +489,7 @@ public partial class SettingsWindow : Window
 			AppThemeManager.ApplyTheme(this, ConfigManager.CurrentConfig?.AppTheme ?? "System");
 			ApplySidebarLayout();
 			LoadConfigToUi();
+			LoadOfficialPluginCatalogCache();
 			SlotsItemsControl.ItemsSource = _slotViewModels;
 			bool flag4 = IsRunningAsAdmin();
 			UacWarningCard.Visibility = (flag4 ? Visibility.Collapsed : Visibility.Visible);
@@ -7477,6 +7480,29 @@ public partial class SettingsWindow : Window
 	/// 是否先与磁盘对账。进入页面时为 true —— 用户可能刚在资源管理器里拷入或删除了插件目录；
 	/// 页面内操作（启用/停用/卸载）之后为 false，那些操作自身已经把状态同步过了。
 	/// </param>
+	private void LoadOfficialPluginCatalogCache()
+	{
+		if (_officialCatalogCacheLoaded) return;
+		_officialCatalogCacheLoaded = true;
+
+		if (OfficialPluginClient.TryLoadCachedCatalog(
+			out OfficialPluginCatalog catalog,
+			out DateTimeOffset cachedAt,
+			out string cacheError))
+		{
+			_officialPluginCatalog = catalog;
+			_officialCatalogCachedAt = cachedAt;
+			_officialPluginsError = null;
+			RenderOfficialPluginItems();
+		}
+		else if (!string.IsNullOrWhiteSpace(cacheError))
+		{
+			AppLogger.LogWarn($"[plugin] 读取官方插件目录缓存失败：{cacheError}");
+		}
+
+		RenderOfficialPluginsStatus();
+	}
+
 	private async void RefreshOfficialPluginsButton_Click(object sender, RoutedEventArgs e)
 	{
 		await RefreshOfficialPluginsAsync();
@@ -7492,6 +7518,7 @@ public partial class SettingsWindow : Window
 		try
 		{
 			_officialPluginCatalog = await OfficialPluginClient.FetchCatalogAsync();
+			_officialCatalogCachedAt = OfficialPluginClient.GetCachedCatalogTimestamp();
 			_officialPluginsError = null;
 			RenderOfficialPluginItems();
 			RenderOfficialPluginsStatus();
@@ -7525,6 +7552,11 @@ public partial class SettingsWindow : Window
 		{
 			OfficialPluginsStatusText.Text = I18n.T("PluginsOfficialLoading");
 		}
+		else if (_officialPluginCatalog != null && _officialCatalogCachedAt.HasValue)
+		{
+			string cachedAt = _officialCatalogCachedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialCatalogCached", cachedAt, _officialPluginCatalog.Modules.Count);
+		}
 		else if (_officialPluginCatalog != null)
 		{
 			OfficialPluginsStatusText.Text = I18n.TF("PluginsOfficialCatalogInfo", _officialPluginCatalog.CatalogVersion, _officialPluginCatalog.Modules.Count);
@@ -7545,6 +7577,35 @@ public partial class SettingsWindow : Window
 		var installed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 		foreach (PluginInstance instance in PluginHost.ListInstances()) installed[instance.PluginId] = instance.Entry.Version;
 		OfficialPluginItemsControl.ItemsSource = _officialPluginCatalog.Modules.OrderBy(module => module.Name, StringComparer.CurrentCultureIgnoreCase).Select(module => new OfficialPluginListItem(module, installed.TryGetValue(module.Id, out string? version) ? version : null)).ToList();
+	}
+
+	private void OpenOfficialPluginDetailsButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button { Tag: OfficialPluginModule module }) return;
+
+		var window = new PluginDetailWindow(
+			PluginDetailModelBuilder.FromOfficial(module, PluginHost.Find(module.Id)))
+		{
+			Owner = this,
+			WindowStartupLocation = WindowStartupLocation.CenterOwner,
+		};
+		window.ShowDialog();
+	}
+
+	private void OpenPluginDetailsButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is not System.Windows.Controls.Button { Tag: string pluginId }
+			|| string.IsNullOrWhiteSpace(pluginId)) return;
+
+		PluginInstance? instance = PluginHost.Find(pluginId);
+		if (instance == null) return;
+
+		var window = new PluginDetailWindow(PluginDetailModelBuilder.FromLocal(instance))
+		{
+			Owner = this,
+			WindowStartupLocation = WindowStartupLocation.CenterOwner,
+		};
+		window.ShowDialog();
 	}
 
 	private async void InstallOfficialPluginButton_Click(object sender, RoutedEventArgs e)

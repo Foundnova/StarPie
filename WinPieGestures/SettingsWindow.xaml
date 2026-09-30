@@ -3875,17 +3875,20 @@
                             </StackPanel>
                             <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
                           </StackPanel>
-                          <Button Grid.Column="1" Content="{Binding InstallButtonText}" Tag="{Binding Module}" Click="InstallOfficialPluginButton_Click" Height="28" Padding="10,0" FontSize="11.5" VerticalAlignment="Top" Margin="10,0,0,0">
-                            <Button.Style>
-                              <Style TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
-                                <Style.Triggers>
-                                  <DataTrigger Binding="{Binding CanInstall}" Value="False">
-                                    <Setter Property="IsEnabled" Value="False" />
-                                  </DataTrigger>
-                                </Style.Triggers>
-                              </Style>
-                            </Button.Style>
-                          </Button>
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                            <Button Content="{Binding DetailsText}" Tag="{Binding Module}" Click="OpenOfficialPluginDetailsButton_Click" Style="{StaticResource ModernButtonStyle}" Height="28" Padding="10,0" FontSize="11.5" />
+                            <Button Content="{Binding InstallButtonText}" Tag="{Binding Module}" Click="InstallOfficialPluginButton_Click" Height="28" Padding="10,0" FontSize="11.5" Margin="6,0,0,0">
+                              <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource ModernButtonStyle}">
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanInstall}" Value="False">
+                                      <Setter Property="IsEnabled" Value="False" />
+                                    </DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </Button.Style>
+                            </Button>
+                          </StackPanel>
                         </Grid>
                       </Border>
                     </DataTemplate>
@@ -4009,6 +4012,7 @@
                         </TextBlock>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Content="{Binding DetailsText}" Tag="{Binding PluginId}" Click="OpenPluginDetailsButton_Click" Style="{StaticResource ModernButtonStyle}" Height="26" Padding="8,0" Margin="0,0,10,0" FontSize="11" />
                         <CheckBox Content="{Binding PreloadText}" Tag="{Binding PluginId}" IsChecked="{Binding IsPreload, Mode=OneWay}" Click="PluginRowPreloadCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,10,0" />
                         <CheckBox Content="{Binding EnableText}" Tag="{Binding PluginId}" IsChecked="{Binding IsEnabled, Mode=OneWay}" Click="PluginRowEnabledCheckBox_Click" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <!-- 「设置」只在插件自己声明了参数页时出现：可见性由 HasSettingsPage 驱动，
