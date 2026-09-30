@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,12 +38,35 @@ internal sealed class OfficialPluginModule
     public string Sha256 { get; set; } = "";
     public long Size { get; set; }
     public string ApiVersion { get; set; } = "";
+    public string TargetFramework { get; set; } = "";
     public string MinHostVersion { get; set; } = "";
     public string? MaxHostVersion { get; set; }
     public List<string> TypeClaims { get; set; } = new();
     public List<string> Capabilities { get; set; } = new();
+    public string Description { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string? Homepage { get; set; }
+    public string License { get; set; } = "";
+    public string? Icon { get; set; }
+    public List<string> Tags { get; set; } = new();
+    public List<OfficialPluginFeature> Features { get; set; } = new();
 }
 
+internal sealed class OfficialPluginFeature
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string? IconKey { get; set; }
+}
+
+internal sealed class OfficialPluginCatalogCache
+{
+    public int CacheVersion { get; set; } = 1;
+    public DateTimeOffset CachedAt { get; set; }
+    public OfficialPluginCatalog Catalog { get; set; } = new();
+}
 
 internal sealed class OfficialPluginInstallResult
 {
@@ -92,7 +116,102 @@ internal static class OfficialPluginClient
         ValidateCatalog(catalog);
         if (!string.Equals(catalog!.ReleaseTag, releaseTag, StringComparison.Ordinal))
             throw new InvalidDataException($"官方 catalog 的 releaseTag 与发布标签不一致：{catalog.ReleaseTag} / {releaseTag}。");
+
+        // 下载成功后写入本地缓存。缓存失败不应把成功的目录刷新误报成失败。
+        try
+        {
+            SaveCachedCatalog(catalog);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogWarn($"[plugin] 保存官方插件目录缓存失败：{ex.Message}");
+        }
+
         return catalog;
+    }
+
+    public static bool TryLoadCachedCatalog(
+        out OfficialPluginCatalog catalog,
+        out DateTimeOffset cachedAt,
+        out string error)
+    {
+        catalog = null!;
+        cachedAt = default;
+        error = "";
+
+        string path = PluginPaths.OfficialCatalogCacheFile;
+        if (!File.Exists(path)) return false;
+
+        try
+        {
+            OfficialPluginCatalogCache? cache = JsonSerializer.Deserialize<OfficialPluginCatalogCache>(
+                File.ReadAllText(path), JsonOptions);
+            if (cache?.Catalog == null)
+            {
+                error = "官方插件目录缓存为空。";
+                return false;
+            }
+            if (cache.CacheVersion != 1)
+            {
+                error = "官方插件目录缓存版本不受支持。";
+                return false;
+            }
+
+            ValidateCatalog(cache.Catalog);
+            catalog = cache.Catalog;
+            cachedAt = cache.CachedAt == default
+                ? new DateTimeOffset(File.GetLastWriteTimeUtc(path))
+                : cache.CachedAt;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    public static DateTimeOffset? GetCachedCatalogTimestamp()
+    {
+        try
+        {
+            string path = PluginPaths.OfficialCatalogCacheFile;
+            return File.Exists(path) ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void SaveCachedCatalog(OfficialPluginCatalog catalog)
+    {
+        Directory.CreateDirectory(PluginPaths.Root);
+        string target = PluginPaths.OfficialCatalogCacheFile;
+        string temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var cache = new OfficialPluginCatalogCache
+        {
+            CacheVersion = 1,
+            CachedAt = DateTimeOffset.Now,
+            Catalog = catalog,
+        };
+
+        try
+        {
+            string json = JsonSerializer.Serialize(cache, JsonOptions);
+            File.WriteAllText(temporary, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temporary, target, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+            catch
+            {
+            }
+        }
     }
 
     private static async Task<string> FetchLatestReleaseTagAsync(CancellationToken cancellationToken)
@@ -374,6 +493,15 @@ internal static class OfficialPluginClient
                 throw new InvalidDataException($"插件 {module.Id} 的包大小不合法。");
             if (module.Sha256.Length != 64 || !module.Sha256.All(Uri.IsHexDigit))
                 throw new InvalidDataException($"插件 {module.Id} 的 SHA-256 不合法。");
+
+            var featureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (OfficialPluginFeature feature in module.Features ?? new List<OfficialPluginFeature>())
+            {
+                if (string.IsNullOrWhiteSpace(feature.Id) || string.IsNullOrWhiteSpace(feature.Name))
+                    throw new InvalidDataException($"插件 {module.Id} 的功能条目缺少 id 或 name。");
+                if (!featureIds.Add(feature.Id))
+                    throw new InvalidDataException($"插件 {module.Id} 含有重复功能：{feature.Id}。");
+            }
         }
     }
 }

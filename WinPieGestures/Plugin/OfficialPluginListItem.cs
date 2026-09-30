@@ -12,17 +12,21 @@ internal sealed class OfficialPluginListItem
     public OfficialPluginModule Module { get; }
     public string DisplayName => Module.Name;
     public string VersionText => string.IsNullOrWhiteSpace(Module.Version) ? "" : $"v{Module.Version}";
-    public string SummaryText => $"{Module.Id}　|　{(Module.TypeClaims.Count == 0
-        ? I18n.T("PluginsOfficialSummaryFallback")
-        : string.Join(I18n.T("PluginsOfficialClaimSeparator"), Module.TypeClaims))}";
+    public string SummaryText => !string.IsNullOrWhiteSpace(Module.Description)
+        ? Module.Description
+        : $"{Module.Id}　|　{(Module.TypeClaims.Count == 0
+            ? I18n.T("PluginsOfficialSummaryFallback")
+            : string.Join(I18n.T("PluginsOfficialClaimSeparator"), Module.TypeClaims))}";
     public string StateText { get; }
     public string InstallButtonText { get; }
+    public string DetailsText { get; }
     public bool CanInstall { get; }
     public bool IsInstalled { get; }
 
     public OfficialPluginListItem(OfficialPluginModule module, string? installedVersion)
     {
         Module = module;
+        DetailsText = I18n.T("PluginsDetailButton");
         IsInstalled = !string.IsNullOrWhiteSpace(installedVersion);
         if (!IsInstalled)
         {

@@ -401,6 +401,29 @@ internal static class PluginHost
         return true;
     }
 
+    /// <summary>
+    /// 设置插件的启动预加载偏好，并同步当前运行时实例。
+    /// <para>
+    /// <c>PluginRegistryStore</c> 负责持久化，而运行中的 <see cref="PluginInstance" />
+    /// 还持有一份登记快照。两者必须同时更新，否则设置页刷新时会从旧快照读回
+    /// <c>IsPreload = false</c>，并且后续的预加载扫描也会漏掉刚勾选的插件。
+    /// </para>
+    /// </summary>
+    public static void SetPreload(string pluginId, bool preload)
+    {
+        if (string.IsNullOrWhiteSpace(pluginId)) return;
+
+        PluginRegistryStore.SetPreload(pluginId, preload);
+
+        lock (Gate)
+        {
+            if (Instances.TryGetValue(pluginId, out PluginInstance? instance))
+            {
+                instance.Entry.Preload = preload;
+            }
+        }
+    }
+
     /// <summary>是否需要重启宿主才能释放该插件的旧运行时。</summary>
     public static bool IsRestartRequired(string pluginId)
     {
