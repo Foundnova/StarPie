@@ -8083,7 +8083,7 @@ public partial class SettingsWindow : Window
 		}
 
 		bool desired = box.IsChecked == true;
-		PluginRegistryStore.SetPreload(pluginId, desired);
+		PluginHost.SetPreload(pluginId, desired);
 		if (desired && !PluginHost.PreloadNow(pluginId, out string preloadError))
 		{
 			System.Windows.MessageBox.Show(this,
